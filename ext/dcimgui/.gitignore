@@ -1,0 +1,8 @@
+venv/
+imgui/
+imgui-docking/
+dear_bindings/
+build/
+src*/*.json
+.zig-*
+zig-*

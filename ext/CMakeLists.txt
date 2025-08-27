@@ -1,0 +1,188 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(sokol)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 11)
+
+if (CMAKE_SYSTEM_NAME STREQUAL Linux)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
+endif()
+
+if (WIN32)
+    add_definitions(-DSOKOL_D3D11)
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+elseif (APPLE)
+    add_definitions(-DSOKOL_METAL)
+elseif (ANDROID)
+    add_definitions(-DSOKOL_GLES3)
+    set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
+else()
+    add_definitions(-DSOKOL_GLCORE)
+endif()
+
+
+set(IMGUI_SOURCE_FILES 
+        dcimgui/src/cimgui.cpp
+        dcimgui/src/imgui_demo.cpp
+        dcimgui/src/imgui_draw.cpp
+        dcimgui/src/imgui_tables.cpp
+        dcimgui/src/imgui_widgets.cpp
+        dcimgui/src/imgui.cpp
+)
+
+# set_source_files_properties(basisu/basisu_transcoder.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+if (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(FILEUTIL_SRCS "util/fileutil_osx.m")
+else()
+    set(FILEUTIL_SRCS "util/fileutil.c" "util/fileutil.h")
+endif()
+add_library(sokol SHARED 
+"sokol.c" 
+${IMGUI_SOURCE_FILES} 
+${FILEUTIL_SRCS}
+"basisu/sokol_basisu.cpp")
+
+
+
+if (APPLE)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+endif()
+
+set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
+
+target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-qualifiers)
+
+target_link_libraries(sokol)
+
+target_include_directories(sokol PRIVATE)
+
+
+if (WIN32)
+    add_definitions(-DSOKOL_D3D11)
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+    
+    # Set Windows-specific properties
+    set_target_properties(sokol PROPERTIES 
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    
+    # Add Windows dependencies
+    target_link_libraries(sokol
+        d3d11
+        dxgi
+        d3dcompiler
+    )
+    
+    # Windows post-build commands
+    add_custom_command(TARGET sokol POST_BUILD
+        # Log source file details
+        COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
+        COMMAND dir /B /S $<TARGET_FILE:sokol>
+        
+        # Create directory and copy
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/
+        
+        # Verify destination file
+        COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
+        COMMAND dir /B /S ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+        
+        # Verify files are identical
+        COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+        
+        COMMENT "Installing and verifying library for Windows"
+    )
+elseif (APPLE)
+    if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        target_compile_options(sokol PRIVATE -x objective-c)
+        target_link_libraries(sokol
+            "-framework UIKit"
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+            "-framework AudioToolbox"
+            "-framework AVFoundation"
+            "-framework Foundation")
+        set_target_properties(sokol PROPERTIES 
+            FRAMEWORK TRUE
+            FRAMEWORK_VERSION A
+            MACOSX_FRAMEWORK_IDENTIFIER com.elix22.sokol
+            MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
+            BUILD_WITH_INSTALL_RPATH ON
+            INSTALL_RPATH "@executable_path/Frameworks"
+            XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+        )
+        # Ensure Info.plist is copied to the framework bundle
+        add_custom_command(TARGET sokol POST_BUILD
+              COMMAND ${CMAKE_COMMAND} -E copy
+              ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
+              $<TARGET_FILE_DIR:sokol>/Info.plist
+          )
+    else()
+        target_compile_options(sokol PRIVATE -x objective-c)
+        target_link_libraries(sokol
+            "-framework Cocoa"
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+            "-framework AudioToolbox"
+            "-framework AVFoundation"
+            "-framework Foundation")
+        set_target_properties(sokol PROPERTIES LINK_FLAGS "-Wl,-F/Library/Frameworks")
+    endif()
+elseif (ANDROID)
+    target_compile_options(sokol PRIVATE -x c)
+    target_link_libraries(sokol
+        android
+        log
+        GLESv3
+        OpenSLES
+        EGL
+        aaudio)
+elseif (LINUX)
+            # Add Linux-specific compile options
+            target_compile_options(sokol PRIVATE -fPIC)
+            
+            # Find required packages
+            find_package(X11 REQUIRED)
+            find_package(OpenGL REQUIRED)
+            find_package(Threads REQUIRED)
+            
+            # Link dependencies
+            target_link_libraries(sokol 
+                X11 
+                Xi 
+                Xcursor 
+                ${OPENGL_LIBRARIES}
+                dl 
+                m
+                Threads::Threads
+            )
+            
+            # Post-build commands for Linux
+            add_custom_command(TARGET sokol POST_BUILD
+                # Log source file info
+                COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
+                COMMAND ls -l $<TARGET_FILE:sokol>
+                
+                # Create directory and copy
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}
+                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/
+                
+                # Verify destination file
+                COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
+                COMMAND ls -l ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                
+                # Verify files are identical
+                COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                
+                COMMENT "Installing and verifying library for Linux"
+            )
+endif()

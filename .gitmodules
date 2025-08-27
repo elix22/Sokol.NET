@@ -1,0 +1,3 @@
+[submodule "ext/sokol"]
+	path = ext/sokol
+	url = git@github.com:elix22/sokol.git
