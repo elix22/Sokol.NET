@@ -1308,7 +1308,7 @@ public struct sg_image_view_desc
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_texture_view_range
 {
-    public int base;
+    public int _base;
     public int count;
 }
 [StructLayout(LayoutKind.Sequential)]

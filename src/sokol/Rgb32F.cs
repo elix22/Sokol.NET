@@ -258,8 +258,8 @@ public partial struct Rgb32F : IEquatable<Rgb32F>
         return obj is Rgb32F other && Equals(other);
     }
 
-    public static implicit operator Gfx.Color(Rgb32F rgb32f)
+    public static implicit operator SG.sg_color(Rgb32F rgb32f)
     {
-        return new Gfx.Color() { R = rgb32f.R, G = rgb32f.G, B = rgb32f.B, A = 1 };
+        return new SG.sg_color() { r = rgb32f.R, g = rgb32f.G, b = rgb32f.B, a = 1 };
     }
 }

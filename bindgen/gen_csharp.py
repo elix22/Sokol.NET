@@ -75,6 +75,7 @@ name_overrides = {
     'out':          '_out',
     'object':       '_object',
     'in':           '_in',
+    'base':        '_base'
 }
 
 # NOTE: syntax for function results: "func_name.RESULT"

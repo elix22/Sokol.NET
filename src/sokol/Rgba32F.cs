@@ -278,8 +278,8 @@ public partial struct Rgba32F : IEquatable<Rgba32F>
     }
 
 
-    public static implicit operator Gfx.Color(Rgba32F rgba32f)
+    public static implicit operator SG.sg_color(Rgba32F rgba32f)
     {
-        return new Gfx.Color() { R = rgba32f.R, G = rgba32f.G, B = rgba32f.B, A = rgba32f.A };
+        return new SG.sg_color() { r = rgba32f.R, g = rgba32f.G, b = rgba32f.B, a = rgba32f.A };
     }
 }

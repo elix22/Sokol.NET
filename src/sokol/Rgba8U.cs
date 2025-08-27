@@ -248,8 +248,8 @@ public partial struct Rgba8U : IEquatable<Rgba8U>
         return obj is Rgba8U other && Equals(other);
     }
 
-    public static implicit operator Gfx.Color(Rgba8U rgba8u)
+    public static implicit operator SG.sg_color(Rgba8U rgba8u)
     {
-        return new Gfx.Color() { R = rgba8u.R, G = rgba8u.G, B = rgba8u.B, A = rgba8u.A };
+        return new SG.sg_color() { r = rgba8u.R, g = rgba8u.G, b = rgba8u.B, a = rgba8u.A };
     }
 }
