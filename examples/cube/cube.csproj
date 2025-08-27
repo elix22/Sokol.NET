@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType Condition="'$(BuildAsLibrary)' != 'true'">Exe</OutputType>
+    <OutputType Condition="'$(BuildAsLibrary)' == 'true'">Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+    <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
+    <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
+    <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
+    <OSArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</OSArch>
+    <IsWindowsHost>$([MSBuild]::IsOSPlatform('Windows'))</IsWindowsHost>
+		<IsLinuxHost>$([MSBuild]::IsOSPlatform('Linux'))</IsLinuxHost>
+		<IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <AssetsSourceFiles Include="Assets/**/*.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+     <ShaderFiles Include="shaders/**/*.glsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <Compile Include="../../src/sokol/*.cs" />
+      <Compile Include="../../src/sokol/generated/*.cs" />
+  </ItemGroup>
+
+  <!-- Exclude shaders from other platform folders -->
+  <ItemGroup>
+    <Compile Remove="shaders/compiled/ios/**/*.cs" Condition="'$(HostShaderFolder)' != 'ios'" />
+    <Compile Remove="shaders/compiled/osx/**/*.cs" Condition="'$(IsOSX)'!='true'"/>
+    <Compile Remove="shaders/compiled/windows/**/*.cs" Condition="'$(IsWindows)'!='true'" />
+    <Compile Remove="shaders/compiled/linux/**/*.cs" Condition="'$(IsLinux)'!='true'" />
+    <Compile Remove="shaders/compiled/android/**/*.cs" Condition="'$(IsAndroid)'!='true'" />
+  </ItemGroup>
+
+  <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found are you sure URHONET_HOME_ROOT is pointing to the right place ?" /> 
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+
+
+
+</Project>
