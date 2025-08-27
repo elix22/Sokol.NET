@@ -271,7 +271,7 @@ public static extern void sgl_disable_texture();
 #else
 [DllImport("sokol", EntryPoint = "sgl_texture", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void sgl_texture(sg_image img, sg_sampler smp);
+public static extern void sgl_texture(sg_view tex_view, sg_sampler smp);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_layer", CallingConvention = CallingConvention.Cdecl)]

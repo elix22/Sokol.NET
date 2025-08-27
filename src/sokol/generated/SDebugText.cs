@@ -345,5 +345,12 @@ public static extern void sdtx_puts([M(U.LPUTF8Str)] string str);
 #endif
 public static extern void sdtx_putr([M(U.LPUTF8Str)] string str, int len);
 
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern sdtx_range sdtx_get_cleared_fmt_buffer();
+
 }
 }

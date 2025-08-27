@@ -86,21 +86,21 @@ public static extern void simgui_render();
 #else
 [DllImport("sokol", EntryPoint = "simgui_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern ulong simgui_imtextureid(sg_image img);
+public static extern ulong simgui_imtextureid(sg_view tex_view);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_imtextureid_with_sampler", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "simgui_imtextureid_with_sampler", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern ulong simgui_imtextureid_with_sampler(sg_image img, sg_sampler smp);
+public static extern ulong simgui_imtextureid_with_sampler(sg_view tex_view, sg_sampler smp);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_image_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_texture_view_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #else
-[DllImport("sokol", EntryPoint = "simgui_image_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("sokol", EntryPoint = "simgui_texture_view_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern sg_image simgui_image_from_imtextureid(ulong imtex_id);
+public static extern sg_view simgui_texture_view_from_imtextureid(ulong imtex_id);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_sampler_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
@@ -192,20 +192,6 @@ public static extern int simgui_map_keycode(sapp_keycode keycode);
 [DllImport("sokol", EntryPoint = "simgui_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void simgui_shutdown();
-
-#if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_create_fonts_texture", CallingConvention = CallingConvention.Cdecl)]
-#else
-[DllImport("sokol", EntryPoint = "simgui_create_fonts_texture", CallingConvention = CallingConvention.Cdecl)]
-#endif
-public static extern void simgui_create_fonts_texture(in simgui_font_tex_desc_t desc);
-
-#if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_destroy_fonts_texture", CallingConvention = CallingConvention.Cdecl)]
-#else
-[DllImport("sokol", EntryPoint = "simgui_destroy_fonts_texture", CallingConvention = CallingConvention.Cdecl)]
-#endif
-public static extern void simgui_destroy_fonts_texture();
 
 }
 }

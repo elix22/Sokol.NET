@@ -58,7 +58,10 @@ target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-quali
 
 target_link_libraries(sokol)
 
-target_include_directories(sokol PRIVATE)
+target_include_directories(sokol PRIVATE sokol)
+
+# Add public include directory for consumers
+target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
 
 
 if (WIN32)
@@ -85,15 +88,15 @@ if (WIN32)
         COMMAND dir /B /S $<TARGET_FILE:sokol>
         
         # Create directory and copy
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/
         
         # Verify destination file
         COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
-        COMMAND dir /B /S ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+        COMMAND dir /B /S ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
         
         # Verify files are identical
-        COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+        COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
         
         COMMENT "Installing and verifying library for Windows"
     )
@@ -173,15 +176,15 @@ elseif (LINUX)
                 COMMAND ls -l $<TARGET_FILE:sokol>
                 
                 # Create directory and copy
-                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}
-                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}
+                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/
                 
                 # Verify destination file
                 COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
-                COMMAND ls -l ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
                 
                 # Verify files are identical
-                COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../NativeLibs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
                 
                 COMMENT "Installing and verifying library for Linux"
             )

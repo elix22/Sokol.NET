@@ -229,29 +229,47 @@
 
         simgui_shutdown()
 
+    ON ATTACHING YOUR OWN FONTS
+    ===========================
+    Since Dear ImGui 1.92.0 using non-default fonts has been greatly simplified:
+
+    First, call `simgui_setup()` with the `.no_default_font` so that
+    sokol_imgui.h skips adding the default font.
+
+    ...then simply call `AddFontDefault()` or `AddFontFromMemoryTTF()` on
+    the Dear ImGui IO object, everything else is taken care of automatically.
+
+    Specifically, do *NOT*:
+        - call the deprecated `GetTexDataAsRGBA32()` function
+        - create a sokol-gfx image object for the font atlas
+        - set the `Font->TexID` on the ImGui IO object
+
+    All those things are now handled inside sokol_imgui.h via a new 'texture update'
+    callback which is called by Dear ImGui whenever the state of the font atlas
+    texture changes.
 
     ON USER-PROVIDED IMAGES AND SAMPLERS
     ====================================
     To render your own images via ImGui::Image() you need to create a Dear ImGui
-    compatible texture handle (ImTextureID) from a sokol-gfx image handle
-    or optionally an image handle and a compatible sampler handle.
+    compatible texture handle (ImTextureID) from a sokol-gfx texture view handle
+    or optionally a texture view handle and a compatible sampler handle.
 
     To create a ImTextureID from a sokol-gfx image handle, call:
 
-        sg_image img= ...;
-        ImTextureID imtex_id = simgui_imtextureid(img);
+        sg_view tex_view = sg_make_view(&(sg_view_desc){ .texture_binding.image = img });
+        ImTextureID imtex_id = simgui_imtextureid(tex_view);
 
     Since no sampler is provided, such a texture handle will use a default
     sampler with nearest filtering and clamp-to-edge.
 
     If you need to render with a different sampler, do this instead:
 
-        sg_image img = ...;
+        sg_view tex_view = ...;
         sg_sampler smp = ...;
-        ImTextureID imtex_id = simgui_imtextureid_with_sampler(img, smp);
+        ImTextureID imtex_id = simgui_imtextureid_with_sampler(tex_img, smp);
 
     You don't need to 'release' the ImTextureID handle, the ImTextureID
-    bits is simply a combination of the sg_image and sg_sampler bits.
+    bits is simply a combination of the sg_view and sg_sampler bits.
 
     Once you have constructed an ImTextureID handle via simgui_imtextureid()
     or simgui_imtextureid_with_sampler(), it used in the ImGui::Image()
@@ -259,10 +277,30 @@
 
         ImGui::Image(imtex_id, ...);
 
-    To extract the sg_image and sg_sampler handle from an ImTextureID:
+    To extract the sg_view and sg_sampler handle from an ImTextureID:
 
-        sg_image img = simgui_image_from_imtextureid(imtex_id);
+        sg_view tex_view = simgui_texture_view_from_imtextureid(imtex_id);
         sg_sampler smp = simgui_sampler_from_imtextureid(imtex_id);
+
+    ...use the sokol-gfx function sg_query_view_image() if you need to
+    extract the texture view's image object:
+
+        sg_image img = sg_query_view_image(tex_view);
+
+    NOTE on C bindings since Dear ImGui 1.92.0:
+
+        Since Dear ImGui v1.92.0 the ImGui::Image function takes an
+        ImTextureRef object instead of ImTextureID. In C++ this doesn't
+        require a code change since the ImTextureRef is automatically constructed
+        from the ImTextureID.
+
+        In C this doesn't work and you need to explicitly create an
+        ImTextureRef struct, for instance:
+
+            igImage((ImTextureRef){ ._TexID = my_tex_id }, ...);
+
+        Currently Dear Bindings is missing a wrapper function for this,
+        also see: https://github.com/dearimgui/dear_bindings/issues/99
 
 
     MEMORY ALLOCATION OVERRIDE
@@ -492,10 +530,12 @@ typedef struct simgui_font_tex_desc_t {
 SOKOL_IMGUI_API_DECL void simgui_setup(const simgui_desc_t* desc);
 SOKOL_IMGUI_API_DECL void simgui_new_frame(const simgui_frame_desc_t* desc);
 SOKOL_IMGUI_API_DECL void simgui_render(void);
-SOKOL_IMGUI_API_DECL uint64_t simgui_imtextureid(sg_image img);
-SOKOL_IMGUI_API_DECL uint64_t simgui_imtextureid_with_sampler(sg_image img, sg_sampler smp);
-SOKOL_IMGUI_API_DECL sg_image simgui_image_from_imtextureid(uint64_t imtex_id);
+
+SOKOL_IMGUI_API_DECL uint64_t simgui_imtextureid(sg_view tex_view);
+SOKOL_IMGUI_API_DECL uint64_t simgui_imtextureid_with_sampler(sg_view tex_view, sg_sampler smp);
+SOKOL_IMGUI_API_DECL sg_view simgui_texture_view_from_imtextureid(uint64_t imtex_id);
 SOKOL_IMGUI_API_DECL sg_sampler simgui_sampler_from_imtextureid(uint64_t imtex_id);
+
 SOKOL_IMGUI_API_DECL void simgui_add_focus_event(bool focus);
 SOKOL_IMGUI_API_DECL void simgui_add_mouse_pos_event(float x, float y);
 SOKOL_IMGUI_API_DECL void simgui_add_touch_pos_event(float x, float y);
@@ -505,13 +545,12 @@ SOKOL_IMGUI_API_DECL void simgui_add_key_event(int imgui_key, bool down);
 SOKOL_IMGUI_API_DECL void simgui_add_input_character(uint32_t c);
 SOKOL_IMGUI_API_DECL void simgui_add_input_characters_utf8(const char* c);
 SOKOL_IMGUI_API_DECL void simgui_add_touch_button_event(int mouse_button, bool down);
+
 #if !defined(SOKOL_IMGUI_NO_SOKOL_APP)
 SOKOL_IMGUI_API_DECL bool simgui_handle_event(const sapp_event* ev);
 SOKOL_IMGUI_API_DECL int simgui_map_keycode(sapp_keycode keycode);  // returns ImGuiKey_*
 #endif
 SOKOL_IMGUI_API_DECL void simgui_shutdown(void);
-SOKOL_IMGUI_API_DECL void simgui_create_fonts_texture(const simgui_font_tex_desc_t* desc);
-SOKOL_IMGUI_API_DECL void simgui_destroy_fonts_texture(void);
 
 #ifdef __cplusplus
 } // extern "C"
@@ -519,7 +558,6 @@ SOKOL_IMGUI_API_DECL void simgui_destroy_fonts_texture(void);
 // reference-based equivalents for C++
 inline void simgui_setup(const simgui_desc_t& desc) { return simgui_setup(&desc); }
 inline void simgui_new_frame(const simgui_frame_desc_t& desc) { return simgui_new_frame(&desc); }
-inline void simgui_create_fonts_texture(const simgui_font_tex_desc_t& desc) { return simgui_create_fonts_texture(&desc); }
 
 #endif
 #endif /* SOKOL_IMGUI_INCLUDED */
@@ -592,9 +630,6 @@ typedef struct {
     float cur_dpi_scale;
     sg_buffer vbuf;
     sg_buffer ibuf;
-    sg_image font_img;
-    sg_sampler font_smp;
-    sg_image def_img;       // used as default image for user images
     sg_sampler def_smp;     // used as default sampler for user images
     sg_shader def_shd;
     sg_pipeline def_pip;
@@ -2233,7 +2268,7 @@ EM_JS(int, simgui_js_is_osx, (void), {
     } else {
         return 0;
     }
-});
+})
 #endif
 
 // ██       ██████   ██████   ██████  ██ ███    ██  ██████
@@ -2266,7 +2301,7 @@ static void _simgui_log(simgui_log_item_t log_item, uint32_t log_level, const ch
                 msg = _simgui_log_messages[log_item];
             }
         #endif
-        _simgui.desc.logger.func("simgui", log_level, log_item, msg, line_nr, filename, _simgui.desc.logger.user_data);
+        _simgui.desc.logger.func("simgui", log_level, (uint32_t)log_item, msg, line_nr, filename, _simgui.desc.logger.user_data);
     } else {
         // for log level PANIC it would be 'undefined behaviour' to continue
         if (log_level == 0) {
@@ -2328,6 +2363,307 @@ static simgui_desc_t _simgui_desc_defaults(const simgui_desc_t* desc) {
     return res;
 }
 
+static ImGuiPlatformIO* _simgui_imgui_get_platform_io(void) {
+    #if defined(__cplusplus)
+        return &ImGui::GetPlatformIO();
+    #else
+        #if defined(CIMGUI_INCLUDED)
+            // 'original' cimgui
+            return _SIMGUI_CFUNC(GetPlatformIO_Nil)();
+        #else
+            // dear bindings cimgui
+            return _SIMGUI_CFUNC(GetPlatformIO)();
+        #endif
+    #endif
+}
+
+static ImGuiIO* _simgui_imgui_get_io(void) {
+    #if defined(__cplusplus)
+        return &ImGui::GetIO();
+    #else
+        #if defined(CIMGUI_INCLUDED)
+            // 'original' cimgui
+            return _SIMGUI_CFUNC(GetIO_Nil)();
+        #else
+            // dear bindings cimgui
+            return _SIMGUI_CFUNC(GetIO)();
+        #endif
+    #endif
+}
+
+static void _simgui_imgui_newframe(void) {
+    #if defined(__cplusplus)
+        ImGui::NewFrame();
+    #else
+        _SIMGUI_CFUNC(NewFrame)();
+    #endif
+}
+
+static void _simgui_imgui_create_context(void) {
+    #if defined(__cplusplus)
+        ImGui::CreateContext();
+    #else
+        _SIMGUI_CFUNC(CreateContext)(0);
+    #endif
+}
+
+static void _simgui_imgui_destroy_context(void) {
+    #if defined(__cplusplus)
+        ImGui::DestroyContext();
+    #else
+        _SIMGUI_CFUNC(DestroyContext)(0);
+    #endif
+}
+
+static void _simgui_imgui_style_colors_dark(void) {
+    #if defined(__cplusplus)
+        ImGui::StyleColorsDark();
+    #else
+        _SIMGUI_CFUNC(StyleColorsDark)(_SIMGUI_CFUNC(GetStyle)());
+    #endif
+}
+
+static void _simgui_io_add_font_default(ImGuiIO* io) {
+    #if defined(__cplusplus)
+        io->Fonts->AddFontDefault();
+    #else
+        ImFontAtlas_AddFontDefault(io->Fonts, 0);
+    #endif
+}
+
+static void _simgui_io_add_focus_event(ImGuiIO* io, bool focus) {
+    #if defined(__cplusplus)
+        io->AddFocusEvent(focus);
+    #else
+        ImGuiIO_AddFocusEvent(io, focus);
+    #endif
+}
+
+static void _simgui_io_add_mouse_source_event(ImGuiIO* io, ImGuiMouseSource source) {
+    #if defined(__cplusplus)
+        io->AddMouseSourceEvent(source);
+    #else
+        ImGuiIO_AddMouseSourceEvent(io, source);
+    #endif
+}
+
+static void _simgui_io_add_mouse_pos_event(ImGuiIO* io, float x, float y) {
+    #if defined(__cplusplus)
+        io->AddMousePosEvent(x, y);
+    #else
+        ImGuiIO_AddMousePosEvent(io, x, y);
+    #endif
+}
+
+static void _simgui_io_add_mouse_button_event(ImGuiIO* io, int mouse_button, bool down) {
+    #if defined(__cplusplus)
+        io->AddMouseButtonEvent(mouse_button, down);
+    #else
+        ImGuiIO_AddMouseButtonEvent(io, mouse_button, down);
+    #endif
+}
+
+static void _simgui_io_add_mouse_wheel_event(ImGuiIO* io, float x, float y) {
+    #if defined(__cplusplus)
+        io->AddMouseWheelEvent(x, y);
+    #else
+        ImGuiIO_AddMouseWheelEvent(io, x, y);
+    #endif
+}
+
+static void _simgui_io_add_key_event(ImGuiIO* io, ImGuiKey imgui_key, bool down) {
+    #if defined(__cplusplus)
+        io->AddKeyEvent(imgui_key, down);
+    #else
+        ImGuiIO_AddKeyEvent(io, imgui_key, down);
+    #endif
+}
+
+static void _simgui_io_add_input_character(ImGuiIO* io, uint32_t c) {
+    #if defined(__cplusplus)
+        io->AddInputCharacter(c);
+    #else
+        ImGuiIO_AddInputCharacter(io, c);
+    #endif
+}
+
+static void _simgui_io_add_input_characters_utf8(ImGuiIO* io, const char* c) {
+    #if defined(__cplusplus)
+        io->AddInputCharactersUTF8(c);
+    #else
+        ImGuiIO_AddInputCharactersUTF8(io, c);
+    #endif
+}
+
+#if !defined(SOKOL_IMGUI_NO_SOKOL_APP)
+static ImGuiMouseCursor _simgui_imgui_get_mouse_cursor(void) {
+    #if defined(__cplusplus)
+        return ImGui::GetMouseCursor();
+    #else
+        return _SIMGUI_CFUNC(GetMouseCursor)();
+    #endif
+}
+#endif
+
+static ImDrawList* _simgui_imdrawlist_at(ImDrawData* draw_data, int cl_index) {
+    #if defined(__cplusplus)
+        return draw_data->CmdLists[cl_index];
+    #else
+        return draw_data->CmdLists.Data[cl_index];
+    #endif
+}
+
+static ImTextureID _simgui_imtexturedata_gettexid(ImTextureData* tex) {
+    #if defined(__cplusplus)
+        return tex->GetTexID();
+    #else
+        return ImTextureData_GetTexID(tex);
+    #endif
+}
+
+static void _simgui_imtexturedata_settexid(ImTextureData* tex, ImTextureID tex_id) {
+    #if defined(__cplusplus)
+        tex->SetTexID(tex_id);
+    #else
+        ImTextureData_SetTexID(tex, tex_id);
+    #endif
+}
+
+static void _simgui_imtexturedata_setstatus(ImTextureData* tex, ImTextureStatus status) {
+    #if defined(__cplusplus)
+        tex->SetStatus(status);
+    #else
+        ImTextureData_SetStatus(tex, status);
+    #endif
+}
+
+static void* _simgui_imtexturedata_getpixels(ImTextureData* tex) {
+    #if defined(__cplusplus)
+        return tex->GetPixels();
+    #else
+        return ImTextureData_GetPixels(tex);
+    #endif
+}
+
+static int _simgui_imtexturedata_getsizeinbytes(ImTextureData* tex) {
+    #if defined(__cplusplus)
+        return tex->GetSizeInBytes();
+    #else
+        return ImTextureData_GetSizeInBytes(tex);
+    #endif
+}
+
+static ImTextureID _simgui_imdrawcmd_gettexid(ImDrawCmd* cmd) {
+    #if defined(__cplusplus)
+        return cmd->GetTexID();
+    #else
+        return ImDrawCmd_GetTexID(cmd);
+    #endif
+}
+
+static int _simgui_imdrawlist_cmd_buffer_size(ImDrawList* cl) {
+    #if defined(__cplusplus)
+        return cl->CmdBuffer.size();
+    #else
+        return cl->CmdBuffer.Size;
+    #endif
+}
+
+static int _simgui_imdrawlist_vtx_buffer_size(ImDrawList* cl) {
+    #if defined(__cplusplus)
+        return cl->VtxBuffer.size();
+    #else
+        return cl->VtxBuffer.Size;
+    #endif
+}
+
+static int _simgui_imdrawlist_idx_buffer_size(ImDrawList* cl) {
+    #if defined(__cplusplus)
+        return cl->IdxBuffer.size();
+    #else
+        return cl->IdxBuffer.Size;
+    #endif
+}
+
+static void _simgui_imgui_render(void) {
+    #if defined(__cplusplus)
+        ImGui::Render();
+    #else
+        _SIMGUI_CFUNC(Render)();
+    #endif
+}
+
+static ImDrawData* _simgui_imgui_get_draw_data(void) {
+    #if defined(__cplusplus)
+        return ImGui::GetDrawData();
+    #else
+        return _SIMGUI_CFUNC(GetDrawData)();
+    #endif
+}
+
+static void _simgui_destroy_texture(ImTextureData* tex) {
+    SOKOL_ASSERT(tex);
+    const sg_view view = simgui_texture_view_from_imtextureid(_simgui_imtexturedata_gettexid(tex));
+    const sg_image img = sg_query_view_image(view);
+    SOKOL_ASSERT(img.id != SG_INVALID_ID);
+    const sg_sampler smp = simgui_sampler_from_imtextureid(_simgui_imtexturedata_gettexid(tex));
+    sg_destroy_view(view);
+    sg_destroy_image(img);
+    sg_destroy_sampler(smp);
+    _simgui_imtexturedata_settexid(tex, ImTextureID_Invalid);
+    _simgui_imtexturedata_setstatus(tex, ImTextureStatus_Destroyed);
+}
+
+static void _simgui_update_texture(ImTextureData* tex) {
+    SOKOL_ASSERT(tex);
+    SOKOL_ASSERT(tex->Format == ImTextureFormat_RGBA32);
+    if (tex->Status == ImTextureStatus_WantCreate) {
+        // create new sokol-gfx image, view and sampler
+        SOKOL_ASSERT(tex->TexID == 0);
+        sg_image_desc img_desc;
+        _simgui_clear(&img_desc, sizeof(img_desc));
+        img_desc.usage.dynamic_update = true;
+        img_desc.width = tex->Width;
+        img_desc.height = tex->Height;
+        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
+        img_desc.label = "sokol-imgui-texture";
+        sg_image img = sg_make_image(&img_desc);
+
+        sg_view_desc view_desc;
+        _simgui_clear(&view_desc, sizeof(view_desc));
+        view_desc.texture.image = img;
+        view_desc.label = "sokol-imgui-texture-view";
+        sg_view view = sg_make_view(&view_desc);
+
+        sg_sampler_desc smp_desc;
+        _simgui_clear(&smp_desc, sizeof(smp_desc));
+        smp_desc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
+        smp_desc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
+        smp_desc.min_filter = SG_FILTER_LINEAR;
+        smp_desc.mag_filter = SG_FILTER_LINEAR;
+        smp_desc.label = "sokol-imgui-sampler";
+        sg_sampler smp = sg_make_sampler(&smp_desc);
+
+        _simgui_imtexturedata_settexid(tex, simgui_imtextureid_with_sampler(view, smp));
+    }
+    if ((tex->Status == ImTextureStatus_WantCreate) || (tex->Status == ImTextureStatus_WantUpdates)) {
+        SOKOL_ASSERT(tex->TexID != 0);
+        const sg_view view = simgui_texture_view_from_imtextureid(_simgui_imtexturedata_gettexid(tex));
+        const sg_image img = sg_query_view_image(view);
+        SOKOL_ASSERT(img.id != SG_INVALID_ID);
+        sg_image_data img_data;
+        _simgui_clear(&img_data, sizeof(img_data));
+        img_data.subimage[0][0].ptr = _simgui_imtexturedata_getpixels(tex);
+        img_data.subimage[0][0].size = (size_t)_simgui_imtexturedata_getsizeinbytes(tex);
+        sg_update_image(img, &img_data);
+        _simgui_imtexturedata_setstatus(tex, ImTextureStatus_OK);
+    }
+    if ((tex->Status == ImTextureStatus_WantDestroy) && (tex->UnusedFrames > 0)) {
+        SOKOL_ASSERT(tex->TexID != 0);
+        _simgui_destroy_texture(tex);
+    }
+}
+
 // ██████  ██    ██ ██████  ██      ██  ██████
 // ██   ██ ██    ██ ██   ██ ██      ██ ██
 // ██████  ██    ██ ██████  ██      ██ ██
@@ -2355,33 +2691,21 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     _simgui.indices.ptr = _simgui_malloc(_simgui.indices.size);
 
     // initialize Dear ImGui
-    #if defined(__cplusplus)
-        ImGui::CreateContext();
-        ImGui::StyleColorsDark();
-        ImGuiIO* io = &ImGui::GetIO();
-        if (!_simgui.desc.no_default_font) {
-            io->Fonts->AddFontDefault();
-        }
-    #else
-        _SIMGUI_CFUNC(CreateContext)(NULL);
-        _SIMGUI_CFUNC(StyleColorsDark)(_SIMGUI_CFUNC(GetStyle)());
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        if (!_simgui.desc.no_default_font) {
-            ImFontAtlas_AddFontDefault(io->Fonts, NULL);
-        }
-    #endif
+    _simgui_imgui_create_context();
+    _simgui_imgui_style_colors_dark();
+    ImGuiIO* io = _simgui_imgui_get_io();
+    if (!_simgui.desc.no_default_font) {
+        _simgui_io_add_font_default(io);
+    }
     io->IniFilename = _simgui.desc.ini_filename;
     io->ConfigMacOSXBehaviors = _simgui_is_osx();
-    io->BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
+    io->BackendRendererName = "sokol-imgui";
+    io->BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasTextures;
     #if !defined(SOKOL_IMGUI_NO_SOKOL_APP)
         if (!_simgui.desc.disable_set_mouse_cursor) {
             io->BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
         }
-        #if defined(__cplusplus)
-            ImGuiPlatformIO* pio = &ImGui::GetPlatformIO();
-        #else
-            ImGuiPlatformIO* pio = _SIMGUI_CFUNC(GetPlatformIO)();
-        #endif
+        ImGuiPlatformIO* pio = _simgui_imgui_get_platform_io();
         pio->Platform_SetClipboardTextFn = _simgui_set_clipboard;
         pio->Platform_GetClipboardTextFn = _simgui_get_clipboard;
     #endif
@@ -2410,21 +2734,21 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     shd_desc.uniform_blocks[0].glsl_uniforms[0].glsl_name = "vs_params";
     shd_desc.uniform_blocks[0].glsl_uniforms[0].type = SG_UNIFORMTYPE_FLOAT4;
     shd_desc.uniform_blocks[0].glsl_uniforms[0].array_count = 1;
-    shd_desc.images[0].stage = SG_SHADERSTAGE_FRAGMENT;
-    shd_desc.images[0].image_type = SG_IMAGETYPE_2D;
-    shd_desc.images[0].sample_type = SG_IMAGESAMPLETYPE_FLOAT;
-    shd_desc.images[0].hlsl_register_t_n = 0;
-    shd_desc.images[0].msl_texture_n = 0;
-    shd_desc.images[0].wgsl_group1_binding_n = 64;
+    shd_desc.views[0].texture.stage = SG_SHADERSTAGE_FRAGMENT;
+    shd_desc.views[0].texture.image_type = SG_IMAGETYPE_2D;
+    shd_desc.views[0].texture.sample_type = SG_IMAGESAMPLETYPE_FLOAT;
+    shd_desc.views[0].texture.hlsl_register_t_n = 0;
+    shd_desc.views[0].texture.msl_texture_n = 0;
+    shd_desc.views[0].texture.wgsl_group1_binding_n = 64;
     shd_desc.samplers[0].stage = SG_SHADERSTAGE_FRAGMENT;
     shd_desc.samplers[0].sampler_type = SG_SAMPLERTYPE_FILTERING;
     shd_desc.samplers[0].hlsl_register_s_n = 0;
     shd_desc.samplers[0].msl_sampler_n = 0;
     shd_desc.samplers[0].wgsl_group1_binding_n = 80;
-    shd_desc.image_sampler_pairs[0].stage = SG_SHADERSTAGE_FRAGMENT;
-    shd_desc.image_sampler_pairs[0].image_slot = 0;
-    shd_desc.image_sampler_pairs[0].sampler_slot = 0;
-    shd_desc.image_sampler_pairs[0].glsl_name = "tex_smp";
+    shd_desc.texture_sampler_pairs[0].stage = SG_SHADERSTAGE_FRAGMENT;
+    shd_desc.texture_sampler_pairs[0].view_slot = 0;
+    shd_desc.texture_sampler_pairs[0].sampler_slot = 0;
+    shd_desc.texture_sampler_pairs[0].glsl_name = "tex_smp";
     shd_desc.label = "sokol-imgui-shader";
     #if defined(SOKOL_GLCORE)
         shd_desc.vertex_func.source = (const char*)_simgui_vs_source_glsl410;
@@ -2496,8 +2820,8 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     pip_desc.label = "sokol-imgui-pipeline";
     _simgui.def_pip = sg_make_pipeline(&pip_desc);
 
-    // create a unfilterable/nonfiltering variants of the shader and pipeline
-    shd_desc.images[0].sample_type = SG_IMAGESAMPLETYPE_UNFILTERABLE_FLOAT;
+    // create unfilterable/nonfiltering variants of the shader and pipeline
+    shd_desc.views[0].texture.sample_type = SG_IMAGESAMPLETYPE_UNFILTERABLE_FLOAT;
     shd_desc.samplers[0].sampler_type = SG_SAMPLERTYPE_NONFILTERING;
     shd_desc.label = "sokol-imgui-shader-unfilterable";
     _simgui.shd_unfilterable = sg_make_shader(&shd_desc);
@@ -2508,15 +2832,15 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     // NOTE: since we're in C++ mode here we can't use C99 designated init
     sg_buffer_desc vb_desc;
     _simgui_clear(&vb_desc, sizeof(vb_desc));
-    vb_desc.usage = SG_USAGE_STREAM;
+    vb_desc.usage.stream_update = true;
     vb_desc.size = _simgui.vertices.size;
     vb_desc.label = "sokol-imgui-vertices";
     _simgui.vbuf = sg_make_buffer(&vb_desc);
 
     sg_buffer_desc ib_desc;
     _simgui_clear(&ib_desc, sizeof(ib_desc));
-    ib_desc.type = SG_BUFFERTYPE_INDEXBUFFER;
-    ib_desc.usage = SG_USAGE_STREAM;
+    ib_desc.usage.index_buffer = true;
+    ib_desc.usage.stream_update = true;
     ib_desc.size = _simgui.indices.size;
     ib_desc.label = "sokol-imgui-indices";
     _simgui.ibuf = sg_make_buffer(&ib_desc);
@@ -2531,95 +2855,27 @@ SOKOL_API_IMPL void simgui_setup(const simgui_desc_t* desc) {
     def_sampler_desc.label = "sokol-imgui-default-sampler";
     _simgui.def_smp = sg_make_sampler(&def_sampler_desc);
 
-    // a default user image
-    static uint32_t def_pixels[64];
-    memset(def_pixels, 0xFF, sizeof(def_pixels));
-    sg_image_desc def_image_desc;
-    _simgui_clear(&def_image_desc, sizeof(def_image_desc));
-    def_image_desc.width = 8;
-    def_image_desc.height = 8;
-    def_image_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    def_image_desc.data.subimage[0][0].ptr = def_pixels;
-    def_image_desc.data.subimage[0][0].size = sizeof(def_pixels);
-    def_image_desc.label = "sokol-imgui-default-image";
-    _simgui.def_img = sg_make_image(&def_image_desc);
-
-    // default font texture
-    if (!_simgui.desc.no_default_font) {
-        simgui_font_tex_desc_t simgui_font_smp_desc;
-        _simgui_clear(&simgui_font_smp_desc, sizeof(simgui_font_smp_desc));
-        simgui_create_fonts_texture(&simgui_font_smp_desc);
-    }
-
     sg_pop_debug_group();
-}
-
-SOKOL_API_IMPL void simgui_create_fonts_texture(const simgui_font_tex_desc_t* desc) {
-    SOKOL_ASSERT(desc);
-    SOKOL_ASSERT(SG_INVALID_ID == _simgui.font_smp.id);
-    SOKOL_ASSERT(SG_INVALID_ID == _simgui.font_img.id);
-
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-    #endif
-
-    // a default font sampler
-    sg_sampler_desc font_smp_desc;
-    _simgui_clear(&font_smp_desc, sizeof(font_smp_desc));
-    font_smp_desc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
-    font_smp_desc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
-    font_smp_desc.min_filter = desc->min_filter;
-    font_smp_desc.mag_filter = desc->mag_filter;
-    font_smp_desc.label = "sokol-imgui-font-sampler";
-    _simgui.font_smp = sg_make_sampler(&font_smp_desc);
-
-    unsigned char* font_pixels;
-    int font_width, font_height;
-    #if defined(__cplusplus)
-        io->Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
-    #else
-        int bytes_per_pixel;
-        ImFontAtlas_GetTexDataAsRGBA32(io->Fonts, &font_pixels, &font_width, &font_height, &bytes_per_pixel);
-    #endif
-    sg_image_desc font_img_desc;
-    _simgui_clear(&font_img_desc, sizeof(font_img_desc));
-    font_img_desc.width = font_width;
-    font_img_desc.height = font_height;
-    font_img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    font_img_desc.data.subimage[0][0].ptr = font_pixels;
-    font_img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
-    font_img_desc.label = "sokol-imgui-font-image";
-    _simgui.font_img = sg_make_image(&font_img_desc);
-
-    io->Fonts->TexID = simgui_imtextureid_with_sampler(_simgui.font_img, _simgui.font_smp);
-}
-
-SOKOL_API_IMPL void simgui_destroy_fonts_texture(void) {
-    // NOTE: it's valid to call the destroy funcs with SG_INVALID_ID
-    sg_destroy_sampler(_simgui.font_smp);
-    sg_destroy_image(_simgui.font_img);
-    _simgui.font_smp.id = SG_INVALID_ID;
-    _simgui.font_img.id = SG_INVALID_ID;
 }
 
 SOKOL_API_IMPL void simgui_shutdown(void) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGui::DestroyContext();
-    #else
-        _SIMGUI_CFUNC(DestroyContext)(0);
-    #endif
+
+    const ImGuiPlatformIO* pio = _simgui_imgui_get_platform_io();
+    for (size_t i = 0; i < (size_t)pio->Textures.Size; i++) {
+        ImTextureData* tex = pio->Textures.Data[i];
+        if (tex->RefCount == 1) {
+            _simgui_destroy_texture(tex);
+        }
+    }
+    _simgui_imgui_destroy_context();
+
     // NOTE: it's valid to call the destroy funcs with SG_INVALID_ID
     sg_destroy_pipeline(_simgui.pip_unfilterable);
     sg_destroy_shader(_simgui.shd_unfilterable);
     sg_destroy_pipeline(_simgui.def_pip);
     sg_destroy_shader(_simgui.def_shd);
-    sg_destroy_sampler(_simgui.font_smp);
-    sg_destroy_image(_simgui.font_img);
     sg_destroy_sampler(_simgui.def_smp);
-    sg_destroy_image(_simgui.def_img);
     sg_destroy_buffer(_simgui.ibuf);
     sg_destroy_buffer(_simgui.vbuf);
     sg_pop_debug_group();
@@ -2631,19 +2887,19 @@ SOKOL_API_IMPL void simgui_shutdown(void) {
     _simgui.init_cookie = 0;
 }
 
-SOKOL_API_IMPL uint64_t simgui_imtextureid_with_sampler(sg_image img, sg_sampler smp) {
-    uint32_t img_id = img.id;
+SOKOL_API_IMPL uint64_t simgui_imtextureid_with_sampler(sg_view tex_view, sg_sampler smp) {
+    uint32_t view_id = tex_view.id;
     uint32_t smp_id = smp.id;
-    return (((uint64_t)smp_id)<<32) | img_id;
+    return (((uint64_t)smp_id)<<32) | view_id;
 }
 
-SOKOL_API_IMPL uint64_t simgui_imtextureid(sg_image img) {
-    return simgui_imtextureid_with_sampler(img, _simgui.def_smp);
+SOKOL_API_IMPL uint64_t simgui_imtextureid(sg_view tex_view) {
+    return simgui_imtextureid_with_sampler(tex_view, _simgui.def_smp);
 }
 
-SOKOL_API_IMPL sg_image simgui_image_from_imtextureid(uint64_t imtex_id) {
-    sg_image img = { (uint32_t)imtex_id };
-    return img;
+SOKOL_API_IMPL sg_view simgui_texture_view_from_imtextureid(uint64_t imtex_id) {
+    sg_view view = { (uint32_t)imtex_id };
+    return view;
 }
 
 SOKOL_API_IMPL sg_sampler simgui_sampler_from_imtextureid(uint64_t imtex_id) {
@@ -2657,17 +2913,7 @@ SOKOL_API_IMPL void simgui_new_frame(const simgui_frame_desc_t* desc) {
     SOKOL_ASSERT(desc->width > 0);
     SOKOL_ASSERT(desc->height > 0);
     _simgui.cur_dpi_scale = _simgui_def(desc->dpi_scale, 1.0f);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-    #endif
-    if (!io->Fonts->TexReady) {
-        simgui_destroy_fonts_texture();
-        simgui_font_tex_desc_t simgui_font_smp_desc;
-        _simgui_clear(&simgui_font_smp_desc, sizeof(simgui_font_smp_desc));
-        simgui_create_fonts_texture(&simgui_font_smp_desc);
-    }
+    ImGuiIO* io = _simgui_imgui_get_io();
     io->DisplaySize.x = ((float)desc->width) / _simgui.cur_dpi_scale;
     io->DisplaySize.y = ((float)desc->height) / _simgui.cur_dpi_scale;
     io->DeltaTime = (float)desc->delta_time;
@@ -2679,11 +2925,7 @@ SOKOL_API_IMPL void simgui_new_frame(const simgui_frame_desc_t* desc) {
             sapp_show_keyboard(false);
         }
         if (!_simgui.desc.disable_set_mouse_cursor) {
-            #if defined(__cplusplus)
-                ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-            #else
-                ImGuiMouseCursor imgui_cursor = _SIMGUI_CFUNC(GetMouseCursor)();
-            #endif
+            ImGuiMouseCursor imgui_cursor = _simgui_imgui_get_mouse_cursor();
             sapp_mouse_cursor cursor = sapp_get_mouse_cursor();
             switch (imgui_cursor) {
                 case ImGuiMouseCursor_Arrow:        cursor = SAPP_MOUSECURSOR_ARROW; break;
@@ -2700,48 +2942,43 @@ SOKOL_API_IMPL void simgui_new_frame(const simgui_frame_desc_t* desc) {
             sapp_set_mouse_cursor(cursor);
         }
     #endif
-    #if defined(__cplusplus)
-        ImGui::NewFrame();
-    #else
-        _SIMGUI_CFUNC(NewFrame)();
-    #endif
+    _simgui_imgui_newframe();
 }
 
-static sg_pipeline _simgui_bind_image_sampler(sg_bindings* bindings, ImTextureID imtex_id) {
-    bindings->images[0] = simgui_image_from_imtextureid(imtex_id);
+static sg_pipeline _simgui_bind_texture_sampler(sg_bindings* bindings, ImTextureID imtex_id) {
+    const sg_view tex_view = simgui_texture_view_from_imtextureid(imtex_id);
+    const sg_image img = sg_query_view_image(tex_view);
+    bindings->views[0] = tex_view;
     bindings->samplers[0] = simgui_sampler_from_imtextureid(imtex_id);
-    if (sg_query_pixelformat(sg_query_image_pixelformat(bindings->images[0])).filter) {
+    if (sg_query_pixelformat(sg_query_image_pixelformat(img)).filter) {
         return _simgui.def_pip;
     } else {
         return _simgui.pip_unfilterable;
     }
 }
 
-static ImDrawList* _simgui_imdrawlist_at(ImDrawData* draw_data, int cl_index) {
-    #if defined(__cplusplus)
-        return draw_data->CmdLists[cl_index];
-    #else
-        return draw_data->CmdLists.Data[cl_index];
-    #endif
-}
-
 SOKOL_API_IMPL void simgui_render(void) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGui::Render();
-        ImDrawData* draw_data = ImGui::GetDrawData();
-        ImGuiIO* io = &ImGui::GetIO();
-    #else
-        _SIMGUI_CFUNC(Render)();
-        ImDrawData* draw_data = _SIMGUI_CFUNC(GetDrawData)();
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_imgui_render();
+    ImDrawData* draw_data = _simgui_imgui_get_draw_data();
     if (0 == draw_data) {
         return;
     }
     if (draw_data->CmdListsCount == 0) {
         return;
     }
+
+    // catch up with texture updates
+    if (draw_data->Textures) {
+        for (size_t i = 0; i < (size_t)draw_data->Textures->Size; i++) {
+            ImTextureData* tex = draw_data->Textures->Data[i];
+            if (tex->Status != ImTextureStatus_OK) {
+                _simgui_update_texture(tex);
+            }
+        }
+    }
+
     /* copy vertices and indices into an intermediate buffer so that
        they can be updated with a single sg_update_buffer() call each
        (sg_append_buffer() has performance problems on some GL platforms),
@@ -2811,8 +3048,7 @@ SOKOL_API_IMPL void simgui_render(void) {
     _simgui_clear((void*)&bind, sizeof(bind));
     bind.vertex_buffers[0] = _simgui.vbuf;
     bind.index_buffer = _simgui.ibuf;
-    ImTextureID tex_id = io->Fonts->TexID;
-    _simgui_bind_image_sampler(&bind, tex_id);
+    ImTextureID tex_id = 0;
     int vb_offset = 0;
     int ib_offset = 0;
     for (int cl_index = 0; cl_index < cmd_list_count; cl_index++) {
@@ -2820,13 +3056,11 @@ SOKOL_API_IMPL void simgui_render(void) {
 
         bind.vertex_buffer_offsets[0] = vb_offset;
         bind.index_buffer_offset = ib_offset;
-        sg_apply_bindings(&bind);
+        if (tex_id != 0) {
+            sg_apply_bindings(&bind);
+        }
 
-        #if defined(__cplusplus)
-            const int num_cmds = cl->CmdBuffer.size();
-        #else
-            const int num_cmds = cl->CmdBuffer.Size;
-        #endif
+        const int num_cmds = _simgui_imdrawlist_cmd_buffer_size(cl);
         uint32_t vtx_offset = 0;
         for (int cmd_index = 0; cmd_index < num_cmds; cmd_index++) {
             ImDrawCmd* pcmd = &cl->CmdBuffer.Data[cmd_index];
@@ -2843,10 +3077,11 @@ SOKOL_API_IMPL void simgui_render(void) {
                     sg_apply_bindings(&bind);
                 }
             } else {
-                if ((tex_id != pcmd->TextureId) || (vtx_offset != pcmd->VtxOffset)) {
-                    tex_id = pcmd->TextureId;
+                ImTextureID cmd_tex_id = _simgui_imdrawcmd_gettexid(pcmd);
+                if ((tex_id != cmd_tex_id) || (vtx_offset != pcmd->VtxOffset)) {
+                    tex_id = cmd_tex_id;
                     vtx_offset = pcmd->VtxOffset;
-                    sg_pipeline pip = _simgui_bind_image_sampler(&bind, tex_id);
+                    sg_pipeline pip = _simgui_bind_texture_sampler(&bind, tex_id);
                     sg_apply_pipeline(pip);
                     sg_apply_uniforms(0, SG_RANGE_REF(vs_params));
                     bind.vertex_buffer_offsets[0] = vb_offset + (int)(pcmd->VtxOffset * sizeof(ImDrawVert));
@@ -2860,15 +3095,8 @@ SOKOL_API_IMPL void simgui_render(void) {
                 sg_draw((int)pcmd->IdxOffset, (int)pcmd->ElemCount, 1);
             }
         }
-        #if defined(__cplusplus)
-            const size_t vtx_size = (size_t)cl->VtxBuffer.size() * sizeof(ImDrawVert);
-            const size_t idx_size = (size_t)cl->IdxBuffer.size() * sizeof(ImDrawIdx);
-        #else
-            const size_t vtx_size = (size_t)cl->VtxBuffer.Size * sizeof(ImDrawVert);
-            const size_t idx_size = (size_t)cl->IdxBuffer.Size * sizeof(ImDrawIdx);
-        #endif
-        vb_offset += (int)vtx_size;
-        ib_offset += (int)idx_size;
+        vb_offset += _simgui_imdrawlist_vtx_buffer_size(cl) * (int)sizeof(ImDrawVert);
+        ib_offset += _simgui_imdrawlist_idx_buffer_size(cl) * (int)sizeof(ImDrawIdx);
     }
     sg_apply_viewport(0, 0, fb_width, fb_height, true);
     sg_apply_scissor_rect(0, 0, fb_width, fb_height, true);
@@ -2877,111 +3105,61 @@ SOKOL_API_IMPL void simgui_render(void) {
 
 SOKOL_API_IMPL void simgui_add_focus_event(bool focus) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddFocusEvent(focus);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddFocusEvent(io, focus);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_focus_event(io, focus);
 }
 
 SOKOL_API_IMPL void simgui_add_mouse_pos_event(float x, float y) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddMouseSourceEvent(ImGuiMouseSource_Mouse);
-        io->AddMousePosEvent(x, y);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddMouseSourceEvent(io, ImGuiMouseSource_Mouse);
-        ImGuiIO_AddMousePosEvent(io, x, y);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_mouse_source_event(io, ImGuiMouseSource_Mouse);
+    _simgui_io_add_mouse_pos_event(io, x, y);
 }
 
 SOKOL_API_IMPL void simgui_add_touch_pos_event(float x, float y) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-        io->AddMousePosEvent(x, y);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddMouseSourceEvent(io, ImGuiMouseSource_TouchScreen);
-        ImGuiIO_AddMousePosEvent(io, x, y);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_mouse_source_event(io, ImGuiMouseSource_TouchScreen);
+    _simgui_io_add_mouse_pos_event(io, x, y);
 }
 
 SOKOL_API_IMPL void simgui_add_mouse_button_event(int mouse_button, bool down) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddMouseSourceEvent(ImGuiMouseSource_Mouse);
-        io->AddMouseButtonEvent(mouse_button, down);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddMouseSourceEvent(io, ImGuiMouseSource_Mouse);
-        ImGuiIO_AddMouseButtonEvent(io, mouse_button, down);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_mouse_source_event(io, ImGuiMouseSource_Mouse);
+    _simgui_io_add_mouse_button_event(io, mouse_button, down);
 }
 
 SOKOL_API_IMPL void simgui_add_touch_button_event(int mouse_button, bool down) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-        io->AddMouseButtonEvent(mouse_button, down);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddMouseSourceEvent(io, ImGuiMouseSource_TouchScreen);
-        ImGuiIO_AddMouseButtonEvent(io, mouse_button, down);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_mouse_source_event(io, ImGuiMouseSource_TouchScreen);
+    _simgui_io_add_mouse_button_event(io, mouse_button, down);
 }
 
 SOKOL_API_IMPL void simgui_add_mouse_wheel_event(float wheel_x, float wheel_y) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddMouseSourceEvent(ImGuiMouseSource_Mouse);
-        io->AddMouseWheelEvent(wheel_x, wheel_y);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddMouseSourceEvent(io, ImGuiMouseSource_Mouse);
-        ImGuiIO_AddMouseWheelEvent(io, wheel_x, wheel_y);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_mouse_source_event(io, ImGuiMouseSource_Mouse);
+    _simgui_io_add_mouse_wheel_event(io, wheel_x, wheel_y);
 }
 
 SOKOL_API_IMPL void simgui_add_key_event(int imgui_key, bool down) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddKeyEvent((ImGuiKey)imgui_key, down);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddKeyEvent(io, (ImGuiKey)imgui_key, down);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_key_event(io, (ImGuiKey)imgui_key, down);
 }
 
 SOKOL_API_IMPL void simgui_add_input_character(uint32_t c) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddInputCharacter(c);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddInputCharacter(io, c);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_input_character(io, c);
 }
 
 SOKOL_API_IMPL void simgui_add_input_characters_utf8(const char* c) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-        io->AddInputCharactersUTF8(c);
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-        ImGuiIO_AddInputCharactersUTF8(io, c);
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
+    _simgui_io_add_input_characters_utf8(io, c);
 }
 
 #if !defined(SOKOL_IMGUI_NO_SOKOL_APP)
@@ -3106,26 +3284,14 @@ _SOKOL_PRIVATE ImGuiKey _simgui_map_keycode(sapp_keycode key) {
 
 _SOKOL_PRIVATE void _simgui_add_sapp_key_event(ImGuiIO* io, sapp_keycode sapp_key, bool down) {
     const ImGuiKey imgui_key = _simgui_map_keycode(sapp_key);
-    #if defined(__cplusplus)
-        io->AddKeyEvent(imgui_key, down);
-    #else
-        ImGuiIO_AddKeyEvent(io, imgui_key, down);
-    #endif
-}
-
-_SOKOL_PRIVATE void _simgui_add_imgui_key_event(ImGuiIO* io, ImGuiKey imgui_key, bool down) {
-    #if defined(__cplusplus)
-        io->AddKeyEvent(imgui_key, down);
-    #else
-        ImGuiIO_AddKeyEvent(io, imgui_key, down);
-    #endif
+    _simgui_io_add_key_event(io, imgui_key, down);
 }
 
 _SOKOL_PRIVATE void _simgui_update_modifiers(ImGuiIO* io, uint32_t mods) {
-    _simgui_add_imgui_key_event(io, ImGuiMod_Ctrl, (mods & SAPP_MODIFIER_CTRL) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiMod_Shift, (mods & SAPP_MODIFIER_SHIFT) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiMod_Alt, (mods & SAPP_MODIFIER_ALT) != 0);
-    _simgui_add_imgui_key_event(io, ImGuiMod_Super, (mods & SAPP_MODIFIER_SUPER) != 0);
+    _simgui_io_add_key_event(io, ImGuiMod_Ctrl, (mods & SAPP_MODIFIER_CTRL) != 0);
+    _simgui_io_add_key_event(io, ImGuiMod_Shift, (mods & SAPP_MODIFIER_SHIFT) != 0);
+    _simgui_io_add_key_event(io, ImGuiMod_Alt, (mods & SAPP_MODIFIER_ALT) != 0);
+    _simgui_io_add_key_event(io, ImGuiMod_Super, (mods & SAPP_MODIFIER_SUPER) != 0);
 }
 
 // returns Ctrl or Super, depending on platform
@@ -3141,11 +3307,7 @@ SOKOL_API_IMPL int simgui_map_keycode(sapp_keycode keycode) {
 SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
     SOKOL_ASSERT(_SIMGUI_INIT_COOKIE == _simgui.init_cookie);
     const float dpi_scale = _simgui.cur_dpi_scale;
-    #if defined(__cplusplus)
-        ImGuiIO* io = &ImGui::GetIO();
-    #else
-        ImGuiIO* io = _SIMGUI_CFUNC(GetIO)();
-    #endif
+    ImGuiIO* io = _simgui_imgui_get_io();
     switch (ev->type) {
         case SAPP_EVENTTYPE_FOCUSED:
             simgui_add_focus_event(true);
@@ -3247,10 +3409,10 @@ SOKOL_API_IMPL bool simgui_handle_event(const sapp_event* ev) {
         case SAPP_EVENTTYPE_CLIPBOARD_PASTED:
             // simulate a Ctrl-V key down/up
             if (!_simgui.desc.disable_paste_override) {
-                _simgui_add_imgui_key_event(io, _simgui_copypaste_modifier(), true);
-                _simgui_add_imgui_key_event(io, ImGuiKey_V, true);
-                _simgui_add_imgui_key_event(io, ImGuiKey_V, false);
-                _simgui_add_imgui_key_event(io, _simgui_copypaste_modifier(), false);
+                _simgui_io_add_key_event(io, _simgui_copypaste_modifier(), true);
+                _simgui_io_add_key_event(io, ImGuiKey_V, true);
+                _simgui_io_add_key_event(io, ImGuiKey_V, false);
+                _simgui_io_add_key_event(io, _simgui_copypaste_modifier(), false);
             }
             break;
         default:

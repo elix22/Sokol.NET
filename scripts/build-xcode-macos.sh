@@ -10,7 +10,7 @@ cmake ../ext -GXcode
 cmake --build . --config Release
 
 # Create directory
-mkdir -p "../NativeLibs/macos/$ARCH"
-cp -f Release/libsokol.dylib ../NativeLibs/macos/$ARCH/libsokol.dylib
+mkdir -p "../libs/macos/$ARCH"
+cp -f Release/libsokol.dylib ../libs/macos/$ARCH/libsokol.dylib
 cd ..
 rm -rf build-xcode-macos
