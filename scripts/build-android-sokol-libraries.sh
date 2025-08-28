@@ -10,8 +10,8 @@ do
     rm -rf $BUILD_DIR
     mkdir -p $BUILD_DIR
     cd $BUILD_DIR
-    
-    # Configure and build
+
+    # Configure and build $ANDROID_NDK is an environment variable and must be configured with the full Android NDK path
     cmake ../ext \
         -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
         -DANDROID_ABI=$ABI \
@@ -21,10 +21,10 @@ do
     cmake --build .
     
    cd ..
-    mkdir -p "NativeLibs/android/${ABI}"
-    cp -f "${BUILD_DIR}/libsokol.so" "NativeLibs/android/${ABI}/libsokol.so"
+    mkdir -p "libs/android/${ABI}"
+    cp -f "${BUILD_DIR}/libsokol.so" "libs/android/${ABI}/libsokol.so"
     
-    if [ ! -f "NativeLibs/android/${ABI}/libsokol.so" ]; then
+    if [ ! -f "libs/android/${ABI}/libsokol.so" ]; then
         echo "Error: Failed to copy libsokol.so for ${ABI}"
         exit 1
     fi

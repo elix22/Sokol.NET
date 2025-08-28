@@ -9,8 +9,8 @@ cd  build-xcode-ios
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_OSX_ARCHITECTURES="arm64" ../ext
 cmake --build . --config Release
 
-mkdir -p "../NativeLibs/ios/arm64"
-cp -rf Release-iphoneos/sokol.framework ../NativeLibs/ios/arm64/
+mkdir -p "../libs/ios/arm64"
+cp -rf Release-iphoneos/sokol.framework ../libs/ios/arm64/
 
 cd ..
 rm -rf build-xcode-ios
@@ -26,4 +26,4 @@ lipo -create  RotatingCubeExample/bin/Release/net9.0/ios-arm64/publish/libRotati
 cp  RotatingCubeExample/Info.plist RotatingCubeExample.framework/Info.plist
 cp -rf RotatingCubeExample.framework iOS/NativeAotTestApp
 rm -rf RotatingCubeExample.framework
-cp -rf  NativeLibs/ios/arm64/sokol.framework iOS/NativeAotTestApp
+cp -rf  libs/ios/arm64/sokol.framework iOS/NativeAotTestApp

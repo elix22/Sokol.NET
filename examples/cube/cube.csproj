@@ -18,6 +18,8 @@
 		<IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
   </PropertyGroup>
 
+    <!-- Import Android NDK pressets -->
+   <Import Project="BionicNativeAot.targets"/>
 
   <ItemGroup>
     <AssetsSourceFiles Include="Assets/**/*.*" />
