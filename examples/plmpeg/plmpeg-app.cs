@@ -20,79 +20,8 @@ using static Sokol.SG.sg_wrap;
 using static Sokol.SG.sg_load_action;
 using static plmpeg_sapp_shader_cs.Shaders;
 using System.Diagnostics;
-public static unsafe class PlMpegApp
+public static unsafe partial class PlMpegApp
 {
-
-    public struct plm_buffer_t { };
-    public struct plm_t { };
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct plm_plane_t
-    {
-        public uint width;
-        public uint height;
-        public byte* data;
-    };
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct plm_frame_t
-    {
-        public double time;
-        public uint width;
-        public uint height;
-        public plm_plane_t y;
-        public plm_plane_t cr;
-        public plm_plane_t cb;
-    };
-
-    const int PLM_AUDIO_SAMPLES_PER_FRAME = 1152;
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct plm_samples_t
-    {
-        public double time;
-        public uint count;
-        public fixed float interleaved[PLM_AUDIO_SAMPLES_PER_FRAME * 2];
-    };
-
-    const string filename = "bjork-all-is-full-of-love.mpg";
-
-    const int BUFFER_SIZE = (1024 * 1024);
-    const int CHUNK_SIZE = (128 * 1024);
-    const int NUM_BUFFERS = (4);
-
-    /*************************************************************************************************/
-    // These buffers must be manually destroyed , because they are not managed by the Garbage Collector
-    /*************************************************************************************************/
-    static SharedBuffer[] sharedBuffer = new SharedBuffer[NUM_BUFFERS];
-
-    const int RING_NUM_SLOTS = (NUM_BUFFERS + 1);
-
-    class ring_t
-    {
-        public uint head;
-        public uint tail;
-        public int[] buf = new int[RING_NUM_SLOTS];
-    };
-
-    // a vertex with position, normal and texcoords
-    [StructLayout(LayoutKind.Sequential)]
-    struct vertex_t
-    {
-        public float x, y, z;
-        public float nx, ny, nz;
-        public float u, v;
-    };
-    
-
-    public struct images_t
-    {
-        public int width;
-        public int height;
-        public ulong last_upd_frame;
-        public sg_image img;
-    };
-
     // application state
     class _state
     {
@@ -114,70 +43,6 @@ public static unsafe class PlMpegApp
     static _state state = new _state();
 
     static bool PauseUpdate = false;
-
-    private static IntPtr _descPtr = IntPtr.Zero;
-
-
-
-#if __IOS__
-      const string  sokol_lib = "@rpath/sokol.framework/sokol";
-#else
-    const string sokol_lib = "sokol";
-#endif
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int plm_decode(plm_t* self, double tick);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern plm_buffer_t* plm_buffer_create_with_capacity(int capacity);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_buffer_set_load_callback(plm_buffer_t* self, delegate* unmanaged<plm_buffer_t*, void*, void> fp, void* user);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern plm_t* plm_create_with_buffer(plm_buffer_t* buffer, int destroy_when_done);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_set_video_decode_callback(plm_t* self, delegate* unmanaged<plm_t*, plm_frame_t*, void*, void> fp, void* user);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_set_audio_decode_callback(plm_t* self, delegate* unmanaged<plm_t*, plm_samples_t*, void*, void> fp, void* user);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_set_loop(plm_t* self, int loop);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_set_audio_enabled(plm_t* self, int enabled, int stream_index);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_set_audio_lead_time(plm_t* self, double lead_time);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int plm_get_num_audio_streams(plm_t* self);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int plm_get_samplerate(plm_t* self);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_buffer_destroy(plm_buffer_t* self);
-
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_buffer_discard_read_bytes(plm_buffer_t* self);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern byte* plm_buffer_get_bytes(plm_buffer_t* self);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int plm_buffer_get_length(plm_buffer_t* self);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void plm_buffer_set_length(plm_buffer_t* self, int length);
-
-    [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int plm_buffer_get_capacity(plm_buffer_t* self);
-
-
 
 
     [UnmanagedCallersOnly]
@@ -395,7 +260,8 @@ public static unsafe class PlMpegApp
 
         // copy decoded plane pixels into texture, need to prevent that
         // sg_update_image() is called more than once per frame
-        if (state.images[slot].last_upd_frame != state.cur_frame) {
+        if (state.images[slot].last_upd_frame != state.cur_frame)
+        {
             state.images[slot].last_upd_frame = state.cur_frame;
             sg_image_data image_data = default;
             image_data.subimage[0, 0] = new sg_range() { ptr = plane->data, size = (uint)(plane->width * plane->height * sizeof(byte)) };
@@ -487,24 +353,16 @@ public static unsafe class PlMpegApp
         }
     }
 
-
-
-
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
-
         SharedBuffer.DisposeAll();
 
         if (state.plm_buffer != null)
         {
             plm_buffer_destroy(state.plm_buffer);
         }
+        
         sg_shutdown();
 
         if (Debugger.IsAttached)
@@ -587,6 +445,6 @@ public static unsafe class PlMpegApp
             icon = { sokol_default = true },
         };
     }
-    
+
 
 }

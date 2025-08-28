@@ -28,10 +28,15 @@
   </ItemGroup>
 
   <ItemGroup>
-      <Compile Include="../../src/sokol/*.cs" />
-      <Compile Include="../../src/sokol/generated/*.cs" />
+      <Compile Include="../../src/sokol/*.cs" >
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Include="../../src/sokol/generated/*.cs">
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
   </ItemGroup>
 
+  
 <PropertyGroup>
   <!-- If __ANDROID__ is defined, force Android (and set IsAndroid to true) -->
   <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
