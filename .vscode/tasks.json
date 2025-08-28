@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+            "label": "compile-cube-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/cube/cube.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+		{
+            "label": "compile-dyntex-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/dyntex/dyntex.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+	]
+}

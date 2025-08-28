@@ -5,7 +5,7 @@ using System.Numerics;
 using static Sokol.SApp;
 using static Sokol.SG;
 using static Sokol.SGlue;
-using static cube_sapp_shader_cs.Shaders;
+using static cube_app_shader_cs.Shaders;
 using static Sokol.SG.sg_vertex_format;
 using static Sokol.SG.sg_index_type;
 using static Sokol.SG.sg_cull_mode;
@@ -30,7 +30,7 @@ public static unsafe class CubeSapp
     [UnmanagedCallersOnly]
     private static unsafe void Init()
     {
-        Console.WriteLine("CubeProgramRaw Initialize() Enter");
+        Console.WriteLine("Initialize() Enter");
 
         sg_setup(new sg_desc()
         {
@@ -103,7 +103,7 @@ public static unsafe class CubeSapp
         }
 
 
-        sg_shader shd = sg_make_shader(cube_sapp_shader_cs.Shaders.cube_shader_desc(sg_query_backend()));
+        sg_shader shd = sg_make_shader(cube_app_shader_cs.Shaders.cube_shader_desc(sg_query_backend()));
 
         var pipeline_desc = default(sg_pipeline_desc);
         pipeline_desc.layout.buffers[0].stride = 28;
@@ -205,7 +205,7 @@ public static unsafe class CubeSapp
         }
     }
 
-    public static SApp.sapp_desc CreateApplicationDescriptor()
+    public static SApp.sapp_desc sokol_main()
     {
         return new SApp.sapp_desc()
         {
@@ -219,22 +219,6 @@ public static unsafe class CubeSapp
             window_title = "Cube (sokol-app)",
             icon = { sokol_default = true },
         };
-    }
-
-
-    public static IntPtr RunAndroidMain()
-    {
-        Console.WriteLine("RunAndroidMain() Enter");
-        var desc = CreateApplicationDescriptor();
-        _descPtr = Marshal.AllocHGlobal(Marshal.SizeOf(desc));
-        Marshal.StructureToPtr(desc, _descPtr, false);
-        return _descPtr;
-    }
-
-    public static unsafe void RunMain()
-    {
-        Console.WriteLine("RunMain() Enter");
-        SApp.sapp_run(CreateApplicationDescriptor());
     }
 
 }

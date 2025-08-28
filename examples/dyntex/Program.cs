@@ -8,7 +8,7 @@ public static unsafe class MainClass
     // Host platform entry point
     public static unsafe void Main()
     {
-        SApp.sapp_run(CubeSapp.sokol_main());
+        SApp.sapp_run(DynTextApp.sokol_main());
     }
 
     static IntPtr _descPtr = IntPtr.Zero;
@@ -16,7 +16,7 @@ public static unsafe class MainClass
     public static unsafe IntPtr AndroidMain()
     {
         Console.WriteLine(" AndroidMain() Enter");
-        SApp.sapp_desc desc = CubeSapp.sokol_main();
+        SApp.sapp_desc desc = DynTextApp.sokol_main();
         _descPtr = Marshal.AllocHGlobal(Marshal.SizeOf(desc));
         Marshal.StructureToPtr(desc, _descPtr, false);
         return _descPtr;
@@ -26,7 +26,7 @@ public static unsafe class MainClass
     public static unsafe void IOSMain()
     {
         Console.WriteLine(" IOSMain() Enter");
-        SApp.sapp_run(CubeSapp.sokol_main());
+        SApp.sapp_run(DynTextApp.sokol_main());
     }
 
 }
