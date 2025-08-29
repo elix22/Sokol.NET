@@ -22,9 +22,9 @@ dotnet msbuild -t:CompileShaders -p:DefineConstants="__IOS__"
 dotnet publish -r  ios-arm64 -c Release -p:BuildAsLibrary=true  -p:DefineConstants="__IOS__"
 
 mkdir -p ios/frameworks/${APPNAME}.framework
-install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib 
-install_name_tool -id @rpath/${APPNAME}.framework/${APPNAME} bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib 
-lipo -create  bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib -output ios/frameworks/${APPNAME}.framework/${APPNAME}
+install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/net9.0/ios-arm64/publish/lib${APPNAME}.dylib 
+install_name_tool -id @rpath/${APPNAME}.framework/${APPNAME} bin/Release/net9.0/ios-arm64/publish/lib${APPNAME}.dylib 
+lipo -create  bin/Release/net9.0/ios-arm64/publish/lib${APPNAME}.dylib -output ios/frameworks/${APPNAME}.framework/${APPNAME}
 cp -f scripts/Info.plist ios/frameworks/${APPNAME}.framework/Info.plist
 
 cp -f scripts/CMakeLists.txt ios/CMakeLists.txt
