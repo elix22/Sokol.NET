@@ -3,6 +3,7 @@
 
 # Get architecture
 ARCH=$(uname -m)
+APPNAME=cube
 rm -rf build-xcode-ios
 mkdir -p build-xcode-ios
 cd  build-xcode-ios
@@ -20,11 +21,11 @@ dotnet msbuild -t:CompileShaders -p:DefineConstants="__IOS__"
 
 dotnet publish -r  ios-arm64 -c Release -p:BuildAsLibrary=true  -p:DefineConstants="__IOS__"
 
-mkdir -p ios/frameworks/cube.framework
-install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/net9.0/ios-arm64/publish/cube.dylib 
-install_name_tool -id @rpath/cube.framework/cube bin/Release/net9.0/ios-arm64/publish/cube.dylib 
-lipo -create  bin/Release/net9.0/ios-arm64/publish/cube.dylib -output ios/frameworks/cube.framework/cube
-cp -f scripts/Info.plist ios/frameworks/cube.framework/Info.plist
+mkdir -p ios/frameworks/${APPNAME}.framework
+install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib 
+install_name_tool -id @rpath/${APPNAME}.framework/${APPNAME} bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib 
+lipo -create  bin/Release/net9.0/ios-arm64/publish/${APPNAME}.dylib -output ios/frameworks/${APPNAME}.framework/${APPNAME}
+cp -f scripts/Info.plist ios/frameworks/${APPNAME}.framework/Info.plist
 
 cp -f scripts/CMakeLists.txt ios/CMakeLists.txt
 cp -f scripts/main.m ios/main.m

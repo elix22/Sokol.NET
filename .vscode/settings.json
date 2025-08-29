@@ -80,6 +80,7 @@
         "__tree": "cpp",
         "hash_map": "cpp",
         "list": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "cgltf.h": "c"
     }
 }
