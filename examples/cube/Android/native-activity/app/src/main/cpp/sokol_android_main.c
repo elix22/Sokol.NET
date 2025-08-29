@@ -1,6 +1,18 @@
 
 #define SOKOL_IMPL
 #define SOKOL_GLES3
+#include <pthread.h>
+#include <unistd.h>
+#include <time.h>
+#include <android/native_window.h>
+#include <android/window.h>
+#include <android/native_activity.h>
+#include <android/looper.h>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
+#include <android/log.h>
+#include <EGL/egl.h>
+#include <GLES3/gl3.h>
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_glue.h"
@@ -9,7 +21,6 @@
 #include "sokol_log.h"
 #include "sokol_shape.h"
 #include "sokol_gl.h"
-#include "sokol_gp.h"
 #define SOKOL_DEBUGTEXT_IMPL
 #include "sokol_debugtext.h"
 #define PL_MPEG_IMPLEMENTATION
@@ -17,10 +28,10 @@
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
-#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#include "cimgui.h"
-#define SOKOL_IMGUI_IMPL
-#include "sokol_imgui.h"
+// #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+// #include "cimgui.h"
+// #define SOKOL_IMGUI_IMPL
+// #include "sokol_imgui.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -33,15 +44,19 @@ extern "C"
    off_t android_size(void *handle);
    int android_close(void *handle);
 
+   const char *fileutil_get_path(const char *filename, char *buf, size_t buf_size)
+   {
+      snprintf(buf, buf_size, "%s", filename);
+      return buf;
+   }
+
 #ifdef __cplusplus
 }
 #endif
 
 #include "sokol_fetch.h"
 
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-#include <android/log.h>
+
 
 extern void *AndroidMain();
 

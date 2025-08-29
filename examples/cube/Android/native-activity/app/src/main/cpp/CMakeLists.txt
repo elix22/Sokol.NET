@@ -46,10 +46,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-add_library(sokol SHARED sokol_android_main.c util/fileutil.c ${IMGUI_SOURCE_FILES})
+add_library(sokol SHARED sokol_android_main.c ${IMGUI_SOURCE_FILES})
 
 target_include_directories(sokol PRIVATE
-    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR}/dcimgui/src .)
+    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR}/dcimgui/src ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf .)
 
 target_compile_options(sokol PRIVATE
     -Werror

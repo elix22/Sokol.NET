@@ -18,6 +18,27 @@
 		<IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
   </PropertyGroup>
 
+    <!-- Library-specific settings -->
+  <PropertyGroup Condition="'$(BuildAsLibrary)' == 'true'">
+    <LibraryName>lib$(MSBuildProjectName)</LibraryName>
+    <AssemblyName>$(LibraryName)</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+
+
+  <PropertyGroup>
+    <!-- If __ANDROID__ is defined, force Android (and set IsAndroid to true) -->
+    <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
+    <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__ANDROID__'))">glsl300es</ShaderSlang>
+    <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__IOS__'))">metal_ios</ShaderSlang>
+    <!-- Fallback, if no constant was defined -->
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsAndroid)'=='true'">glsl300es</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsOSX)'=='true'">metal_macos</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsWindows)'=='true'">hlsl5</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsLinux)'=='true'">glsl430</ShaderSlang>
+  </PropertyGroup>
+
     <!-- Import Android NDK pressets -->
    <Import Project="BionicNativeAot.targets"/>
 
@@ -38,17 +59,50 @@
       </Compile>
   </ItemGroup>
 
-<PropertyGroup>
-  <!-- If __ANDROID__ is defined, force Android (and set IsAndroid to true) -->
-  <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
-  <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__ANDROID__'))">glsl300es</ShaderSlang>
-  <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__IOS__'))">metal_ios</ShaderSlang>
-  <!-- Fallback, if no constant was defined -->
-  <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsAndroid)'=='true'">glsl300es</ShaderSlang>
-  <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsOSX)'=='true'">metal_macos</ShaderSlang>
-  <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsWindows)'=='true'">hlsl5</ShaderSlang>
-  <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsLinux)'=='true'">glsl430</ShaderSlang>
-</PropertyGroup>
+  	<!--Following blocks are exclusive for Android building-->
+	<PropertyGroup Condition="$(IsAndroid) == 'true'">
+        <!--Use ndk-sample expected library name -->
+		<CppCompilerAndLinker Condition="$(IsWindowsHost) == 'true'">./scripts/android_fake_clang.cmd</CppCompilerAndLinker>
+		<CppCompilerAndLinker Condition="$(IsLinuxHost) == 'true'">./scripts/android_fake_clang.sh</CppCompilerAndLinker>
+		<CppCompilerAndLinker Condition="$(IsOSXHost) == 'true'">./scripts/android_fake_clang.command</CppCompilerAndLinker>
+		<NdkHost Condition="$(IsWindowsHost) == 'true'">windows-x86_64</NdkHost>
+		<NdkHost Condition="$(IsLinuxHost) == 'true'">linux-x86_64</NdkHost>
+		<NdkHost Condition="$(IsOSXHost) == 'true'">darwin-x86_64</NdkHost>
+		<ObjCopyName Condition="'$(ObjCopyName)' == ''">$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(NdkHost)/bin/llvm-objcopy</ObjCopyName>
+		<SysRoot Condition="'$(SysRoot)' == ''">$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(NdkHost)/sysroot</SysRoot>
+		<!--Hack for removing init and fini sections into the exports file-->
+		<ExportsPatch>'s/global: _init; _fini;/global: /g;'</ExportsPatch>
+	</PropertyGroup>
+
+  	<Target Name="RemoveSections" Condition="$(IsAndroid) == 'true' And $(RemoveSections) == 'true'" AfterTargets="IlcCompile" BeforeTargets="LinkNative">
+		<!--Reads as lines the generated exports file-->
+		<ReadLinesFromFile File="$(ExportsFile)">
+			<Output TaskParameter="Lines" PropertyName="ExportsLines" />
+		</ReadLinesFromFile>
+		<!--Gets a single text from the exports lines-->
+		<PropertyGroup>
+			<ExportsText Condition="$(ExportsLines) != ''">@(ExportsLines)</ExportsText>
+		</PropertyGroup>
+		<!--The sed tool is used as invalid lines remover-->
+		<Exec Command="sed -i -z $(ExportsPatch) $(ExportsFile)" />
+	</Target>
+
+  <ItemGroup Condition="'$(IsAndroid)' == 'true'">
+    <!-- https://github.com/exelix11/SysDVR/blob/master/Client/Client.csproj -->
+    <!-- Android needs a proper soname property or it will refuse to load the library -->
+    <LinkerArg Include="-Wl,-soname,$(LibraryName).so,--undefined-version" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="$(IsAndroid) == 'true'">
+    <!-- Architecture mapping -->
+    <LibraryOutputBase>Android/native-activity/app/libs</LibraryOutputBase>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm64'))">$(LibraryOutputBase)/arm64-v8a</ArchitectureOutputPath>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm'))">$(LibraryOutputBase)/armeabi-v7a</ArchitectureOutputPath>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('x64'))">$(LibraryOutputBase)/x86_64</ArchitectureOutputPath>
+  </PropertyGroup>
+
+
+
 
   <PropertyGroup>
     <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_ios'">ios</HostShaderFolder>
@@ -88,6 +142,29 @@
   </Target>
 
 
+
+  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" 
+          Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+      <PropertyGroup>
+          <BuiltLibrary>$(PublishDir)/$(LibraryName).so</BuiltLibrary>
+      </PropertyGroup>
+      <Error Condition="!Exists('$(BuiltLibrary)')" 
+            Text="Built library not found at $(BuiltLibrary)" />
+      <MakeDir Directories="$(ArchitectureOutputPath)" />
+      <Copy SourceFiles="$(BuiltLibrary)"
+            DestinationFolder="$(ArchitectureOutputPath)"
+            SkipUnchangedFiles="true" />
+      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" 
+              Importance="high" />
+  </Target>
+
+  <Target Name="CopyAssetsToAndroidFolder" AfterTargets="Publish" Condition="'$(IsAndroid)'=='true'">
+    <Message Text="Copying assets to Android app/src/main/assets folder..." Importance="high" />
+    <Copy 
+      SourceFiles="@(AssetsSourceFiles)" 
+      DestinationFiles="@(AssetsSourceFiles->'Android/native-activity/app/src/main/assets\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
+  </Target>
 
 
 </Project>
