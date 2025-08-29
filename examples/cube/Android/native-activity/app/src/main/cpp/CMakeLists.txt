@@ -20,6 +20,8 @@ project(sokol)
 # build native_app_glue as a static lib
 set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
 
+set(APP_NAME "cube")
+
 set(EXT_ROOT_DIR "../../../../../../../../ext")
 
 set(IMGUI_SOURCE_FILES
@@ -61,11 +63,11 @@ set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES
 
 set(PREBUILT_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs)
 
-add_library(RotatingCubeExample SHARED IMPORTED)
-set_target_properties(RotatingCubeExample PROPERTIES 
-    IMPORTED_LOCATION ${PREBUILT_LIB_PATH}/${ANDROID_ABI}/libRotatingCubeExample.so
+add_library(${APP_NAME} SHARED IMPORTED)
+set_target_properties(${APP_NAME} PROPERTIES 
+    IMPORTED_LOCATION ${PREBUILT_LIB_PATH}/${ANDROID_ABI}/lib${APP_NAME}.so
      # Ensure library name matches what Android expects
-    IMPORTED_SONAME "libRotatingCubeExample.so")
+    IMPORTED_SONAME "lib${APP_NAME}.so")
 
 # add lib dependencies
 target_link_libraries(sokol
@@ -77,5 +79,5 @@ target_link_libraries(sokol
     GLESv3
     aaudio
     log
-    RotatingCubeExample
+    ${APP_NAME}
 )

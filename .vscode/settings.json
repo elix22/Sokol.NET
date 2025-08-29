@@ -82,5 +82,6 @@
         "list": "cpp",
         "ranges": "cpp",
         "cgltf.h": "c"
-    }
+    },
+    "java.configuration.updateBuildConfiguration": "disabled"
 }
