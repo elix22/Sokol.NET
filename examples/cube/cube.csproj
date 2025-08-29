@@ -40,7 +40,7 @@
   </PropertyGroup>
 
     <!-- Import Android NDK pressets -->
-   <Import Project="BionicNativeAot.targets"/>
+   <Import Project="scripts/BionicNativeAot.targets"/>
 
   <ItemGroup>
     <AssetsSourceFiles Include="Assets/**/*.*" />
