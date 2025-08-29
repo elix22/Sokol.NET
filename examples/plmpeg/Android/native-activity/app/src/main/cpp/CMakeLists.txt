@@ -20,6 +20,7 @@ project(sokol)
 # build native_app_glue as a static lib
 set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
 
+
 set(EXT_ROOT_DIR "../../../../../../../../ext")
 
 set(IMGUI_SOURCE_FILES
