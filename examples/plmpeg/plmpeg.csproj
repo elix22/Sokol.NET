@@ -4,11 +4,14 @@
     <OutputType Condition="'$(BuildAsLibrary)' != 'true'">Exe</OutputType>
     <OutputType Condition="'$(BuildAsLibrary)' == 'true'">Library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+    <TrimMode>partial</TrimMode>
+    <TrimmerRemoveSymbols>false</TrimmerRemoveSymbols>
     <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
     <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
     <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
@@ -135,7 +138,7 @@
       <PropertyGroup>
         <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found " /> 
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found are you sure URHONET_HOME_ROOT is pointing to the right place ?" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
        <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
@@ -148,7 +151,6 @@
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
-
 
 
   <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" 

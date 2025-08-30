@@ -317,6 +317,11 @@ public static unsafe partial class PlMpegApp
                 sfetch_continue(response->handle);
             }
         }
+        else
+        {
+            // error or aborted
+            Console.WriteLine($"sfetch error or aborted (0x{(int)response->error_code:x})");
+        }
     }
 
 
