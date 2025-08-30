@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(cube-ios-app)
+project(dyntex-ios-app)
 
 # Set iOS deployment target
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum iOS deployment version")
@@ -18,13 +18,13 @@ set(SOURCES
 )
 
 # Create the iOS application executable
-add_executable(cube-ios-app ${SOURCES})
+add_executable(dyntex-ios-app ${SOURCES})
 
 # Set iOS-specific properties
-set_target_properties(cube-ios-app PROPERTIES
+set_target_properties(dyntex-ios-app PROPERTIES
     MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.elix22.cube-ios-app"
-    MACOSX_BUNDLE_BUNDLE_NAME "Cube iOS App"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.elix22.dyntex-ios-app"
+    MACOSX_BUNDLE_BUNDLE_NAME "Dyntex iOS App"
     MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
     XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "YES"
@@ -48,34 +48,26 @@ set_target_properties(cube-ios-app PROPERTIES
 # Embed the frameworks
 set(FRAMEWORK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/frameworks")
 
-# Embed sokol.framework
-set_source_files_properties(
-    "${FRAMEWORK_DIR}/sokol.framework"
-    PROPERTIES
-    MACOSX_PACKAGE_LOCATION Frameworks
-    XCODE_FILE_ATTRIBUTES "CodeSignOnCopy;RemoveHeadersOnCopy"
-)
-target_sources(cube-ios-app PRIVATE "${FRAMEWORK_DIR}/sokol.framework")
 
-# Embed cube.framework
-set_source_files_properties(
-    "${FRAMEWORK_DIR}/cube.framework"
-    PROPERTIES
-    MACOSX_PACKAGE_LOCATION Frameworks
-    XCODE_FILE_ATTRIBUTES "CodeSignOnCopy;RemoveHeadersOnCopy"
+set(CMAKE_XCODE_ATTRIBUTE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/dyntex.framework")
+set_target_properties(dyntex-ios-app PROPERTIES
+    XCODE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/dyntex.framework"
+    XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY ON
+    XCODE_ATTRIBUTE_STRIP_STYLE "non-global"
+    XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "NO"
+    XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "NO"
 )
-target_sources(cube-ios-app PRIVATE "${FRAMEWORK_DIR}/cube.framework")
 
 # Link against the frameworks
-target_link_libraries(cube-ios-app
+target_link_libraries(dyntex-ios-app
     "-F${FRAMEWORK_DIR}"
     "-framework sokol"
-    "-framework cube"
+    "-framework dyntex"
     "-framework UIKit"
     "-framework Foundation"
 )
 
 # Set the output directory for the app bundle
-set_target_properties(cube-ios-app PROPERTIES
+set_target_properties(dyntex-ios-app PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )

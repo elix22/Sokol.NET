@@ -1,9 +1,23 @@
 
 #!/bin/bash
 
+# iOS Build Script
+# Usage: ./build-xcode-ios.sh <project-file.csproj>
+# Example: ./build-xcode-ios.sh cube.csproj
+
+# Check if project file is provided as argument
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <project-file.csproj>"
+    echo "Example: $0 cube.csproj"
+    exit 1
+fi
+
+# Get the project file name and extract APPNAME
+PROJECT_FILE=$1
+APPNAME=$(basename "$PROJECT_FILE" .csproj)
+
 # Get architecture
 ARCH=$(uname -m)
-APPNAME=cube
 rm -rf build-xcode-ios
 mkdir -p build-xcode-ios
 cd  build-xcode-ios

@@ -48,23 +48,19 @@ set_target_properties(cube-ios-app PROPERTIES
 # Embed the frameworks
 set(FRAMEWORK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/frameworks")
 
-# Embed sokol.framework
-set_source_files_properties(
-    "${FRAMEWORK_DIR}/sokol.framework"
-    PROPERTIES
-    MACOSX_PACKAGE_LOCATION Frameworks
-    XCODE_FILE_ATTRIBUTES "CodeSignOnCopy;RemoveHeadersOnCopy"
-)
-target_sources(cube-ios-app PRIVATE "${FRAMEWORK_DIR}/sokol.framework")
 
-# Embed cube.framework
-set_source_files_properties(
-    "${FRAMEWORK_DIR}/cube.framework"
-    PROPERTIES
-    MACOSX_PACKAGE_LOCATION Frameworks
-    XCODE_FILE_ATTRIBUTES "CodeSignOnCopy;RemoveHeadersOnCopy"
+# Embed sokol.framework
+set(CMAKE_XCODE_ATTRIBUTE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/cube.framework")
+set_target_properties(cube-ios-app PROPERTIES
+    XCODE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/cube.framework"
+    XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY ON
+    XCODE_ATTRIBUTE_STRIP_STYLE "non-global"
+    XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "NO"
+    XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "NO"
 )
-target_sources(cube-ios-app PRIVATE "${FRAMEWORK_DIR}/cube.framework")
+
+
+# Embed sokol.framework
 
 # Link against the frameworks
 target_link_libraries(cube-ios-app

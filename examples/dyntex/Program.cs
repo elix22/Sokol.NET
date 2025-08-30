@@ -1,15 +1,17 @@
 ﻿
-
+using System;
 using System.Runtime.InteropServices;
 using Sokol;
 
 public static unsafe class MainClass
 {
     // Host platform entry point
-
-    // Host platform entry point
     public static unsafe void Main()
     {
+        // elix22 - some hack that is needed in case that the application is published as NativeAOT on an desktop platform
+        var applicationPath = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+        System.IO.Directory.SetCurrentDirectory(applicationPath);
+
         SApp.sapp_run(CreateAppDesc());
     }
 

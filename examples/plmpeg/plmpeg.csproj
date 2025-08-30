@@ -16,6 +16,10 @@
     <IsWindowsHost>$([MSBuild]::IsOSPlatform('Windows'))</IsWindowsHost>
 		<IsLinuxHost>$([MSBuild]::IsOSPlatform('Linux'))</IsLinuxHost>
 		<IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
+    <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
+    <IsAndroid>$(RuntimeIdentifier.ToLower().StartsWith('android'))</IsAndroid>
+		<IsAndroid Condition="'$(IsAndroid)'=='false'">$(RuntimeIdentifier.ToLower().StartsWith('linux-bionic'))</IsAndroid>
+    <IsIOS Condition="$(DefineConstants.Contains('__IOS__'))">true</IsIOS>
   </PropertyGroup>
 
     <!-- Library-specific settings -->
@@ -29,7 +33,6 @@
 
   <PropertyGroup>
     <!-- If __ANDROID__ is defined, force Android (and set IsAndroid to true) -->
-    <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
     <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__ANDROID__'))">glsl300es</ShaderSlang>
     <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__IOS__'))">metal_ios</ShaderSlang>
     <!-- Fallback, if no constant was defined -->
@@ -61,7 +64,7 @@
 
   	<!--Following blocks are exclusive for Android building-->
 	<PropertyGroup Condition="$(IsAndroid) == 'true'">
-        <!--Use ndk-sample expected library name -->
+    <!--Use ndk-sample expected library name -->
 		<CppCompilerAndLinker Condition="$(IsWindowsHost) == 'true'">./scripts/android_fake_clang.cmd</CppCompilerAndLinker>
 		<CppCompilerAndLinker Condition="$(IsLinuxHost) == 'true'">./scripts/android_fake_clang.sh</CppCompilerAndLinker>
 		<CppCompilerAndLinker Condition="$(IsOSXHost) == 'true'">./scripts/android_fake_clang.command</CppCompilerAndLinker>
@@ -72,7 +75,20 @@
 		<SysRoot Condition="'$(SysRoot)' == ''">$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(NdkHost)/sysroot</SysRoot>
 		<!--Hack for removing init and fini sections into the exports file-->
 		<ExportsPatch>'s/global: _init; _fini;/global: /g;'</ExportsPatch>
+    <!--Google new requirement , 16 KB page sizes for 64 bit native shared libraries-->
+		<LdFlags Condition="$(RuntimeIdentifier.EndsWith('x64')) or $(RuntimeIdentifier.EndsWith('arm64'))" >$(LdFlags) -Wl,-z,max-page-size=16384</LdFlags>
+    <!-- Architecture mapping -->
+    <LibraryOutputBase>Android/native-activity/app/libs</LibraryOutputBase>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm64'))">$(LibraryOutputBase)/arm64-v8a</ArchitectureOutputPath>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm'))">$(LibraryOutputBase)/armeabi-v7a</ArchitectureOutputPath>
+    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('x64'))">$(LibraryOutputBase)/x86_64</ArchitectureOutputPath>
 	</PropertyGroup>
+
+    <ItemGroup Condition="'$(IsAndroid)' == 'true'">
+    <!-- https://github.com/exelix11/SysDVR/blob/master/Client/Client.csproj -->
+    <!-- Android needs a proper soname property or it will refuse to load the library -->
+    <LinkerArg Include="-Wl,-soname,$(LibraryName).so,--undefined-version" />
+    </ItemGroup>
 
   	<Target Name="RemoveSections" Condition="$(IsAndroid) == 'true' And $(RemoveSections) == 'true'" AfterTargets="IlcCompile" BeforeTargets="LinkNative">
 		<!--Reads as lines the generated exports file-->
@@ -86,23 +102,6 @@
 		<!--The sed tool is used as invalid lines remover-->
 		<Exec Command="sed -i -z $(ExportsPatch) $(ExportsFile)" />
 	</Target>
-
-  <ItemGroup Condition="'$(IsAndroid)' == 'true'">
-    <!-- https://github.com/exelix11/SysDVR/blob/master/Client/Client.csproj -->
-    <!-- Android needs a proper soname property or it will refuse to load the library -->
-    <LinkerArg Include="-Wl,-soname,$(LibraryName).so,--undefined-version" />
-  </ItemGroup>
-
-  <PropertyGroup Condition="$(IsAndroid) == 'true'">
-    <!-- Architecture mapping -->
-    <LibraryOutputBase>Android/native-activity/app/libs</LibraryOutputBase>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm64'))">$(LibraryOutputBase)/arm64-v8a</ArchitectureOutputPath>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm'))">$(LibraryOutputBase)/armeabi-v7a</ArchitectureOutputPath>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('x64'))">$(LibraryOutputBase)/x86_64</ArchitectureOutputPath>
-  </PropertyGroup>
-
-
-
 
   <PropertyGroup>
     <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_ios'">ios</HostShaderFolder>
@@ -136,9 +135,18 @@
       <PropertyGroup>
         <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found are you sure URHONET_HOME_ROOT is pointing to the right place ?" /> 
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found " /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
        <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishMacOS" AfterTargets="Publish" Condition="'$(IsOSX)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found" /> 
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
 

@@ -59,6 +59,11 @@ target_compile_options(sokol PRIVATE
 
 set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
 
+# Google new requirement , Apply max-page-size linker option only for 64-bit architectures
+if(ANDROID_ABI STREQUAL "arm64-v8a" OR ANDROID_ABI STREQUAL "x86_64")
+    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
+
 set(PREBUILT_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs)
 
 add_library(${APP_NAME} SHARED IMPORTED)

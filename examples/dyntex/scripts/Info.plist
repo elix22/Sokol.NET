@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>cube</string>
+    <string>dyntex</string>
     <key>CFBundleIdentifier</key>
-    <string>com.companyname.cube</string>
+    <string>com.companyname.dyntex</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleExecutable</key>
-    <string>cube</string>
+    <string>dyntex</string>
     <key>CFBundlePackageType</key>
     <string>FMWK</string>
 </dict>
