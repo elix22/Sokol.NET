@@ -12,6 +12,20 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+unamestr=$(uname)
+
+# Switch-on alias expansion within the script 
+shopt -s expand_aliases
+
+#Alias the sed in-place command for OSX and Linux - incompatibilities between BSD and Linux sed args
+if [[ "$unamestr" == "Darwin" ]]; then
+	alias aliassedinplace='sed -i ""'
+else
+	#For Linux, notice no space after the '-i' 
+	alias aliassedinplace='sed -i""'
+fi
+
+
 # Get the project file name and extract APPNAME
 PROJECT_FILE=$1
 APPNAME=$(basename "$PROJECT_FILE" .csproj)
@@ -40,8 +54,12 @@ install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Releas
 install_name_tool -id @rpath/${APPNAME}.framework/${APPNAME} bin/Release/net9.0/ios-arm64/publish/lib${APPNAME}.dylib 
 lipo -create  bin/Release/net9.0/ios-arm64/publish/lib${APPNAME}.dylib -output ios/frameworks/${APPNAME}.framework/${APPNAME}
 cp -f scripts/Info.plist ios/frameworks/${APPNAME}.framework/Info.plist
+aliassedinplace "s*TEMPLATE_PROJECT_NAME*$APPNAME*g" "ios/frameworks/${APPNAME}.framework/Info.plist"
 
 cp -f scripts/CMakeLists.txt ios/CMakeLists.txt
+aliassedinplace "s*TEMPLATE_PROJECT_NAME*$APPNAME*g" "ios/CMakeLists.txt"
+
+
 cp -f scripts/main.m ios/main.m
 rm -rf ios/build-xcode-ios
 mkdir -p ios/build-xcode-ios
