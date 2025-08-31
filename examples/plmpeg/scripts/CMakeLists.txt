@@ -21,13 +21,31 @@ set(SOURCES
 set(ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Assets")
 if(EXISTS ${ASSETS_DIR})
     file(GLOB_RECURSE ASSETS_FILES "${ASSETS_DIR}/*")
+    # Filter out directories, only include files
+    set(ASSETS_FILES_FILTERED)
     foreach(ASSET_FILE ${ASSETS_FILES})
-        file(RELATIVE_PATH REL_PATH "${ASSETS_DIR}" "${ASSET_FILE}")
-        set_source_files_properties(${ASSET_FILE} PROPERTIES 
-            MACOSX_PACKAGE_LOCATION "Resources"
-        )
+        if(NOT IS_DIRECTORY ${ASSET_FILE})
+            list(APPEND ASSETS_FILES_FILTERED ${ASSET_FILE})
+        endif()
     endforeach()
-    list(APPEND SOURCES ${ASSETS_FILES})
+    foreach(ASSET_FILE ${ASSETS_FILES_FILTERED})
+        file(RELATIVE_PATH REL_PATH "${ASSETS_DIR}" "${ASSET_FILE}")
+        # For files directly in Assets, put them in Resources root
+        # For files in subdirectories, preserve the subdirectory structure
+        if(REL_PATH MATCHES ".*/.*")
+            # File is in a subdirectory
+            set_source_files_properties(${ASSET_FILE} PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources/${REL_PATH}"
+            )
+        else()
+            # File is directly in Assets - explicitly mark as not a bundle
+            set_source_files_properties(${ASSET_FILE} PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources"
+                XCODE_FILE_ATTRIBUTES "CodeSignOnCopy"
+            )
+        endif()
+    endforeach()
+    list(APPEND SOURCES ${ASSETS_FILES_FILTERED})
 endif()
 
 # Create the iOS application executable
