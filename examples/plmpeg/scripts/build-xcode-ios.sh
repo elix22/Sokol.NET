@@ -2,26 +2,27 @@
 #!/bin/bash
 
 # iOS Build Script
-# Usage: ./build-xcode-ios.sh <project-file.csproj>
-# Example: ./build-xcode-ios.sh cube.csproj
+# Usage: ./build-xcode-ios.sh <project-file.csproj> [development-team]
+# Example: ./build-xcode-ios.sh cube.csproj ABC123DEF4
 
 # Check if project file is provided as argument
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <project-file.csproj>"
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <project-file.csproj> [development-team]"
     echo "Example: $0 cube.csproj"
+    echo "Example: $0 cube.csproj ABC123DEF4"
     exit 1
 fi
 
 unamestr=$(uname)
 
-# Switch-on alias expansion within the script 
+# Switch-on alias expansion within the script
 shopt -s expand_aliases
 
 #Alias the sed in-place command for OSX and Linux - incompatibilities between BSD and Linux sed args
 if [[ "$unamestr" == "Darwin" ]]; then
 	alias aliassedinplace='sed -i ""'
 else
-	#For Linux, notice no space after the '-i' 
+	#For Linux, notice no space after the '-i'
 	alias aliassedinplace='sed -i""'
 fi
 
@@ -29,6 +30,13 @@ fi
 # Get the project file name and extract APPNAME
 PROJECT_FILE=$1
 APPNAME=$(basename "$PROJECT_FILE" .csproj)
+
+# Get development team if provided
+DEVELOPMENT_TEAM=""
+if [ $# -ge 2 ]; then
+    DEVELOPMENT_TEAM=$2
+    echo "Using development team: $DEVELOPMENT_TEAM"
+fi
 
 # Get architecture
 ARCH=$(uname -m)
@@ -60,8 +68,14 @@ cp -f scripts/CMakeLists.txt ios/CMakeLists.txt
 aliassedinplace "s*TEMPLATE_PROJECT_NAME*$APPNAME*g" "ios/CMakeLists.txt"
 
 
-cp -f scripts/main.m ios/main.m
 rm -rf ios/build-xcode-ios
 mkdir -p ios/build-xcode-ios
 cd ios/build-xcode-ios
-cmake .. -G Xcode
+
+# Build cmake command with optional development team
+CMAKE_CMD="cmake .. -G Xcode"
+if [ -n "$DEVELOPMENT_TEAM" ]; then
+    CMAKE_CMD="$CMAKE_CMD -DDEVELOPMENT_TEAM=$DEVELOPMENT_TEAM"
+fi
+echo "Running: $CMAKE_CMD"
+eval $CMAKE_CMD
