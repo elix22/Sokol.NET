@@ -41,10 +41,10 @@ add_library(native_app_glue STATIC
 # now build app's shared lib
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
-# Export Adyntex_onCreate(),
+# Export ANativeActivity_onCreate(),
 # Refer to: https://github.com/android-ndk/ndk/issues/381.
 set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -u Adyntex_onCreate")
+    "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
 add_library(sokol SHARED sokol_android_main.c ${IMGUI_SOURCE_FILES})
 

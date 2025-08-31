@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.native_activity'
+    namespace 'com.elix22.plmpeg'
     compileSdk 34
 
     defaultConfig {
-        applicationId = 'com.example.native_activity'
+        applicationId = 'com.elix22.plmpeg'
         minSdk 26
         targetSdk 34
         versionCode 1

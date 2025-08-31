@@ -20,7 +20,6 @@ project(sokol)
 # build native_app_glue as a static lib
 set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
 
-
 set(EXT_ROOT_DIR "../../../../../../../../ext")
 
 set(IMGUI_SOURCE_FILES
@@ -42,10 +41,10 @@ add_library(native_app_glue STATIC
 # now build app's shared lib
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
-# Export ANativeActivity_onCreate(),
+# Export Aplmpeg_onCreate(),
 # Refer to: https://github.com/android-ndk/ndk/issues/381.
 set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
+    "${CMAKE_SHARED_LINKER_FLAGS} -u Aplmpeg_onCreate")
 
 add_library(sokol SHARED sokol_android_main.c ${IMGUI_SOURCE_FILES})
 

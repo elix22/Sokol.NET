@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.elix22.dyntex'
+    namespace 'com.example.native_activity'
     compileSdk 34
 
     defaultConfig {
-        applicationId = 'com.elix22.dyntex'
+        applicationId = 'com.example.native_activity'
         minSdk 26
         targetSdk 34
         versionCode 1
