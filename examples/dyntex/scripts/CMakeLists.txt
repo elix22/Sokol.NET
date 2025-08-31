@@ -17,6 +17,28 @@ set(SOURCES
     main.m
 )
 
+# Include assets in the bundle
+set(ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Assets")
+if(EXISTS ${ASSETS_DIR})
+    # Find all files directly in Assets directory (not in subdirectories)
+    file(GLOB ASSETS_FILES "${ASSETS_DIR}/*")
+    foreach(ASSET_ITEM ${ASSETS_FILES})
+        if(NOT IS_DIRECTORY ${ASSET_ITEM})
+            # This is a file directly in Assets - add to Resources
+            list(APPEND SOURCES ${ASSET_ITEM})
+            set_source_files_properties(${ASSET_ITEM} PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources"
+            )
+        else()
+            # This is a subdirectory - add the entire directory to Resources
+            list(APPEND SOURCES ${ASSET_ITEM})
+            set_source_files_properties(${ASSET_ITEM} PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources"
+            )
+        endif()
+    endforeach()
+endif()
+
 # Create the iOS application executable
 add_executable(TEMPLATE_PROJECT_NAME-ios-app ${SOURCES})
 
@@ -30,8 +52,6 @@ set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES
     XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "YES"
     XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "YES"
     XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "iPhone Developer"
-    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
-    XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER ""
     XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/Frameworks"
     XCODE_ATTRIBUTE_DYLIB_INSTALL_NAME_BASE "@rpath"
     # iPad support configurations
@@ -44,6 +64,13 @@ set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES
     # Launch screen
     XCODE_ATTRIBUTE_UILaunchScreen~ipad "{}"
 )
+
+# Set development team if provided
+if(DEFINED DEVELOPMENT_TEAM)
+    set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${DEVELOPMENT_TEAM}"
+    )
+endif()
 
 # Embed the frameworks
 set(FRAMEWORK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/frameworks")
