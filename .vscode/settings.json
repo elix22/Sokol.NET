@@ -83,5 +83,6 @@
         "ranges": "cpp",
         "cgltf.h": "c"
     },
-    "java.configuration.updateBuildConfiguration": "disabled"
+    "java.configuration.updateBuildConfiguration": "disabled",
+    "liveServer.settings.port": 5502
 }

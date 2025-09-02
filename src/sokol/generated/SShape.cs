@@ -82,7 +82,12 @@ public struct sshape_buffer_item_t
 [StructLayout(LayoutKind.Sequential)]
 public struct sshape_buffer_t
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public sshape_buffer_item_t vertices;
     public sshape_buffer_item_t indices;
 }
@@ -93,8 +98,18 @@ public struct sshape_plane_t
     public float depth;
     public ushort tiles;
     public uint color;
+#if WEB
+    private byte _random_colors;
+    public bool random_colors { get => _random_colors != 0; set => _random_colors = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool random_colors;
+#endif
+#if WEB
+    private byte _merge;
+    public bool merge { get => _merge != 0; set => _merge = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool merge;
+#endif
     public sshape_mat4_t transform;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -105,8 +120,18 @@ public struct sshape_box_t
     public float depth;
     public ushort tiles;
     public uint color;
+#if WEB
+    private byte _random_colors;
+    public bool random_colors { get => _random_colors != 0; set => _random_colors = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool random_colors;
+#endif
+#if WEB
+    private byte _merge;
+    public bool merge { get => _merge != 0; set => _merge = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool merge;
+#endif
     public sshape_mat4_t transform;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -116,8 +141,18 @@ public struct sshape_sphere_t
     public ushort slices;
     public ushort stacks;
     public uint color;
+#if WEB
+    private byte _random_colors;
+    public bool random_colors { get => _random_colors != 0; set => _random_colors = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool random_colors;
+#endif
+#if WEB
+    private byte _merge;
+    public bool merge { get => _merge != 0; set => _merge = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool merge;
+#endif
     public sshape_mat4_t transform;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -128,8 +163,18 @@ public struct sshape_cylinder_t
     public ushort slices;
     public ushort stacks;
     public uint color;
+#if WEB
+    private byte _random_colors;
+    public bool random_colors { get => _random_colors != 0; set => _random_colors = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool random_colors;
+#endif
+#if WEB
+    private byte _merge;
+    public bool merge { get => _merge != 0; set => _merge = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool merge;
+#endif
     public sshape_mat4_t transform;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -140,8 +185,18 @@ public struct sshape_torus_t
     public ushort sides;
     public ushort rings;
     public uint color;
+#if WEB
+    private byte _random_colors;
+    public bool random_colors { get => _random_colors != 0; set => _random_colors = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool random_colors;
+#endif
+#if WEB
+    private byte _merge;
+    public bool merge { get => _merge != 0; set => _merge = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool merge;
+#endif
     public sshape_mat4_t transform;
 }
 #if __IOS__

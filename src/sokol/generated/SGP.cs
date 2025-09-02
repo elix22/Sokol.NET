@@ -266,7 +266,12 @@ public struct sgp_pipeline_desc
     public sg_pixel_format color_format;
     public sg_pixel_format depth_format;
     public int sample_count;
+#if WEB
+    private byte _has_vs_color;
+    public bool has_vs_color { get => _has_vs_color != 0; set => _has_vs_color = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool has_vs_color;
+#endif
 }
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgp_setup", CallingConvention = CallingConvention.Cdecl)]

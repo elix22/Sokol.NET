@@ -437,7 +437,13 @@ def gen_struct(decl, prefix):
         field_type = field['type']
         field_type = check_type_override(struct_name, field_name, field_type)
         if field_type == "bool":
+            # Conditional for bool fields with properties
+            l("#if WEB")
+            l(f"    private byte _{field_name};")
+            l(f"    public bool {field_name} {{ get => _{field_name} != 0; set => _{field_name} = value ? (byte)1 : (byte)0; }}")
+            l("#else")
             l(f"    [M(U.I1)] public bool {field_name};")
+            l("#endif")
         elif is_prim_type(field_type):
             l(f"    public {as_zig_prim_type(field_type)} {field_name};")
         elif is_struct_type(field_type):
@@ -445,7 +451,13 @@ def gen_struct(decl, prefix):
         elif is_enum_type(field_type):
             l(f"    public {as_zig_enum_type(field_type, prefix)} {field_name};")
         elif util.is_string_ptr(field_type):
+            # Conditional for string fields with properties
+            l("#if WEB")
+            l(f"    private IntPtr _{field_name};")
+            l(f"    public string {field_name} {{ get => Marshal.PtrToStringAnsi(_{field_name}); set => _{field_name} = Marshal.StringToHGlobalAnsi(value); }}")
+            l("#else")
             l(f"    [M(U.LPUTF8Str)] public string {field_name};")
+            l("#endif")
         elif util.is_const_void_ptr(field_type):
             l(f"    public void* {field_name};")
         elif util.is_void_ptr(field_type):

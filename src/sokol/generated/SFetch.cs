@@ -73,12 +73,42 @@ public enum sfetch_error_t
 public struct sfetch_response_t
 {
     public sfetch_handle_t handle;
+#if WEB
+    private byte _dispatched;
+    public bool dispatched { get => _dispatched != 0; set => _dispatched = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool dispatched;
+#endif
+#if WEB
+    private byte _fetched;
+    public bool fetched { get => _fetched != 0; set => _fetched = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool fetched;
+#endif
+#if WEB
+    private byte _paused;
+    public bool paused { get => _paused != 0; set => _paused = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool paused;
+#endif
+#if WEB
+    private byte _finished;
+    public bool finished { get => _finished != 0; set => _finished = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool finished;
+#endif
+#if WEB
+    private byte _failed;
+    public bool failed { get => _failed != 0; set => _failed = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool failed;
+#endif
+#if WEB
+    private byte _cancelled;
+    public bool cancelled { get => _cancelled != 0; set => _cancelled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool cancelled;
+#endif
     public sfetch_error_t error_code;
     public uint channel;
     public uint lane;
@@ -92,7 +122,12 @@ public struct sfetch_response_t
 public struct sfetch_request_t
 {
     public uint channel;
+#if WEB
+    private IntPtr _path;
+    public string path { get => Marshal.PtrToStringAnsi(_path); set => _path = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string path;
+#endif
     public delegate* unmanaged<sfetch_response_t*, void> callback;
     public uint chunk_size;
     public sfetch_range_t buffer;

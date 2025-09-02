@@ -128,8 +128,18 @@ public struct sspine_mat4
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_string
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
+#if WEB
+    private byte _truncated;
+    public bool truncated { get => _truncated != 0; set => _truncated = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool truncated;
+#endif
     public byte len;
     #pragma warning disable 169
     public struct cstrCollection
@@ -278,7 +288,12 @@ public struct sspine_context_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_image_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public sg_image sgimage;
     public sg_view sgview;
     public sg_sampler sgsampler;
@@ -289,7 +304,12 @@ public struct sspine_image_info
     public sg_wrap wrap_v;
     public int width;
     public int height;
+#if WEB
+    private byte _premul_alpha;
+    public bool premul_alpha { get => _premul_alpha != 0; set => _premul_alpha = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool premul_alpha;
+#endif
     public sspine_string filename;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -300,8 +320,18 @@ public struct sspine_atlas_overrides
     public sg_filter mipmap_filter;
     public sg_wrap wrap_u;
     public sg_wrap wrap_v;
+#if WEB
+    private byte _premul_alpha_enabled;
+    public bool premul_alpha_enabled { get => _premul_alpha_enabled != 0; set => _premul_alpha_enabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool premul_alpha_enabled;
+#endif
+#if WEB
+    private byte _premul_alpha_disabled;
+    public bool premul_alpha_disabled { get => _premul_alpha_disabled != 0; set => _premul_alpha_disabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool premul_alpha_disabled;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_atlas_desc
@@ -312,7 +342,12 @@ public struct sspine_atlas_desc
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_atlas_page_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public sspine_atlas atlas;
     public sspine_image_info image;
     public sspine_atlas_overrides overrides;
@@ -323,7 +358,12 @@ public struct sspine_skeleton_desc
     public sspine_atlas atlas;
     public float prescale;
     public float anim_default_mix;
+#if WEB
+    private IntPtr _json_data;
+    public string json_data { get => Marshal.PtrToStringAnsi(_json_data); set => _json_data = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string json_data;
+#endif
     public sspine_range binary_data;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -373,7 +413,12 @@ public struct sspine_skinset_desc
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_anim_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public float duration;
     public sspine_string name;
@@ -381,7 +426,12 @@ public struct sspine_anim_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_bone_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public sspine_bone parent_bone;
     public float length;
@@ -392,7 +442,12 @@ public struct sspine_bone_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_slot_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public sspine_bone bone;
     public sg_color color;
@@ -402,7 +457,12 @@ public struct sspine_slot_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_iktarget_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public sspine_bone target_bone;
     public sspine_string name;
@@ -410,14 +470,24 @@ public struct sspine_iktarget_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_skin_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public sspine_string name;
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_event_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public int index;
     public int int_value;
     public float float_value;
@@ -430,7 +500,12 @@ public struct sspine_event_info
 [StructLayout(LayoutKind.Sequential)]
 public struct sspine_triggered_event_info
 {
+#if WEB
+    private byte _valid;
+    public bool valid { get => _valid != 0; set => _valid = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool valid;
+#endif
     public sspine_event _event;
     public float time;
     public int int_value;

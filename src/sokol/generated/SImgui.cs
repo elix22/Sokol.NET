@@ -37,12 +37,42 @@ public struct simgui_desc_t
     public sg_pixel_format color_format;
     public sg_pixel_format depth_format;
     public int sample_count;
+#if WEB
+    private IntPtr _ini_filename;
+    public string ini_filename { get => Marshal.PtrToStringAnsi(_ini_filename); set => _ini_filename = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string ini_filename;
+#endif
+#if WEB
+    private byte _no_default_font;
+    public bool no_default_font { get => _no_default_font != 0; set => _no_default_font = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool no_default_font;
+#endif
+#if WEB
+    private byte _disable_paste_override;
+    public bool disable_paste_override { get => _disable_paste_override != 0; set => _disable_paste_override = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool disable_paste_override;
+#endif
+#if WEB
+    private byte _disable_set_mouse_cursor;
+    public bool disable_set_mouse_cursor { get => _disable_set_mouse_cursor != 0; set => _disable_set_mouse_cursor = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool disable_set_mouse_cursor;
+#endif
+#if WEB
+    private byte _disable_windows_resize_from_edges;
+    public bool disable_windows_resize_from_edges { get => _disable_windows_resize_from_edges != 0; set => _disable_windows_resize_from_edges = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool disable_windows_resize_from_edges;
+#endif
+#if WEB
+    private byte _write_alpha_channel;
+    public bool write_alpha_channel { get => _write_alpha_channel != 0; set => _write_alpha_channel = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool write_alpha_channel;
+#endif
     public simgui_allocator_t allocator;
     public simgui_logger_t logger;
 }

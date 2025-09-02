@@ -143,28 +143,113 @@ public enum sg_pixel_format
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_pixelformat_info
 {
+#if WEB
+    private byte _sample;
+    public bool sample { get => _sample != 0; set => _sample = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool sample;
+#endif
+#if WEB
+    private byte _filter;
+    public bool filter { get => _filter != 0; set => _filter = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool filter;
+#endif
+#if WEB
+    private byte _render;
+    public bool render { get => _render != 0; set => _render = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool render;
+#endif
+#if WEB
+    private byte _blend;
+    public bool blend { get => _blend != 0; set => _blend = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool blend;
+#endif
+#if WEB
+    private byte _msaa;
+    public bool msaa { get => _msaa != 0; set => _msaa = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool msaa;
+#endif
+#if WEB
+    private byte _depth;
+    public bool depth { get => _depth != 0; set => _depth = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool depth;
+#endif
+#if WEB
+    private byte _compressed;
+    public bool compressed { get => _compressed != 0; set => _compressed = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool compressed;
+#endif
+#if WEB
+    private byte _read;
+    public bool read { get => _read != 0; set => _read = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool read;
+#endif
+#if WEB
+    private byte _write;
+    public bool write { get => _write != 0; set => _write = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool write;
+#endif
     public int bytes_per_pixel;
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_features
 {
+#if WEB
+    private byte _origin_top_left;
+    public bool origin_top_left { get => _origin_top_left != 0; set => _origin_top_left = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool origin_top_left;
+#endif
+#if WEB
+    private byte _image_clamp_to_border;
+    public bool image_clamp_to_border { get => _image_clamp_to_border != 0; set => _image_clamp_to_border = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool image_clamp_to_border;
+#endif
+#if WEB
+    private byte _mrt_independent_blend_state;
+    public bool mrt_independent_blend_state { get => _mrt_independent_blend_state != 0; set => _mrt_independent_blend_state = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool mrt_independent_blend_state;
+#endif
+#if WEB
+    private byte _mrt_independent_write_mask;
+    public bool mrt_independent_write_mask { get => _mrt_independent_write_mask != 0; set => _mrt_independent_write_mask = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool mrt_independent_write_mask;
+#endif
+#if WEB
+    private byte _compute;
+    public bool compute { get => _compute != 0; set => _compute = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool compute;
+#endif
+#if WEB
+    private byte _msaa_texture_bindings;
+    public bool msaa_texture_bindings { get => _msaa_texture_bindings != 0; set => _msaa_texture_bindings = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool msaa_texture_bindings;
+#endif
+#if WEB
+    private byte _separate_buffer_types;
+    public bool separate_buffer_types { get => _separate_buffer_types != 0; set => _separate_buffer_types = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool separate_buffer_types;
+#endif
+#if WEB
+    private byte _gl_texture_views;
+    public bool gl_texture_views { get => _gl_texture_views != 0; set => _gl_texture_views = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool gl_texture_views;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_limits
@@ -560,11 +645,21 @@ public struct sg_attachments
 public struct sg_pass
 {
     public uint _start_canary;
+#if WEB
+    private byte _compute;
+    public bool compute { get => _compute != 0; set => _compute = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool compute;
+#endif
     public sg_pass_action action;
     public sg_attachments attachments;
     public sg_swapchain swapchain;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     public uint _end_canary;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -666,12 +761,42 @@ public struct sg_bindings
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_buffer_usage
 {
+#if WEB
+    private byte _vertex_buffer;
+    public bool vertex_buffer { get => _vertex_buffer != 0; set => _vertex_buffer = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool vertex_buffer;
+#endif
+#if WEB
+    private byte _index_buffer;
+    public bool index_buffer { get => _index_buffer != 0; set => _index_buffer = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool index_buffer;
+#endif
+#if WEB
+    private byte _storage_buffer;
+    public bool storage_buffer { get => _storage_buffer != 0; set => _storage_buffer = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool storage_buffer;
+#endif
+#if WEB
+    private byte _immutable;
+    public bool immutable { get => _immutable != 0; set => _immutable = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool immutable;
+#endif
+#if WEB
+    private byte _dynamic_update;
+    public bool dynamic_update { get => _dynamic_update != 0; set => _dynamic_update = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool dynamic_update;
+#endif
+#if WEB
+    private byte _stream_update;
+    public bool stream_update { get => _stream_update != 0; set => _stream_update = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool stream_update;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_buffer_desc
@@ -680,7 +805,12 @@ public struct sg_buffer_desc
     public nuint size;
     public sg_buffer_usage usage;
     public sg_range data;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     #pragma warning disable 169
     public struct gl_buffersCollection
     {
@@ -706,13 +836,48 @@ public struct sg_buffer_desc
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_image_usage
 {
+#if WEB
+    private byte _storage_image;
+    public bool storage_image { get => _storage_image != 0; set => _storage_image = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool storage_image;
+#endif
+#if WEB
+    private byte _color_attachment;
+    public bool color_attachment { get => _color_attachment != 0; set => _color_attachment = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool color_attachment;
+#endif
+#if WEB
+    private byte _resolve_attachment;
+    public bool resolve_attachment { get => _resolve_attachment != 0; set => _resolve_attachment = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool resolve_attachment;
+#endif
+#if WEB
+    private byte _depth_stencil_attachment;
+    public bool depth_stencil_attachment { get => _depth_stencil_attachment != 0; set => _depth_stencil_attachment = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool depth_stencil_attachment;
+#endif
+#if WEB
+    private byte _immutable;
+    public bool immutable { get => _immutable != 0; set => _immutable = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool immutable;
+#endif
+#if WEB
+    private byte _dynamic_update;
+    public bool dynamic_update { get => _dynamic_update != 0; set => _dynamic_update = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool dynamic_update;
+#endif
+#if WEB
+    private byte _stream_update;
+    public bool stream_update { get => _stream_update != 0; set => _stream_update = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool stream_update;
+#endif
 }
 public enum sg_view_type
 {
@@ -845,7 +1010,12 @@ public struct sg_image_desc
     public sg_pixel_format pixel_format;
     public int sample_count;
     public sg_image_data data;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     #pragma warning disable 169
     public struct gl_texturesCollection
     {
@@ -884,7 +1054,12 @@ public struct sg_sampler_desc
     public sg_border_color border_color;
     public sg_compare_func compare;
     public uint max_anisotropy;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     public uint gl_sampler;
     public void* mtl_sampler;
     public void* d3d11_sampler;
@@ -902,11 +1077,31 @@ public enum sg_shader_stage
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_shader_function
 {
+#if WEB
+    private IntPtr _source;
+    public string source { get => Marshal.PtrToStringAnsi(_source); set => _source = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string source;
+#endif
     public sg_range bytecode;
+#if WEB
+    private IntPtr _entry;
+    public string entry { get => Marshal.PtrToStringAnsi(_entry); set => _entry = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string entry;
+#endif
+#if WEB
+    private IntPtr _d3d11_target;
+    public string d3d11_target { get => Marshal.PtrToStringAnsi(_d3d11_target); set => _d3d11_target = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string d3d11_target;
+#endif
+#if WEB
+    private IntPtr _d3d11_filepath;
+    public string d3d11_filepath { get => Marshal.PtrToStringAnsi(_d3d11_filepath); set => _d3d11_filepath = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string d3d11_filepath;
+#endif
 }
 public enum sg_shader_attr_base_type
 {
@@ -920,8 +1115,18 @@ public enum sg_shader_attr_base_type
 public struct sg_shader_vertex_attr
 {
     public sg_shader_attr_base_type base_type;
+#if WEB
+    private IntPtr _glsl_name;
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string glsl_name;
+#endif
+#if WEB
+    private IntPtr _hlsl_sem_name;
+    public string hlsl_sem_name { get => Marshal.PtrToStringAnsi(_hlsl_sem_name); set => _hlsl_sem_name = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string hlsl_sem_name;
+#endif
     public byte hlsl_sem_index;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -929,7 +1134,12 @@ public struct sg_glsl_shader_uniform
 {
     public sg_uniform_type type;
     public ushort array_count;
+#if WEB
+    private IntPtr _glsl_name;
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string glsl_name;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_shader_uniform_block
@@ -970,7 +1180,12 @@ public struct sg_shader_texture_view
     public sg_shader_stage stage;
     public sg_image_type image_type;
     public sg_image_sample_type sample_type;
+#if WEB
+    private byte _multisampled;
+    public bool multisampled { get => _multisampled != 0; set => _multisampled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool multisampled;
+#endif
     public byte hlsl_register_t_n;
     public byte msl_texture_n;
     public byte wgsl_group1_binding_n;
@@ -979,7 +1194,12 @@ public struct sg_shader_texture_view
 public struct sg_shader_storage_buffer_view
 {
     public sg_shader_stage stage;
+#if WEB
+    private byte __readonly;
+    public bool _readonly { get => __readonly != 0; set => __readonly = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool _readonly;
+#endif
     public byte hlsl_register_t_n;
     public byte hlsl_register_u_n;
     public byte msl_buffer_n;
@@ -992,7 +1212,12 @@ public struct sg_shader_storage_image_view
     public sg_shader_stage stage;
     public sg_image_type image_type;
     public sg_pixel_format access_format;
+#if WEB
+    private byte _writeonly;
+    public bool writeonly { get => _writeonly != 0; set => _writeonly = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool writeonly;
+#endif
     public byte hlsl_register_u_n;
     public byte msl_texture_n;
     public byte wgsl_group1_binding_n;
@@ -1020,7 +1245,12 @@ public struct sg_shader_texture_sampler_pair
     public sg_shader_stage stage;
     public byte view_slot;
     public byte sampler_slot;
+#if WEB
+    private IntPtr _glsl_name;
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string glsl_name;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_mtl_shader_threads_per_threadgroup
@@ -1156,7 +1386,12 @@ public struct sg_shader_desc
     #pragma warning restore 169
     public texture_sampler_pairsCollection texture_sampler_pairs;
     public sg_mtl_shader_threads_per_threadgroup mtl_threads_per_threadgroup;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     public uint _end_canary;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -1226,7 +1461,12 @@ public struct sg_stencil_face_state
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_stencil_state
 {
+#if WEB
+    private byte _enabled;
+    public bool enabled { get => _enabled != 0; set => _enabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool enabled;
+#endif
     public sg_stencil_face_state front;
     public sg_stencil_face_state back;
     public byte read_mask;
@@ -1238,7 +1478,12 @@ public struct sg_depth_state
 {
     public sg_pixel_format pixel_format;
     public sg_compare_func compare;
+#if WEB
+    private byte _write_enabled;
+    public bool write_enabled { get => _write_enabled != 0; set => _write_enabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool write_enabled;
+#endif
     public float bias;
     public float bias_slope_scale;
     public float bias_clamp;
@@ -1246,7 +1491,12 @@ public struct sg_depth_state
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_blend_state
 {
+#if WEB
+    private byte _enabled;
+    public bool enabled { get => _enabled != 0; set => _enabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool enabled;
+#endif
     public sg_blend_factor src_factor_rgb;
     public sg_blend_factor dst_factor_rgb;
     public sg_blend_op op_rgb;
@@ -1265,7 +1515,12 @@ public struct sg_color_target_state
 public struct sg_pipeline_desc
 {
     public uint _start_canary;
+#if WEB
+    private byte _compute;
+    public bool compute { get => _compute != 0; set => _compute = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool compute;
+#endif
     public sg_shader shader;
     public sg_vertex_layout_state layout;
     public sg_depth_state depth;
@@ -1288,8 +1543,18 @@ public struct sg_pipeline_desc
     public sg_face_winding face_winding;
     public int sample_count;
     public sg_color blend_color;
+#if WEB
+    private byte _alpha_to_coverage_enabled;
+    public bool alpha_to_coverage_enabled { get => _alpha_to_coverage_enabled != 0; set => _alpha_to_coverage_enabled = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool alpha_to_coverage_enabled;
+#endif
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     public uint _end_canary;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -1328,7 +1593,12 @@ public struct sg_view_desc
     public sg_image_view_desc color_attachment;
     public sg_image_view_desc resolve_attachment;
     public sg_image_view_desc depth_stencil_attachment;
+#if WEB
+    private IntPtr _label;
+    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string label;
+#endif
     public uint _end_canary;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -1345,7 +1615,12 @@ public struct sg_buffer_info
     public uint update_frame_index;
     public uint append_frame_index;
     public int append_pos;
+#if WEB
+    private byte _append_overflow;
+    public bool append_overflow { get => _append_overflow != 0; set => _append_overflow = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool append_overflow;
+#endif
     public int num_slots;
     public int active_slot;
 }
@@ -2037,11 +2312,36 @@ public struct sg_desc
     public int view_pool_size;
     public int uniform_buffer_size;
     public int max_commit_listeners;
+#if WEB
+    private byte _disable_validation;
+    public bool disable_validation { get => _disable_validation != 0; set => _disable_validation = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool disable_validation;
+#endif
+#if WEB
+    private byte _d3d11_shader_debugging;
+    public bool d3d11_shader_debugging { get => _d3d11_shader_debugging != 0; set => _d3d11_shader_debugging = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool d3d11_shader_debugging;
+#endif
+#if WEB
+    private byte _mtl_force_managed_storage_mode;
+    public bool mtl_force_managed_storage_mode { get => _mtl_force_managed_storage_mode != 0; set => _mtl_force_managed_storage_mode = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool mtl_force_managed_storage_mode;
+#endif
+#if WEB
+    private byte _mtl_use_command_buffer_with_retained_references;
+    public bool mtl_use_command_buffer_with_retained_references { get => _mtl_use_command_buffer_with_retained_references != 0; set => _mtl_use_command_buffer_with_retained_references = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool mtl_use_command_buffer_with_retained_references;
+#endif
+#if WEB
+    private byte _wgpu_disable_bindgroups_cache;
+    public bool wgpu_disable_bindgroups_cache { get => _wgpu_disable_bindgroups_cache != 0; set => _wgpu_disable_bindgroups_cache = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool wgpu_disable_bindgroups_cache;
+#endif
     public int wgpu_bindgroups_cache_size;
     public sg_allocator allocator;
     public sg_logger logger;

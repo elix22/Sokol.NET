@@ -39,13 +39,48 @@ public struct sgl_context
 [StructLayout(LayoutKind.Sequential)]
 public struct sgl_error_t
 {
+#if WEB
+    private byte _any;
+    public bool any { get => _any != 0; set => _any = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool any;
+#endif
+#if WEB
+    private byte _vertices_full;
+    public bool vertices_full { get => _vertices_full != 0; set => _vertices_full = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool vertices_full;
+#endif
+#if WEB
+    private byte _uniforms_full;
+    public bool uniforms_full { get => _uniforms_full != 0; set => _uniforms_full = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool uniforms_full;
+#endif
+#if WEB
+    private byte _commands_full;
+    public bool commands_full { get => _commands_full != 0; set => _commands_full = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool commands_full;
+#endif
+#if WEB
+    private byte _stack_overflow;
+    public bool stack_overflow { get => _stack_overflow != 0; set => _stack_overflow = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool stack_overflow;
+#endif
+#if WEB
+    private byte _stack_underflow;
+    public bool stack_underflow { get => _stack_underflow != 0; set => _stack_underflow = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool stack_underflow;
+#endif
+#if WEB
+    private byte _no_context;
+    public bool no_context { get => _no_context != 0; set => _no_context = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool no_context;
+#endif
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sgl_context_desc_t

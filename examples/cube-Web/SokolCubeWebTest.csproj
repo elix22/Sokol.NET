@@ -1,0 +1,123 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <WasmBuildNative>true</WasmBuildNative>
+        <RunAOTCompilation>true</RunAOTCompilation>
+        <WasmEnableSIMD>false</WasmEnableSIMD>
+        <EmccEnableAssertions>true</EmccEnableAssertions>
+        <EnableAggressiveTrimming>true</EnableAggressiveTrimming>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>partial</TrimMode>
+        <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+
+    <!-- <ItemGroup>
+      <Reference Include="sokol">
+        <HintPath>assemblies\sokol.dll</HintPath>
+      </Reference>
+    </ItemGroup> -->
+
+    <ItemGroup>
+      <NativeFileReference Include="libs\sokol.a">
+        <Link>libs\sokol.a</Link>
+      </NativeFileReference>
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <Compile Include="../../src/sokol/*.cs" >
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Include="../../src/sokol/generated/*.cs">
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Remove="../../src/sokol/obj/**/*.cs" />
+      <Compile Remove="../../src/sokol/bin/**/*.cs" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <AssetsSourceFiles Include="../cube/Assets/**/*.*">
+            <Link>Assets\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </AssetsSourceFiles>
+    </ItemGroup>
+    
+  <Target  Name="CopyIndexHTML" AfterTargets="AfterBuild">
+  <PropertyGroup>
+    <OutputPath Condition="'$(OutputPath)' == ''">$(OutDir)</OutputPath>
+  </PropertyGroup>
+    <Copy SourceFiles="wwwroot/index.html" DestinationFolder="$(OutputPath)/wwwroot" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="wwwroot/main.js" DestinationFolder="$(OutputPath)/wwwroot" SkipUnchangedFiles="true" />
+  </Target>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <DefineConstants>DEBUG;TRACE</DefineConstants>
+    </PropertyGroup>
+    
+    <Choose>
+        <When Condition=" $(Configuration) == 'Debug' ">
+            <PropertyGroup>
+                <WasmEmitSymbolMap>true</WasmEmitSymbolMap>
+                <EmccFlags>
+                    -s EXPORT_ALL=1
+                    --bind  
+                    -Wbad-function-cast -Wcast-function-type 
+                    -O1 
+                    -g3 
+                    -s VERBOSE=1
+                    -s FULL_ES3
+                    -s USE_WEBGL2=1
+                    -s MIN_WEBGL_VERSION=2 
+                    -s MAX_WEBGL_VERSION=2
+                    -s ASSERTIONS=1
+                    -s WASM=1
+                    -s INITIAL_MEMORY=128MB
+                    -s MAXIMUM_MEMORY=2048MB
+                    -s ALLOW_MEMORY_GROWTH=1
+                    -s ASYNCIFY_STACK_SIZE=10000000
+                    -s TOTAL_MEMORY=520MB
+                    --embed-file ../cube/Assets@/
+                </EmccFlags>
+                <EmccExtraLDFlags>
+                    -lidbfs.js
+                    -s EXPORTED_RUNTIME_METHODS='['ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
+                    <!-- -s EXPORTED_FUNCTIONS='['_malloc','_sg_make_buffer']' -->
+                    <!-- -s EXPORTED_FUNCTIONS='['_malloc','_glGetIntegerv' , '_glBindSampler']' -->
+                </EmccExtraLDFlags>
+            </PropertyGroup>
+        </When>
+        <When Condition=" $(Configuration) == 'Release' ">
+            <PropertyGroup>
+                <EmccFlags>
+                    -s EXPORT_ALL=1
+                    -O3 
+                    --bind
+                    -s WASM=1
+                    -s VERBOSE=1
+                    -s FULL_ES3
+                    -s USE_WEBGL2=1
+                    -s MIN_WEBGL_VERSION=2 
+                    -s MAX_WEBGL_VERSION=2
+                    -s ASSERTIONS=1
+                    -s INITIAL_MEMORY=128MB
+                    -s MAXIMUM_MEMORY=2048MB
+                    -s ALLOW_MEMORY_GROWTH=1
+                    -s TOTAL_MEMORY=520MB
+                    --embed-file ../cube/Assets@/
+                </EmccFlags>
+                <EmccExtraLDFlags>
+                    -lexports.js
+                    -s EXPORTED_RUNTIME_METHODS='['ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
+                </EmccExtraLDFlags>
+            </PropertyGroup>
+        </When>
+    </Choose>
+    
+</Project>

@@ -179,7 +179,12 @@ public struct sapp_touchpoint
     public float pos_x;
     public float pos_y;
     public sapp_android_tooltype android_tooltype;
+#if WEB
+    private byte _changed;
+    public bool changed { get => _changed != 0; set => _changed = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool changed;
+#endif
 }
 public enum sapp_mousebutton
 {
@@ -202,7 +207,12 @@ public struct sapp_event
     public sapp_event_type type;
     public sapp_keycode key_code;
     public uint char_code;
+#if WEB
+    private byte _key_repeat;
+    public bool key_repeat { get => _key_repeat != 0; set => _key_repeat = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool key_repeat;
+#endif
     public uint modifiers;
     public sapp_mousebutton mouse_button;
     public float mouse_x;
@@ -248,7 +258,12 @@ public struct sapp_image_desc
 [StructLayout(LayoutKind.Sequential)]
 public struct sapp_icon_desc
 {
+#if WEB
+    private byte _sokol_default;
+    public bool sokol_default { get => _sokol_default != 0; set => _sokol_default = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool sokol_default;
+#endif
     #pragma warning disable 169
     public struct imagesCollection
     {
@@ -397,13 +412,43 @@ public struct sapp_desc
     public int height;
     public int sample_count;
     public int swap_interval;
+#if WEB
+    private byte _high_dpi;
+    public bool high_dpi { get => _high_dpi != 0; set => _high_dpi = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool high_dpi;
+#endif
+#if WEB
+    private byte _fullscreen;
+    public bool fullscreen { get => _fullscreen != 0; set => _fullscreen = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool fullscreen;
+#endif
+#if WEB
+    private byte _alpha;
+    public bool alpha { get => _alpha != 0; set => _alpha = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool alpha;
+#endif
+#if WEB
+    private IntPtr _window_title;
+    public string window_title { get => Marshal.PtrToStringAnsi(_window_title); set => _window_title = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string window_title;
+#endif
+#if WEB
+    private byte _enable_clipboard;
+    public bool enable_clipboard { get => _enable_clipboard != 0; set => _enable_clipboard = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool enable_clipboard;
+#endif
     public int clipboard_size;
+#if WEB
+    private byte _enable_dragndrop;
+    public bool enable_dragndrop { get => _enable_dragndrop != 0; set => _enable_dragndrop = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool enable_dragndrop;
+#endif
     public int max_dropped_files;
     public int max_dropped_file_path_length;
     public sapp_icon_desc icon;
@@ -411,23 +456,108 @@ public struct sapp_desc
     public sapp_logger logger;
     public int gl_major_version;
     public int gl_minor_version;
+#if WEB
+    private byte _win32_console_utf8;
+    public bool win32_console_utf8 { get => _win32_console_utf8 != 0; set => _win32_console_utf8 = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool win32_console_utf8;
+#endif
+#if WEB
+    private byte _win32_console_create;
+    public bool win32_console_create { get => _win32_console_create != 0; set => _win32_console_create = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool win32_console_create;
+#endif
+#if WEB
+    private byte _win32_console_attach;
+    public bool win32_console_attach { get => _win32_console_attach != 0; set => _win32_console_attach = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool win32_console_attach;
+#endif
+#if WEB
+    private IntPtr _html5_canvas_selector;
+    public string html5_canvas_selector { get => Marshal.PtrToStringAnsi(_html5_canvas_selector); set => _html5_canvas_selector = Marshal.StringToHGlobalAnsi(value); }
+#else
     [M(U.LPUTF8Str)] public string html5_canvas_selector;
+#endif
+#if WEB
+    private byte _html5_canvas_resize;
+    public bool html5_canvas_resize { get => _html5_canvas_resize != 0; set => _html5_canvas_resize = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_canvas_resize;
+#endif
+#if WEB
+    private byte _html5_preserve_drawing_buffer;
+    public bool html5_preserve_drawing_buffer { get => _html5_preserve_drawing_buffer != 0; set => _html5_preserve_drawing_buffer = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_preserve_drawing_buffer;
+#endif
+#if WEB
+    private byte _html5_premultiplied_alpha;
+    public bool html5_premultiplied_alpha { get => _html5_premultiplied_alpha != 0; set => _html5_premultiplied_alpha = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_premultiplied_alpha;
+#endif
+#if WEB
+    private byte _html5_ask_leave_site;
+    public bool html5_ask_leave_site { get => _html5_ask_leave_site != 0; set => _html5_ask_leave_site = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_ask_leave_site;
+#endif
+#if WEB
+    private byte _html5_update_document_title;
+    public bool html5_update_document_title { get => _html5_update_document_title != 0; set => _html5_update_document_title = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_update_document_title;
+#endif
+#if WEB
+    private byte _html5_bubble_mouse_events;
+    public bool html5_bubble_mouse_events { get => _html5_bubble_mouse_events != 0; set => _html5_bubble_mouse_events = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_bubble_mouse_events;
+#endif
+#if WEB
+    private byte _html5_bubble_touch_events;
+    public bool html5_bubble_touch_events { get => _html5_bubble_touch_events != 0; set => _html5_bubble_touch_events = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_bubble_touch_events;
+#endif
+#if WEB
+    private byte _html5_bubble_wheel_events;
+    public bool html5_bubble_wheel_events { get => _html5_bubble_wheel_events != 0; set => _html5_bubble_wheel_events = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_bubble_wheel_events;
+#endif
+#if WEB
+    private byte _html5_bubble_key_events;
+    public bool html5_bubble_key_events { get => _html5_bubble_key_events != 0; set => _html5_bubble_key_events = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_bubble_key_events;
+#endif
+#if WEB
+    private byte _html5_bubble_char_events;
+    public bool html5_bubble_char_events { get => _html5_bubble_char_events != 0; set => _html5_bubble_char_events = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_bubble_char_events;
+#endif
+#if WEB
+    private byte _html5_use_emsc_set_main_loop;
+    public bool html5_use_emsc_set_main_loop { get => _html5_use_emsc_set_main_loop != 0; set => _html5_use_emsc_set_main_loop = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_use_emsc_set_main_loop;
+#endif
+#if WEB
+    private byte _html5_emsc_set_main_loop_simulate_infinite_loop;
+    public bool html5_emsc_set_main_loop_simulate_infinite_loop { get => _html5_emsc_set_main_loop_simulate_infinite_loop != 0; set => _html5_emsc_set_main_loop_simulate_infinite_loop = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool html5_emsc_set_main_loop_simulate_infinite_loop;
+#endif
+#if WEB
+    private byte _ios_keyboard_resizes_canvas;
+    public bool ios_keyboard_resizes_canvas { get => _ios_keyboard_resizes_canvas != 0; set => _ios_keyboard_resizes_canvas = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool ios_keyboard_resizes_canvas;
+#endif
 }
 public enum sapp_html5_fetch_error
 {
@@ -438,7 +568,12 @@ public enum sapp_html5_fetch_error
 [StructLayout(LayoutKind.Sequential)]
 public struct sapp_html5_fetch_response
 {
+#if WEB
+    private byte _succeeded;
+    public bool succeeded { get => _succeeded != 0; set => _succeeded = value ? (byte)1 : (byte)0; }
+#else
     [M(U.I1)] public bool succeeded;
+#endif
     public sapp_html5_fetch_error error_code;
     public int file_index;
     public sapp_range data;
