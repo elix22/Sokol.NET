@@ -148,6 +148,7 @@ prim_defaults = {
     'size_t':       '0'
 }
 
+# Functions which need special handling for WebAssembly (Emscripten) platform
 web_wrapper_functions = {
     'sg_make_shader',
     'sg_alloc_shader',
@@ -163,7 +164,10 @@ web_wrapper_functions = {
     'sg_alloc_sampler'
 }
 
-large_struct_functions = {
+# Functions which need special handling for WebAssembly (Emscripten) platform
+# For every additional query function that returns a struct, add it here 
+# You have to make sure to implement the function on the native side, see examples in sokol_glue.h
+web_wrapper_struct_return_functions = {
     'sglue_swapchain': 'sg_swapchain',
     'sglue_environment': 'sg_environment'
     # Add other query functions that return structs
@@ -580,7 +584,7 @@ def gen_enum(decl, prefix):
 
 def gen_func_c(decl, prefix):
     c_func_name = decl['name']
-    if c_func_name not in large_struct_functions:
+    if c_func_name not in web_wrapper_struct_return_functions:
         l("#if __IOS__")
         l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#else")
@@ -619,9 +623,8 @@ def gen_func_csharp(decl, prefix):
         return
 
       # Special case for large struct return functions in WebAssembly
-    if c_func_name in large_struct_functions:
+    if c_func_name in web_wrapper_struct_return_functions:
         l("#if WEB")
-        # l(f"static extern void {csharp_func_name}_internal(out {csharp_res_type} result{', ' + funcdecl_args_csharp(decl, prefix) if decl['params'] else ''});")
         l(f"public static {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
         l("{")
         l(f"    {csharp_res_type} result = default;")

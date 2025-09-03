@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dyntex", "examples\dyntex\d
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "plmpeg", "examples\plmpeg\plmpeg.csproj", "{20D1473D-EE27-4FC7-8074-0136E46E8343}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SokolCubeWebTest", "examples\cube-Web\SokolCubeWebTest.csproj", "{2D554284-B3B8-4FC4-BC3D-CFBACC21429B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +38,10 @@ Global
 		{20D1473D-EE27-4FC7-8074-0136E46E8343}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20D1473D-EE27-4FC7-8074-0136E46E8343}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20D1473D-EE27-4FC7-8074-0136E46E8343}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D554284-B3B8-4FC4-BC3D-CFBACC21429B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D554284-B3B8-4FC4-BC3D-CFBACC21429B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D554284-B3B8-4FC4-BC3D-CFBACC21429B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D554284-B3B8-4FC4-BC3D-CFBACC21429B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -45,6 +51,7 @@ Global
 		{D9D7E1F6-43DC-2E1E-3476-2A5B2940F232} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C6A900C0-2305-4DB2-988B-88E7540BC67F} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{20D1473D-EE27-4FC7-8074-0136E46E8343} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{2D554284-B3B8-4FC4-BC3D-CFBACC21429B} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

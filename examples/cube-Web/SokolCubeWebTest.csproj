@@ -15,14 +15,9 @@
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <DefineConstants>WEB</DefineConstants>
     </PropertyGroup>
 
-
-    <!-- <ItemGroup>
-      <Reference Include="sokol">
-        <HintPath>assemblies\sokol.dll</HintPath>
-      </Reference>
-    </ItemGroup> -->
 
     <ItemGroup>
       <NativeFileReference Include="libs\sokol.a">
@@ -58,7 +53,7 @@
   </Target>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <DefineConstants>DEBUG;TRACE</DefineConstants>
+      <DefineConstants>DEBUG;TRACE;WEB</DefineConstants>
     </PropertyGroup>
     
     <Choose>
