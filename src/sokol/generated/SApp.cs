@@ -253,6 +253,8 @@ public struct sapp_image_desc
 {
     public int width;
     public int height;
+    public int cursor_hotspot_x;
+    public int cursor_hotspot_y;
     public sapp_range pixels;
 }
 [StructLayout(LayoutKind.Sequential)]
@@ -315,6 +317,7 @@ public enum sapp_log_item
     SAPP_LOGITEM_WIN32_REGISTER_RAW_INPUT_DEVICES_FAILED_MOUSE_LOCK,
     SAPP_LOGITEM_WIN32_REGISTER_RAW_INPUT_DEVICES_FAILED_MOUSE_UNLOCK,
     SAPP_LOGITEM_WIN32_GET_RAW_INPUT_DATA_FAILED,
+    SAPP_LOGITEM_WIN32_DESTROYICON_FOR_CURSOR_FAILED,
     SAPP_LOGITEM_LINUX_GLX_LOAD_LIBGL_FAILED,
     SAPP_LOGITEM_LINUX_GLX_LOAD_ENTRY_POINTS_FAILED,
     SAPP_LOGITEM_LINUX_GLX_EXTENSION_NOT_FOUND,
@@ -601,6 +604,22 @@ public enum sapp_mouse_cursor
     SAPP_MOUSECURSOR_RESIZE_NESW,
     SAPP_MOUSECURSOR_RESIZE_ALL,
     SAPP_MOUSECURSOR_NOT_ALLOWED,
+    SAPP_MOUSECURSOR_CUSTOM_0,
+    SAPP_MOUSECURSOR_CUSTOM_1,
+    SAPP_MOUSECURSOR_CUSTOM_2,
+    SAPP_MOUSECURSOR_CUSTOM_3,
+    SAPP_MOUSECURSOR_CUSTOM_4,
+    SAPP_MOUSECURSOR_CUSTOM_5,
+    SAPP_MOUSECURSOR_CUSTOM_6,
+    SAPP_MOUSECURSOR_CUSTOM_7,
+    SAPP_MOUSECURSOR_CUSTOM_8,
+    SAPP_MOUSECURSOR_CUSTOM_9,
+    SAPP_MOUSECURSOR_CUSTOM_10,
+    SAPP_MOUSECURSOR_CUSTOM_11,
+    SAPP_MOUSECURSOR_CUSTOM_12,
+    SAPP_MOUSECURSOR_CUSTOM_13,
+    SAPP_MOUSECURSOR_CUSTOM_14,
+    SAPP_MOUSECURSOR_CUSTOM_15,
     _SAPP_MOUSECURSOR_NUM,
 }
 #if __IOS__
@@ -742,6 +761,20 @@ public static extern void sapp_set_mouse_cursor(sapp_mouse_cursor cursor);
 [DllImport("sokol", EntryPoint = "sapp_get_mouse_cursor", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sapp_mouse_cursor sapp_get_mouse_cursor();
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_bind_mouse_cursor_image", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sapp_bind_mouse_cursor_image", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern sapp_mouse_cursor sapp_bind_mouse_cursor_image(sapp_mouse_cursor cursor, in sapp_image_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_unbind_mouse_cursor_image", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sapp_unbind_mouse_cursor_image", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sapp_unbind_mouse_cursor_image(sapp_mouse_cursor cursor);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_userdata", CallingConvention = CallingConvention.Cdecl)]

@@ -2469,20 +2469,6 @@ public static extern sg_shader sg_make_shader(in sg_shader_desc desc);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_shader2", CallingConvention = CallingConvention.Cdecl)]
-#else
-[DllImport("sokol", EntryPoint = "sg_make_shader2", CallingConvention = CallingConvention.Cdecl)]
-#endif
-public static extern uint sg_make_shader2(in sg_shader_desc desc);
-
-#if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_shader_ptr", CallingConvention = CallingConvention.Cdecl)]
-#else
-[DllImport("sokol", EntryPoint = "sg_make_shader_ptr", CallingConvention = CallingConvention.Cdecl)]
-#endif
-public static extern void sg_make_shader_ptr(in sg_shader_desc desc, in sg_shader shader_ptr);
-
-#if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
