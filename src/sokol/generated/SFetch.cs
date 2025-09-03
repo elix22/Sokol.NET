@@ -124,7 +124,7 @@ public struct sfetch_request_t
     public uint channel;
 #if WEB
     private IntPtr _path;
-    public string path { get => Marshal.PtrToStringAnsi(_path); set => _path = Marshal.StringToHGlobalAnsi(value); }
+    public string path { get => Marshal.PtrToStringAnsi(_path);  set { if (_path != IntPtr.Zero) { Marshal.FreeHGlobal(_path); _path = IntPtr.Zero; } if (value != null) { _path = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string path;
 #endif

@@ -360,7 +360,7 @@ public struct sspine_skeleton_desc
     public float anim_default_mix;
 #if WEB
     private IntPtr _json_data;
-    public string json_data { get => Marshal.PtrToStringAnsi(_json_data); set => _json_data = Marshal.StringToHGlobalAnsi(value); }
+    public string json_data { get => Marshal.PtrToStringAnsi(_json_data);  set { if (_json_data != IntPtr.Zero) { Marshal.FreeHGlobal(_json_data); _json_data = IntPtr.Zero; } if (value != null) { _json_data = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string json_data;
 #endif

@@ -432,7 +432,7 @@ public struct sapp_desc
 #endif
 #if WEB
     private IntPtr _window_title;
-    public string window_title { get => Marshal.PtrToStringAnsi(_window_title); set => _window_title = Marshal.StringToHGlobalAnsi(value); }
+    public string window_title { get => Marshal.PtrToStringAnsi(_window_title);  set { if (_window_title != IntPtr.Zero) { Marshal.FreeHGlobal(_window_title); _window_title = IntPtr.Zero; } if (value != null) { _window_title = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string window_title;
 #endif
@@ -476,7 +476,7 @@ public struct sapp_desc
 #endif
 #if WEB
     private IntPtr _html5_canvas_selector;
-    public string html5_canvas_selector { get => Marshal.PtrToStringAnsi(_html5_canvas_selector); set => _html5_canvas_selector = Marshal.StringToHGlobalAnsi(value); }
+    public string html5_canvas_selector { get => Marshal.PtrToStringAnsi(_html5_canvas_selector);  set { if (_html5_canvas_selector != IntPtr.Zero) { Marshal.FreeHGlobal(_html5_canvas_selector); _html5_canvas_selector = IntPtr.Zero; } if (value != null) { _html5_canvas_selector = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string html5_canvas_selector;
 #endif

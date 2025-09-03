@@ -43,12 +43,6 @@ public static unsafe class CubeSapp
             environment.defaults.depth_format = (sg_pixel_format)sapp_depth_format();
             environment.defaults.sample_count = sapp_sample_count();
 
-
-            // Console.WriteLine($"sglue_environment_size returned: {native_size} , sg_environment size is {sizeof(sg_environment)}");
-            // Get the sokol environment for WebGL
-            // var environment = sglue_environment();
-            Console.WriteLine($"sglue_environment returned: {environment}");
-
             // Create sokol desc with the environment
             var sgdesc = new sg_desc()
             {
@@ -106,11 +100,9 @@ public static unsafe class CubeSapp
             1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.5f, 1.0f
         };
 
-        Console.WriteLine("Init() Line 74");
         sg_buffer vbuf = default; ;
         fixed (float* ptr_vertices = vertices)
         {
-            Console.WriteLine("Init() Line 102");
             vbuf = sg_make_buffer(new sg_buffer_desc()
             {
                 data = SG_RANGE(vertices),
@@ -118,9 +110,6 @@ public static unsafe class CubeSapp
             }
             );
         }
-        vbuf.id = 65537; // TBD ELI
-
-        Console.WriteLine("Init() Line 111");
 
         UInt16[] indices = {
                 0, 1, 2,  0, 2, 3,
@@ -142,15 +131,10 @@ public static unsafe class CubeSapp
             }
             );
         }
-        ibuf.id = 65538; // TBD ELI
+ 
 
-        Console.WriteLine("Init() Line 134");
-
+     
         sg_shader shd = sg_make_shader(cube_app_shader_cs.Shaders.cube_shader_desc(sg_query_backend()));
-
-        Console.WriteLine($"Init() Line 138 shd.id: {shd.id}. size:{sizeof(sg_shader)}");
-        // TBD ELI
-        shd.id = 65537;
 
         var pipeline_desc = default(sg_pipeline_desc);
         pipeline_desc.layout.buffers[0].stride = 28;
@@ -164,16 +148,55 @@ public static unsafe class CubeSapp
         pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
         pipeline_desc.label = "cube-pipeline";
 
-        Console.WriteLine("Init() Line 152");
         state.pip = sg_make_pipeline(pipeline_desc);
-        state.pip.id = 65537; // TBD ELI
-        Console.WriteLine("Init() Line 158");
         state.bind = new sg_bindings();
         state.bind.vertex_buffers[0] = vbuf;
         state.bind.index_buffer = ibuf;
-        Console.WriteLine("Init() Line 159");
 
     }
+
+    public static void PrintShaderDescBytes(sg_shader_desc desc)
+    {
+        int size = Marshal.SizeOf<sg_shader_desc>();
+        IntPtr ptr = Marshal.AllocHGlobal(size);
+
+        try
+        {
+            Marshal.StructureToPtr(desc, ptr, false);
+            byte[] bytes = new byte[size];
+            Marshal.Copy(ptr, bytes, 0, size);
+
+            Console.WriteLine($"Managed sg_shader_desc bytes ({size} bytes):");
+
+            // Print in hex dump format
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                if (i % 16 == 0)
+                {
+                    Console.Write($"{i:x4}: ");
+                }
+                Console.Write($"{bytes[i]:x2} ");
+                if ((i + 1) % 16 == 0)
+                {
+                    Console.WriteLine();
+                }
+            }
+            if (bytes.Length % 16 != 0)
+            {
+                Console.WriteLine();
+            }
+
+            // Print as single hex string for comparison
+            Console.WriteLine("\nManaged bytes (hex string): " +
+                BitConverter.ToString(bytes).Replace("-", "").ToLower());
+            Console.WriteLine();
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(ptr);
+        }
+    }
+
 
 
     [UnmanagedCallersOnly]

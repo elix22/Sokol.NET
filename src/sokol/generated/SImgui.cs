@@ -39,7 +39,7 @@ public struct simgui_desc_t
     public int sample_count;
 #if WEB
     private IntPtr _ini_filename;
-    public string ini_filename { get => Marshal.PtrToStringAnsi(_ini_filename); set => _ini_filename = Marshal.StringToHGlobalAnsi(value); }
+    public string ini_filename { get => Marshal.PtrToStringAnsi(_ini_filename);  set { if (_ini_filename != IntPtr.Zero) { Marshal.FreeHGlobal(_ini_filename); _ini_filename = IntPtr.Zero; } if (value != null) { _ini_filename = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string ini_filename;
 #endif

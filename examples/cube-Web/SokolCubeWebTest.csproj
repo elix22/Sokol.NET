@@ -83,12 +83,16 @@
                     -s ALLOW_MEMORY_GROWTH=1
                     -s ASYNCIFY_STACK_SIZE=10000000
                     -s TOTAL_MEMORY=520MB
+                    -s STACK_SIZE=16MB
+                    -s TOTAL_STACK=16MB
+                    -s STACK_OVERFLOW_CHECK=2
+                    <!-- -s SAFE_HEAP=1 -->
                     --embed-file ../cube/Assets@/
                 </EmccFlags>
                 <EmccExtraLDFlags>
                     -lidbfs.js
                     -s EXPORTED_RUNTIME_METHODS='['ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
-                    <!-- -s EXPORTED_FUNCTIONS='['_malloc','_sg_make_buffer']' -->
+                    <!-- -s EXPORTED_FUNCTIONS='['_mono_jiterp_placeholder_trace','_sbrk','_malloc']' -->
                     <!-- -s EXPORTED_FUNCTIONS='['_malloc','_glGetIntegerv' , '_glBindSampler']' -->
                 </EmccExtraLDFlags>
             </PropertyGroup>

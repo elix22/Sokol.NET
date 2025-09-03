@@ -52,12 +52,12 @@ namespace Sokol
 
             public static implicit operator sg_color(Vector3 v)
             {
-                return new sg_color { r = v.X, g = v.Y, b = v.Z, a=1 };
+                return new sg_color { r = v.X, g = v.Y, b = v.Z, a = 1 };
             }
 
             public static implicit operator sg_color(Vector4 v)
             {
-                return new sg_color { r = v.X, g = v.Y, b = v.Z, a=v.W };
+                return new sg_color { r = v.X, g = v.Y, b = v.Z, a = v.W };
             }
 
             public static implicit operator sg_color(float[] arr)

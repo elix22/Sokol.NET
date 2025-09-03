@@ -656,7 +656,7 @@ public struct sg_pass
     public sg_swapchain swapchain;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -807,7 +807,7 @@ public struct sg_buffer_desc
     public sg_range data;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -1012,7 +1012,7 @@ public struct sg_image_desc
     public sg_image_data data;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -1056,7 +1056,7 @@ public struct sg_sampler_desc
     public uint max_anisotropy;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -1079,26 +1079,26 @@ public struct sg_shader_function
 {
 #if WEB
     private IntPtr _source;
-    public string source { get => Marshal.PtrToStringAnsi(_source); set => _source = Marshal.StringToHGlobalAnsi(value); }
+    public string source { get => Marshal.PtrToStringAnsi(_source);  set { if (_source != IntPtr.Zero) { Marshal.FreeHGlobal(_source); _source = IntPtr.Zero; } if (value != null) { _source = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string source;
 #endif
     public sg_range bytecode;
 #if WEB
     private IntPtr _entry;
-    public string entry { get => Marshal.PtrToStringAnsi(_entry); set => _entry = Marshal.StringToHGlobalAnsi(value); }
+    public string entry { get => Marshal.PtrToStringAnsi(_entry);  set { if (_entry != IntPtr.Zero) { Marshal.FreeHGlobal(_entry); _entry = IntPtr.Zero; } if (value != null) { _entry = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string entry;
 #endif
 #if WEB
     private IntPtr _d3d11_target;
-    public string d3d11_target { get => Marshal.PtrToStringAnsi(_d3d11_target); set => _d3d11_target = Marshal.StringToHGlobalAnsi(value); }
+    public string d3d11_target { get => Marshal.PtrToStringAnsi(_d3d11_target);  set { if (_d3d11_target != IntPtr.Zero) { Marshal.FreeHGlobal(_d3d11_target); _d3d11_target = IntPtr.Zero; } if (value != null) { _d3d11_target = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string d3d11_target;
 #endif
 #if WEB
     private IntPtr _d3d11_filepath;
-    public string d3d11_filepath { get => Marshal.PtrToStringAnsi(_d3d11_filepath); set => _d3d11_filepath = Marshal.StringToHGlobalAnsi(value); }
+    public string d3d11_filepath { get => Marshal.PtrToStringAnsi(_d3d11_filepath);  set { if (_d3d11_filepath != IntPtr.Zero) { Marshal.FreeHGlobal(_d3d11_filepath); _d3d11_filepath = IntPtr.Zero; } if (value != null) { _d3d11_filepath = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string d3d11_filepath;
 #endif
@@ -1117,13 +1117,13 @@ public struct sg_shader_vertex_attr
     public sg_shader_attr_base_type base_type;
 #if WEB
     private IntPtr _glsl_name;
-    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name);  set { if (_glsl_name != IntPtr.Zero) { Marshal.FreeHGlobal(_glsl_name); _glsl_name = IntPtr.Zero; } if (value != null) { _glsl_name = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string glsl_name;
 #endif
 #if WEB
     private IntPtr _hlsl_sem_name;
-    public string hlsl_sem_name { get => Marshal.PtrToStringAnsi(_hlsl_sem_name); set => _hlsl_sem_name = Marshal.StringToHGlobalAnsi(value); }
+    public string hlsl_sem_name { get => Marshal.PtrToStringAnsi(_hlsl_sem_name);  set { if (_hlsl_sem_name != IntPtr.Zero) { Marshal.FreeHGlobal(_hlsl_sem_name); _hlsl_sem_name = IntPtr.Zero; } if (value != null) { _hlsl_sem_name = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string hlsl_sem_name;
 #endif
@@ -1136,7 +1136,7 @@ public struct sg_glsl_shader_uniform
     public ushort array_count;
 #if WEB
     private IntPtr _glsl_name;
-    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name);  set { if (_glsl_name != IntPtr.Zero) { Marshal.FreeHGlobal(_glsl_name); _glsl_name = IntPtr.Zero; } if (value != null) { _glsl_name = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string glsl_name;
 #endif
@@ -1247,7 +1247,7 @@ public struct sg_shader_texture_sampler_pair
     public byte sampler_slot;
 #if WEB
     private IntPtr _glsl_name;
-    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name); set => _glsl_name = Marshal.StringToHGlobalAnsi(value); }
+    public string glsl_name { get => Marshal.PtrToStringAnsi(_glsl_name);  set { if (_glsl_name != IntPtr.Zero) { Marshal.FreeHGlobal(_glsl_name); _glsl_name = IntPtr.Zero; } if (value != null) { _glsl_name = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string glsl_name;
 #endif
@@ -1388,7 +1388,7 @@ public struct sg_shader_desc
     public sg_mtl_shader_threads_per_threadgroup mtl_threads_per_threadgroup;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -1551,7 +1551,7 @@ public struct sg_pipeline_desc
 #endif
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -1595,7 +1595,7 @@ public struct sg_view_desc
     public sg_image_view_desc depth_stencil_attachment;
 #if WEB
     private IntPtr _label;
-    public string label { get => Marshal.PtrToStringAnsi(_label); set => _label = Marshal.StringToHGlobalAnsi(value); }
+    public string label { get => Marshal.PtrToStringAnsi(_label);  set { if (_label != IntPtr.Zero) { Marshal.FreeHGlobal(_label); _label = IntPtr.Zero; } if (value != null) { _label = Marshal.StringToHGlobalAnsi(value); } } }
 #else
     [M(U.LPUTF8Str)] public string label;
 #endif
@@ -2409,42 +2409,110 @@ public static extern bool sg_remove_commit_listener(sg_commit_listener listener)
 #else
 [DllImport("sokol", EntryPoint = "sg_make_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_buffer_internal(in sg_buffer_desc desc);
+public static sg_buffer sg_make_buffer(in sg_buffer_desc desc)
+{
+    uint _id = sg_make_buffer_internal(desc);
+    return new sg_buffer { id = _id };
+}
+#else
 public static extern sg_buffer sg_make_buffer(in sg_buffer_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_image", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_image", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_image_internal(in sg_image_desc desc);
+public static sg_image sg_make_image(in sg_image_desc desc)
+{
+    uint _id = sg_make_image_internal(desc);
+    return new sg_image { id = _id };
+}
+#else
 public static extern sg_image sg_make_image(in sg_image_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_sampler", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_sampler", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_sampler_internal(in sg_sampler_desc desc);
+public static sg_sampler sg_make_sampler(in sg_sampler_desc desc)
+{
+    uint _id = sg_make_sampler_internal(desc);
+    return new sg_sampler { id = _id };
+}
+#else
 public static extern sg_sampler sg_make_sampler(in sg_sampler_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_shader", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_shader", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_shader_internal(in sg_shader_desc desc);
+public static sg_shader sg_make_shader(in sg_shader_desc desc)
+{
+    uint _id = sg_make_shader_internal(desc);
+    return new sg_shader { id = _id };
+}
+#else
 public static extern sg_shader sg_make_shader(in sg_shader_desc desc);
+#endif
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_shader2", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_make_shader2", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern uint sg_make_shader2(in sg_shader_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_shader_ptr", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_make_shader_ptr", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_make_shader_ptr(in sg_shader_desc desc, in sg_shader shader_ptr);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_pipeline_internal(in sg_pipeline_desc desc);
+public static sg_pipeline sg_make_pipeline(in sg_pipeline_desc desc)
+{
+    uint _id = sg_make_pipeline_internal(desc);
+    return new sg_pipeline { id = _id };
+}
+#else
 public static extern sg_pipeline sg_make_pipeline(in sg_pipeline_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_make_view", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_make_view", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_make_view_internal(in sg_view_desc desc);
+public static sg_view sg_make_view(in sg_view_desc desc)
+{
+    uint _id = sg_make_view_internal(desc);
+    return new sg_view { id = _id };
+}
+#else
 public static extern sg_view sg_make_view(in sg_view_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_destroy_buffer", CallingConvention = CallingConvention.Cdecl)]
@@ -2920,42 +2988,96 @@ public static extern sg_buffer sg_query_view_buffer(sg_view view);
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_buffer_internal();
+public static sg_buffer sg_alloc_buffer()
+{
+    uint _id = sg_alloc_buffer_internal();
+    return new sg_buffer { id = _id };
+}
+#else
 public static extern sg_buffer sg_alloc_buffer();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_image", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_image", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_image_internal();
+public static sg_image sg_alloc_image()
+{
+    uint _id = sg_alloc_image_internal();
+    return new sg_image { id = _id };
+}
+#else
 public static extern sg_image sg_alloc_image();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_sampler", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_sampler", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_sampler_internal();
+public static sg_sampler sg_alloc_sampler()
+{
+    uint _id = sg_alloc_sampler_internal();
+    return new sg_sampler { id = _id };
+}
+#else
 public static extern sg_sampler sg_alloc_sampler();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_shader", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_shader", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_shader_internal();
+public static sg_shader sg_alloc_shader()
+{
+    uint _id = sg_alloc_shader_internal();
+    return new sg_shader { id = _id };
+}
+#else
 public static extern sg_shader sg_alloc_shader();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_pipeline_internal();
+public static sg_pipeline sg_alloc_pipeline()
+{
+    uint _id = sg_alloc_pipeline_internal();
+    return new sg_pipeline { id = _id };
+}
+#else
 public static extern sg_pipeline sg_alloc_pipeline();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_view", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_alloc_view", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sg_alloc_view_internal();
+public static sg_view sg_alloc_view()
+{
+    uint _id = sg_alloc_view_internal();
+    return new sg_view { id = _id };
+}
+#else
 public static extern sg_view sg_alloc_view();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_dealloc_buffer", CallingConvention = CallingConvention.Cdecl)]

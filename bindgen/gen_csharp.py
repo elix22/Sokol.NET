@@ -104,6 +104,7 @@ prim_types = {
     'uint16_t':     'ushort',
     'int32_t':      'int',
     'uint32_t':     'uint',
+    'unsigned int': 'uint',
     'int64_t':      'long',
     'uint64_t':     'ulong',
     'float':        'float',
@@ -147,6 +148,21 @@ prim_defaults = {
     'size_t':       '0'
 }
 
+web_wrapper_functions = {
+    'sg_make_shader',
+    'sg_alloc_shader',
+    'sg_make_pipeline', 
+    'sg_alloc_pipeline',
+    'sg_make_view',
+    'sg_alloc_view',
+    'sg_make_buffer',
+    'sg_alloc_buffer',
+    'sg_make_image',
+    'sg_alloc_image',
+    'sg_make_sampler',
+    'sg_alloc_sampler'
+}
+
 struct_types = []
 enum_types = []
 enum_items = {}
@@ -166,15 +182,15 @@ def l(s):
     global out_lines
     out_lines += s + '\n'
 
-def as_zig_prim_type(s):
+def as_csharp_prim_type(s):
     return prim_types[s]
 
 # prefix_bla_blub(_t) => (dep.)BlaBlub
-def as_zig_struct_type(s, prefix):
+def as_csharp_struct_type(s, prefix):
     return s
 
 # prefix_bla_blub(_t) => (dep.)BlaBlub
-def as_zig_enum_type(s, prefix):
+def as_csharp_enum_type(s, prefix):
     return s
 
 def check_type_override(func_or_struct_name, field_or_arg_name, orig_type):
@@ -285,11 +301,11 @@ def as_extern_c_arg_type(arg_type, prefix):
     if arg_type == "void":
         return "void"
     elif is_prim_type(arg_type):
-        return as_zig_prim_type(arg_type)
+        return as_csharp_prim_type(arg_type)
     elif is_struct_type(arg_type):
-        return as_zig_struct_type(arg_type, prefix)
+        return as_csharp_struct_type(arg_type, prefix)
     elif is_enum_type(arg_type):
-        return as_zig_enum_type(arg_type, prefix)
+        return as_csharp_enum_type(arg_type, prefix)
     elif is_void_ptr(arg_type):
         return "void*"
     elif is_const_void_ptr(arg_type):
@@ -297,18 +313,18 @@ def as_extern_c_arg_type(arg_type, prefix):
     elif is_string_ptr(arg_type):
         return "byte*"
     elif is_const_struct_ptr(arg_type):
-        return f"{as_zig_struct_type(extract_ptr_type(arg_type), prefix)}*"
+        return f"{as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}*"
     elif is_const_struct_sturct_ptr(arg_type):
         return f"void *" 
     elif is_prim_ptr(arg_type):
-        return f"{as_zig_prim_type(extract_ptr_type(arg_type))}*"
+        return f"{as_csharp_prim_type(extract_ptr_type(arg_type))}*"
     elif is_const_prim_ptr(arg_type):
-        return f"{as_zig_prim_type(extract_ptr_type(arg_type))}*"
+        return f"{as_csharp_prim_type(extract_ptr_type(arg_type))}*"
     else:
         return '??? (as_extern_c_arg_type)'
 
 
-def as_zig_arg_type(arg_prefix, arg_type, prefix):
+def as_csharp_arg_type(arg_prefix, arg_type, prefix):
     # NOTE: if arg_prefix is None, the result is used as return value
     pre = "" if arg_prefix is None else arg_prefix
     if arg_type == "void":
@@ -319,11 +335,11 @@ def as_zig_arg_type(arg_prefix, arg_type, prefix):
     elif arg_type.startswith("const ImVec4 *"):
         return f"ImVec4_t *{pre}"
     elif is_prim_type(arg_type):
-        return as_zig_prim_type(arg_type) + pre
+        return as_csharp_prim_type(arg_type) + pre
     elif is_struct_type(arg_type):
-        return as_zig_struct_type(arg_type, prefix) + pre
+        return as_csharp_struct_type(arg_type, prefix) + pre
     elif is_enum_type(arg_type):
-        return as_zig_enum_type(arg_type, prefix) + pre
+        return as_csharp_enum_type(arg_type, prefix) + pre
     elif is_void_ptr(arg_type):
         return "void*" + pre
     elif is_const_void_ptr(arg_type):
@@ -332,11 +348,11 @@ def as_zig_arg_type(arg_prefix, arg_type, prefix):
         return "string" + pre
     elif is_const_struct_ptr(arg_type):
         # not a bug, pass const structs by value
-        return f"in {as_zig_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
+        return f"in {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
     elif is_prim_ptr(arg_type):
-        return f"ref {as_zig_prim_type(extract_ptr_type(arg_type))}" + pre
+        return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     elif is_const_prim_ptr(arg_type):
-        return f"in {as_zig_prim_type(extract_ptr_type(arg_type))}" + pre
+        return f"in {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     # Explicit handling for specific SGP types:
     elif arg_type.startswith("const sgp_point *"):
         return f"in sgp_vec2{pre}"
@@ -357,8 +373,8 @@ def as_zig_arg_type(arg_prefix, arg_type, prefix):
     elif arg_type.startswith("cgltf_accessor *"):
         return f"cgltf_accessor *"
     else:
-        print(f"[DEBUG] as_zig_arg_type not handled for arg_type: '{arg_type}', arg_prefix: '{arg_prefix}', prefix: '{prefix}'", file=sys.stderr, flush=True)
-        return arg_prefix + "??? (as_zig_arg_type)"
+        print(f"[DEBUG] as_csharp_arg_type not handled for arg_type: '{arg_type}', arg_prefix: '{arg_prefix}', prefix: '{prefix}'", file=sys.stderr, flush=True)
+        return arg_prefix + "??? (as_csharp_arg_type)"
 
 # get C-style arguments of a function pointer as string
 def funcptr_args_c(field_type, prefix):
@@ -396,7 +412,7 @@ def funcdecl_args_c(decl, prefix):
         s += as_extern_c_arg_type(param_type, prefix)
     return s
 
-def funcdecl_args_zig(decl, prefix):
+def funcdecl_args_csharp(decl, prefix):
     s = ""
     func_name = decl['name']
     for param_decl in decl['params']:
@@ -408,7 +424,7 @@ def funcdecl_args_zig(decl, prefix):
         if is_string_ptr(param_type):
             s += "[M(U.LPUTF8Str)] "
 
-        s += f"{as_zig_arg_type(f' {param_name}', param_type, prefix)}"
+        s += f"{as_csharp_arg_type(f' {param_name}', param_type, prefix)}"
     return s
 
 def funcdecl_result_c(decl, prefix):
@@ -417,20 +433,20 @@ def funcdecl_result_c(decl, prefix):
     result_type = check_type_override(func_name, 'RESULT', decl_type[:decl_type.index('(')].strip())
     return as_extern_c_arg_type(result_type, prefix)
 
-def funcdecl_result_zig(decl, prefix):
+def funcdecl_result_csharp(decl, prefix):
     func_name = decl['name']
     decl_type = decl['type']
     result_type = check_type_override(func_name, 'RESULT', decl_type[:decl_type.index('(')].strip())
-    zig_res_type = as_zig_arg_type(None, result_type, prefix)
-    if zig_res_type == "":
-        zig_res_type = "void"
-    return zig_res_type
+    csharp_res_type = as_csharp_arg_type(None, result_type, prefix)
+    if csharp_res_type == "":
+        csharp_res_type = "void"
+    return csharp_res_type
 
 def gen_struct(decl, prefix):
     struct_name = decl['name']
-    zig_type = as_zig_struct_type(struct_name, prefix)
+    csharp_type = as_csharp_struct_type(struct_name, prefix)
     l(f"[StructLayout(LayoutKind.Sequential)]")
-    l(f"public struct {zig_type}")
+    l(f"public struct {csharp_type}")
     l("{")
     for field in decl['fields']:
         field_name = as_pascal_case(check_name_override(field['name']), "")
@@ -445,16 +461,16 @@ def gen_struct(decl, prefix):
             l(f"    [M(U.I1)] public bool {field_name};")
             l("#endif")
         elif is_prim_type(field_type):
-            l(f"    public {as_zig_prim_type(field_type)} {field_name};")
+            l(f"    public {as_csharp_prim_type(field_type)} {field_name};")
         elif is_struct_type(field_type):
-            l(f"    public {as_zig_struct_type(field_type, prefix)} {field_name};")
+            l(f"    public {as_csharp_struct_type(field_type, prefix)} {field_name};")
         elif is_enum_type(field_type):
-            l(f"    public {as_zig_enum_type(field_type, prefix)} {field_name};")
+            l(f"    public {as_csharp_enum_type(field_type, prefix)} {field_name};")
         elif util.is_string_ptr(field_type):
             # Conditional for string fields with properties
             l("#if WEB")
             l(f"    private IntPtr _{field_name};")
-            l(f"    public string {field_name} {{ get => Marshal.PtrToStringAnsi(_{field_name}); set => _{field_name} = Marshal.StringToHGlobalAnsi(value); }}")
+            l(f"    public string {field_name} {{ get => Marshal.PtrToStringAnsi(_{field_name});  set {{ if (_{field_name} != IntPtr.Zero) {{ Marshal.FreeHGlobal(_{field_name}); _{field_name} = IntPtr.Zero; }} if (value != null) {{ _{field_name} = Marshal.StringToHGlobalAnsi(value); }} }} }}")
             l("#else")
             l(f"    [M(U.LPUTF8Str)] public string {field_name};")
             l("#endif")
@@ -463,11 +479,11 @@ def gen_struct(decl, prefix):
         elif util.is_void_ptr(field_type):
             l(f"    public void* {field_name};")
         elif is_const_prim_ptr(field_type):
-            l(f"    public {as_zig_prim_type(extract_ptr_type(field_type))}* {field_name};")
+            l(f"    public {as_csharp_prim_type(extract_ptr_type(field_type))}* {field_name};")
         elif is_struct_ptr(field_type):
-            l(f"    public {as_zig_struct_type(extract_ptr_type(field_type), prefix)}* {field_name};")
+            l(f"    public {as_csharp_struct_type(extract_ptr_type(field_type), prefix)}* {field_name};")
         elif is_struct_ptr_ptr(field_type):
-            l(f"    public {as_zig_struct_type(extract_ptr_type(field_type), prefix)}** {field_name};")
+            l(f"    public {as_csharp_struct_type(extract_ptr_type(field_type), prefix)}** {field_name};")
         elif util.is_func_ptr(field_type):
             args = funcptr_args_c(field_type, prefix)
             if args != "":
@@ -478,21 +494,21 @@ def gen_struct(decl, prefix):
             array_nums = util.extract_array_sizes(field_type)
             if is_prim_type(array_type) or is_struct_type(array_type) or is_enum_type(array_type)  or is_const_void_ptr(array_type):
                 if is_prim_type(array_type):
-                    zig_type = as_zig_prim_type(array_type)
+                    csharp_type = as_csharp_prim_type(array_type)
                 elif is_struct_type(array_type):
-                    zig_type = as_zig_struct_type(array_type, prefix)
+                    csharp_type = as_csharp_struct_type(array_type, prefix)
                 elif is_enum_type(array_type):
-                    zig_type = as_zig_enum_type(array_type, prefix)
+                    csharp_type = as_csharp_enum_type(array_type, prefix)
                 elif is_const_void_ptr(array_type):
-                    zig_type = "IntPtr"
+                    csharp_type = "IntPtr"
                 else:
-                    zig_type = '??? (1d array type)'
+                    csharp_type = '??? (1d array type)'
                 l("    #pragma warning disable 169")
                 l(f"    public struct {field_name}Collection")
                 l("    {")
-                l(f"        public ref {zig_type} this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, {array_nums[0]})[index];")
+                l(f"        public ref {csharp_type} this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, {array_nums[0]})[index];")
                 for i in range(0, int(array_nums[0])):
-                    l(f"        private {zig_type} _item{i};")
+                    l(f"        private {csharp_type} _item{i};")
                 l("    }")
                 l("    #pragma warning restore 169")
 
@@ -505,32 +521,32 @@ def gen_struct(decl, prefix):
             array_type = util.extract_array_type(field_type)
             array_nums = util.extract_array_sizes(field_type)
             if is_prim_type(array_type):
-                zig_type = as_zig_prim_type(array_type)
+                csharp_type = as_csharp_prim_type(array_type)
                 def_val = type_default_value(array_type)
             elif is_struct_type(array_type):
-                zig_type = as_zig_struct_type(array_type, prefix)
+                csharp_type = as_csharp_struct_type(array_type, prefix)
                 def_val = ".{ }"
             elif is_enum_type(array_type):
-                zig_type = as_zig_enum_type(array_type, prefix)
+                csharp_type = as_csharp_enum_type(array_type, prefix)
             elif is_const_void_ptr(array_type):
-                zig_type = "IntPtr"
+                csharp_type = "IntPtr"
             else:
-                zig_type = '??? (2d array type)'
+                csharp_type = '??? (2d array type)'
                 def_val = "???"
 
             l("    #pragma warning disable 169")
             l(f"    public struct {field_name}Collection")
             l("    {")
-            l(f"        public ref {zig_type} this[int x, int y] {{ get {{ fixed ({zig_type}* pTP = &_item0) return ref *(pTP + x + (y * {array_nums[0]})); }} }}")
+            l(f"        public ref {csharp_type} this[int x, int y] {{ get {{ fixed ({csharp_type}* pTP = &_item0) return ref *(pTP + x + (y * {array_nums[0]})); }} }}")
             for i in range(0, int(array_nums[0]) * int(array_nums[1])):
-                l(f"        private {zig_type} _item{i};")
+                l(f"        private {csharp_type} _item{i};")
             l("    }")
             l("    #pragma warning restore 169")
 
             l(f"    public {field_name}Collection {field_name};")
 
-            #t0 = f"[{array_nums[0]}][{array_nums[1]}]{zig_type}"
-            #l(f"    {field_name}: {t0} = [_][{array_nums[1]}]{zig_type}{{[_]{zig_type}{{ {def_val} }}**{array_nums[1]}}}**{array_nums[0]},")
+            #t0 = f"[{array_nums[0]}][{array_nums[1]}]{csharp_type}"
+            #l(f"    {field_name}: {t0} = [_][{array_nums[1]}]{csharp_type}{{[_]{csharp_type}{{ {def_val} }}**{array_nums[1]}}}**{array_nums[0]},")
         else:
             l(f"// FIXME: {field_name}: {field_type};")
     l("}")
@@ -540,7 +556,7 @@ def gen_consts(decl, prefix):
         l(f"public const int {as_pascal_case(item['name'], prefix)} = {item['value']};")
 
 def gen_enum(decl, prefix):
-    l(f"public enum {as_zig_enum_type(decl['name'], prefix)}")
+    l(f"public enum {as_csharp_enum_type(decl['name'], prefix)}")
     l("{")
     for item in decl['items']:
         item_name = as_enum_item_name(item['name'])
@@ -558,15 +574,41 @@ def gen_func_c(decl, prefix):
     l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
     l("#endif")
 
-def gen_func_zig(decl, prefix):
+def gen_func_csharp(decl, prefix):
     c_func_name = decl['name']
-    zig_func_name = as_pascal_case(check_name_override(decl['name']), prefix)
-    zig_res_type = funcdecl_result_zig(decl, prefix)
+    csharp_func_name = as_pascal_case(check_name_override(decl['name']), prefix)
+    csharp_res_type = funcdecl_result_csharp(decl, prefix)
 
-    if zig_res_type == "string":
+    # Special case for sg_make_shader on WebAssembly
+    if c_func_name in web_wrapper_functions:
+        l("#if WEB")
+        l(f"static extern uint {csharp_func_name}_internal({funcdecl_args_csharp(decl, prefix)});")
+        l(f"public static {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
+        l("{")
+        # Handle functions with parameters vs those without
+        if decl['params']:
+            # Functions like sg_make_shader that take parameters - use the actual parameter names
+            param_names = [check_name_override(param['name']) for param in decl['params']]
+            param_list = ", ".join(param_names)
+            l(f"    uint _id = {csharp_func_name}_internal({param_list});")
+        else:
+            # Functions like sg_alloc_shader that take no parameters
+            l(f"    uint _id = {csharp_func_name}_internal();")
+            
+        l(f"    return new {csharp_res_type} {{ id = _id }};")
+        l("}")
+        l("#else")
+        if csharp_res_type == "string":
+            l("[return:M(U.LPUTF8Str)]")
+        l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
+        l("#endif")
+        l("")
+        return
+    
+    if csharp_res_type == "string":
         l("[return:M(U.LPUTF8Str)]")
 
-    l(f"public static extern {zig_res_type} {zig_func_name}({funcdecl_args_zig(decl, prefix)});")
+    l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
     l("")
 
 def pre_parse(inp):
@@ -615,7 +657,7 @@ def gen_module(inp, dep_prefixes):
                     gen_enum(decl, prefix)
                 elif kind == 'func':
                     gen_func_c(decl, prefix)
-                    gen_func_zig(decl, prefix)
+                    gen_func_csharp(decl, prefix)
     l("}")
     l("}")
 

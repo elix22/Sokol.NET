@@ -123,10 +123,10 @@ public static unsafe class Shaders
         if (backend == SG_BACKEND_GLES3) {
             sg_shader_desc desc = default(sg_shader_desc);
             desc.vertex_func.source = System.Text.Encoding.UTF8.GetString(vs_source_glsl300es);
-            Console.WriteLine($"Vertex Shader Source: {desc.vertex_func.source}");
+            // Console.WriteLine($"Vertex Shader Source: {desc.vertex_func.source}");
             desc.vertex_func.entry = "main";
             desc.fragment_func.source = System.Text.Encoding.UTF8.GetString(fs_source_glsl300es);
-            Console.WriteLine($"Fragment Shader Source: {desc.fragment_func.source}");
+            // Console.WriteLine($"Fragment Shader Source: {desc.fragment_func.source}");
             desc.fragment_func.entry = "main";
             desc.attrs[0].base_type = SG_SHADERATTRBASETYPE_FLOAT;
             desc.attrs[0].glsl_name = "position";

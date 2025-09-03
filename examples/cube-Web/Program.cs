@@ -14,9 +14,7 @@ public static unsafe class MainClass
         var applicationPath = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
         System.IO.Directory.SetCurrentDirectory(applicationPath);
 #endif
-        Console.WriteLine(" Before sapp_run()");
         SApp.sapp_run(CreateAppDesc());
-        Console.WriteLine(" After sapp_run()");
     }
 
     //ANDROID

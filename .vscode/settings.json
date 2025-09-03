@@ -81,7 +81,8 @@
         "hash_map": "cpp",
         "list": "cpp",
         "ranges": "cpp",
-        "cgltf.h": "c"
+        "cgltf.h": "c",
+        "future": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5502
