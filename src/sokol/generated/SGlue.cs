@@ -10,19 +10,51 @@ namespace Sokol
 {
 public static unsafe partial class SGlue
 {
+#if WEB
+public static sg_environment sglue_environment()
+{
+    sg_environment result = default;
+    sglue_environment_internal(out result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_environment", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sglue_environment", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_environment sglue_environment();
+#endif
 
+#if WEB
+public static sg_swapchain sglue_swapchain()
+{
+    sg_swapchain result = default;
+    sglue_swapchain_internal(out result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_swapchain", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sglue_swapchain", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_swapchain sglue_swapchain();
+#endif
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_environment_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sglue_environment_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sglue_environment_internal(out sg_environment env);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sglue_swapchain_internal(out sg_swapchain swapchain);
 
 }
 }

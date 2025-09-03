@@ -163,6 +163,12 @@ web_wrapper_functions = {
     'sg_alloc_sampler'
 }
 
+large_struct_functions = {
+    'sglue_swapchain': 'sg_swapchain',
+    'sglue_environment': 'sg_environment'
+    # Add other query functions that return structs
+}
+
 struct_types = []
 enum_types = []
 enum_items = {}
@@ -349,6 +355,11 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
     elif is_const_struct_ptr(arg_type):
         # not a bug, pass const structs by value
         return f"in {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
+    elif is_struct_ptr(arg_type):
+        if arg_prefix is None:  # This is a return type
+            return f"ref {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
+        else:  # This is a parameter
+            return f"out {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
     elif is_prim_ptr(arg_type):
         return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     elif is_const_prim_ptr(arg_type):
@@ -568,11 +579,13 @@ def gen_enum(decl, prefix):
     l("}")
 
 def gen_func_c(decl, prefix):
-    l("#if __IOS__")
-    l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-    l("#else")
-    l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-    l("#endif")
+    c_func_name = decl['name']
+    if c_func_name not in large_struct_functions:
+        l("#if __IOS__")
+        l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#else")
+        l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#endif")
 
 def gen_func_csharp(decl, prefix):
     c_func_name = decl['name']
@@ -594,7 +607,7 @@ def gen_func_csharp(decl, prefix):
         else:
             # Functions like sg_alloc_shader that take no parameters
             l(f"    uint _id = {csharp_func_name}_internal();")
-            
+
         l(f"    return new {csharp_res_type} {{ id = _id }};")
         l("}")
         l("#else")
@@ -604,7 +617,35 @@ def gen_func_csharp(decl, prefix):
         l("#endif")
         l("")
         return
-    
+
+      # Special case for large struct return functions in WebAssembly
+    if c_func_name in large_struct_functions:
+        l("#if WEB")
+        # l(f"static extern void {csharp_func_name}_internal(out {csharp_res_type} result{', ' + funcdecl_args_csharp(decl, prefix) if decl['params'] else ''});")
+        l(f"public static {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
+        l("{")
+        l(f"    {csharp_res_type} result = default;")
+        if decl['params']:
+            param_names = [check_name_override(param['name']) for param in decl['params']]
+            param_list = ", ".join(param_names)
+            l(f"    {csharp_func_name}_internal(out result, {param_list});")
+        else:
+            l(f"    {csharp_func_name}_internal(out result);")
+        l("    return result;")
+        l("}")
+        l("#else")
+        l("#if __IOS__")
+        l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#else")
+        l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#endif")
+        if csharp_res_type == "string":
+            l("[return:M(U.LPUTF8Str)]")
+        l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
+        l("#endif")
+        l("")
+        return
+      
     if csharp_res_type == "string":
         l("[return:M(U.LPUTF8Str)]")
 

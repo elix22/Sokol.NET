@@ -22,8 +22,6 @@ public static unsafe class CubeSapp
         public sg_pipeline pip;
         public sg_bindings bind;
         public bool PauseUpdate;
-
-        public sg_swapchain swapchain;
     }
 
     static _state state = new _state();
@@ -32,41 +30,13 @@ public static unsafe class CubeSapp
     [UnmanagedCallersOnly]
     private static unsafe void Init()
     {
-        Console.WriteLine("Init() Enter");
-        try
+        Console.WriteLine("Initialize() Enter");
+
+        sg_setup(new sg_desc()
         {
-            Console.WriteLine("Getting sokol environment");
+            environment = sglue_environment()
+        });
 
-            // int native_size = sglue_environment_size();
-            sg_environment environment = default;
-            environment.defaults.color_format = (sg_pixel_format)sapp_color_format();
-            environment.defaults.depth_format = (sg_pixel_format)sapp_depth_format();
-            environment.defaults.sample_count = sapp_sample_count();
-
-            // Create sokol desc with the environment
-            var sgdesc = new sg_desc()
-            {
-                environment = environment,
-                disable_validation = false
-            };
-
-            Console.WriteLine("About to call sg_setup()");
-            sg_setup(sgdesc);
-            Console.WriteLine("sg_setup() succeeded");
-
-            state.swapchain = default;
-            state.swapchain.width = sapp_width();
-            state.swapchain.height = sapp_height();
-            state.swapchain.sample_count = sapp_sample_count();
-            state.swapchain.color_format = (sg_pixel_format)sapp_color_format();
-            state.swapchain.depth_format = (sg_pixel_format)sapp_depth_format();
-            state.swapchain.gl.framebuffer = sapp_gl_get_framebuffer();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Exception in Init(): {ex.Message}");
-            throw;
-        }
         /* cube vertex buffer */
         float[] vertices =  {
             -1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f, 1.0f,
@@ -100,7 +70,7 @@ public static unsafe class CubeSapp
             1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.5f, 1.0f
         };
 
-        sg_buffer vbuf = default; ;
+        sg_buffer vbuf;
         fixed (float* ptr_vertices = vertices)
         {
             vbuf = sg_make_buffer(new sg_buffer_desc()
@@ -131,9 +101,8 @@ public static unsafe class CubeSapp
             }
             );
         }
- 
 
-     
+
         sg_shader shd = sg_make_shader(cube_app_shader_cs.Shaders.cube_shader_desc(sg_query_backend()));
 
         var pipeline_desc = default(sg_pipeline_desc);
@@ -149,54 +118,12 @@ public static unsafe class CubeSapp
         pipeline_desc.label = "cube-pipeline";
 
         state.pip = sg_make_pipeline(pipeline_desc);
+
         state.bind = new sg_bindings();
         state.bind.vertex_buffers[0] = vbuf;
         state.bind.index_buffer = ibuf;
 
     }
-
-    public static void PrintShaderDescBytes(sg_shader_desc desc)
-    {
-        int size = Marshal.SizeOf<sg_shader_desc>();
-        IntPtr ptr = Marshal.AllocHGlobal(size);
-
-        try
-        {
-            Marshal.StructureToPtr(desc, ptr, false);
-            byte[] bytes = new byte[size];
-            Marshal.Copy(ptr, bytes, 0, size);
-
-            Console.WriteLine($"Managed sg_shader_desc bytes ({size} bytes):");
-
-            // Print in hex dump format
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                if (i % 16 == 0)
-                {
-                    Console.Write($"{i:x4}: ");
-                }
-                Console.Write($"{bytes[i]:x2} ");
-                if ((i + 1) % 16 == 0)
-                {
-                    Console.WriteLine();
-                }
-            }
-            if (bytes.Length % 16 != 0)
-            {
-                Console.WriteLine();
-            }
-
-            // Print as single hex string for comparison
-            Console.WriteLine("\nManaged bytes (hex string): " +
-                BitConverter.ToString(bytes).Replace("-", "").ToLower());
-            Console.WriteLine();
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(ptr);
-        }
-    }
-
 
 
     [UnmanagedCallersOnly]
@@ -210,13 +137,14 @@ public static unsafe class CubeSapp
         vs_params_t vs_params = default;
 
         float deltaSeconds = (float)(Sokol.SApp.sapp_frame_duration());
+
         state.rx += 1.0f * deltaSeconds;
         state.ry += 2.0f * deltaSeconds;
         var rotationMatrixX = Matrix4x4.CreateFromAxisAngle(Vector3.UnitX, state.rx);
         var rotationMatrixY = Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, state.ry);
         var modelMatrix = rotationMatrixX * rotationMatrixY;
 
-
+        
         var width = SApp.sapp_widthf();
         var height = SApp.sapp_heightf();
 
@@ -225,7 +153,6 @@ public static unsafe class CubeSapp
             width / height,
             0.01f,
             10.0f);
-
         var viewMatrix = Matrix4x4.CreateLookAt(
             new Vector3(0.0f, 1.5f, 6.0f),
             Vector3.Zero,
@@ -235,8 +162,8 @@ public static unsafe class CubeSapp
 
         sg_pass pass = default;
         pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        pass.action.colors[0].clear_value = new float[4] { 0.25f, 0.5f, 0.75f, 1.0f };
-        pass.swapchain = state.swapchain;
+        pass.action.colors[0].clear_value =new  float[4] {  0.25f, 0.5f, 0.75f,  1.0f };
+        pass.swapchain = sglue_swapchain();
         sg_begin_pass(pass);
 
         sg_apply_pipeline(state.pip);
@@ -270,7 +197,7 @@ public static unsafe class CubeSapp
         }
 
         sg_shutdown();
-
+        
         // Force a complete shutdown if debugging
         if (Debugger.IsAttached)
         {
