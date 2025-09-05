@@ -111,11 +111,7 @@ public static unsafe partial class PlMpegApp
 
         state.bind.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
         {
-            data = new sg_range()
-            {
-                ptr = Unsafe.AsPointer(ref vertex_buffer[0]),
-                size = (uint)(vertex_buffer.Length * Marshal.SizeOf<vertex_t>())
-            },
+            data = SG_RANGE<vertex_t>(vertex_buffer),
             label = "vertices"
         });
 
@@ -129,7 +125,7 @@ public static unsafe partial class PlMpegApp
         state.bind.index_buffer = sg_make_buffer(new sg_buffer_desc()
         {
             usage = new sg_buffer_usage { index_buffer = true },
-            data = SG_RANGE(indices),
+            data = SG_RANGE<UInt16>(indices),
             label = "indices"
         });
 
@@ -182,11 +178,11 @@ public static unsafe partial class PlMpegApp
         else if (ring_count(state.full_buffers) == 2)
         {
             state.plm_buffer = plm_buffer_create_with_capacity(BUFFER_SIZE);
-            plm_buffer_set_load_callback(state.plm_buffer, &plmpeg_load_callback, null);
+            plm_buffer_set_load_callback(state.plm_buffer, (IntPtr)(delegate* unmanaged<plm_buffer_t*, void*, void>)&plmpeg_load_callback, null);
             state.plm = plm_create_with_buffer(state.plm_buffer, 1);
             // assert(state.plm);
-            plm_set_video_decode_callback(state.plm, &video_cb, null);
-            plm_set_audio_decode_callback(state.plm, &audio_cb, null);
+            plm_set_video_decode_callback(state.plm, (IntPtr)(delegate* unmanaged<plm_t*, plm_frame_t*, void*, void> )&video_cb, null);
+            plm_set_audio_decode_callback(state.plm, (IntPtr)(delegate* unmanaged<plm_t*, plm_samples_t*, void*, void> )&audio_cb, null);
             plm_set_loop(state.plm, 1);
             plm_set_audio_enabled(state.plm, 1, 0);
             plm_set_audio_lead_time(state.plm, 0.25);
@@ -222,6 +218,7 @@ public static unsafe partial class PlMpegApp
             //     ptr = Unsafe.AsPointer(ref vs_params),
             //     size = (uint)Marshal.SizeOf<vs_params_t>()
             // });
+
             sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
             sg_draw(0, 24, 1);
         }

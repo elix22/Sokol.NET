@@ -40,7 +40,6 @@ int sdtx_print_wrapper(const char* str)
     return sdtx_printf("%s", str);
 }
 
-
 // TBD elix22
 #ifdef __ANDROID__
 sapp_desc sokol_main(int argc, char* argv[]) {

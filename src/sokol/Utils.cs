@@ -21,7 +21,7 @@ namespace Sokol
 #if __IOS__
       const string  sokol_lib = "@rpath/sokol.framework/sokol";
 #else
-      const string  sokol_lib = "sokol";
+        const string sokol_lib = "sokol";
 #endif
 
         [DllImport(sokol_lib, CallingConvention = CallingConvention.Cdecl)]
@@ -38,6 +38,26 @@ namespace Sokol
         {
             return _random.Next();
         }
+
+        public static sg_range SG_RANGE<T>(Span<T> span) where T : unmanaged
+        {
+            return new sg_range()
+            {
+                ptr = Unsafe.AsPointer(ref span[0]),
+                size = (uint)(span.Length * Marshal.SizeOf<T>())
+            };
+        }
+
+        public static sg_range SG_RANGE<T>(ref T value) where T : unmanaged
+        {
+            return new sg_range()
+            {
+                ptr = Unsafe.AsPointer(ref value),
+                size = (uint)Marshal.SizeOf<T>()
+            };
+        }
+
+
         public static sg_range SG_RANGE(float[] vertices)
         {
             var result = new sg_range()
@@ -150,7 +170,7 @@ namespace Sokol
                 byte* result = fileutil_get_path(filename, buf_ptr, 1024);
                 fullPath = Marshal.PtrToStringUTF8((IntPtr)result);
             }
-             return fullPath;
+            return fullPath;
         }
 
         /// <summary>
@@ -169,7 +189,7 @@ namespace Sokol
             byte[] data = new byte[str.len];
             for (int i = 0; i < str.len; i++)
             {
-            data[i] = (byte)str.cstr[i];
+                data[i] = (byte)str.cstr[i];
             }
             return Encoding.UTF8.GetString(data);
         }
@@ -179,7 +199,7 @@ namespace Sokol
             return Marshal.PtrToStringUTF8((IntPtr)ptr);
         }
 
-             /// <summary>
+        /// <summary>
         /// Returns a reference to the first float field (M11) of the Matrix4x4.
         /// </summary>
         public static ref float AsFloat(this Matrix4x4 matrix)
