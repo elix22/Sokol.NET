@@ -130,11 +130,7 @@ public static unsafe class LoadPngSApp
 
         state.bind.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
         {
-            data = new sg_range()
-            {
-                ptr = Unsafe.AsPointer(ref vertex_buffer[0]),
-                size = (uint)(vertex_buffer.Length * Marshal.SizeOf<vertex_t>())
-            },
+            data = SG_RANGE<vertex_t>(vertex_buffer),
             label = "cube-vertices"
         });
 
@@ -151,13 +147,13 @@ public static unsafe class LoadPngSApp
         state.bind.index_buffer = sg_make_buffer(new sg_buffer_desc()
         {
             usage = new sg_buffer_usage { index_buffer = true },
-            data = SG_RANGE(indices),
+            data = SG_RANGE<UInt16>(indices),
             label = "cube-indices"
         });
 
         // create a shader object
 
-        sg_pipeline_desc desc = new sg_pipeline_desc();
+        sg_pipeline_desc desc = default;
         desc.shader = sg_make_shader(loadpng_shader_desc(sg_query_backend()));
         desc.layout.attrs[ATTR_loadpng_pos].format = SG_VERTEXFORMAT_FLOAT3;
         desc.layout.attrs[ATTR_loadpng_texcoord0].format = SG_VERTEXFORMAT_SHORT2N;
@@ -252,11 +248,7 @@ public static unsafe class LoadPngSApp
         sg_begin_pass(new sg_pass() { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);
         sg_apply_bindings(state.bind);
-        sg_apply_uniforms(UB_vs_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref vs_params),
-            size = (uint)Marshal.SizeOf<vs_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(0, 36, 1);
         sg_end_pass();
         sg_commit();

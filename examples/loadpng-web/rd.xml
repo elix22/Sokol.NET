@@ -1,0 +1,6 @@
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="sokol" Dynamic="Required All" />
+    <Assembly Name="loadpngWeb" Dynamic="Required All" />
+  </Application>
+</Directives>

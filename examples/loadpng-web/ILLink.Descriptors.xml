@@ -1,0 +1,24 @@
+<linker>
+  <!-- Preserve your game types -->
+  <assembly fullname="Game">
+    <type fullname="*" preserve="fields" />
+    <!-- Add any other custom game types that need serialization -->
+  </assembly>
+  
+  <!-- Preserve System types needed for serialization -->
+  <assembly fullname="System.Private.CoreLib">
+    <type fullname="System.Collections.Generic.List`1" preserve="all"/>
+    <type fullname="System.Array" preserve="all"/>
+  </assembly>
+  
+  <!-- Preserve JSON serialization functionality -->
+  <assembly fullname="System.Text.Json">
+    <type fullname="System.Text.Json.JsonSerializer" preserve="all"/>
+  </assembly>
+
+  <!-- Preserve Urho.Json assembly -->
+  <assembly fullname="UrhoDotNet">
+    <type fullname="Urho.Json.JsonConvert" preserve="all"/>
+    <type fullname="*" preserve="fields" />
+  </assembly>
+</linker>

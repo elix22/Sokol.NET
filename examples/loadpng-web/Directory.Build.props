@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="GenerateDepotSource" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="GenerateDepotSource" />
+  </ItemGroup>
+</Project>
