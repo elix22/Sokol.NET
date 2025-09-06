@@ -71,6 +71,19 @@
 <canvas class="emscripten" id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()">
 Your browser does not support HTML5 canvas.
 </canvas>
+<script>
+// Ensure WebGL context has depth buffer enabled
+var canvas = document.getElementById('canvas');
+var gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+if (gl) {
+    // Check if depth buffer is available
+    var depthBits = gl.getParameter(gl.DEPTH_BITS);
+    console.log('WebGL depth bits:', depthBits);
+    if (depthBits === 0) {
+        console.warn('No depth buffer available in WebGL context!');
+    }
+}
+</script>
 <script type="module" src="./main.js"></script>
 </body>
 </html>
