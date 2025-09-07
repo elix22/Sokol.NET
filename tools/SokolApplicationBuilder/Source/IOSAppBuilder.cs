@@ -150,7 +150,7 @@ namespace SokolApplicationBuilder
                     // Install on device if requested
                     if (opts.Install)
                     {
-                        if (!InstallOnDevice(iosDir, projectName))
+                        if (!InstallOnDevice(iosDir, projectName, opts.Run))
                             return false;
                     }
                 }
@@ -483,7 +483,7 @@ namespace SokolApplicationBuilder
             }
         }
 
-        private bool InstallOnDevice(string iosDir, string projectName)
+        private bool InstallOnDevice(string iosDir, string projectName, bool runAfterInstall = false)
         {
             try
             {
@@ -612,6 +612,59 @@ namespace SokolApplicationBuilder
                 }
 
                 Log.LogMessage(MessageImportance.High, "App installed successfully on device!");
+
+                // Launch the app if requested
+                if (runAfterInstall)
+                {
+                    Log.LogMessage(MessageImportance.High, "Launching app on device...");
+
+                    // Extract bundle ID from Info.plist
+                    string infoPlistPath = Path.Combine(appBundlePath, "Info.plist");
+                    string bundleId = "";
+
+                    try
+                    {
+                        // Use plutil to extract bundle ID from binary plist
+                        var plistResult = Cli.Wrap("plutil")
+                            .WithArguments($"-extract CFBundleIdentifier raw \"{infoPlistPath}\"")
+                            .ExecuteBufferedAsync()
+                            .GetAwaiter()
+                            .GetResult();
+
+                        if (plistResult.ExitCode == 0)
+                        {
+                            bundleId = plistResult.StandardOutput.Trim();
+                        }
+                        else
+                        {
+                            Log.LogError($"Failed to extract bundle ID from Info.plist: {plistResult.StandardError}");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.LogError($"Failed to extract bundle ID: {ex.Message}");
+                        return false;
+                    }
+
+                    // Launch the app using devicectl (more reliable than ios-deploy)
+                    var launchResult = Cli.Wrap("xcrun")
+                        .WithArguments($"devicectl device process launch --device {deviceId} {bundleId}")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (launchResult.ExitCode != 0)
+                    {
+                        Log.LogError($"Failed to launch app: {launchResult.StandardError}");
+                        return false;
+                    }
+
+                    Log.LogMessage(MessageImportance.High, "App launched successfully on device!");
+                }
+
                 return true;
             }
             catch (Exception ex)

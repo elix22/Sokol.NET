@@ -82,6 +82,9 @@ namespace SokolApplicationBuilder
         [Option("compile", Required = false, HelpText = "Compile the Xcode project after generation")]
         public bool Compile { get; set; } = false;
 
+        [Option("run", Required = false, HelpText = "Launch the app after installation")]
+        public bool Run { get; set; } = false;
+
         // Computed properties
         public string Path => ProjectPath;
         public string TemplatesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", "templates");
