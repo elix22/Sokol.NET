@@ -20,7 +20,11 @@ android {
             cmake {
                 def cmakeArgs = project.hasProperty('cmakeArgs') ? 
                     project.property('cmakeArgs') : ""
-                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26', cmakeArgs
+                if (cmakeArgs) {
+                    arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26', cmakeArgs
+                } else {
+                    arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26'
+                }
             }
         }
     }

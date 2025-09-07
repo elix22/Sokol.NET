@@ -278,7 +278,7 @@ pwd
 
 # Build the appropriate version
 if [ "$BUILD_TYPE" = "release" ]; then
-    ./gradlew assembleRelease -PcmakeArgs="-DAPP_NAME=$APP_NAME"
+    ./gradlew assembleRelease
 
     # Sign the release APK with Android debug key
     echo "Signing release APK..."

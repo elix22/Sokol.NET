@@ -298,7 +298,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleRelease -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithArguments($"assembleRelease")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -315,7 +315,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleDebug -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithArguments($"assembleDebug")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
