@@ -213,8 +213,8 @@ public static unsafe class CubeSapp
             frame_cb = &Frame,
             event_cb = &Event,
             cleanup_cb = &Cleanup,
-            width = 800,
-            height = 600,
+            width = 0,  // Let iOS determine the size based on orientation
+            height = 0, // Let iOS determine the size based on orientation
             sample_count = 4,
             window_title = "Cube (sokol-app)",
             icon = { sokol_default = true },

@@ -51,7 +51,7 @@ namespace SokolApplicationBuilder
         [Option("device", Required = false, HelpText = "Android device ID to install to (use 'adb devices' to list available devices)")]
         public string DeviceId { get; set; } = "";
 
-        [Option("ios-device", Required = false, HelpText = "iOS device ID to install to (use 'ios-deploy -c' to list available devices)")]
+        [Option("ios-device", Required = false, HelpText = "iOS device ID to install to (use 'ios-deploy -c' to list available devices). If not specified, installs on all connected devices.")]
         public string IOSDeviceId { get; set; } = "";
 
         [Option("graphics", Required = false, HelpText = "Graphics backend , default is OpenGL/OpenGL ES")]
@@ -88,9 +88,27 @@ namespace SokolApplicationBuilder
         [Option("run", Required = false, HelpText = "Launch the app after installation")]
         public bool Run { get; set; } = false;
 
+        [Option("orientation", Required = false, HelpText = "iOS app orientation: portrait, landscape, or both (default: both)")]
+        public string Orientation { get; set; } = "both";
+
         // Computed properties
         public string Path => ProjectPath;
         public string TemplatesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", "templates");
+
+        public string ValidatedOrientation
+        {
+            get
+            {
+                string orientation = Orientation?.ToLower() ?? "both";
+                return orientation switch
+                {
+                    "portrait" => "portrait",
+                    "landscape" => "landscape",
+                    "both" => "both",
+                    _ => "both" // default fallback
+                };
+            }
+        }
 
     }
 

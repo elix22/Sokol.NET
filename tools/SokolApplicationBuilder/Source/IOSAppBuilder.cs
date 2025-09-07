@@ -381,7 +381,49 @@ namespace SokolApplicationBuilder
                 // Replace placeholders
                 string content = File.ReadAllText(cmakeDest);
                 content = content.Replace("TEMPLATE_PROJECT_NAME", projectName);
+                
+                // Set orientation based on user preference
+                string iosOrientations, ipadOrientations;
+                string iosOrientationsPlist, ipadOrientationsPlist;
+                switch (opts.ValidatedOrientation)
+                {
+                    case "portrait":
+                        iosOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+                        ipadOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+                        iosOrientationsPlist = "\n        <string>UIInterfaceOrientationPortrait</string>\n        <string>UIInterfaceOrientationPortraitUpsideDown</string>";
+                        ipadOrientationsPlist = "\n        <string>UIInterfaceOrientationPortrait</string>\n        <string>UIInterfaceOrientationPortraitUpsideDown</string>";
+                        break;
+                    case "landscape":
+                        iosOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                        ipadOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                        iosOrientationsPlist = "\n        <string>UIInterfaceOrientationLandscapeLeft</string>\n        <string>UIInterfaceOrientationLandscapeRight</string>";
+                        ipadOrientationsPlist = "\n        <string>UIInterfaceOrientationLandscapeLeft</string>\n        <string>UIInterfaceOrientationLandscapeRight</string>";
+                        break;
+                    case "both":
+                    default:
+                        iosOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                        ipadOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                        iosOrientationsPlist = "\n        <string>UIInterfaceOrientationPortrait</string>\n        <string>UIInterfaceOrientationPortraitUpsideDown</string>\n        <string>UIInterfaceOrientationLandscapeLeft</string>\n        <string>UIInterfaceOrientationLandscapeRight</string>";
+                        ipadOrientationsPlist = "\n        <string>UIInterfaceOrientationPortrait</string>\n        <string>UIInterfaceOrientationPortraitUpsideDown</string>\n        <string>UIInterfaceOrientationLandscapeLeft</string>\n        <string>UIInterfaceOrientationLandscapeRight</string>";
+                        break;
+                }
+                
+                content = content.Replace("TEMPLATE_IOS_ORIENTATIONS", iosOrientations);
+                content = content.Replace("TEMPLATE_IPAD_ORIENTATIONS", ipadOrientations);
+                
                 File.WriteAllText(cmakeDest, content);
+
+                // Copy and process Info.plist.in
+                string plistSource = Path.Combine(templatesDir, "Info.plist.in");
+                string plistDest = Path.Combine(iosDir, "Info.plist.in");
+                if (File.Exists(plistSource))
+                {
+                    string plistContent = File.ReadAllText(plistSource);
+                    plistContent = plistContent.Replace("TEMPLATE_PROJECT_NAME", projectName);
+                    plistContent = plistContent.Replace("@TEMPLATE_IOS_ORIENTATIONS_PLIST@", iosOrientationsPlist);
+                    plistContent = plistContent.Replace("@TEMPLATE_IPAD_ORIENTATIONS_PLIST@", ipadOrientationsPlist);
+                    File.WriteAllText(plistDest, plistContent);
+                }
 
                 // Copy main.m
                 string mainSource = Path.Combine(templatesDir, "main.m");
@@ -606,9 +648,8 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
-                // Select device based on user preference or first available
-                string selectedDeviceId;
-                string selectedDeviceName;
+                // Select device(s) based on user preference
+                List<(string Id, string Name)> selectedDevices;
 
                 if (!string.IsNullOrEmpty(opts.IOSDeviceId))
                 {
@@ -623,36 +664,63 @@ namespace SokolApplicationBuilder
                         }
                         return false;
                     }
-                    selectedDeviceId = matchingDevice.Id;
-                    selectedDeviceName = matchingDevice.Name;
-                    Log.LogMessage(MessageImportance.High, $"Using specified iOS device: {selectedDeviceName} ({selectedDeviceId})");
+                    selectedDevices = new List<(string Id, string Name)> { matchingDevice };
+                    Log.LogMessage(MessageImportance.High, $"Using specified iOS device: {matchingDevice.Name} ({matchingDevice.Id})");
                 }
                 else
                 {
-                    // Use first available device
-                    selectedDeviceId = availableDevices[0].Id;
-                    selectedDeviceName = availableDevices[0].Name;
-                    Log.LogMessage(MessageImportance.High, $"Using first available iOS device: {selectedDeviceName} ({selectedDeviceId})");
-                    
-                    if (availableDevices.Count > 1)
+                    // Use all available devices when multiple are connected
+                    selectedDevices = availableDevices;
+                    if (availableDevices.Count == 1)
                     {
-                        Log.LogMessage(MessageImportance.Normal, $"Multiple devices found. To use a specific device, use --ios-device <device_id>");
+                        Log.LogMessage(MessageImportance.High, $"Using available iOS device: {availableDevices[0].Name} ({availableDevices[0].Id})");
+                    }
+                    else
+                    {
+                        Log.LogMessage(MessageImportance.High, $"Installing on all {availableDevices.Count} connected iOS devices:");
                         foreach (var device in availableDevices)
                         {
-                            Log.LogMessage(MessageImportance.Normal, $"  Available: {device.Id} - {device.Name}");
+                            Log.LogMessage(MessageImportance.Normal, $"  - {device.Name} ({device.Id})");
                         }
                     }
                 }
 
-                string deviceId = selectedDeviceId;
-
-                if (string.IsNullOrEmpty(deviceId))
+                // Install on each selected device
+                foreach (var device in selectedDevices)
                 {
-                    Log.LogError("No iOS device found connected via USB");
-                    return false;
-                }
+                    string deviceId = device.Id;
+                    string deviceName = device.Name;
 
-                Log.LogMessage(MessageImportance.High, $"Installing to device: {selectedDeviceName} ({deviceId})");
+                    if (string.IsNullOrEmpty(deviceId))
+                    {
+                        Log.LogError("No iOS device found connected via USB");
+                        return false;
+                    }
+
+                Log.LogMessage(MessageImportance.High, $"Installing to device: {deviceName} ({deviceId})");
+
+                // Try to uninstall the app first if it exists (helps with installation errors)
+                try
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Attempting to uninstall existing app from device: {deviceName}");
+                    var uninstallResult = Cli.Wrap("ios-deploy")
+                        .WithArguments($"--id {deviceId} --uninstall_only --bundle_id com.elix22.cube-ios-app")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    // Note: uninstall may fail if app is not installed, which is fine
+                    if (uninstallResult.ExitCode == 0)
+                    {
+                        Log.LogMessage(MessageImportance.Normal, $"Successfully uninstalled existing app from {deviceName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Uninstall attempt failed (app may not be installed): {ex.Message}");
+                }
 
                 var installResult = Cli.Wrap("ios-deploy")
                     .WithArguments($"--id {deviceId} --bundle \"{appBundlePath}\" --no-wifi")
@@ -661,67 +729,96 @@ namespace SokolApplicationBuilder
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
-
+                    
                 if (installResult.ExitCode != 0)
                 {
-                    Log.LogError($"Installation failed: {installResult.StandardError}");
-                    return false;
+                    // Check for common installation errors and provide helpful suggestions
+                    string errorOutput = installResult.StandardError ?? "";
+                    if (errorOutput.Contains("0xe8008001") || errorOutput.Contains("unknown error"))
+                    {
+                        Log.LogMessage(MessageImportance.Normal, $"Installation failed with error 0xe8008001. This can happen due to:");
+                        Log.LogMessage(MessageImportance.Normal, $"  - Trust issues with developer certificate");
+                        Log.LogMessage(MessageImportance.Normal, $"  - Provisioning profile problems");
+                        Log.LogMessage(MessageImportance.Normal, $"  - App already installed with different signing");
+                        Log.LogMessage(MessageImportance.Normal, $"");
+                        Log.LogMessage(MessageImportance.Normal, $"Troubleshooting steps:");
+                        Log.LogMessage(MessageImportance.Normal, $"  1. On your iOS device, go to Settings > General > VPN & Device Management");
+                        Log.LogMessage(MessageImportance.Normal, $"  2. Trust the developer certificate for 'Eli Aloni'");
+                        Log.LogMessage(MessageImportance.Normal, $"  3. Try restarting your iOS device");
+                        Log.LogMessage(MessageImportance.Normal, $"  4. Try a different USB cable or USB port");
+                        Log.LogMessage(MessageImportance.Normal, $"");
+                        Log.LogMessage(MessageImportance.Normal, $"Retrying installation...");
+                        
+                        // Retry installation once
+                        installResult = Cli.Wrap("ios-deploy")
+                            .WithArguments($"--id {deviceId} --bundle \"{appBundlePath}\" --no-wifi")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                            .ExecuteBufferedAsync()
+                            .GetAwaiter()
+                            .GetResult();
+                    }
+                    
+                    if (installResult.ExitCode != 0)
+                    {
+                        Log.LogError($"Installation failed on {deviceName}: {installResult.StandardError}");
+                        return false;
+                    }
                 }
 
-                Log.LogMessage(MessageImportance.High, "App installed successfully on device!");
+                    Log.LogMessage(MessageImportance.High, $"App installed successfully on device: {deviceName}!");
 
-                // Launch the app if requested
-                if (runAfterInstall)
-                {
-                    Log.LogMessage(MessageImportance.High, "Launching app on device...");
-
-                    // Extract bundle ID from Info.plist
-                    string infoPlistPath = Path.Combine(appBundlePath, "Info.plist");
-                    string bundleId = "";
-
-                    try
+                    // Launch the app if requested
+                    if (runAfterInstall)
                     {
-                        // Use plutil to extract bundle ID from binary plist
-                        var plistResult = Cli.Wrap("plutil")
-                            .WithArguments($"-extract CFBundleIdentifier raw \"{infoPlistPath}\"")
+                        Log.LogMessage(MessageImportance.High, $"Launching app on device: {deviceName} ({deviceId})");
+
+                        // Extract bundle ID from Info.plist
+                        string infoPlistPath = Path.Combine(appBundlePath, "Info.plist");
+                        string bundleId = "";
+
+                        try
+                        {
+                            // Use plutil to extract bundle ID from binary plist
+                            var plistResult = Cli.Wrap("plutil")
+                                .WithArguments($"-extract CFBundleIdentifier raw \"{infoPlistPath}\"")
+                                .ExecuteBufferedAsync()
+                                .GetAwaiter()
+                                .GetResult();
+
+                            if (plistResult.ExitCode == 0)
+                            {
+                                bundleId = plistResult.StandardOutput.Trim();
+                            }
+                            else
+                            {
+                                Log.LogError($"Failed to extract bundle ID from Info.plist: {plistResult.StandardError}");
+                                return false;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.LogError($"Failed to extract bundle ID: {ex.Message}");
+                            return false;
+                        }
+
+                        // Launch the app using devicectl (more reliable than ios-deploy)
+                        var launchResult = Cli.Wrap("xcrun")
+                            .WithArguments($"devicectl device process launch --device {deviceId} {bundleId}")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                             .ExecuteBufferedAsync()
                             .GetAwaiter()
                             .GetResult();
 
-                        if (plistResult.ExitCode == 0)
+                        if (launchResult.ExitCode != 0)
                         {
-                            bundleId = plistResult.StandardOutput.Trim();
-                        }
-                        else
-                        {
-                            Log.LogError($"Failed to extract bundle ID from Info.plist: {plistResult.StandardError}");
+                            Log.LogError($"Failed to launch app on {deviceName}: {launchResult.StandardError}");
                             return false;
                         }
+
+                        Log.LogMessage(MessageImportance.High, $"App launched successfully on device: {deviceName}!");
                     }
-                    catch (Exception ex)
-                    {
-                        Log.LogError($"Failed to extract bundle ID: {ex.Message}");
-                        return false;
-                    }
-
-                    Log.LogMessage(MessageImportance.High, $"Launching app on device: {selectedDeviceName} ({deviceId})");
-
-                    // Launch the app using devicectl (more reliable than ios-deploy)
-                    var launchResult = Cli.Wrap("xcrun")
-                        .WithArguments($"devicectl device process launch --device {deviceId} {bundleId}")
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                        .ExecuteBufferedAsync()
-                        .GetAwaiter()
-                        .GetResult();
-
-                    if (launchResult.ExitCode != 0)
-                    {
-                        Log.LogError($"Failed to launch app: {launchResult.StandardError}");
-                        return false;
-                    }
-
-                    Log.LogMessage(MessageImportance.High, "App launched successfully on device!");
                 }
 
                 return true;
