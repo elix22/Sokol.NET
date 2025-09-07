@@ -1,0 +1,1 @@
+ dotnet run -- --task build --architecture android --path /Users/elialoni/Development/Graphics/sokol-charp/examples/cube --install --device R8YW60MZRDV

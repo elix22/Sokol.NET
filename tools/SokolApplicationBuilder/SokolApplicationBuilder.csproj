@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.13.9"   />
+    <PackageReference Include="Microsoft.Build" Version="17.13.9"   />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.13.9"  />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.9.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+  <PackageReference Include="CommandLineParser" Version="2.9.1" />
+  <PackageReference Include="CliWrap" Version="3.9.0" />
+ </ItemGroup>
+
+  <!-- Copy templates folder to output directory -->
+  <ItemGroup>
+    <Content Include="templates\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+
+  <Target Name = "CustomAfterClean" AfterTargets="AfterClean">
+        <RemoveDir Directories="bin" />
+        <RemoveDir Directories="obj" />
+  </Target>
+
+</Project>
