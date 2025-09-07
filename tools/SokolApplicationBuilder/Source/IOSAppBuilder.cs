@@ -183,6 +183,8 @@ namespace SokolApplicationBuilder
                 var cmakeResult = Cli.Wrap("cmake")
                     .WithArguments($"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_OSX_ARCHITECTURES=\"arm64\" {Path.Combine(projectDir, "../../ext")}")
                     .WithWorkingDirectory(sokolDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -196,6 +198,8 @@ namespace SokolApplicationBuilder
                 var buildResult = Cli.Wrap("cmake")
                     .WithArguments("--build . --config Release")
                     .WithWorkingDirectory(sokolDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -236,6 +240,8 @@ namespace SokolApplicationBuilder
                 var result = Cli.Wrap("dotnet")
                     .WithArguments("msbuild -t:CompileShaders -p:DefineConstants=\"__IOS__\"")
                     .WithWorkingDirectory(projectDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -265,6 +271,8 @@ namespace SokolApplicationBuilder
                 var result = Cli.Wrap("dotnet")
                     .WithArguments("publish -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"")
                     .WithWorkingDirectory(projectDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -310,6 +318,8 @@ namespace SokolApplicationBuilder
                 // Use install_name_tool to modify the library
                 var installNameResult = Cli.Wrap("install_name_tool")
                     .WithArguments($"-rpath @executable_path @executable_path/Frameworks \"{destLib}\"")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -322,6 +332,8 @@ namespace SokolApplicationBuilder
 
                 var idResult = Cli.Wrap("install_name_tool")
                     .WithArguments($"-id @rpath/{projectName}.framework/{projectName} \"{destLib}\"")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -402,6 +414,8 @@ namespace SokolApplicationBuilder
                 var result = Cli.Wrap("cmake")
                     .WithArguments(cmakeCmd)
                     .WithWorkingDirectory(buildDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -433,6 +447,8 @@ namespace SokolApplicationBuilder
                 var result = Cli.Wrap("xcodebuild")
                     .WithArguments("-configuration Release -sdk iphoneos -arch arm64")
                     .WithWorkingDirectory(buildDir)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -474,6 +490,8 @@ namespace SokolApplicationBuilder
                 // Check if ios-deploy is available
                 var checkResult = Cli.Wrap("which")
                     .WithArguments("ios-deploy")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
@@ -486,6 +504,8 @@ namespace SokolApplicationBuilder
 
                 var installResult = Cli.Wrap("ios-deploy")
                     .WithArguments($"--id $(ios-deploy -c | head -1 | cut -d' ' -f2) --bundle \"{appBundlePath}\" --no-wifi")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
                     .GetAwaiter()
                     .GetResult();
