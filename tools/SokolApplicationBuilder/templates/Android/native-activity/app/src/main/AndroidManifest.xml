@@ -28,7 +28,7 @@
     <activity android:name="android.app.NativeActivity"
               android:label="@string/app_name"
               android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
-              android:screenOrientation="landscape"
+              android:screenOrientation="ANDROID_ORIENTATION_PLACEHOLDER"
               android:keepScreenOn="true"
         android:exported="true">
       <!-- Tell NativeActivity the name of our .so -->

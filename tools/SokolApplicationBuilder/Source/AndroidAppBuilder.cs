@@ -160,7 +160,20 @@ namespace SokolApplicationBuilder
             if (File.Exists(manifestPath))
             {
                 string content = File.ReadAllText(manifestPath);
-                content = content.Replace("android:label=\"NativeActivity\"", $"android:label=\"{appName}\"");
+                content = content.Replace("@string/app_name", appName);
+
+                // Configure orientation
+                string androidOrientation = opts.ValidatedOrientation switch
+                {
+                    "portrait" => "portrait",
+                    "landscape" => "landscape",
+                    "both" => "unspecified", // Android uses "unspecified" to allow both orientations
+                    _ => "unspecified"
+                };
+
+                // Replace orientation placeholder
+                content = content.Replace("ANDROID_ORIENTATION_PLACEHOLDER", androidOrientation);
+
                 File.WriteAllText(manifestPath, content);
             }
 
@@ -658,76 +671,6 @@ namespace SokolApplicationBuilder
             }
             return result;
         }
-
-        void CreateAndroidManifest()
-        {
-            string AndroidManifest = Path.Combine(opts.OutputPath, "Android/app/src/main/AndroidManifest.xml");
-
-            AndroidManifest.DeleteFile();
-            AndroidManifest.AppendTextLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
-            AndroidManifest.AppendTextLine($"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"{PROJECT_UUID}\">");
-
-            List<string> permissions = GetAndroidPermissions();
-
-            foreach (var i in permissions)
-            {
-                AndroidManifest.AppendTextLine($"   <uses-permission android:name=\"{i}\"/>");
-            }
-
-
-            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/AndroidManifest.xml")))
-            {
-                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/AndroidManifest.xml"));
-                AndroidManifest.AppendText(extra);
-            }
-
-            AndroidManifest.AppendTextLine("   <application android:allowBackup=\"true\" android:icon=\"@mipmap/ic_launcher\" android:label=\"@string/app_name\" android:roundIcon=\"@mipmap/ic_launcher_round\" android:supportsRtl=\"true\" android:theme=\"@style/AppTheme\">");
-
-            string GAD_APPLICATION_ID = GetEnvValue("GAD_APPLICATION_ID");
-            if (GAD_APPLICATION_ID != string.Empty)
-            {
-                AndroidManifest.AppendTextLine($"      <meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" android:value=\"{GAD_APPLICATION_ID}\"/>");
-            }
-
-
-            AndroidManifest.AppendTextLine($"      <activity android:name=\".MainActivity\" android:exported=\"true\">");
-            AndroidManifest.AppendTextLine($"          <intent-filter>");
-            AndroidManifest.AppendTextLine($"              <action android:name=\"android.intent.action.MAIN\" />");
-            AndroidManifest.AppendTextLine($"              <category android:name=\"android.intent.category.LAUNCHER\" />");
-            AndroidManifest.AppendTextLine($"          </intent-filter>");
-
-            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/IntentFilters.xml")))
-            {
-                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/IntentFilters.xml"));
-                AndroidManifest.AppendText(extra);
-            }
-
-            AndroidManifest.AppendTextLine($"      </activity>");
-
-            string SCREEN_ORIENTATION = GetEnvValue("SCREEN_ORIENTATION");
-            if (SCREEN_ORIENTATION == string.Empty)
-            {
-                SCREEN_ORIENTATION = "landscape";
-            }
-            if (SCREEN_ORIENTATION != "landscape" && SCREEN_ORIENTATION != "portrait")
-            {
-                SCREEN_ORIENTATION = "landscape";
-            }
-
-            AndroidManifest.AppendTextLine($"      <activity android:name=\".UrhoMainActivity\" android:exported=\"true\" android:configChanges=\"keyboardHidden|orientation|screenSize\" android:screenOrientation=\"{SCREEN_ORIENTATION}\" android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\"/>");
-
-            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/Activities.xml")))
-            {
-                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/Activities.xml"));
-                AndroidManifest.AppendText(extra);
-            }
-
-            AndroidManifest.AppendTextLine($"   </application>");
-            AndroidManifest.AppendTextLine($"</manifest>");
-
-
-        }
-
 
         public override int GetHashCode()
         {
