@@ -26,6 +26,8 @@ using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Task = Microsoft.Build.Utilities.Task;
+using CliWrap;
+using CliWrap.Buffered;
 
 
 namespace SokolApplicationBuilder
@@ -38,25 +40,25 @@ namespace SokolApplicationBuilder
 
     public class IOSBuildTask : Task
     {
-        Options opts;
-        Dictionary<string, string> envVars = new();
+        private readonly Options opts;
+        private readonly Dictionary<string, string> envVars = new();
 
-        string PROJECT_UUID = string.Empty;
-        string PROJECT_NAME = string.Empty;
-        string JAVA_PACKAGE_PATH = string.Empty;
-        string VERSION_CODE = string.Empty;
-        string VERSION_NAME = string.Empty;
+        private string PROJECT_UUID = string.Empty;
+        private string PROJECT_NAME = string.Empty;
+        private string JAVA_PACKAGE_PATH = string.Empty;
+        private string VERSION_CODE = string.Empty;
+        private string VERSION_NAME = string.Empty;
 
-        string URHONET_HOME_PATH = string.Empty;
+        private string URHONET_HOME_PATH = string.Empty;
 
-        string DEVELOPMENT_TEAM = string.Empty;
+        private string DEVELOPMENT_TEAM = string.Empty;
 
-        string CLANG_CMD = string.Empty;
-        string AR_CMD = string.Empty;
-        string LIPO_CMD = string.Empty;
-        string IOS_SDK_PATH = string.Empty;
+        private string CLANG_CMD = string.Empty;
+        private string AR_CMD = string.Empty;
+        private string LIPO_CMD = string.Empty;
+        private string IOS_SDK_PATH = string.Empty;
 
-        ProcessortArchitecture processortArchitecture = ProcessortArchitecture.Intel;
+        private ProcessortArchitecture processortArchitecture = ProcessortArchitecture.Intel;
 
         public IOSBuildTask(Options opts)
         {
@@ -64,109 +66,13 @@ namespace SokolApplicationBuilder
             Utils.opts = opts;
         }
 
-
-
-
-        public override bool Equals(object? obj)
-        {
-            return base.Equals(obj);
-        }
-
         public override bool Execute()
         {
             return BuildIOSApp();
         }
 
-        private bool PublishAOT()
-        {
-            string buildType = "Debug";
-
-            if (opts.Type == "release")
-            {
-                buildType = "Release";
-            }
-            string targetFramework = (opts.Framework != "")? opts.Framework : "net9.0";
-            /*
-             * dotnet publish -f net9.0 -r  ios-arm64 -c Release -p:OutputType=Library  -p:PublishAot=true -p:TrimmerRemoveSymbols=false -p:TrimMode=partial -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:StripSymbols=true -p:BuildAsLibrary=true  -p:DefineConstants="IOS"
-               mkdir Game.framework
-               install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/net9.0/ios-arm64/publish/libGame.dylib 
-               install_name_tool -id @rpath/Game.framework/Game bin/Release/net9.0/ios-arm64/publish/libGame.dylib 
-               lipo -create  bin/Release/net9.0/ios-arm64/publish/libGame.dylib -output Game.framework/Game
-               cp  Info.plist Game.framework/Info.plist
-               mkdir -p IOS/Frameworks
-               rm -rf IOS/Frameworks/Game.framework
-               mv -f Game.framework IOS/Frameworks
-             */
-            
-            string dotnet_build_command = $"dotnet publish -f {targetFramework} -r  ios-arm64 -c {buildType} -p:OutputType=Library  -p:PublishAot=true -p:TrimmerRemoveSymbols=false -p:TrimMode=partial -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:StripSymbols=true -p:BuildAsLibrary=true  -p:DefineConstants=\"IOS\"";
-
-            (int exitCode, string output) = Utils.RunShellCommand(Log,
-                dotnet_build_command,
-                envVars,
-                workingDir: opts.ProjectPath,
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "dotnet-build");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-            
-            Utils.DeleteDirectory(Path.Combine(opts.OutputPath, "IOS/Frameworks","Game.framework"));
-            Directory.CreateDirectory(Path.Combine(opts.OutputPath, "IOS/Frameworks","Game.framework"));
-            
-            ( exitCode,  output) = Utils.RunShellCommand(Log,
-                $"install_name_tool -rpath @executable_path @executable_path/Frameworks bin/Release/{targetFramework}/ios-arm64/publish/libGame.dylib",
-                envVars,
-                workingDir: opts.ProjectPath,
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "dotnet-build");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-            
-            ( exitCode,  output) = Utils.RunShellCommand(Log,
-                $"install_name_tool -id @rpath/Game.framework/Game bin/Release/{targetFramework}/ios-arm64/publish/libGame.dylib",
-                envVars,
-                workingDir: opts.ProjectPath,
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "dotnet-build");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-            
-            ( exitCode,  output) = Utils.RunShellCommand(Log,
-                $"lipo -create  bin/Release/{targetFramework}/ios-arm64/publish/libGame.dylib -output {Path.Combine(opts.OutputPath, "IOS/Frameworks","Game.framework","Game")}",
-                envVars,
-                workingDir: opts.ProjectPath,
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "dotnet-build");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-            
-            File.Copy(Path.Combine(URHONET_HOME_PATH, "template/IOS" , "Info.plist"), Path.Combine(opts.OutputPath, "IOS/Frameworks","Game.framework","Info.plist"), true);
-            
-            return true;
-        }
-
         private bool BuildIOSApp()
         {
-
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 Log.LogError("Can run only on Apple OSX");
@@ -191,657 +97,430 @@ namespace SokolApplicationBuilder
                 return false;
             }
 
-            if (opts.DeveloperID == null)
+            try
             {
-                Log.LogError("Developer ID can't be empty");
-                return false;
-            }
+                // Extract project information
+                string projectPath = opts.Path;
+                string projectName = Path.GetFileName(projectPath);
+                string projectDir = projectPath;
 
-            opts.ProjectPath = opts.ProjectPath.Trim();
-            opts.DeveloperID = opts.DeveloperID.Trim();
-            opts.Type =    opts.Type.Trim();
+                Log.LogMessage(MessageImportance.High, $"Building iOS app for project: {projectName}");
 
-            FileInfo fi = new FileInfo(opts.ProjectPath);
-            opts.ProjectPath = fi.FullName;
-            Console.WriteLine($"Project path:{opts.ProjectPath}");
-
-
-            
-
-            (int exitCode, string output) = Utils.RunShellCommand(Log,
-                                             "xcode-select --print-path",
-                                             envVars,
-                                             workingDir: opts.ProjectPath,
-                                             logStdErrAsMessage: true,
-                                             debugMessageImportance: MessageImportance.High,
-                                             label: "find-xcode");
-
-            if (exitCode != 0 || output == string.Empty)
-            {
-                Log.LogError("xcode not found");
-                return false;
-            }
-
-            CLANG_CMD = Path.Combine(output, "Toolchains/XcodeDefault.xctoolchain/usr/bin/clang");
-            if (!File.Exists(CLANG_CMD))
-            {
-                Log.LogError($"clang not found , searched in {CLANG_CMD}");
-                return false;
-            }
-            AR_CMD = Path.Combine(output, "Toolchains/XcodeDefault.xctoolchain/usr/bin/ar");
-            if (!File.Exists(AR_CMD))
-            {
-                Log.LogError($"ar not found , searched in {AR_CMD}");
-                return false;
-            }
-            LIPO_CMD = Path.Combine(output, "Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo");
-            if (!File.Exists(LIPO_CMD))
-            {
-                Log.LogError($"lipo not found , searched in {LIPO_CMD}");
-                return false;
-            }
-            IOS_SDK_PATH = Path.Combine(output, "Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk");
-            if (!Directory.Exists(IOS_SDK_PATH))
-            {
-                Log.LogError($"iOS sdk not found , searched in {IOS_SDK_PATH}");
-                return false;
-            }
-
-            if (opts.Type != "debug" && opts.Type != "release")
-            {
-                Log.LogError($"You must provide build type release/debug");
-                return false;
-            }
-
-
-            SetOutputPath();
-
-            if (opts.DeveloperID == string.Empty)
-            {
-                if (!File.Exists(Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh")))
+                // Set development team if provided
+                if (!string.IsNullOrEmpty(opts.DevelopmentTeam))
                 {
-                    Log.LogError("Apple Developer ID not provided");
+                    DEVELOPMENT_TEAM = opts.DevelopmentTeam;
+                    Log.LogMessage(MessageImportance.High, $"Using development team: {DEVELOPMENT_TEAM}");
+                }
+
+                // Create iOS build directory structure
+                string iosDir = Path.Combine(projectDir, "ios");
+                Directory.CreateDirectory(iosDir);
+
+                // Build sokol framework
+                if (!BuildSokolFramework(iosDir, projectDir))
                     return false;
+
+                // Compile shaders
+                if (!CompileShaders(projectDir))
+                    return false;
+
+                // Publish .NET project for iOS
+                if (!PublishDotNetProject(projectDir, projectName))
+                    return false;
+
+                // Create app framework
+                if (!CreateAppFramework(iosDir, projectDir, projectName))
+                    return false;
+
+                // Copy iOS templates
+                if (!CopyIOSTemplates(iosDir, projectName))
+                    return false;
+
+                // Generate Xcode project
+                if (!GenerateXcodeProject(iosDir, projectName))
+                    return false;
+
+                // Compile Xcode project if requested
+                if (opts.Compile)
+                {
+                    if (!CompileXcodeProject(iosDir, projectName))
+                        return false;
+
+                    // Install on device if requested
+                    if (opts.Install)
+                    {
+                        if (!InstallOnDevice(iosDir, projectName))
+                            return false;
+                    }
                 }
                 else
                 {
-                    string project_vars_path = Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh");
-                    ParseEnvironmentVars(project_vars_path);
+                    Log.LogMessage(MessageImportance.High, "Xcode project generated. To compile manually:");
+                    Log.LogMessage(MessageImportance.High, $"cd {Path.Combine(iosDir, "build-xcode-ios-app")} && xcodebuild -configuration Release -sdk iphoneos -arch arm64");
                 }
+
+                Log.LogMessage(MessageImportance.High, "iOS build completed successfully!");
+                return true;
             }
-            else
+            catch (Exception ex)
             {
-                envVars["DEVELOPMENT_TEAM"] = opts.DeveloperID;
-                envVars["CODE_SIGN_IDENTITY"] = string.Empty;
-                envVars["PROVISIONING_PROFILE_SPECIFIER"] = string.Empty;
-            }
-
-            envVars["MONO_PATH"] = Path.Combine(opts.OutputPath, "IOS/bin/Data/DotNet/ios");
-            envVars["URHO3D_HOME"] = Path.Combine(opts.OutputPath, "IOS");
-
-
-            DEVELOPMENT_TEAM = envVars["DEVELOPMENT_TEAM"];
-
-            if (DEVELOPMENT_TEAM == string.Empty || DEVELOPMENT_TEAM == null)
-            {
-                Log.LogError("DEVELOPMENT_TEAM ID is empty");
+                Log.LogError($"iOS build failed: {ex.Message}");
                 return false;
             }
+        }
 
-            Console.WriteLine($"DEVELOPMENT_TEAM = {DEVELOPMENT_TEAM}");
-
-            bool result = CheckDependencies(new List<string> { "cmake", "xcodebuild", "ios-deploy", "codesign", "dotnet", "plutil" });
-            if (!result)
+        private bool BuildSokolFramework(string iosDir, string projectDir)
+        {
+            try
             {
-                Log.LogError("Not all dependencies found");
-                return false;
-            }
+                Log.LogMessage(MessageImportance.High, "Building sokol framework...");
 
+                string sokolDir = Path.Combine(iosDir, "sokol-ios");
+                Directory.CreateDirectory(sokolDir);
 
+                // Build sokol framework using CMake
+                var cmakeResult = Cli.Wrap("cmake")
+                    .WithArguments($"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_OSX_ARCHITECTURES=\"arm64\" {Path.Combine(projectDir, "../../ext")}")
+                    .WithWorkingDirectory(sokolDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
-            GetUrhoNetHomePath();
-            if (URHONET_HOME_PATH == string.Empty) return false;
-
-            ParseEnvironmentVariables();
-
-            if (!Directory.Exists(Path.Combine(opts.OutputPath, "IOS")))
-            {
-                if (!Directory.Exists(Path.Combine(URHONET_HOME_PATH, "template/IOS")))
+                if (cmakeResult.ExitCode != 0)
                 {
-                    Log.LogError(Path.Combine(URHONET_HOME_PATH, "template/IOS") + "Doesn't exist");
+                    Log.LogError($"CMake configure failed: {cmakeResult.StandardError}");
                     return false;
                 }
 
-                Path.Combine(URHONET_HOME_PATH, "template/IOS").CopyDirectory(Path.Combine(opts.OutputPath, "IOS"), true);
-            }
+                var buildResult = Cli.Wrap("cmake")
+                    .WithArguments("--build . --config Release")
+                    .WithWorkingDirectory(sokolDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
-            Path.Combine(opts.OutputPath, $"IOS/CMakeLists.txt").ReplaceInfile("TEMPLATE_PROJECT_NAME", PROJECT_NAME);
-  
-          
-            (exitCode,  output) = Utils.RunShellCommand(Log,
-                              "chmod +x *.sh",
-                              envVars,
-                              workingDir: Path.Combine(opts.OutputPath, "IOS/script"),
-                              logStdErrAsMessage: true,
-                              debugMessageImportance: MessageImportance.High,
-                              label: "chmod-sh");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("chmod +x *.sh failed");
-                return false;
-            }
-
-
-            (exitCode, output) = Utils.RunShellCommand(Log,
-                              "chmod +x .bash_helpers.sh",
-                              envVars,
-                              workingDir: Path.Combine(opts.OutputPath, "IOS/script"),
-                              logStdErrAsMessage: true,
-                              debugMessageImportance: MessageImportance.High,
-                              label: "chmod-sh");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("chmod +x .bash_helpers.sh");
-                return false;
-            }
-
-
-
-            Directory.CreateDirectory(Path.Combine(opts.OutputPath, "IOS/bin"));
-            Utils.RunShellCommand(Log,
-                                      "ln -sf  ../../Assets/* .",
-                                      envVars,
-                                      workingDir: Path.Combine(opts.OutputPath, "IOS/bin"),
-                                      logStdErrAsMessage: true,
-                                      debugMessageImportance: MessageImportance.High,
-                                      label: "link-assets");
-
-            // TBD ELI
-            // if (!HandlePlugins())
-            // {
-            //     return false;
-            // }
-
-            Utils.RunShellCommand(Log,
-                           "plutil -remove NSUserTrackingUsageDescription  CMake/Modules/iOSBundleInfo.plist.template",
-                           envVars,
-                           workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                           logStdErrAsMessage: true,
-                           debugMessageImportance: MessageImportance.High,
-                           label: "plist-update");
-
-            Utils.RunShellCommand(Log,
-            "plutil -replace NSUserTrackingUsageDescription  -string \"This identifier will be used to deliver personalized ads to you.\" CMake/Modules/iOSBundleInfo.plist.template",
-            envVars,
-            workingDir: Path.Combine(opts.OutputPath, "IOS"),
-            logStdErrAsMessage: true,
-            debugMessageImportance: MessageImportance.High,
-            label: "plist-update");
-
-            string SCREEN_ORIENTATION = GetEnvValue("SCREEN_ORIENTATION");
-            if (SCREEN_ORIENTATION == string.Empty)
-            {
-                SCREEN_ORIENTATION = "landscape";
-            }
-            if (SCREEN_ORIENTATION != "landscape" && SCREEN_ORIENTATION != "portrait")
-            {
-                SCREEN_ORIENTATION = "landscape";
-            }
-
-            Utils.RunShellCommand(Log,
-                $"plutil -remove UISupportedInterfaceOrientations  {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                envVars,
-                workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "plist-update");
-
-            Utils.RunShellCommand(Log,
-                $"plutil -insert UISupportedInterfaceOrientations -array  {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                envVars,
-                workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "plist-update");
-
-
-            if (SCREEN_ORIENTATION == "landscape")
-            {
-                Utils.RunShellCommand(Log,
-                     $"plutil -insert UISupportedInterfaceOrientations -string UIInterfaceOrientationLandscapeLeft -append {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                     envVars,
-                     workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                     logStdErrAsMessage: true,
-                     debugMessageImportance: MessageImportance.High,
-                     label: "plist-update");
-
-                Utils.RunShellCommand(Log,
-                     $"plutil -insert UISupportedInterfaceOrientations -string UIInterfaceOrientationLandscapeRight -append {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                     envVars,
-                     workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                     logStdErrAsMessage: true,
-                     debugMessageImportance: MessageImportance.High,
-                     label: "plist-update");
-            }
-            else
-            {
-                Utils.RunShellCommand(Log,
-                     $"plutil -insert UISupportedInterfaceOrientations -string UIInterfaceOrientationPortrait -append {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                     envVars,
-                     workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                     logStdErrAsMessage: true,
-                     debugMessageImportance: MessageImportance.High,
-                     label: "plist-update");
-
-                Utils.RunShellCommand(Log,
-                     $"plutil -insert UISupportedInterfaceOrientations -string UIInterfaceOrientationPortraitUpsideDown -append {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                     envVars,
-                     workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                     logStdErrAsMessage: true,
-                     debugMessageImportance: MessageImportance.High,
-                     label: "plist-update");
-            }
-
-
-            Utils.RunShellCommand(Log,
-                           $"plutil -remove GADIsAdManagerApp  {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                           envVars,
-                           workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                           logStdErrAsMessage: true,
-                           debugMessageImportance: MessageImportance.High,
-                           label: "plist-update");
-
-            Utils.RunShellCommand(Log,
-                  $"plutil -remove GADApplicationIdentifier  {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                  envVars,
-                  workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                  logStdErrAsMessage: true,
-                  debugMessageImportance: MessageImportance.High,
-                  label: "plist-update");
-
-            string GAD_APPLICATION_ID = GetEnvValue("GAD_APPLICATION_ID");
-            if (GAD_APPLICATION_ID != string.Empty)
-            {
-
-                Utils.RunShellCommand(Log,
-                $"plutil -replace GADIsAdManagerApp  -bool 'true' {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                envVars,
-                workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "plist-update");
-
-                Utils.RunShellCommand(Log,
-                $"plutil -replace GADApplicationIdentifier  -string {GAD_APPLICATION_ID} {envVars["URHO3D_HOME"]}/CMake/Modules/iOSBundleInfo.plist.template",
-                envVars,
-                workingDir: Path.Combine(opts.OutputPath, "IOS"),
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "plist-update");
-            }
-          
-  
-
-            Directory.CreateDirectory(Path.Combine(opts.OutputPath, "IOS/Frameworks"));
-
-            if (opts.Type == "debug")
-            {
-                
-                // if (File.Exists(Path.Combine(opts.OutputPath, "IOS/lib", "libUrho3D.a")))
-                //     File.Delete(Path.Combine(opts.OutputPath, "IOS/lib", "libUrho3D.a"));
-                // (exitCode, output) = Utils.RunShellCommand(Log,
-                //               $"cat libUrho3D.split.??  > {Path.Combine(opts.OutputPath, "IOS/lib", "libUrho3D.a")}",
-                //               envVars,
-                //               workingDir: Path.Combine(URHONET_HOME_PATH, "template/libs/ios/urho3d", renderingBackend, "debug"),
-                //               logStdErrAsMessage: true,
-                //               debugMessageImportance: MessageImportance.High,
-                //               label: "copy cat libUrho3D.a");
-                // TBD ELI
-                Path.Combine(URHONET_HOME_PATH, "template/libs/ios/urho3d","release").CopyDirectory(Path.Combine(opts.OutputPath, "IOS/Frameworks"), true);
-            }
-            else
-            {
-                Path.Combine(URHONET_HOME_PATH, "template/libs/ios/urho3d","release").CopyDirectory(Path.Combine(opts.OutputPath, "IOS/Frameworks"), true);
-            }
-
-
-            Directory.CreateDirectory(Path.Combine(opts.OutputPath, "IOS/build"));
-
-            if (opts.DeveloperID != string.Empty && opts.DeveloperID != null)
-            {
-                File.Copy(Path.Combine(opts.OutputPath, "IOS/script/ios_env_vars.sh"), Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh"), true);
-                Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh").ReplaceInfile("T_DEVELOPMENT_TEAM", opts.DeveloperID);
-                Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh").ReplaceInfile("T_CODE_SIGN_IDENTITY", string.Empty);
-                Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh").ReplaceInfile("T_PROVISIONING_PROFILE_SPECIFIER", string.Empty);
-            }
-            else
-            {
-                if (!File.Exists(Path.Combine(opts.OutputPath, "IOS/build/ios_env_vars.sh")))
+                if (buildResult.ExitCode != 0)
                 {
-                    Log.LogError("Developer ID not provided");
+                    Log.LogError($"CMake build failed: {buildResult.StandardError}");
                     return false;
                 }
-            }
 
-            
-            File.Copy(Path.Combine(opts.OutputPath, "IOS/script/ios.entitlements"), Path.Combine(opts.OutputPath, "IOS/build/ios.entitlements"), true);
-            Path.Combine(opts.OutputPath, "IOS/build/ios.entitlements").ReplaceInfile("T_DEVELOPER_ID", (opts.DeveloperID == null)?"":opts.DeveloperID);
-            Path.Combine(opts.OutputPath, "IOS/build/ios.entitlements").ReplaceInfile("T_UUID", PROJECT_UUID);
+                // Copy framework to frameworks directory
+                string frameworksDir = Path.Combine(iosDir, "frameworks");
+                Directory.CreateDirectory(frameworksDir);
 
+                string sourceFramework = Path.Combine(sokolDir, "Release-iphoneos", "sokol.framework");
+                string destFramework = Path.Combine(frameworksDir, "sokol.framework");
 
-            string buildType = "Debug";
-
-            if (opts.Type == "release")
-            {
-                buildType = "Release";
-            }
-
-
-            if (!PublishAOT())
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-            
-            (exitCode, output) = Utils.RunShellCommand(Log,
-                       $"{Path.Combine(opts.OutputPath, "IOS/script/cmake_ios_dotnet.sh")} {Path.Combine(opts.OutputPath, "IOS/build")} -DDEVELOPMENT_TEAM={GetEnvValue("DEVELOPMENT_TEAM")} -DCODE_SIGN_IDENTITY={GetEnvValue("CODE_SIGN_IDENTITY")} -DPROVISIONING_PROFILE_SPECIFIER={GetEnvValue("PROVISIONING_PROFILE_SPECIFIER")}",
-                       envVars,
-                       workingDir: opts.OutputPath,
-                       logStdErrAsMessage: true,
-                       debugMessageImportance: MessageImportance.High,
-                       label: "cmake-ios");
-
-
-            if (exitCode != 0)
-            {
-                Log.LogError($"cmake failed ");
-                return false;
-            }
-
-            string buildConfiguration = "Debug";
-            if(opts.Type == "release")
-            {
-                buildConfiguration = "Release";
-            }
-
-            (exitCode, output) = Utils.RunShellCommand(Log,
-                              $"xcodebuild -project {Path.Combine(opts.OutputPath, "IOS/build")}/{PROJECT_NAME}.xcodeproj -configuration {buildConfiguration}  ",
-                              envVars,
-                              workingDir: opts.OutputPath,
-                              logStdErrAsMessage: true,
-                              debugMessageImportance: MessageImportance.High,
-                              label: "xcode-build");
-
-
-            if (exitCode != 0)
-            {
-                Log.LogError($"xcode build failed ");
-                return false;
-            }
-
-            if (opts.Install)
-            {
-                (exitCode, output) = Utils.RunShellCommand(Log,
-                  $"ios-deploy --justlaunch --debug --bundle  {Path.Combine(opts.OutputPath, "IOS/build/bin")}/{PROJECT_NAME}.app  ",
-                  envVars,
-                  workingDir: opts.OutputPath,
-                  logStdErrAsMessage: true,
-                  debugMessageImportance: MessageImportance.High,
-                  label: "ios-deploy");
-                if (exitCode != 0)
+                if (Directory.Exists(sourceFramework))
                 {
-                    Log.LogError($"ios-deploy failed ");
+                    CopyDirectory(sourceFramework, destFramework);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to build sokol framework: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool CompileShaders(string projectDir)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "Compiling shaders...");
+
+                var result = Cli.Wrap("dotnet")
+                    .WithArguments("msbuild -t:CompileShaders -p:DefineConstants=\"__IOS__\"")
+                    .WithWorkingDirectory(projectDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (result.ExitCode != 0)
+                {
+                    Log.LogError($"Shader compilation failed: {result.StandardError}");
                     return false;
                 }
+
+                Log.LogMessage(MessageImportance.High, "Shaders compilation completed");
+                return true;
             }
-            else if (opts.Debug)
+            catch (Exception ex)
             {
-                (exitCode, output) = Utils.RunShellCommand(Log,
-                  $"ios-deploy  --debug --bundle  {Path.Combine(opts.OutputPath, "IOS/build/bin")}/{PROJECT_NAME}.app  ",
-                  envVars,
-                  workingDir: opts.OutputPath,
-                  logStdErrAsMessage: true,
-                  debugMessageImportance: MessageImportance.High,
-                  label: "ios-deploy");
-                if (exitCode != 0)
-                {
-                    Log.LogError($"ios-deploy failed ");
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
-        public override string? ToString()
-        {
-            return base.ToString();
-        }
-
-        private void SetOutputPath()
-        {
-            if (opts.OutputPath == string.Empty)
-            {
-                opts.OutputPath = opts.ProjectPath;
-            }
-
-            if (!Directory.Exists(opts.OutputPath))
-                Directory.CreateDirectory(opts.OutputPath);
-        }
-        string GetUrhoNetHomePath()
-        {
-
-            if (URHONET_HOME_PATH != string.Empty) return URHONET_HOME_PATH;
-
-            string homeFolder = Utils.GetHomeFolder();
-            string urhoNetConfigFolderPath = Path.Combine(homeFolder, ".urhonet_config");
-
-            if (!Directory.Exists(urhoNetConfigFolderPath))
-            {
-                Log.LogError($".urhonet_config folder not found");
-                return string.Empty;
-            }
-
-            string urhoNetHomeFilePath = Path.Combine(urhoNetConfigFolderPath, "urhonethome");
-            if (!File.Exists(urhoNetHomeFilePath))
-            {
-                Log.LogError($"urhonethome not found");
-                return string.Empty;
-            }
-
-
-            string[] lines = urhoNetHomeFilePath.FileReadAllLines();
-            foreach (var line in lines)
-            {
-                if (line == string.Empty) continue;
-
-                if (Directory.Exists(line))
-                {
-                    URHONET_HOME_PATH = line;
-                    break;
-                }
-            }
-
-            return URHONET_HOME_PATH;
-        }
-
-        private bool ParseEnvironmentVariables()
-        {
-
-            string project_vars_path = Path.Combine(opts.ProjectPath, "script", "project_vars.sh");
-
-            if (!File.Exists(project_vars_path))
-            {
-                Log.LogError($"project_vars.sh not found");
+                Log.LogError($"Shader compilation failed: {ex.Message}");
                 return false;
             }
-            ParseEnvironmentVars(project_vars_path);
-
-            PROJECT_UUID = GetEnvValue("PROJECT_UUID");
-            PROJECT_NAME = GetEnvValue("PROJECT_NAME");
-            JAVA_PACKAGE_PATH = GetEnvValue("JAVA_PACKAGE_PATH");
-            VERSION_CODE = GetEnvValue("VERSION_CODE");
-            VERSION_NAME = GetEnvValue("VERSION_NAME");
-
-            if (VERSION_CODE == string.Empty)
-            {
-                VERSION_CODE = "1";
-            }
-
-            if (VERSION_NAME == string.Empty)
-            {
-                VERSION_NAME = "1.0.0";
-            }
-
-
-            Console.WriteLine("UrhoNetHomePath = " + URHONET_HOME_PATH);
-            Console.WriteLine("opts.OutputPath = " + opts.OutputPath);
-            Console.WriteLine("OutputPath  = " + opts.OutputPath);
-            Console.WriteLine("PROJECT_UUID" + "=" + PROJECT_UUID);
-            Console.WriteLine("PROJECT_NAME" + "=" + PROJECT_NAME);
-            Console.WriteLine("JAVA_PACKAGE_PATH" + "=" + JAVA_PACKAGE_PATH);
-
-
-            return true;
         }
 
-        void ParseEnvironmentVars(string project_vars_path)
+        private bool PublishDotNetProject(string projectDir, string projectName)
         {
-            string[] project_vars = project_vars_path.FileReadAllLines();
-
-            foreach (string v in project_vars)
+            try
             {
-                if (v.Contains('#') || v == string.Empty) continue;
-                string tr = v.Trim();
-                if (tr.StartsWith("export"))
-                {
-                    tr = tr.Replace("export", "");
-                    string[] vars = tr.Split('=', 2);
-                    envVars[vars[0].Trim()] = vars[1].Trim();
-                }
-            }
-        }
+                Log.LogMessage(MessageImportance.High, "Publishing .NET project for iOS...");
 
-        private bool HandlePlugins()
-        {
-            List<string> PLUGINS = GetPlugins();
-            if (PLUGINS.Count > 0)
-            {
-                Directory.CreateDirectory(Path.Combine(opts.OutputPath, "IOS/Plugins"));
-                foreach (string plugin in PLUGINS)
-                {
-                    if (!Directory.Exists(Path.Combine(URHONET_HOME_PATH, $"template/Plugins/{plugin}")))
-                    {
-                        Log.LogError(Path.Combine(URHONET_HOME_PATH, $"template/Plugins/{plugin}") + " not found");
-                        return false;
-                    }
+                var result = Cli.Wrap("dotnet")
+                    .WithArguments("publish -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"")
+                    .WithWorkingDirectory(projectDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
-                    if (!Directory.Exists(Path.Combine(opts.OutputPath, $"IOS/Plugins/{plugin}")))
-                        Path.Combine(URHONET_HOME_PATH, $"template/Plugins/{plugin}").CopyDirectory(Path.Combine(opts.OutputPath, $"IOS/Plugins/{plugin}"));
+                if (result.ExitCode != 0)
+                {
+                    Log.LogError($"Dotnet publish failed: {result.StandardError}");
+                    return false;
                 }
 
+                Log.LogMessage(MessageImportance.High, "Dotnet publish completed");
+                return true;
             }
-            return true;
+            catch (Exception ex)
+            {
+                Log.LogError($"Dotnet publish failed: {ex.Message}");
+                return false;
+            }
         }
 
-        List<string> GetPlugins()
+        private bool CreateAppFramework(string iosDir, string projectDir, string projectName)
         {
-            List<string> result = new List<string>();
-
-            string PLUGINS = GetEnvValue("PLUGINS");
-            if (PLUGINS != string.Empty)
+            try
             {
-                result = SplitToList(PLUGINS);
-            }
+                Log.LogMessage(MessageImportance.High, $"Creating {projectName} framework...");
 
-            return result;
-        }
+                string frameworksDir = Path.Combine(iosDir, "frameworks");
+                string frameworkDir = Path.Combine(frameworksDir, $"{projectName}.framework");
+                Directory.CreateDirectory(frameworkDir);
 
-        List<string> GetDotNetReferenceAssemblies()
-        {
-            List<string> result = new List<string>();
+                string libPath = Path.Combine(projectDir, "bin", "Release", "net9.0", "ios-arm64", "publish", $"lib{projectName}.dylib");
 
-            string DOTNET_REFERENCE_DLL = GetEnvValue("DOTNET_REFERENCE_DLL");
-            if (DOTNET_REFERENCE_DLL != string.Empty)
-            {
-                result = SplitToList(DOTNET_REFERENCE_DLL);
-            }
-
-            return result;
-        }
-
-        List<string> SplitToList(string value)
-        {
-            List<string> result = new List<string>();
-            if (value != string.Empty)
-            {
-                value = value.Replace("\'", "").Replace(",", "").Trim().Trim('(').Trim(')').Trim();
-
-                string[] entries = value.Split(' ');
-                foreach (var entry in entries)
+                if (!File.Exists(libPath))
                 {
-                    if (entry == string.Empty) continue;
-                    result.Add(entry);
+                    Log.LogError($"Library file not found: {libPath}");
+                    return false;
                 }
-            }
-            return result;
-        }
 
-        string GetEnvValue(string key)
-        {
-            string value = string.Empty;
-            if (envVars.TryGetValue(key, out var val))
-            {
-                value = val;
-                value = value.Replace("\'", "");
-            }
-            return value.Trim();
-        }
+                // Copy and modify the library
+                string destLib = Path.Combine(frameworkDir, projectName);
+                File.Copy(libPath, destLib, true);
 
-        bool CheckDependencies(List<string> deps)
-        {
-            bool result = true;
+                // Use install_name_tool to modify the library
+                var installNameResult = Cli.Wrap("install_name_tool")
+                    .WithArguments($"-rpath @executable_path @executable_path/Frameworks \"{destLib}\"")
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
-            foreach (var dep in deps)
-            {
-                if (!iscmd(dep))
+                if (installNameResult.ExitCode != 0)
                 {
-                    result = false;
-                    Log.LogError(dep + " not found");
-                    break;
+                    Log.LogError($"install_name_tool rpath failed: {installNameResult.StandardError}");
+                    return false;
                 }
+
+                var idResult = Cli.Wrap("install_name_tool")
+                    .WithArguments($"-id @rpath/{projectName}.framework/{projectName} \"{destLib}\"")
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (idResult.ExitCode != 0)
+                {
+                    Log.LogError($"install_name_tool id failed: {idResult.StandardError}");
+                    return false;
+                }
+
+                // Copy Info.plist
+                string infoPlistSource = Path.Combine(opts.TemplatesPath, "ios", "Info.plist");
+                string infoPlistDest = Path.Combine(frameworkDir, "Info.plist");
+                File.Copy(infoPlistSource, infoPlistDest, true);
+
+                // Replace placeholders in Info.plist
+                string content = File.ReadAllText(infoPlistDest);
+                content = content.Replace("TEMPLATE_PROJECT_NAME", projectName);
+                File.WriteAllText(infoPlistDest, content);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to create app framework: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool CopyIOSTemplates(string iosDir, string projectName)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "Copying iOS templates...");
+
+                string templatesDir = Path.Combine(opts.TemplatesPath, "ios");
+
+                // Copy CMakeLists.txt
+                string cmakeSource = Path.Combine(templatesDir, "CMakeLists.txt");
+                string cmakeDest = Path.Combine(iosDir, "CMakeLists.txt");
+                File.Copy(cmakeSource, cmakeDest, true);
+
+                // Replace placeholders
+                string content = File.ReadAllText(cmakeDest);
+                content = content.Replace("TEMPLATE_PROJECT_NAME", projectName);
+                File.WriteAllText(cmakeDest, content);
+
+                // Copy main.m
+                string mainSource = Path.Combine(templatesDir, "main.m");
+                string mainDest = Path.Combine(iosDir, "main.m");
+                File.Copy(mainSource, mainDest, true);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to copy iOS templates: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool GenerateXcodeProject(string iosDir, string projectName)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "Generating Xcode project...");
+
+                string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+                Directory.CreateDirectory(buildDir);
+
+                // Build cmake command with optional development team
+                string cmakeCmd = "cmake .. -G Xcode";
+                if (!string.IsNullOrEmpty(DEVELOPMENT_TEAM))
+                {
+                    cmakeCmd += $" -DDEVELOPMENT_TEAM={DEVELOPMENT_TEAM}";
+                }
+
+                var result = Cli.Wrap("cmake")
+                    .WithArguments(cmakeCmd)
+                    .WithWorkingDirectory(buildDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (result.ExitCode != 0)
+                {
+                    Log.LogError($"CMake Xcode generation failed: {result.StandardError}");
+                    return false;
+                }
+
+                Log.LogMessage(MessageImportance.High, "Xcode project generated successfully");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to generate Xcode project: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool CompileXcodeProject(string iosDir, string projectName)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "Compiling Xcode project...");
+
+                string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+
+                var result = Cli.Wrap("xcodebuild")
+                    .WithArguments("-configuration Release -sdk iphoneos -arch arm64")
+                    .WithWorkingDirectory(buildDir)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (result.ExitCode != 0)
+                {
+                    Log.LogError($"Xcode build failed: {result.StandardError}");
+                    return false;
+                }
+
+                string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
+                Log.LogMessage(MessageImportance.High, $"Xcode project compiled successfully!");
+                Log.LogMessage(MessageImportance.High, $"App bundle location: {appBundlePath}");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to compile Xcode project: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool InstallOnDevice(string iosDir, string projectName)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "Installing on iOS device...");
+
+                string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+                string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
+
+                if (!Directory.Exists(appBundlePath))
+                {
+                    Log.LogError($"App bundle not found: {appBundlePath}");
+                    return false;
+                }
+
+                // Check if ios-deploy is available
+                var checkResult = Cli.Wrap("which")
+                    .WithArguments("ios-deploy")
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (checkResult.ExitCode != 0)
+                {
+                    Log.LogError("ios-deploy not found. Install with: npm install -g ios-deploy");
+                    return false;
+                }
+
+                var installResult = Cli.Wrap("ios-deploy")
+                    .WithArguments($"--id $(ios-deploy -c | head -1 | cut -d' ' -f2) --bundle \"{appBundlePath}\" --no-wifi")
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (installResult.ExitCode != 0)
+                {
+                    Log.LogError($"Installation failed: {installResult.StandardError}");
+                    return false;
+                }
+
+                Log.LogMessage(MessageImportance.High, "App installed successfully on device!");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"Failed to install on device: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void CopyDirectory(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+
+            foreach (string file in Directory.GetFiles(sourceDir))
+            {
+                string destFile = Path.Combine(destDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
             }
 
-            return result;
+            foreach (string subDir in Directory.GetDirectories(sourceDir))
+            {
+                string destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
+                CopyDirectory(subDir, destSubDir);
+            }
         }
-
-        bool iscmd(string cmd)
-        {
-            bool result = false;
-            string command = " command -v " + cmd;
-            (int exitCode, string output) = Utils.RunShellCommand(Log,
-                                 command,
-                                 null,
-                                 workingDir: opts.ProjectPath,
-                                 logStdErrAsMessage: true,
-                                 debugMessageImportance: MessageImportance.High,
-                                 label: "iscmd");
-
-            if (output != string.Empty && exitCode == 0) result = true;
-
-            return result;
-        }
-
-
     }
-
-
-
 }

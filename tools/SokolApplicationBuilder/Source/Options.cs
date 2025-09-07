@@ -75,6 +75,17 @@ namespace SokolApplicationBuilder
         [Option( "rid", Required = false, HelpText = "runtime identifier")]
         public string  RID { get; set; } = "";
 
+        // iOS specific options
+        [Option("development-team", Required = false, HelpText = "iOS development team ID")]
+        public string DevelopmentTeam { get; set; } = "";
+
+        [Option("compile", Required = false, HelpText = "Compile the Xcode project after generation")]
+        public bool Compile { get; set; } = false;
+
+        // Computed properties
+        public string Path => ProjectPath;
+        public string TemplatesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", "templates");
+
     }
 
 }
