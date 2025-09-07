@@ -565,7 +565,7 @@ namespace SokolApplicationBuilder
 
                                 if (refAssemblyFullPath != string.Empty)
                                 {
-                                    String name = assembliesList.FindLast(item => item.Equals(refAssembly));
+                                    string? name = assembliesList.FindLast(item => item.Equals(refAssembly));
                                     if (name == null)
                                     {
                                         assembliesList.Add(refAssembly);

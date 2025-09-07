@@ -58,7 +58,9 @@ namespace SokolApplicationBuilder
         private string LIPO_CMD = string.Empty;
         private string IOS_SDK_PATH = string.Empty;
 
+#pragma warning disable CS0414 // The field is assigned but its value is never used
         private ProcessortArchitecture processortArchitecture = ProcessortArchitecture.Intel;
+#pragma warning restore CS0414
 
         public IOSBuildTask(Options opts)
         {
@@ -502,7 +504,7 @@ namespace SokolApplicationBuilder
                     Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app")
                 };
 
-                string foundPath = null;
+                string? foundPath = null;
                 foreach (var path in possiblePaths)
                 {
                     if (Directory.Exists(path))
@@ -567,8 +569,8 @@ namespace SokolApplicationBuilder
 
                 Log.LogMessage(MessageImportance.Normal, $"Device detection output: {deviceResult.StandardOutput}");
 
-                // Parse device ID from output (first device)
-                string deviceId = "";
+                // Parse all available devices
+                var availableDevices = new List<(string Id, string Name)>();
                 var lines = deviceResult.StandardOutput.Split('\n');
                 foreach (var line in lines)
                 {
@@ -582,12 +584,67 @@ namespace SokolApplicationBuilder
                             var deviceIdEnd = afterFound.IndexOf(" ");
                             if (deviceIdEnd > 0)
                             {
-                                deviceId = afterFound.Substring(0, deviceIdEnd).Trim();
-                                break;
+                                var extractedDeviceId = afterFound.Substring(0, deviceIdEnd).Trim();
+                                var deviceName = "Unknown";
+                                
+                                // Try to extract device name
+                                var akaIndex = afterFound.IndexOf("a.k.a.");
+                                if (akaIndex >= 0)
+                                {
+                                    deviceName = afterFound.Substring(akaIndex + 7).Trim('\'', ' ');
+                                }
+                                
+                                availableDevices.Add((extractedDeviceId, deviceName));
                             }
                         }
                     }
                 }
+
+                if (availableDevices.Count == 0)
+                {
+                    Log.LogError("No iOS devices found connected via USB");
+                    return false;
+                }
+
+                // Select device based on user preference or first available
+                string selectedDeviceId;
+                string selectedDeviceName;
+
+                if (!string.IsNullOrEmpty(opts.IOSDeviceId))
+                {
+                    // User specified a specific device
+                    var matchingDevice = availableDevices.FirstOrDefault(d => d.Id.Contains(opts.IOSDeviceId) || d.Name.Contains(opts.IOSDeviceId));
+                    if (matchingDevice.Id == null)
+                    {
+                        Log.LogError($"Specified iOS device '{opts.IOSDeviceId}' not found. Available devices:");
+                        foreach (var device in availableDevices)
+                        {
+                            Log.LogError($"  {device.Id} - {device.Name}");
+                        }
+                        return false;
+                    }
+                    selectedDeviceId = matchingDevice.Id;
+                    selectedDeviceName = matchingDevice.Name;
+                    Log.LogMessage(MessageImportance.High, $"Using specified iOS device: {selectedDeviceName} ({selectedDeviceId})");
+                }
+                else
+                {
+                    // Use first available device
+                    selectedDeviceId = availableDevices[0].Id;
+                    selectedDeviceName = availableDevices[0].Name;
+                    Log.LogMessage(MessageImportance.High, $"Using first available iOS device: {selectedDeviceName} ({selectedDeviceId})");
+                    
+                    if (availableDevices.Count > 1)
+                    {
+                        Log.LogMessage(MessageImportance.Normal, $"Multiple devices found. To use a specific device, use --ios-device <device_id>");
+                        foreach (var device in availableDevices)
+                        {
+                            Log.LogMessage(MessageImportance.Normal, $"  Available: {device.Id} - {device.Name}");
+                        }
+                    }
+                }
+
+                string deviceId = selectedDeviceId;
 
                 if (string.IsNullOrEmpty(deviceId))
                 {
@@ -595,7 +652,7 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
-                Log.LogMessage(MessageImportance.High, $"Installing to device: {deviceId}");
+                Log.LogMessage(MessageImportance.High, $"Installing to device: {selectedDeviceName} ({deviceId})");
 
                 var installResult = Cli.Wrap("ios-deploy")
                     .WithArguments($"--id {deviceId} --bundle \"{appBundlePath}\" --no-wifi")
@@ -646,6 +703,8 @@ namespace SokolApplicationBuilder
                         Log.LogError($"Failed to extract bundle ID: {ex.Message}");
                         return false;
                     }
+
+                    Log.LogMessage(MessageImportance.High, $"Launching app on device: {selectedDeviceName} ({deviceId})");
 
                     // Launch the app using devicectl (more reliable than ios-deploy)
                     var launchResult = Cli.Wrap("xcrun")

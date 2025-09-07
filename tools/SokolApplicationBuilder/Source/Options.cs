@@ -51,6 +51,9 @@ namespace SokolApplicationBuilder
         [Option("device", Required = false, HelpText = "Android device ID to install to (use 'adb devices' to list available devices)")]
         public string DeviceId { get; set; } = "";
 
+        [Option("ios-device", Required = false, HelpText = "iOS device ID to install to (use 'ios-deploy -c' to list available devices)")]
+        public string IOSDeviceId { get; set; } = "";
+
         [Option("graphics", Required = false, HelpText = "Graphics backend , default is OpenGL/OpenGL ES")]
         public string GraphicsBackend { get; set; } = "";
 
