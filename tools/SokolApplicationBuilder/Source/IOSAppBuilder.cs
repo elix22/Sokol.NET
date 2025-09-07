@@ -405,7 +405,7 @@ namespace SokolApplicationBuilder
                 Directory.CreateDirectory(buildDir);
 
                 // Build cmake command with optional development team
-                string cmakeCmd = "cmake .. -G Xcode";
+                string cmakeCmd = ".. -G Xcode";
                 if (!string.IsNullOrEmpty(DEVELOPMENT_TEAM))
                 {
                     cmakeCmd += $" -DDEVELOPMENT_TEAM={DEVELOPMENT_TEAM}";
