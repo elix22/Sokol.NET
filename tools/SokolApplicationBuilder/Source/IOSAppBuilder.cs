@@ -445,7 +445,7 @@ namespace SokolApplicationBuilder
                 string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
 
                 var result = Cli.Wrap("xcodebuild")
-                    .WithArguments("-configuration Release -sdk iphoneos -arch arm64")
+                    .WithArguments($"-target {projectName}-ios-app -configuration Release -sdk iphoneos -arch arm64")
                     .WithWorkingDirectory(buildDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -460,6 +460,17 @@ namespace SokolApplicationBuilder
                 }
 
                 string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
+                
+                // Check if the app bundle exists at the expected location, otherwise look in bin/Release
+                if (!Directory.Exists(appBundlePath))
+                {
+                    string altPath = Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app");
+                    if (Directory.Exists(altPath))
+                    {
+                        appBundlePath = altPath;
+                    }
+                }
+                
                 Log.LogMessage(MessageImportance.High, $"Xcode project compiled successfully!");
                 Log.LogMessage(MessageImportance.High, $"App bundle location: {appBundlePath}");
 
@@ -481,11 +492,48 @@ namespace SokolApplicationBuilder
                 string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
                 string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
 
-                if (!Directory.Exists(appBundlePath))
+                // Check multiple possible locations for the app bundle
+                string[] possiblePaths = new[]
                 {
-                    Log.LogError($"App bundle not found: {appBundlePath}");
+                    appBundlePath,
+                    Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app", $"{projectName}-ios-app.app"),
+                    Path.Combine(buildDir, "Release", $"{projectName}-ios-app.app"),
+                    Path.Combine(buildDir, $"{projectName}-ios-app.app"),
+                    Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app")
+                };
+
+                string foundPath = null;
+                foreach (var path in possiblePaths)
+                {
+                    if (Directory.Exists(path))
+                    {
+                        foundPath = path;
+                        break;
+                    }
+                }
+
+                if (foundPath == null)
+                {
+                    Log.LogError($"App bundle not found at expected locations:");
+                    foreach (var path in possiblePaths)
+                    {
+                        Log.LogError($"  {path}");
+                    }
+
+                    // List contents of build directory to see what's actually there
+                    Log.LogMessage(MessageImportance.High, $"Contents of build directory {buildDir}:");
+                    if (Directory.Exists(buildDir))
+                    {
+                        foreach (var item in Directory.GetFileSystemEntries(buildDir))
+                        {
+                            Log.LogMessage(MessageImportance.Normal, $"  {item}");
+                        }
+                    }
                     return false;
                 }
+
+                appBundlePath = foundPath;
+                Log.LogMessage(MessageImportance.High, $"Found app bundle at: {appBundlePath}");
 
                 // Check if ios-deploy is available
                 var checkResult = Cli.Wrap("which")
@@ -502,8 +550,55 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
+                // Get connected device ID
+                var deviceResult = Cli.Wrap("ios-deploy")
+                    .WithArguments("-c")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (deviceResult.ExitCode != 0)
+                {
+                    Log.LogError("Failed to get connected devices");
+                    return false;
+                }
+
+                Log.LogMessage(MessageImportance.Normal, $"Device detection output: {deviceResult.StandardOutput}");
+
+                // Parse device ID from output (first device)
+                string deviceId = "";
+                var lines = deviceResult.StandardOutput.Split('\n');
+                foreach (var line in lines)
+                {
+                    if (line.Contains("Found") && line.Contains("connected through USB"))
+                    {
+                        // Extract device ID from line like: "[....] Found 00008030-000135660CE3802E (D79AP, iPhone SE 2G, iphoneos, arm64e, 18.6.2, 22G100) a.k.a. 'iPhone' connected through USB."
+                        var foundIndex = line.IndexOf("Found");
+                        if (foundIndex >= 0)
+                        {
+                            var afterFound = line.Substring(foundIndex + 6); // Skip "Found "
+                            var deviceIdEnd = afterFound.IndexOf(" ");
+                            if (deviceIdEnd > 0)
+                            {
+                                deviceId = afterFound.Substring(0, deviceIdEnd).Trim();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(deviceId))
+                {
+                    Log.LogError("No iOS device found connected via USB");
+                    return false;
+                }
+
+                Log.LogMessage(MessageImportance.High, $"Installing to device: {deviceId}");
+
                 var installResult = Cli.Wrap("ios-deploy")
-                    .WithArguments($"--id $(ios-deploy -c | head -1 | cut -d' ' -f2) --bundle \"{appBundlePath}\" --no-wifi")
+                    .WithArguments($"--id {deviceId} --bundle \"{appBundlePath}\" --no-wifi")
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteBufferedAsync()
