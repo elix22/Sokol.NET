@@ -188,7 +188,10 @@ namespace SokolApplicationBuilder
             if (File.Exists(cmakePath))
             {
                 string content = File.ReadAllText(cmakePath);
-                content = content.Replace("NativeActivity", appName);
+                // Replace APP_NAME placeholder but preserve ANativeActivity_onCreate function name
+                content = content.Replace("${APP_NAME}", appName);
+                content = content.Replace("lib${APP_NAME}.so", $"lib{appName}.so");
+                // Don't replace ANativeActivity_onCreate - it must remain unchanged
                 File.WriteAllText(cmakePath, content);
             }
 
@@ -228,40 +231,47 @@ namespace SokolApplicationBuilder
 
                 try
                 {
-                    // Use direct Process execution with proper environment setup
-                    using (var process = new System.Diagnostics.Process())
+                    var result = Cli.Wrap("dotnet")
+                        .WithArguments($"publish -r {arch} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
+                        .WithWorkingDirectory(opts.ProjectPath)
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (result.ExitCode == 0)
                     {
-                        process.StartInfo.FileName = "dotnet";
-                        process.StartInfo.Arguments = $"publish -r {arch} -p:BuildAsLibrary=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet";
-                        process.StartInfo.WorkingDirectory = opts.ProjectPath;
-                        process.StartInfo.UseShellExecute = false;
-                        process.StartInfo.RedirectStandardOutput = false; // Don't redirect to avoid hanging
-                        process.StartInfo.RedirectStandardError = false;
-                        process.StartInfo.RedirectStandardInput = true;
-                        process.StartInfo.CreateNoWindow = true;
-
-                        // Copy current environment variables
-                        foreach (System.Collections.DictionaryEntry envVar in Environment.GetEnvironmentVariables())
+                        Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
+                        
+                        // Copy the published library to the Android libs directory
+                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net9.0", arch, "publish");
+                        string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "libs");
+                        string abiName = arch switch
                         {
-                            process.StartInfo.EnvironmentVariables[envVar.Key.ToString()] = envVar.Value?.ToString();
-                        }
-
-                        Log.LogMessage(MessageImportance.Normal, $"Starting process: dotnet {process.StartInfo.Arguments}");
-                        Log.LogMessage(MessageImportance.Normal, $"Working directory: {process.StartInfo.WorkingDirectory}");
-
-                        process.Start();
-
-                        // Wait for exit without timeout - let it run as long as needed
-                        process.WaitForExit();
-
-                        if (process.ExitCode == 0)
+                            "linux-bionic-arm64" => "arm64-v8a",
+                            "linux-bionic-arm" => "armeabi-v7a",
+                            "linux-bionic-x64" => "x86_64",
+                            _ => arch
+                        };
+                        string libsAbiDir = Path.Combine(libsDir, abiName);
+                        string sourceLib = Path.Combine(publishDir, $"lib{GetAppName()}.so");
+                        string destLib = Path.Combine(libsAbiDir, $"lib{GetAppName()}.so");
+                        
+                        if (File.Exists(sourceLib))
                         {
-                            Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
+                            Directory.CreateDirectory(libsAbiDir);
+                            File.Copy(sourceLib, destLib, true);
+                            Log.LogMessage(MessageImportance.Normal, $"Copied {sourceLib} to {destLib}");
                         }
                         else
                         {
-                            Log.LogWarning($"Publishing for {arch} completed with exit code: {process.ExitCode}");
+                            Log.LogWarning($"Published library not found: {sourceLib}");
                         }
+                    }
+                    else
+                    {
+                        Log.LogWarning($"Publishing for {arch} completed with exit code: {result.ExitCode}");
                     }
                 }
                 catch (Exception ex)
@@ -320,10 +330,13 @@ namespace SokolApplicationBuilder
         void SignReleaseApp()
         {
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
-            string apkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
+            string unsignedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
 
-            if (!File.Exists(apkPath))
+            if (!File.Exists(unsignedApkPath))
+            {
+                Log.LogError("Unsigned release APK not found!");
                 return;
+            }
 
             Log.LogMessage(MessageImportance.High, "Signing release APK...");
 
@@ -347,19 +360,84 @@ namespace SokolApplicationBuilder
             // Sign the APK
             string signedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release.apk");
 
-            var signResult = Cli.Wrap("jarsigner")
-                .WithArguments($"-keystore \"{debugKeystore}\" -storepass android -keypass android -digestalg SHA-256 -sigalg SHA256withRSA \"{signedApkPath}\" androiddebugkey")
-                .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                .ExecuteAsync()
-                .GetAwaiter()
-                .GetResult();
+            // Don't copy the unsigned APK yet - let apksigner do it with --out parameter
+            // Copy unsigned APK to final location before signing
+            if (File.Exists(signedApkPath))
+                File.Delete(signedApkPath);
 
-            Log.LogMessage(MessageImportance.High, $"APK signing completed with exit code: {signResult.ExitCode}");
-
-            // Remove unsigned APK
-            if (File.Exists(apkPath))
-                File.Delete(apkPath);
+            // Try to sign with apksigner first (better for APKs with native libraries)
+            bool signingSuccess = false;
+            
+            try
+            {
+                // Find apksigner in Android SDK
+                var stringBuilder = new System.Text.StringBuilder();
+                var findApksignerResult = Cli.Wrap("find")
+                    .WithArguments(new[] { "/Users/elialoni/Library/Android/sdk", "-name", "apksigner", "-type", "f" })
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(stringBuilder))
+                    .WithValidation(CommandResultValidation.None) // Don't fail on exit code
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+                
+                string apksignerPath = stringBuilder.ToString().Trim();
+                if (!string.IsNullOrEmpty(apksignerPath))
+                {
+                    Log.LogMessage(MessageImportance.High, $"Using apksigner: {apksignerPath}");
+                    
+                    var apksignerResult = Cli.Wrap(apksignerPath.Split('\n')[0]) // Use first line if multiple
+                        .WithArguments($"sign --ks \"{debugKeystore}\" --ks-pass pass:android --key-pass pass:android --out \"{signedApkPath}\" \"{unsignedApkPath}\"")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    
+                    if (apksignerResult.ExitCode == 0)
+                    {
+                        signingSuccess = true;
+                        Log.LogMessage(MessageImportance.High, "APK signed successfully with apksigner!");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"apksigner failed: {ex.Message}");
+            }
+            
+            // Fallback to jarsigner if apksigner failed
+            if (!signingSuccess)
+            {
+                Log.LogMessage(MessageImportance.High, "Falling back to jarsigner...");
+                
+                // Copy unsigned APK to final location before signing with jarsigner
+                File.Copy(unsignedApkPath, signedApkPath, true);
+                
+                var jarsignerResult = Cli.Wrap("jarsigner")
+                    .WithArguments($"-keystore \"{debugKeystore}\" -storepass android -keypass android -digestalg SHA-256 -sigalg SHA256withRSA \"{signedApkPath}\" androiddebugkey")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+                
+                if (jarsignerResult.ExitCode == 0)
+                {
+                    signingSuccess = true;
+                    Log.LogMessage(MessageImportance.High, "APK signed successfully with jarsigner!");
+                }
+            }
+            
+            if (signingSuccess)
+            {
+                // Remove unsigned APK
+                if (File.Exists(unsignedApkPath))
+                    File.Delete(unsignedApkPath);
+            }
+            else
+            {
+                Log.LogError("Failed to sign APK with both apksigner and jarsigner!");
+            }
         }
 
         void InstallOnDevice(string appName, string buildType)

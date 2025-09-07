@@ -25,9 +25,50 @@ android {
         }
     }
 
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Don't include debug symbols in release builds to keep APK size small
+            ndk {
+                debugSymbolLevel 'none'
+            }
+            externalNativeBuild {
+                cmake {
+                    arguments '-DCMAKE_BUILD_TYPE=Release'
+                }
+            }
+            packaging {
+                resources {
+                    excludes += '/META-INF/{AL2.0,LGPL2.1}'
+                }
+                // Let Gradle strip native libraries for smaller APK size
+                // doNotStrip '**/*.so'
+            }
+        }
+        debug {
+            ndk {
+                debugSymbolLevel 'full'
+            }
+            externalNativeBuild {
+                cmake {
+                    arguments '-DCMAKE_BUILD_TYPE=Debug'
+                }
+            }
+        }
+    }
+
     externalNativeBuild {
         cmake {
             path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.whenTaskAdded { task ->
+        if (task.name == 'stripReleaseDebugSymbols') {
+            task.enabled = false
         }
     }
 }
