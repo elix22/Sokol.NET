@@ -71,9 +71,6 @@
       <None Remove="bin/**/*" />
       <None Remove="wwwroot/**/*" />
       <Content Remove="wwwroot/**/*" />
-      <None Remove="Directory.Build.props" />
-      <None Remove="Directory.Build.targets" />
-      <None Remove="Directory.Packages.props" />
       <None Remove="*.user" />
       <Compile Remove="obj/**/*" />
       <Compile Remove="bin/**/*" />
