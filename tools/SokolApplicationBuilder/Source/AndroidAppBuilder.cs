@@ -82,6 +82,7 @@ namespace SokolApplicationBuilder
 
                 // Get app name
                 string appName = GetAppName();
+                PROJECT_NAME = appName; // Store for use in other methods
                 Log.LogMessage(MessageImportance.High, $"Configuring Android app for: {appName}");
 
                 // Copy Android template
@@ -120,13 +121,55 @@ namespace SokolApplicationBuilder
 
         string GetAppName()
         {
-            // Get app name from csproj or directory
-            string csprojFile = Directory.GetFiles(opts.ProjectPath, "*.csproj").FirstOrDefault();
-            if (!string.IsNullOrEmpty(csprojFile))
+            // If project name is explicitly provided via options, use it
+            if (!string.IsNullOrEmpty(opts.ProjectName))
             {
-                return Path.GetFileNameWithoutExtension(csprojFile);
+                Log.LogMessage(MessageImportance.Normal, $"Using explicitly specified project name: {opts.ProjectName}");
+                return opts.ProjectName;
             }
-            return Path.GetFileName(opts.ProjectPath);
+
+            // Find all .csproj files in the project directory
+            string[] csprojFiles = Directory.GetFiles(opts.ProjectPath, "*.csproj");
+
+            if (csprojFiles.Length == 0)
+            {
+                Log.LogError($"No .csproj files found in directory: {opts.ProjectPath}");
+                throw new FileNotFoundException("No .csproj files found in the specified directory");
+            }
+
+            if (csprojFiles.Length == 1)
+            {
+                // Only one project found, use it
+                string projectName = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+                Log.LogMessage(MessageImportance.Normal, $"Found single project: {projectName}");
+                return projectName;
+            }
+
+            // Multiple projects found, try to match with parent folder name
+            string parentFolderName = Path.GetFileName(opts.ProjectPath);
+            Log.LogMessage(MessageImportance.Normal, $"Found {csprojFiles.Length} projects, looking for match with parent folder: {parentFolderName}");
+
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                if (string.Equals(projectName, parentFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Matched project with parent folder name: {projectName}");
+                    return projectName;
+                }
+            }
+
+            // No match found, list available projects and use the first one as fallback
+            Log.LogMessage(MessageImportance.Normal, $"No project matched parent folder name '{parentFolderName}'. Available projects:");
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                Log.LogMessage(MessageImportance.Normal, $"  - {projectName}");
+            }
+
+            string fallbackProject = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+            Log.LogMessage(MessageImportance.Normal, $"Using first project as fallback: {fallbackProject}");
+            return fallbackProject;
         }
 
         void CopyAndroidTemplate()
@@ -160,6 +203,7 @@ namespace SokolApplicationBuilder
             if (File.Exists(manifestPath))
             {
                 string content = File.ReadAllText(manifestPath);
+                // Replace the @string/app_name references with the actual app name (without extra quotes)
                 content = content.Replace("@string/app_name", appName);
 
                 // Configure orientation
@@ -222,8 +266,10 @@ namespace SokolApplicationBuilder
         {
             Log.LogMessage(MessageImportance.High, "Compiling shaders...");
 
+            string projectFile = Path.Combine(opts.ProjectPath, $"{PROJECT_NAME}.csproj");
+
             var result = Cli.Wrap("dotnet")
-                .WithArguments("msbuild -t:CompileShaders -p:DefineConstants=\"__ANDROID__\"")
+                .WithArguments($"msbuild \"{projectFile}\" -t:CompileShaders -p:DefineConstants=\"__ANDROID__\"")
                 .WithWorkingDirectory(opts.ProjectPath)
                 .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -244,8 +290,10 @@ namespace SokolApplicationBuilder
 
                 try
                 {
+                    string projectFile = Path.Combine(opts.ProjectPath, $"{PROJECT_NAME}.csproj");
+
                     var result = Cli.Wrap("dotnet")
-                        .WithArguments($"publish -r {arch} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
+                        .WithArguments($"publish \"{projectFile}\" -r {arch} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
                         .WithWorkingDirectory(opts.ProjectPath)
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -671,6 +719,85 @@ namespace SokolApplicationBuilder
             }
             return result;
         }
+
+        void CreateAndroidManifest()
+        {
+            string AndroidManifest = Path.Combine(opts.OutputPath, "Android/app/src/main/AndroidManifest.xml");
+
+            AndroidManifest.DeleteFile();
+            AndroidManifest.AppendTextLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+            AndroidManifest.AppendTextLine($"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"{PROJECT_UUID}\">");
+
+            List<string> permissions = GetAndroidPermissions();
+
+            foreach (var i in permissions)
+            {
+                AndroidManifest.AppendTextLine($"   <uses-permission android:name=\"{i}\"/>");
+            }
+
+
+            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/AndroidManifest.xml")))
+            {
+                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/AndroidManifest.xml"));
+                AndroidManifest.AppendText(extra);
+            }
+
+            AndroidManifest.AppendTextLine("   <application android:allowBackup=\"true\" android:icon=\"@mipmap/ic_launcher\" android:label=\"@string/app_name\" android:roundIcon=\"@mipmap/ic_launcher_round\" android:supportsRtl=\"true\" android:theme=\"@style/AppTheme\">");
+
+            string GAD_APPLICATION_ID = GetEnvValue("GAD_APPLICATION_ID");
+            if (GAD_APPLICATION_ID != string.Empty)
+            {
+                AndroidManifest.AppendTextLine($"      <meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" android:value=\"{GAD_APPLICATION_ID}\"/>");
+            }
+
+
+            AndroidManifest.AppendTextLine($"      <activity android:name=\".MainActivity\" android:exported=\"true\">");
+            AndroidManifest.AppendTextLine($"          <intent-filter>");
+            AndroidManifest.AppendTextLine($"              <action android:name=\"android.intent.action.MAIN\" />");
+            AndroidManifest.AppendTextLine($"              <category android:name=\"android.intent.category.LAUNCHER\" />");
+            AndroidManifest.AppendTextLine($"          </intent-filter>");
+
+            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/IntentFilters.xml")))
+            {
+                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/IntentFilters.xml"));
+                AndroidManifest.AppendText(extra);
+            }
+
+            AndroidManifest.AppendTextLine($"      </activity>");
+
+            string SCREEN_ORIENTATION = opts.ValidatedOrientation;
+            if (SCREEN_ORIENTATION == string.Empty)
+            {
+                SCREEN_ORIENTATION = "both";
+            }
+            if (SCREEN_ORIENTATION != "landscape" && SCREEN_ORIENTATION != "portrait" && SCREEN_ORIENTATION != "both")
+            {
+                SCREEN_ORIENTATION = "both";
+            }
+
+            // Convert orientation to Android manifest format
+            string androidOrientation = SCREEN_ORIENTATION switch
+            {
+                "portrait" => "portrait",
+                "landscape" => "landscape",
+                "both" => "unspecified", // Android uses "unspecified" to allow both orientations
+                _ => "unspecified"
+            };
+
+            AndroidManifest.AppendTextLine($"      <activity android:name=\".UrhoMainActivity\" android:exported=\"true\" android:configChanges=\"keyboardHidden|orientation|screenSize\" android:screenOrientation=\"{androidOrientation}\" android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\"/>");
+
+            if (File.Exists(Path.Combine(opts.ProjectPath, "platform/android/manifest/Activities.xml")))
+            {
+                string extra = File.ReadAllText(Path.Combine(opts.ProjectPath, "platform/android/manifest/Activities.xml"));
+                AndroidManifest.AppendText(extra);
+            }
+
+            AndroidManifest.AppendTextLine($"   </application>");
+            AndroidManifest.AppendTextLine($"</manifest>");
+
+
+        }
+
 
         public override int GetHashCode()
         {

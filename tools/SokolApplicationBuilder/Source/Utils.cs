@@ -843,18 +843,42 @@ namespace SokolApplicationBuilder
 
         public static bool FindProjectInPath(string path, ref string projectPath)
         {
-            bool found = false;
-            string[] files = Directory.GetFiles(path, "*.csproj", SearchOption.AllDirectories);
-            if (files.Length > 0)
+            string[] csprojFiles = Directory.GetFiles(path, "*.csproj");
+
+            if (csprojFiles.Length == 0)
             {
-                projectPath = files[0];
-                found = true;
+                Console.WriteLine($"No .csproj files found in {path}");
+                return false;
             }
-            else
+
+            if (csprojFiles.Length == 1)
             {
-                Console.WriteLine($"Project not found in {path}");
+                // Only one project found, use it
+                projectPath = csprojFiles[0];
+                Console.WriteLine($"Found single project: {Path.GetFileNameWithoutExtension(projectPath)}");
+                return true;
             }
-            return found;
+
+            // Multiple projects found, try to match with parent folder name
+            string parentFolderName = Path.GetFileName(path);
+            Console.WriteLine($"Found {csprojFiles.Length} projects, looking for match with parent folder: {parentFolderName}");
+
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                if (string.Equals(projectName, parentFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"Matched project with parent folder name: {projectName}");
+                    projectPath = csprojFile;
+                    return true;
+                }
+            }
+
+            // No match found, use the first one as fallback
+            string fallbackProject = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+            Console.WriteLine($"No project matched parent folder name '{parentFolderName}'. Using first project as fallback: {fallbackProject}");
+            projectPath = csprojFiles[0];
+            return true;
         }
 
         public static void ParseEnvironmentVariables(this string project_vars_path , out Dictionary<string, string> envVarsDict)

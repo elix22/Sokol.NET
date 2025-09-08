@@ -103,7 +103,9 @@ namespace SokolApplicationBuilder
             {
                 // Extract project information
                 string projectPath = opts.Path;
-                string projectName = Path.GetFileName(projectPath);
+
+                // Use smart project selection logic
+                string projectName = GetProjectName(projectPath);
                 string projectDir = projectPath;
 
                 Log.LogMessage(MessageImportance.High, $"Building iOS app for project: {projectName}");
@@ -239,8 +241,12 @@ namespace SokolApplicationBuilder
             {
                 Log.LogMessage(MessageImportance.High, "Compiling shaders...");
 
+                // Get the project name using the same logic as the main build process
+                string projectName = GetProjectName(projectDir);
+                string projectFile = Path.Combine(projectDir, projectName + ".csproj");
+
                 var result = Cli.Wrap("dotnet")
-                    .WithArguments("msbuild -t:CompileShaders -p:DefineConstants=\"__IOS__\"")
+                    .WithArguments($"msbuild \"{projectFile}\" -t:CompileShaders -p:DefineConstants=\"__IOS__\"")
                     .WithWorkingDirectory(projectDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -270,8 +276,10 @@ namespace SokolApplicationBuilder
             {
                 Log.LogMessage(MessageImportance.High, "Publishing .NET project for iOS...");
 
+                string projectFile = Path.Combine(projectDir, projectName + ".csproj");
+
                 var result = Cli.Wrap("dotnet")
-                    .WithArguments("publish -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"")
+                    .WithArguments($"publish \"{projectFile}\" -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"")
                     .WithWorkingDirectory(projectDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -828,6 +836,59 @@ namespace SokolApplicationBuilder
                 Log.LogError($"Failed to install on device: {ex.Message}");
                 return false;
             }
+        }
+
+        private string GetProjectName(string projectPath)
+        {
+            // If project name is explicitly provided via options, use it
+            if (!string.IsNullOrEmpty(opts.ProjectName))
+            {
+                Log.LogMessage(MessageImportance.Normal, $"Using explicitly specified project name: {opts.ProjectName}");
+                return opts.ProjectName;
+            }
+
+            // Find all .csproj files in the project directory
+            string[] csprojFiles = Directory.GetFiles(projectPath, "*.csproj");
+
+            if (csprojFiles.Length == 0)
+            {
+                Log.LogError($"No .csproj files found in directory: {projectPath}");
+                throw new FileNotFoundException("No .csproj files found in the specified directory");
+            }
+
+            if (csprojFiles.Length == 1)
+            {
+                // Only one project found, use it
+                string projectName = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+                Log.LogMessage(MessageImportance.Normal, $"Found single project: {projectName}");
+                return projectName;
+            }
+
+            // Multiple projects found, try to match with parent folder name
+            string parentFolderName = Path.GetFileName(projectPath);
+            Log.LogMessage(MessageImportance.Normal, $"Found {csprojFiles.Length} projects, looking for match with parent folder: {parentFolderName}");
+
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                if (string.Equals(projectName, parentFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Matched project with parent folder name: {projectName}");
+                    return projectName;
+                }
+            }
+
+            // No match found, list available projects and use the first one as fallback
+            Log.LogMessage(MessageImportance.Normal, $"No project matched parent folder name '{parentFolderName}'. Available projects:");
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                Log.LogMessage(MessageImportance.Normal, $"  - {projectName}");
+            }
+
+            string fallbackProject = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+            Log.LogMessage(MessageImportance.Normal, $"Using first project as fallback: {fallbackProject}");
+            return fallbackProject;
         }
 
         private void CopyDirectory(string sourceDir, string destDir)

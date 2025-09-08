@@ -115,6 +115,29 @@ namespace SokolApplicationBuilder
             VERSION_CODE = envVarsDict.GetEnvValue("VERSION_CODE");
             VERSION_NAME = envVarsDict.GetEnvValue("VERSION_NAME");
 
+            // Override PROJECT_NAME if specified via command line option
+            if (!string.IsNullOrEmpty(opts.ProjectName))
+            {
+                PROJECT_NAME = opts.ProjectName;
+                Log.LogMessage(MessageImportance.Normal, $"Using project name from command line: {PROJECT_NAME}");
+            }
+
+            // If PROJECT_NAME is still empty, use smart project selection
+            if (string.IsNullOrEmpty(PROJECT_NAME))
+            {
+                string dummyPath = "";
+                if (Utils.FindProjectInPath(opts.ProjectPath, ref dummyPath))
+                {
+                    PROJECT_NAME = Path.GetFileNameWithoutExtension(dummyPath);
+                    Log.LogMessage(MessageImportance.Normal, $"Using auto-detected project name: {PROJECT_NAME}");
+                }
+                else
+                {
+                    Log.LogError("Could not determine project name");
+                    return false;
+                }
+            }
+
             if (VERSION_CODE == string.Empty)
             {
                 VERSION_CODE = "1";

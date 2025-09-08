@@ -6,7 +6,7 @@ emcmake cmake -B build-emscripten -S ext/
 cmake --build build-emscripten
 rm -f examples/cube-Web/libs/sokol.a
 mkdir -p examples/cube-Web/libs
-cp -f build-emscripten/libsokol.a examples/cube-Web/libs/sokol.a
+cp -f build-emscripten/sokol.a examples/cube-Web/libs/sokol.a
 cd examples/cube-Web
 dotnet clean
 dotnet msbuild -t:CompileShaders -p:DefineConstants="WEB"

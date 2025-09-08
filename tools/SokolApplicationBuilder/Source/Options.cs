@@ -91,6 +91,9 @@ namespace SokolApplicationBuilder
         [Option("orientation", Required = false, HelpText = "iOS app orientation: portrait, landscape, or both (default: both)")]
         public string Orientation { get; set; } = "both";
 
+        [Option("project", Required = false, HelpText = "Project name to build (if not specified, auto-detect based on folder contents)")]
+        public string ProjectName { get; set; } = "";
+
         // Computed properties
         public string Path => ProjectPath;
         public string TemplatesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", "templates");
