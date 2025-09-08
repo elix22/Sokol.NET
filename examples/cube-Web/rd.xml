@@ -1,6 +1,0 @@
-<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
-  <Application>
-    <Assembly Name="UrhoDotnet" Dynamic="Required All" />
-    <Assembly Name="Game" Dynamic="Required All" />
-  </Application>
-</Directives>
