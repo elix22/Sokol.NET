@@ -707,17 +707,12 @@ def gen_module(inp, dep_prefixes):
 
 def prepare():
     print('Generating C# bindings:')
-    if not os.path.isdir('sokol-csharp/src/sokol'):
-        os.makedirs('sokol-csharp/src/sokol')
-    if not os.path.isdir('sokol-csharp/src/sokol/c'):
-        os.makedirs('sokol-csharp/src/sokol/c')
 
 def gen(c_header_path, c_prefix, dep_c_prefixes):
     module_name = module_names[c_prefix]
     c_source_path = c_source_paths[c_prefix]
     print(f'  {c_header_path} => {module_name}')
     reset_globals()
-    shutil.copyfile(c_header_path, f'../ext/{os.path.basename(c_header_path)}')
     ir = gen_ir.gen(c_header_path, c_source_path, module_name, c_prefix, dep_c_prefixes)
     gen_module(ir, dep_c_prefixes)
     output_path = f"../src/sokol/generated/{ir['module']}.cs"
