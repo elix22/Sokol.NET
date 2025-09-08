@@ -67,6 +67,28 @@
       <None Remove="bin/**/*" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="scripts/**/*" />
+      <None Remove="Android/**/*" />
+      <Content Remove="Android/**/*" />
+      <Compile Remove="Android/**/*" />
+      <None Remove="ios/**/*" />
+      <Content Remove="ios/**/*" />
+      <Compile Remove="ios/**/*" />
+      <None Remove="obj/**/*" />
+      <None Remove="bin/**/*" />
+      <None Remove="wwwroot/**/*" />
+      <Content Remove="wwwroot/**/*" />
+      <None Remove="Directory.Build.props" />
+      <None Remove="Directory.Build.targets" />
+      <None Remove="Directory.Packages.props" />
+      <None Remove="*.user" />
+      <Compile Remove="obj/**/*" />
+      <Compile Remove="bin/**/*" />
+      <Content Remove="obj/**/*" />
+      <Content Remove="bin/**/*" />
+    </ItemGroup>
+
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
     <Compile Remove="shaders/compiled/ios/**/*.cs" />
