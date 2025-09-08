@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cubeweb", "examples\cube\cu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dyntexWeb", "examples\dyntex\dyntexWeb.csproj", "{30C9ECF5-58F0-4728-86ED-354BAFCE5084}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "loadpngWeb", "examples\loadpng\loadpngWeb.csproj", "{9B109CD7-3035-45E9-8D2D-02A82E8DD153}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,6 +56,10 @@ Global
 		{30C9ECF5-58F0-4728-86ED-354BAFCE5084}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30C9ECF5-58F0-4728-86ED-354BAFCE5084}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{30C9ECF5-58F0-4728-86ED-354BAFCE5084}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B109CD7-3035-45E9-8D2D-02A82E8DD153}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B109CD7-3035-45E9-8D2D-02A82E8DD153}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B109CD7-3035-45E9-8D2D-02A82E8DD153}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B109CD7-3035-45E9-8D2D-02A82E8DD153}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -66,6 +72,7 @@ Global
 		{62B58DF8-B096-4A87-B036-F037B642C0D3} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{CF3B6BD7-3C68-4534-A41A-75B087CDAD22} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{30C9ECF5-58F0-4728-86ED-354BAFCE5084} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{9B109CD7-3035-45E9-8D2D-02A82E8DD153} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

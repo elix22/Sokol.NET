@@ -172,7 +172,7 @@ public static unsafe class LoadPngSApp
         */
 
         sfetch_request_t request = default;
-        request.path = util_get_file_path("baboon.png");
+        request.path = util_get_file_path("Assets/baboon.png");
         request.callback = &fetch_callback;
         request.buffer = new sfetch_range_t()
         {

@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType Condition="'$(BuildAsLibrary)' != 'true'">Exe</OutputType>
     <OutputType Condition="'$(BuildAsLibrary)' == 'true'">Library</OutputType>
+    <ImportDirectoryBuildProps Condition="'$(ImportDirectoryBuildProps)' == ''">true</ImportDirectoryBuildProps>
     <TargetFramework>net9.0</TargetFramework>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -23,6 +24,9 @@
     <IsAndroid>$(RuntimeIdentifier.ToLower().StartsWith('android'))</IsAndroid>
 		<IsAndroid Condition="'$(IsAndroid)'=='false'">$(RuntimeIdentifier.ToLower().StartsWith('linux-bionic'))</IsAndroid>
     <IsIOS Condition="$(DefineConstants.Contains('__IOS__'))">true</IsIOS>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute> 
   </PropertyGroup>
 
     <!-- Library-specific settings -->
@@ -114,8 +118,18 @@
     <HostShaderFolder Condition="'$(ShaderSlang)'=='glsl300es'">android</HostShaderFolder>
   </PropertyGroup>
 
+    <ItemGroup>
+      <None Remove="scripts/**/*" />
+      <None Remove="Android/**/*" />
+      <None Remove="ios/**/*" />
+      <None Remove="obj/**/*" />
+      <None Remove="bin/**/*" />
+      <None Remove="wwwroot/**/*" />
+    </ItemGroup>
+
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
+    <Compile Remove="shaders/compiled/web/**/*.cs"/>
     <Compile Remove="shaders/compiled/ios/**/*.cs" Condition="'$(HostShaderFolder)' != 'ios'" />
     <Compile Remove="shaders/compiled/osx/**/*.cs" Condition="'$(HostShaderFolder)' != 'osx'" />
     <Compile Remove="shaders/compiled/windows/**/*.cs" Condition="'$(HostShaderFolder)' != 'windows'" />
