@@ -12,10 +12,11 @@ python3 -m pip install -r dear_bindings/requirements.txt
 
 mkdir -p src
 python3 dear_bindings/dear_bindings.py -o src/cimgui --custom-namespace-prefix ig imgui/imgui.h
-python3 dear_bindings/dear_bindings.py -o src/zimgui --custom-namespace-prefix "" imgui/imgui.h
+python3 dear_bindings/dear_bindings.py -o src/cimgui_internal --custom-namespace-prefix ig --include imgui/imgui.h imgui/imgui_internal.h
 cp imgui/*.h imgui/*.cpp imgui/LICENSE.txt src/
 
 # docking branch
 mkdir -p src-docking
 python3 dear_bindings/dear_bindings.py -o src-docking/cimgui --custom-namespace-prefix ig imgui-docking/imgui.h
+python3 dear_bindings/dear_bindings.py -o src-docking/cimgui_internal --custom-namespace-prefix ig --include imgui-docking/imgui.h imgui-docking/imgui_internal.h
 cp imgui-docking/*.h imgui-docking/*.cpp imgui-docking/LICENSE.txt src-docking/

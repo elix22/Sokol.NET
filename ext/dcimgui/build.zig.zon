@@ -1,6 +1,7 @@
 .{
-    .name = "cimgui",
+    .name = .cimgui,
     .version = "0.1.0",
+    .fingerprint = 0x49726f5f91a580e3,
     .paths = .{
         "src",
         "src-docking",

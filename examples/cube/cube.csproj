@@ -72,6 +72,15 @@
       </Compile>
   </ItemGroup>
 
+    <ItemGroup>
+      <Compile Include="../../src/ImGuiNET/*.cs" >
+        <Link>ImGuiNET\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Include="../../src/ImGuiNET/Generated/*.cs">
+        <Link>ImGuiNET\Generated\%(Filename)%(Extension)</Link>
+      </Compile>
+  </ItemGroup>
+
   	<!--Following blocks are exclusive for Android building-->
 	<PropertyGroup Condition="$(IsAndroid) == 'true'">
     <!--Use ndk-sample expected library name -->

@@ -32,8 +32,8 @@
 #include "dcimgui/src/cimgui.h"
 
 //TBD ELI , needs fixing
-// #define SOKOL_IMGUI_IMPL
-// #include "sokol_imgui.h"
+#define SOKOL_IMGUI_IMPL
+#include "sokol_imgui.h"
 
 int sdtx_print_wrapper(const char* str)
 {

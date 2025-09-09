@@ -2,7 +2,7 @@
 // **DO NOT EDIT DIRECTLY**
 // https://github.com/dearimgui/dear_bindings
 
-// dear imgui, v1.91.7
+// dear imgui, v1.92.2b
 // (headers)
 
 // Help:
@@ -32,17 +32,23 @@
 
 // Library Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals, e.g. '#if IMGUI_VERSION_NUM >= 12345')
-#define IMGUI_VERSION       "1.91.7"
-#define IMGUI_VERSION_NUM   19170
-#define IMGUI_HAS_TABLE
-#define IMGUI_HAS_VIEWPORT           // Viewport WIP branch
-#define IMGUI_HAS_DOCK               // Docking WIP branch
+#define IMGUI_VERSION       "1.92.2b"
+#define IMGUI_VERSION_NUM   19222
+#define IMGUI_HAS_TABLE              // Added BeginTable() - from IMGUI_VERSION_NUM >= 18000
+#define IMGUI_HAS_TEXTURES           // Added ImGuiBackendFlags_RendererHasTextures - from IMGUI_VERSION_NUM >= 19198
+#define IMGUI_HAS_VIEWPORT           // In 'docking' WIP branch.
+#define IMGUI_HAS_DOCK               // In 'docking' WIP branch.
+
+// Extra defines set by Dear Bindings for internal purposes
+#define IMGUI_DEAR_BINDINGS_HAS_GETWINDOWFRAMEBUFFERSCALE
+#define IMGUI_DEAR_BINDINGS_HAS_GETWINDOWWORKAREAINSETS
 
 /*
 
 Index of this file:
 // [SECTION] Header mess
 // [SECTION] Forward declarations and basic types
+// [SECTION] Texture identifiers (ImTextureID, ImTextureRef)
 // [SECTION] Dear ImGui end-user API functions
 // [SECTION] Flags & Enumerations
 // [SECTION] Tables API flags and structures (ImGuiTableFlags, ImGuiTableColumnFlags, ImGuiTableRowFlags, ImGuiTableBgTarget, ImGuiTableSortSpecs, ImGuiTableColumnSortSpecs)
@@ -53,7 +59,8 @@ Index of this file:
 // [SECTION] Helpers (ImGuiOnceUponAFrame, ImGuiTextFilter, ImGuiTextBuffer, ImGuiStorage, ImGuiListClipper, Math Operators, ImColor)
 // [SECTION] Multi-Select API flags and structures (ImGuiMultiSelectFlags, ImGuiMultiSelectIO, ImGuiSelectionRequest, ImGuiSelectionBasicStorage, ImGuiSelectionExternalStorage)
 // [SECTION] Drawing API (ImDrawCallback, ImDrawCmd, ImDrawIdx, ImDrawVert, ImDrawChannel, ImDrawListSplitter, ImDrawFlags, ImDrawListFlags, ImDrawList, ImDrawData)
-// [SECTION] Font API (ImFontConfig, ImFontGlyph, ImFontGlyphRangesBuilder, ImFontAtlasFlags, ImFontAtlas, ImFont)
+// [SECTION] Texture API (ImTextureFormat, ImTextureStatus, ImTextureRect, ImTextureData)
+// [SECTION] Font API (ImFontConfig, ImFontGlyph, ImFontGlyphRangesBuilder, ImFontAtlasFlags, ImFontAtlas, ImFontBaked, ImFont)
 // [SECTION] Viewports (ImGuiViewportFlags, ImGuiViewport)
 // [SECTION] ImGuiPlatformIO + other Platform Dependent Interfaces (ImGuiPlatformMonitor, ImGuiPlatformImeData)
 // [SECTION] Obsolete functions and types
@@ -151,36 +158,46 @@ extern "C"
 #endif // #if defined(__clang__)
 //-----------------------------------------------------------------------------
 // [SECTION] Forward declarations and basic types
-//-----------------------------------------------------------------------------
-
 // Auto-generated forward declarations for C header
 typedef struct ImVec2_t ImVec2;
 typedef struct ImVec4_t ImVec4;
-typedef struct ImVector_ImWchar_t ImVector_ImWchar;
-typedef struct ImVector_ImGuiTextFilter_ImGuiTextRange_t ImVector_ImGuiTextFilter_ImGuiTextRange;
+typedef struct ImTextureRef_t ImTextureRef;
+typedef struct ImVector_ImGuiTextRange_t ImVector_ImGuiTextRange;
 typedef struct ImVector_char_t ImVector_char;
 typedef struct ImVector_ImGuiStoragePair_t ImVector_ImGuiStoragePair;
 typedef struct ImVector_ImGuiSelectionRequest_t ImVector_ImGuiSelectionRequest;
+typedef struct ImVector_ImDrawChannel_t ImVector_ImDrawChannel;
 typedef struct ImVector_ImDrawCmd_t ImVector_ImDrawCmd;
 typedef struct ImVector_ImDrawIdx_t ImVector_ImDrawIdx;
-typedef struct ImVector_ImDrawChannel_t ImVector_ImDrawChannel;
 typedef struct ImVector_ImDrawVert_t ImVector_ImDrawVert;
 typedef struct ImVector_ImVec2_t ImVector_ImVec2;
 typedef struct ImVector_ImVec4_t ImVector_ImVec4;
-typedef struct ImVector_ImTextureID_t ImVector_ImTextureID;
+typedef struct ImVector_ImTextureRef_t ImVector_ImTextureRef;
 typedef struct ImVector_ImU8_t ImVector_ImU8;
 typedef struct ImVector_ImDrawListPtr_t ImVector_ImDrawListPtr;
+typedef struct ImVector_ImTextureRect_t ImVector_ImTextureRect;
 typedef struct ImVector_ImU32_t ImVector_ImU32;
+typedef struct ImVector_ImWchar_t ImVector_ImWchar;
 typedef struct ImVector_ImFontPtr_t ImVector_ImFontPtr;
-typedef struct ImVector_ImFontAtlasCustomRect_t ImVector_ImFontAtlasCustomRect;
 typedef struct ImVector_ImFontConfig_t ImVector_ImFontConfig;
+typedef struct ImVector_ImDrawListSharedDataPtr_t ImVector_ImDrawListSharedDataPtr;
 typedef struct ImVector_float_t ImVector_float;
+typedef struct ImVector_ImU16_t ImVector_ImU16;
 typedef struct ImVector_ImFontGlyph_t ImVector_ImFontGlyph;
+typedef struct ImVector_ImFontConfigPtr_t ImVector_ImFontConfigPtr;
 typedef struct ImVector_ImGuiPlatformMonitor_t ImVector_ImGuiPlatformMonitor;
+typedef struct ImVector_ImTextureDataPtr_t ImVector_ImTextureDataPtr;
 typedef struct ImVector_ImGuiViewportPtr_t ImVector_ImGuiViewportPtr;
 typedef struct ImGuiTextFilter_ImGuiTextRange_t ImGuiTextFilter_ImGuiTextRange;
 typedef struct ImDrawCmdHeader_t ImDrawCmdHeader;
-typedef struct ImFontAtlasCustomRect_t ImFontAtlasCustomRect;
+// ImDrawIdx: vertex index. [Compile-time configurable type]
+// - To use 16-bit indices + allow large meshes: backend need to set 'io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset' and handle ImDrawCmd::VtxOffset (recommended).
+// - To use 32-bit indices: override with '#define ImDrawIdx unsigned int' in your imconfig.h file.
+#ifndef ImDrawIdx
+typedef unsigned short ImDrawIdx;  // Default: 16-bit (for maximum compatibility with renderer backends)
+#endif // #ifndef ImDrawIdx
+//-----------------------------------------------------------------------------
+
 // Scalar data types
 typedef unsigned int ImGuiID;      // A unique ID used by widgets (typically the result of hashing a stack of string)
 typedef signed char ImS8;          // 8-bit signed integer
@@ -192,21 +209,28 @@ typedef unsigned int ImU32;        // 32-bit unsigned integer (often used to sto
 typedef signed long long ImS64;    // 64-bit signed integer
 typedef unsigned long long ImU64;  // 64-bit unsigned integer
 
-// Forward declarations
-typedef struct ImDrawChannel_t ImDrawChannel;                                  // Temporary storage to output draw commands out of order, used by ImDrawListSplitter and ImDrawList::ChannelsSplit()
-typedef struct ImDrawCmd_t ImDrawCmd;                                          // A single draw command within a parent ImDrawList (generally maps to 1 GPU draw call, unless it is a callback)
-typedef struct ImDrawData_t ImDrawData;                                        // All draw command lists required to render the frame + pos/size coordinates to use for the projection matrix.
-typedef struct ImDrawList_t ImDrawList;                                        // A single draw command list (generally one per window, conceptually you may see this as a dynamic "mesh" builder)
-typedef struct ImDrawListSharedData_t ImDrawListSharedData;                    // Data shared among multiple draw lists (typically owned by parent ImGui context, but you may create one yourself)
-typedef struct ImDrawListSplitter_t ImDrawListSplitter;                        // Helper to split a draw list into different layers which can be drawn into out of order, then flattened back.
-typedef struct ImDrawVert_t ImDrawVert;                                        // A single vertex (pos + uv + col = 20 bytes by default. Override layout with IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT)
-typedef struct ImFont_t ImFont;                                                // Runtime data for a single font within a parent ImFontAtlas
-typedef struct ImFontAtlas_t ImFontAtlas;                                      // Runtime data for multiple fonts, bake multiple fonts into a single texture, TTF/OTF font loader
-typedef struct ImFontBuilderIO_t ImFontBuilderIO;                              // Opaque interface to a font builder (stb_truetype or FreeType).
-typedef struct ImFontConfig_t ImFontConfig;                                    // Configuration data when adding a font or merging fonts
-typedef struct ImFontGlyph_t ImFontGlyph;                                      // A single font glyph (code point + coordinates within in ImFontAtlas + offset)
-typedef struct ImFontGlyphRangesBuilder_t ImFontGlyphRangesBuilder;            // Helper to build glyph ranges from text/string data
-typedef struct ImColor_t ImColor;                                              // Helper functions to create a color that can be converted to either u32 or float4 (*OBSOLETE* please avoid using)
+// Forward declarations: ImDrawList, ImFontAtlas layer
+typedef struct ImDrawChannel_t ImDrawChannel;                        // Temporary storage to output draw commands out of order, used by ImDrawListSplitter and ImDrawList::ChannelsSplit()
+typedef struct ImDrawCmd_t ImDrawCmd;                                // A single draw command within a parent ImDrawList (generally maps to 1 GPU draw call, unless it is a callback)
+typedef struct ImDrawData_t ImDrawData;                              // All draw command lists required to render the frame + pos/size coordinates to use for the projection matrix.
+typedef struct ImDrawList_t ImDrawList;                              // A single draw command list (generally one per window, conceptually you may see this as a dynamic "mesh" builder)
+typedef struct ImDrawListSharedData_t ImDrawListSharedData;          // Data shared among multiple draw lists (typically owned by parent ImGui context, but you may create one yourself)
+typedef struct ImDrawListSplitter_t ImDrawListSplitter;              // Helper to split a draw list into different layers which can be drawn into out of order, then flattened back.
+typedef struct ImDrawVert_t ImDrawVert;                              // A single vertex (pos + uv + col = 20 bytes by default. Override layout with IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT)
+typedef struct ImFont_t ImFont;                                      // Runtime data for a single font within a parent ImFontAtlas
+typedef struct ImFontAtlas_t ImFontAtlas;                            // Runtime data for multiple fonts, bake multiple fonts into a single texture, TTF/OTF font loader
+typedef struct ImFontAtlasBuilder_t ImFontAtlasBuilder;              // Opaque storage for building a ImFontAtlas
+typedef struct ImFontAtlasRect_t ImFontAtlasRect;                    // Output of ImFontAtlas::GetCustomRect() when using custom rectangles.
+typedef struct ImFontBaked_t ImFontBaked;                            // Baked data for a ImFont at a given size.
+typedef struct ImFontConfig_t ImFontConfig;                          // Configuration data when adding a font or merging fonts
+typedef struct ImFontGlyph_t ImFontGlyph;                            // A single font glyph (code point + coordinates within in ImFontAtlas + offset)
+typedef struct ImFontGlyphRangesBuilder_t ImFontGlyphRangesBuilder;  // Helper to build glyph ranges from text/string data
+typedef struct ImFontLoader_t ImFontLoader;                          // Opaque interface to a font loading backend (stb_truetype, FreeType etc.).
+typedef struct ImTextureData_t ImTextureData;                        // Specs and pixel storage for a texture used by Dear ImGui.
+typedef struct ImTextureRect_t ImTextureRect;                        // Coordinates of a rectangle within a texture.
+typedef struct ImColor_t ImColor;                                    // Helper functions to create a color that can be converted to either u32 or float4 (*OBSOLETE* please avoid using)
+
+// Forward declarations: ImGui layer
 typedef struct ImGuiContext_t ImGuiContext;                                    // Dear ImGui context (opaque structure, unless including imgui_internal.h)
 typedef struct ImGuiIO_t ImGuiIO;                                              // Main configuration and I/O between your application and ImGui (also see: ImGuiPlatformIO)
 typedef struct ImGuiInputTextCallbackData_t ImGuiInputTextCallbackData;        // Shared state of InputText() when using custom ImGuiInputTextCallback (rare/advanced use)
@@ -256,7 +280,8 @@ typedef int ImGuiTableBgTarget;   // -> enum ImGuiTableBgTarget_   // Enum: A co
 //   - In VS Code, CLion, etc.: CTRL+click can follow symbols inside comments.
 typedef int ImDrawFlags;            // -> enum ImDrawFlags_          // Flags: for ImDrawList functions
 typedef int ImDrawListFlags;        // -> enum ImDrawListFlags_      // Flags: for ImDrawList instance
-typedef int ImFontAtlasFlags;       // -> enum ImFontAtlasFlags_     // Flags: for ImFontAtlas build
+typedef int ImFontFlags;            // -> enum ImFontFlags_          // Flags: for ImFont
+typedef int ImFontAtlasFlags;       // -> enum ImFontAtlasFlags_     // Flags: for ImFontAtlas
 typedef int ImGuiBackendFlags;      // -> enum ImGuiBackendFlags_    // Flags: for io.BackendFlags
 typedef int ImGuiButtonFlags;       // -> enum ImGuiButtonFlags_     // Flags: for InvisibleButton()
 typedef int ImGuiChildFlags;        // -> enum ImGuiChildFlags_      // Flags: for BeginChild()
@@ -284,20 +309,6 @@ typedef int ImGuiTreeNodeFlags;     // -> enum ImGuiTreeNodeFlags_   // Flags: f
 typedef int ImGuiViewportFlags;     // -> enum ImGuiViewportFlags_   // Flags: for ImGuiViewport
 typedef int ImGuiWindowFlags;       // -> enum ImGuiWindowFlags_     // Flags: for Begin(), BeginChild()
 
-// ImTexture: user data for renderer backend to identify a texture [Compile-time configurable type]
-// - To use something else than an opaque void* pointer: override with e.g. '#define ImTextureID MyTextureType*' in your imconfig.h file.
-// - This can be whatever to you want it to be! read the FAQ about ImTextureID for details.
-// - You can make this a structure with various constructors if you need. You will have to implement ==/!= operators.
-// - (note: before v1.91.4 (2024/10/08) the default type for ImTextureID was void*. Use intermediary intptr_t cast and read FAQ if you have casting warnings)
-#ifndef ImTextureID
-typedef ImU64 ImTextureID;  // Default: store a pointer or an integer fitting in a pointer (most renderer backends are ok with that)
-#endif // #ifndef ImTextureID
-// ImDrawIdx: vertex index. [Compile-time configurable type]
-// - To use 16-bit indices + allow large meshes: backend need to set 'io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset' and handle ImDrawCmd::VtxOffset (recommended).
-// - To use 32-bit indices: override with '#define ImDrawIdx unsigned int' in your imconfig.h file.
-#ifndef ImDrawIdx
-typedef unsigned short ImDrawIdx;  // Default: 16-bit (for maximum compatibility with renderer backends)
-#endif // #ifndef ImDrawIdx
 // Character types
 // (we generally use UTF-8 encoded string in the API. This is storage specifically for a decoded character used for keyboard input and display)
 typedef unsigned int ImWchar32;        // A single decoded U32 character/code point. We encode them as multi bytes UTF-8 when used in strings.
@@ -335,6 +346,59 @@ struct ImVec4_t
 IM_MSVC_RUNTIME_CHECKS_RESTORE
 
 //-----------------------------------------------------------------------------
+// [SECTION] Texture identifiers (ImTextureID, ImTextureRef)
+//-----------------------------------------------------------------------------
+
+// ImTextureID = backend specific, low-level identifier for a texture uploaded in GPU/graphics system.
+// [Compile-time configurable type]
+// - When a Rendered Backend creates a texture, it store its native identifier into a ImTextureID value.
+//   (e.g. Used by DX11 backend to a `ID3D11ShaderResourceView*`; Used by OpenGL backends to store `GLuint`;
+//         Used by SDLGPU backend to store a `SDL_GPUTextureSamplerBinding*`, etc.).
+// - User may submit their own textures to e.g. ImGui::Image() function by passing this value.
+// - During the rendering loop, the Renderer Backend retrieve the ImTextureID, which stored inside a
+//   ImTextureRef, which is stored inside a ImDrawCmd.
+// - Compile-time type configuration:
+//   - To use something other than a 64-bit value: add '#define ImTextureID MyTextureType*' in your imconfig.h file.
+//   - This can be whatever to you want it to be! read the FAQ entry about textures for details.
+//   - You may decide to store a higher-level structure containing texture, sampler, shader etc. with various
+//     constructors if you like. You will need to implement ==/!= operators.
+// History:
+// - In v1.91.4 (2024/10/08): the default type for ImTextureID was changed from 'void*' to 'ImU64'. This allowed backends requirig 64-bit worth of data to build on 32-bit architectures. Use intermediary intptr_t cast and read FAQ if you have casting warnings.
+// - In v1.92.0 (2025/06/11): added ImTextureRef which carry either a ImTextureID either a pointer to internal texture atlas. All user facing functions taking ImTextureID changed to ImTextureRef
+#ifndef ImTextureID
+typedef ImU64 ImTextureID;  // Default: store up to 64-bits (any pointer or integer). A majority of backends are ok with that.
+#endif // #ifndef ImTextureID
+// Define this if you need 0 to be a valid ImTextureID for your backend.
+#ifndef ImTextureID_Invalid
+#define ImTextureID_Invalid     ((ImTextureID)0)
+#endif // #ifndef ImTextureID_Invalid
+// ImTextureRef = higher-level identifier for a texture. Store a ImTextureID _or_ a ImTextureData*.
+// The identifier is valid even before the texture has been uploaded to the GPU/graphics system.
+// This is what gets passed to functions such as `ImGui::Image()`, `ImDrawList::AddImage()`.
+// This is what gets stored in draw commands (`ImDrawCmd`) to identify a texture during rendering.
+// - When a texture is created by user code (e.g. custom images), we directly stores the low-level ImTextureID.
+//   Because of this, when displaying your own texture you are likely to ever only manage ImTextureID values on your side.
+// - When a texture is created by the backend, we stores a ImTextureData* which becomes an indirection
+//   to extract the ImTextureID value during rendering, after texture upload has happened.
+// - To create a ImTextureRef from a ImTextureData you can use ImTextureData::GetTexRef().
+//   We intentionally do not provide an ImTextureRef constructor for this: we don't expect this
+//   to be frequently useful to the end-user, and it would be erroneously called by many legacy code.
+// - If you want to bind the current atlas when using custom rectangle, you can use io.Fonts->TexRef.
+// - Binding generators for languages such as C (which don't have constructors), should provide a helper, e.g.
+//      inline ImTextureRef ImTextureRefFromID(ImTextureID tex_id) { ImTextureRef tex_ref = { ._TexData = NULL, .TexID = tex_id }; return tex_ref; }
+// In 1.92 we changed most drawing functions using ImTextureID to use ImTextureRef.
+// We intentionally do not provide an implicit ImTextureRef -> ImTextureID cast operator because it is technically lossy to convert ImTextureRef to ImTextureID before rendering.
+IM_MSVC_RUNTIME_CHECKS_OFF
+struct ImTextureRef_t
+{
+    // Members (either are set, never both!)
+    ImTextureData* _TexData;  //      A texture, generally owned by a ImFontAtlas. Will convert to ImTextureID during render loop, after texture has been uploaded.
+    ImTextureID    _TexID;    // _OR_ Low-level backend texture identifier, if already uploaded or created by user/app. Generally provided to e.g. ImGui::Image() calls.
+};
+CIMGUI_API ImTextureID ImTextureRef_GetTexID(const ImTextureRef* self);  // == (_TexData ? _TexData->TexID : _TexID) // Implemented below in the file.
+IM_MSVC_RUNTIME_CHECKS_RESTORE
+
+//-----------------------------------------------------------------------------
 // [SECTION] Dear ImGui end-user API functions
 // (Note that ImGui:: being a namespace, you can add extra ImGui:: functions in your own separate file. Please don't modify imgui source files!)
 //-----------------------------------------------------------------------------
@@ -355,7 +419,7 @@ CIMGUI_API ImGuiStyle*      igGetStyle(void);           // access the Style stru
 CIMGUI_API void             igNewFrame(void);           // start a new Dear ImGui frame, you can submit any command from this point until Render()/EndFrame().
 CIMGUI_API void             igEndFrame(void);           // ends the Dear ImGui frame. automatically called by Render(). If you don't need to render data (skipping rendering) you may call EndFrame() without Render()... but you'll have wasted CPU already! If you don't need to render, better to not create any windows and not call NewFrame() at all!
 CIMGUI_API void             igRender(void);             // ends the Dear ImGui frame, finalize the draw data. You can then get call GetDrawData().
-CIMGUI_API ImDrawData*      igGetDrawData(void);        // valid after Render() and until the next call to NewFrame(). this is what you have to render.
+CIMGUI_API ImDrawData*      igGetDrawData(void);        // valid after Render() and until the next call to NewFrame(). Call ImGui_ImplXXXX_RenderDrawData() function in your Renderer Backend to render.
 
 // Demo, Debug, Information
 CIMGUI_API void        igShowDemoWindow(bool* p_open /* = NULL */);               // create Demo window. demonstrate most ImGui features. call this to learn about the library! try to make it always available in your application!
@@ -442,7 +506,6 @@ CIMGUI_API void igSetWindowPos(ImVec2 pos, ImGuiCond cond /* = 0 */);           
 CIMGUI_API void igSetWindowSize(ImVec2 size, ImGuiCond cond /* = 0 */);                                             // (not recommended) set current window size - call within Begin()/End(). set to ImVec2(0, 0) to force an auto-fit. prefer using SetNextWindowSize(), as this may incur tearing and minor side-effects.
 CIMGUI_API void igSetWindowCollapsed(bool collapsed, ImGuiCond cond /* = 0 */);                                     // (not recommended) set current window collapsed state. prefer using SetNextWindowCollapsed().
 CIMGUI_API void igSetWindowFocus(void);                                                                             // (not recommended) set current window to be focused / top-most. prefer using SetNextWindowFocus().
-CIMGUI_API void igSetWindowFontScale(float scale);                                                                  // [OBSOLETE] set font scale. Adjust IO.FontGlobalScale if you want to scale all windows. This is an old API! For correct scaling, prefer to reload font + rebuild ImFontAtlas + call style.ScaleAllSizes().
 CIMGUI_API void igSetWindowPosStr(const char* name, ImVec2 pos, ImGuiCond cond /* = 0 */);                          // set named window position.
 CIMGUI_API void igSetWindowSizeStr(const char* name, ImVec2 size, ImGuiCond cond /* = 0 */);                        // set named window size. set axis to 0.0f to force an auto-fit on this axis.
 CIMGUI_API void igSetWindowCollapsedStr(const char* name, bool collapsed, ImGuiCond cond /* = 0 */);                // set named window collapsed state
@@ -462,9 +525,29 @@ CIMGUI_API void  igSetScrollHereY(float center_y_ratio /* = 0.5f */);           
 CIMGUI_API void  igSetScrollFromPosX(float local_x, float center_x_ratio /* = 0.5f */);      // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
 CIMGUI_API void  igSetScrollFromPosY(float local_y, float center_y_ratio /* = 0.5f */);      // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
 
+// Parameters stacks (font)
+//  - PushFont(font, 0.0f)                       // Change font and keep current size
+//  - PushFont(NULL, 20.0f)                      // Keep font and change current size
+//  - PushFont(font, 20.0f)                      // Change font and set size to 20.0f
+//  - PushFont(font, style.FontSizeBase * 2.0f)  // Change font and set size to be twice bigger than current size.
+//  - PushFont(font, font->LegacySize)           // Change font and set size to size passed to AddFontXXX() function. Same as pre-1.92 behavior.
+// *IMPORTANT* before 1.92, fonts had a single size. They can now be dynamically be adjusted.
+//  - In 1.92 we have REMOVED the single parameter version of PushFont() because it seems like the easiest way to provide an error-proof transition.
+//  - PushFont(font) before 1.92 = PushFont(font, font->LegacySize) after 1.92          // Use default font size as passed to AddFontXXX() function.
+// *IMPORTANT* global scale factors are applied over the provided size.
+//  - Global scale factors are: 'style.FontScaleMain', 'style.FontScaleDpi' and maybe more.
+// -  If you want to apply a factor to the _current_ font size:
+//  - CORRECT:   PushFont(NULL, style.FontSizeBase)         // use current unscaled size    == does nothing
+//  - CORRECT:   PushFont(NULL, style.FontSizeBase * 2.0f)  // use current unscaled size x2 == make text twice bigger
+//  - INCORRECT: PushFont(NULL, GetFontSize())              // INCORRECT! using size after global factors already applied == GLOBAL SCALING FACTORS WILL APPLY TWICE!
+//  - INCORRECT: PushFont(NULL, GetFontSize() * 2.0f)       // INCORRECT! using size after global factors already applied == GLOBAL SCALING FACTORS WILL APPLY TWICE!
+CIMGUI_API void         igPushFontFloat(ImFont* font, float font_size_base_unscaled);      // Use NULL as a shortcut to keep current font. Use 0.0f to keep current size.
+CIMGUI_API void         igPopFont(void);
+CIMGUI_API ImFont*      igGetFont(void);                                                   // get current font
+CIMGUI_API float        igGetFontSize(void);                                               // get current scaled font size (= height in pixels). AFTER global scale factors applied. *IMPORTANT* DO NOT PASS THIS VALUE TO PushFont()! Use ImGui::GetStyle().FontSizeBase to get value before global scale factors.
+CIMGUI_API ImFontBaked* igGetFontBaked(void);                                              // get current font bound at current size // == GetFont()->GetFontBaked(GetFontSize())
+
 // Parameters stacks (shared)
-CIMGUI_API void igPushFont(ImFont* font);                                 // use NULL as a shortcut to push default font
-CIMGUI_API void igPopFont(void);
 CIMGUI_API void igPushStyleColor(ImGuiCol idx, ImU32 col);                // modify a style color. always use this if you modify the style after NewFrame().
 CIMGUI_API void igPushStyleColorImVec4(ImGuiCol idx, ImVec4 col);
 CIMGUI_API void igPopStyleColor(void);                                    // Implied count = 1
@@ -488,8 +571,6 @@ CIMGUI_API void  igPopTextWrapPos(void);
 
 // Style read access
 // - Use the ShowStyleEditor() function to interactively see/edit the colors.
-CIMGUI_API ImFont*       igGetFont(void);                                                    // get current font
-CIMGUI_API float         igGetFontSize(void);                                                // get current font size (= height in pixels) of current font with current scale applied
 CIMGUI_API ImVec2        igGetFontTexUvWhitePixel(void);                                     // get UV coordinate for a white pixel, useful to draw custom shapes via the ImDrawList API
 CIMGUI_API ImU32         igGetColorU32(ImGuiCol idx);                                        // Implied alpha_mul = 1.0f
 CIMGUI_API ImU32         igGetColorU32Ex(ImGuiCol idx, float alpha_mul /* = 1.0f */);        // retrieve given style color with style alpha applied and optional extra alpha multiplier, packed as a 32-bit value suitable for ImDrawList
@@ -574,7 +655,7 @@ CIMGUI_API void igLabelText(const char* label, const char* fmt, ...) IM_FMTARGS(
 CIMGUI_API void igLabelTextV(const char* label, const char* fmt, va_list args) IM_FMTLIST(2);
 CIMGUI_API void igBulletText(const char* fmt, ...) IM_FMTARGS(1);                                  // shortcut for Bullet()+Text()
 CIMGUI_API void igBulletTextV(const char* fmt, va_list args) IM_FMTLIST(1);
-CIMGUI_API void igSeparatorText(const char* label);                                                // currently: formatted text with an horizontal line
+CIMGUI_API void igSeparatorText(const char* label);                                                // currently: formatted text with a horizontal line
 
 // Widgets: Main
 // - Most widgets return true when the value has been changed or when pressed/selected
@@ -592,18 +673,21 @@ CIMGUI_API bool igRadioButtonIntPtr(const char* label, int* v, int v_button);   
 CIMGUI_API void igProgressBar(float fraction, ImVec2 size_arg /* = ImVec2(-FLT_MIN, 0) */, const char* overlay /* = NULL */);
 CIMGUI_API void igBullet(void);                                                                                // draw a small circle + keep the cursor on the same line. advance cursor x position by GetTreeNodeToLabelSpacing(), same distance that TreeNode() uses
 CIMGUI_API bool igTextLink(const char* label);                                                                 // hyperlink text button, return true when clicked
-CIMGUI_API void igTextLinkOpenURL(const char* label);                                                          // Implied url = NULL
-CIMGUI_API void igTextLinkOpenURLEx(const char* label, const char* url /* = NULL */);                          // hyperlink text button, automatically open file/url when clicked
+CIMGUI_API bool igTextLinkOpenURL(const char* label);                                                          // Implied url = NULL
+CIMGUI_API bool igTextLinkOpenURLEx(const char* label, const char* url /* = NULL */);                          // hyperlink text button, automatically open file/url when clicked
 
 // Widgets: Images
-// - Read about ImTextureID here: https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
+// - Read about ImTextureID/ImTextureRef  here: https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
 // - 'uv0' and 'uv1' are texture coordinates. Read about them from the same link above.
-// - Note that Image() may add +2.0f to provided size if a border is visible, ImageButton() adds style.FramePadding*2.0f to provided size.
+// - Image() pads adds style.ImageBorderSize on each side, ImageButton() adds style.FramePadding on each side.
 // - ImageButton() draws a background based on regular Button() color + optionally an inner background if specified.
-CIMGUI_API void igImage(ImTextureID user_texture_id, ImVec2 image_size);                                // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), tint_col = ImVec4(1, 1, 1, 1), border_col = ImVec4(0, 0, 0, 0)
-CIMGUI_API void igImageEx(ImTextureID user_texture_id, ImVec2 image_size, ImVec2 uv0 /* = ImVec2(0, 0) */, ImVec2 uv1 /* = ImVec2(1, 1) */, ImVec4 tint_col /* = ImVec4(1, 1, 1, 1) */, ImVec4 border_col /* = ImVec4(0, 0, 0, 0) */);
-CIMGUI_API bool igImageButton(const char* str_id, ImTextureID user_texture_id, ImVec2 image_size);      // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), bg_col = ImVec4(0, 0, 0, 0), tint_col = ImVec4(1, 1, 1, 1)
-CIMGUI_API bool igImageButtonEx(const char* str_id, ImTextureID user_texture_id, ImVec2 image_size, ImVec2 uv0 /* = ImVec2(0, 0) */, ImVec2 uv1 /* = ImVec2(1, 1) */, ImVec4 bg_col /* = ImVec4(0, 0, 0, 0) */, ImVec4 tint_col /* = ImVec4(1, 1, 1, 1) */);
+// - An obsolete version of Image(), before 1.91.9 (March 2025), had a 'tint_col' parameter which is now supported by the ImageWithBg() function.
+CIMGUI_API void igImage(ImTextureRef tex_ref, ImVec2 image_size);                                                                          // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1)
+CIMGUI_API void igImageEx(ImTextureRef tex_ref, ImVec2 image_size, ImVec2 uv0 /* = ImVec2(0, 0) */, ImVec2 uv1 /* = ImVec2(1, 1) */);
+CIMGUI_API void igImageWithBg(ImTextureRef tex_ref, ImVec2 image_size);                                                                    // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), bg_col = ImVec4(0, 0, 0, 0), tint_col = ImVec4(1, 1, 1, 1)
+CIMGUI_API void igImageWithBgEx(ImTextureRef tex_ref, ImVec2 image_size, ImVec2 uv0 /* = ImVec2(0, 0) */, ImVec2 uv1 /* = ImVec2(1, 1) */, ImVec4 bg_col /* = ImVec4(0, 0, 0, 0) */, ImVec4 tint_col /* = ImVec4(1, 1, 1, 1) */);
+CIMGUI_API bool igImageButton(const char* str_id, ImTextureRef tex_ref, ImVec2 image_size);                                                // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), bg_col = ImVec4(0, 0, 0, 0), tint_col = ImVec4(1, 1, 1, 1)
+CIMGUI_API bool igImageButtonEx(const char* str_id, ImTextureRef tex_ref, ImVec2 image_size, ImVec2 uv0 /* = ImVec2(0, 0) */, ImVec2 uv1 /* = ImVec2(1, 1) */, ImVec4 bg_col /* = ImVec4(0, 0, 0, 0) */, ImVec4 tint_col /* = ImVec4(1, 1, 1, 1) */);
 
 // Widgets: Combo Box (Dropdown)
 // - The BeginCombo()/EndCombo() api allows you to manage your contents and selection state however you want it, by creating e.g. Selectable() items.
@@ -775,7 +859,7 @@ CIMGUI_API bool                igIsItemToggledSelection(void);                  
 // - This is essentially a thin wrapper to using BeginChild/EndChild with the ImGuiChildFlags_FrameStyle flag for stylistic changes + displaying a label.
 // - If you don't need a label you can probably simply use BeginChild() with the ImGuiChildFlags_FrameStyle flag for the same result.
 // - You can submit contents and manage your selection state however you want it, by creating e.g. Selectable() or any other items.
-// - The simplified/old ListBox() api are helpers over BeginListBox()/EndListBox() which are kept available for convenience purpose. This is analoguous to how Combos are created.
+// - The simplified/old ListBox() api are helpers over BeginListBox()/EndListBox() which are kept available for convenience purpose. This is analogous to how Combos are created.
 // - Choose frame width:   size.x > 0.0f: custom  /  size.x < 0.0f or -FLT_MIN: right-align   /  size.x = 0.0f (default): use current ItemWidth
 // - Choose frame height:  size.y > 0.0f: custom  /  size.y < 0.0f or -FLT_MIN: bottom-align  /  size.y = 0.0f (default): arbitrary default height which can fit ~7 items
 CIMGUI_API bool igBeginListBox(const char* label, ImVec2 size /* = ImVec2(0, 0) */);                                                                             // open a framed scrolling region
@@ -926,7 +1010,7 @@ CIMGUI_API void igTableAngledHeadersRow(void);                                  
 CIMGUI_API ImGuiTableSortSpecs*  igTableGetSortSpecs(void);                           // get latest sort specs for the table (NULL if not sorting).  Lifetime: don't hold on this pointer over multiple frames or past any subsequent call to BeginTable().
 CIMGUI_API int                   igTableGetColumnCount(void);                         // return number of columns (value passed to BeginTable)
 CIMGUI_API int                   igTableGetColumnIndex(void);                         // return current column index.
-CIMGUI_API int                   igTableGetRowIndex(void);                            // return current row index.
+CIMGUI_API int                   igTableGetRowIndex(void);                            // return current row index (header rows are accounted for)
 CIMGUI_API const char*           igTableGetColumnName(int column_n /* = -1 */);       // return "" if column didn't have a name declared by TableSetupColumn(). Pass -1 to use current column.
 CIMGUI_API ImGuiTableColumnFlags igTableGetColumnFlags(int column_n /* = -1 */);      // return column flags so you can query their Enabled/Visible/Sorted/Hovered status flags. Pass -1 to use current column.
 CIMGUI_API void                  igTableSetColumnEnabled(int column_n, bool v);       // change user accessible enabled/disabled state of a column. Set to false to hide the column. User can use the context menu to change this themselves (right-click in headers, or right-click in columns body with ImGuiTableFlags_ContextMenuInBody)
@@ -1013,7 +1097,7 @@ CIMGUI_API void igPushClipRect(ImVec2 clip_rect_min, ImVec2 clip_rect_max, bool 
 CIMGUI_API void igPopClipRect(void);
 
 // Focus, Activation
-CIMGUI_API void igSetItemDefaultFocus(void);                         // make last item the default focused item of of a newly appearing window.
+CIMGUI_API void igSetItemDefaultFocus(void);                         // make last item the default focused item of a newly appearing window.
 CIMGUI_API void igSetKeyboardFocusHere(void);                        // Implied offset = 0
 CIMGUI_API void igSetKeyboardFocusHereEx(int offset /* = 0 */);      // focus keyboard on the next widget. Use positive 'offset' to access sub components of a multiple component widget. Use -1 to access previous widget.
 
@@ -1087,7 +1171,7 @@ CIMGUI_API bool        igIsKeyPressedEx(ImGuiKey key, bool repeat /* = true */);
 CIMGUI_API bool        igIsKeyReleased(ImGuiKey key);                                            // was key released (went from Down to !Down)?
 CIMGUI_API bool        igIsKeyChordPressed(ImGuiKeyChord key_chord);                             // was key chord (mods + key) pressed, e.g. you can pass 'ImGuiMod_Ctrl | ImGuiKey_S' as a key-chord. This doesn't do any routing or focus check, please consider using Shortcut() function instead.
 CIMGUI_API int         igGetKeyPressedAmount(ImGuiKey key, float repeat_delay, float rate);      // uses provided repeat rate/delay. return a count, most often 0 or 1 but might be >1 if RepeatRate is small enough that DeltaTime > RepeatRate
-CIMGUI_API const char* igGetKeyName(ImGuiKey key);                                               // [DEBUG] returns English name of the key. Those names a provided for debugging purpose and are not meant to be saved persistently not compared.
+CIMGUI_API const char* igGetKeyName(ImGuiKey key);                                               // [DEBUG] returns English name of the key. Those names are provided for debugging purpose and are not meant to be saved persistently nor compared.
 CIMGUI_API void        igSetNextFrameWantCaptureKeyboard(bool want_capture_keyboard);            // Override io.WantCaptureKeyboard flag next frame (said flag is left for your application to handle, typically when true it instructs your app to ignore inputs). e.g. force capture keyboard when your widget is being hovered. This is equivalent to setting "io.WantCaptureKeyboard = want_capture_keyboard"; after the next NewFrame() call.
 
 // Inputs Utilities: Shortcut Testing & Routing [BETA]
@@ -1125,6 +1209,7 @@ CIMGUI_API bool             igIsMouseClicked(ImGuiMouseButton button);          
 CIMGUI_API bool             igIsMouseClickedEx(ImGuiMouseButton button, bool repeat /* = false */);              // did mouse button clicked? (went from !Down to Down). Same as GetMouseClickedCount() == 1.
 CIMGUI_API bool             igIsMouseReleased(ImGuiMouseButton button);                                          // did mouse button released? (went from Down to !Down)
 CIMGUI_API bool             igIsMouseDoubleClicked(ImGuiMouseButton button);                                     // did mouse button double-clicked? Same as GetMouseClickedCount() == 2. (note that a double-click will also report IsMouseClicked() == true)
+CIMGUI_API bool             igIsMouseReleasedWithDelay(ImGuiMouseButton button, float delay);                    // delayed mouse release (use very sparingly!). Generally used with 'delay >= io.MouseDoubleClickTime' + combined with a 'io.MouseClickedLastCount==1' test. This is a very rarely used UI idiom, but some apps use this: e.g. MS Explorer single click on an icon to rename.
 CIMGUI_API int              igGetMouseClickedCount(ImGuiMouseButton button);                                     // return the number of successive mouse-clicks at the time where a click happen (otherwise 0).
 CIMGUI_API bool             igIsMouseHoveringRect(ImVec2 r_min, ImVec2 r_max);                                   // Implied clip = true
 CIMGUI_API bool             igIsMouseHoveringRectEx(ImVec2 r_min, ImVec2 r_max, bool clip /* = true */);         // is mouse hovering given bounding rect (in screen space). clipped by current clipping settings, but disregarding of other consideration of focus/window ordering/popup-block.
@@ -1138,7 +1223,7 @@ CIMGUI_API void             igResetMouseDragDelta(void);                        
 CIMGUI_API void             igResetMouseDragDeltaEx(ImGuiMouseButton button /* = 0 */);                          //
 CIMGUI_API ImGuiMouseCursor igGetMouseCursor(void);                                                              // get desired mouse cursor shape. Important: reset in ImGui::NewFrame(), this is updated during the frame. valid before Render(). If you use software rendering by setting io.MouseDrawCursor ImGui will render those for you
 CIMGUI_API void             igSetMouseCursor(ImGuiMouseCursor cursor_type);                                      // set desired mouse cursor shape
-CIMGUI_API void             igSetNextFrameWantCaptureMouse(bool want_capture_mouse);                             // Override io.WantCaptureMouse flag next frame (said flag is left for your application to handle, typical when true it instucts your app to ignore inputs). This is equivalent to setting "io.WantCaptureMouse = want_capture_mouse;" after the next NewFrame() call.
+CIMGUI_API void             igSetNextFrameWantCaptureMouse(bool want_capture_mouse);                             // Override io.WantCaptureMouse flag next frame (said flag is left for your application to handle, typical when true it instructs your app to ignore inputs). This is equivalent to setting "io.WantCaptureMouse = want_capture_mouse;" after the next NewFrame() call.
 
 // Clipboard Utilities
 // - Also see the LogToClipboard() function to capture GUI into clipboard, or easily output text data to the clipboard.
@@ -1217,12 +1302,12 @@ typedef enum
     ImGuiWindowFlags_NoInputs                  = ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus,
 
     // [Internal]
+    ImGuiWindowFlags_DockNodeHost              = 1<<23,  // Don't use! For internal use by Begin()/NewFrame()
     ImGuiWindowFlags_ChildWindow               = 1<<24,  // Don't use! For internal use by BeginChild()
     ImGuiWindowFlags_Tooltip                   = 1<<25,  // Don't use! For internal use by BeginTooltip()
     ImGuiWindowFlags_Popup                     = 1<<26,  // Don't use! For internal use by BeginPopup()
     ImGuiWindowFlags_Modal                     = 1<<27,  // Don't use! For internal use by BeginPopupModal()
     ImGuiWindowFlags_ChildMenu                 = 1<<28,  // Don't use! For internal use by BeginMenu()
-    ImGuiWindowFlags_DockNodeHost              = 1<<29,  // Don't use! For internal use by Begin()/NewFrame()
 
     // Obsolete names
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
@@ -1319,29 +1404,36 @@ typedef enum
 typedef enum
 {
     ImGuiTreeNodeFlags_None                 = 0,
-    ImGuiTreeNodeFlags_Selected             = 1<<0,                               // Draw as selected
-    ImGuiTreeNodeFlags_Framed               = 1<<1,                               // Draw frame with background (e.g. for CollapsingHeader)
-    ImGuiTreeNodeFlags_AllowOverlap         = 1<<2,                               // Hit testing to allow subsequent widgets to overlap this one
-    ImGuiTreeNodeFlags_NoTreePushOnOpen     = 1<<3,                               // Don't do a TreePush() when open (e.g. for CollapsingHeader) = no extra indent nor pushing on ID stack
-    ImGuiTreeNodeFlags_NoAutoOpenOnLog      = 1<<4,                               // Don't automatically and temporarily open node when Logging is active (by default logging will automatically open tree nodes)
-    ImGuiTreeNodeFlags_DefaultOpen          = 1<<5,                               // Default node to be open
-    ImGuiTreeNodeFlags_OpenOnDoubleClick    = 1<<6,                               // Open on double-click instead of simple click (default for multi-select unless any _OpenOnXXX behavior is set explicitly). Both behaviors may be combined.
-    ImGuiTreeNodeFlags_OpenOnArrow          = 1<<7,                               // Open when clicking on the arrow part (default for multi-select unless any _OpenOnXXX behavior is set explicitly). Both behaviors may be combined.
-    ImGuiTreeNodeFlags_Leaf                 = 1<<8,                               // No collapsing, no arrow (use as a convenience for leaf nodes).
-    ImGuiTreeNodeFlags_Bullet               = 1<<9,                               // Display a bullet instead of arrow. IMPORTANT: node can still be marked open/close if you don't set the _Leaf flag!
-    ImGuiTreeNodeFlags_FramePadding         = 1<<10,                              // Use FramePadding (even for an unframed text node) to vertically align text baseline to regular widget height. Equivalent to calling AlignTextToFramePadding() before the node.
-    ImGuiTreeNodeFlags_SpanAvailWidth       = 1<<11,                              // Extend hit box to the right-most edge, even if not framed. This is not the default in order to allow adding other items on the same line without using AllowOverlap mode.
-    ImGuiTreeNodeFlags_SpanFullWidth        = 1<<12,                              // Extend hit box to the left-most and right-most edges (cover the indent area).
-    ImGuiTreeNodeFlags_SpanLabelWidth       = 1<<13,                              // Narrow hit box + narrow hovering highlight, will only cover the label text.
-    ImGuiTreeNodeFlags_SpanAllColumns       = 1<<14,                              // Frame will span all columns of its container table (label will still fit in current column)
-    ImGuiTreeNodeFlags_LabelSpanAllColumns  = 1<<15,                              // Label will span all columns of its container table
+    ImGuiTreeNodeFlags_Selected             = 1<<0,                                     // Draw as selected
+    ImGuiTreeNodeFlags_Framed               = 1<<1,                                     // Draw frame with background (e.g. for CollapsingHeader)
+    ImGuiTreeNodeFlags_AllowOverlap         = 1<<2,                                     // Hit testing to allow subsequent widgets to overlap this one
+    ImGuiTreeNodeFlags_NoTreePushOnOpen     = 1<<3,                                     // Don't do a TreePush() when open (e.g. for CollapsingHeader) = no extra indent nor pushing on ID stack
+    ImGuiTreeNodeFlags_NoAutoOpenOnLog      = 1<<4,                                     // Don't automatically and temporarily open node when Logging is active (by default logging will automatically open tree nodes)
+    ImGuiTreeNodeFlags_DefaultOpen          = 1<<5,                                     // Default node to be open
+    ImGuiTreeNodeFlags_OpenOnDoubleClick    = 1<<6,                                     // Open on double-click instead of simple click (default for multi-select unless any _OpenOnXXX behavior is set explicitly). Both behaviors may be combined.
+    ImGuiTreeNodeFlags_OpenOnArrow          = 1<<7,                                     // Open when clicking on the arrow part (default for multi-select unless any _OpenOnXXX behavior is set explicitly). Both behaviors may be combined.
+    ImGuiTreeNodeFlags_Leaf                 = 1<<8,                                     // No collapsing, no arrow (use as a convenience for leaf nodes).
+    ImGuiTreeNodeFlags_Bullet               = 1<<9,                                     // Display a bullet instead of arrow. IMPORTANT: node can still be marked open/close if you don't set the _Leaf flag!
+    ImGuiTreeNodeFlags_FramePadding         = 1<<10,                                    // Use FramePadding (even for an unframed text node) to vertically align text baseline to regular widget height. Equivalent to calling AlignTextToFramePadding() before the node.
+    ImGuiTreeNodeFlags_SpanAvailWidth       = 1<<11,                                    // Extend hit box to the right-most edge, even if not framed. This is not the default in order to allow adding other items on the same line without using AllowOverlap mode.
+    ImGuiTreeNodeFlags_SpanFullWidth        = 1<<12,                                    // Extend hit box to the left-most and right-most edges (cover the indent area).
+    ImGuiTreeNodeFlags_SpanLabelWidth       = 1<<13,                                    // Narrow hit box + narrow hovering highlight, will only cover the label text.
+    ImGuiTreeNodeFlags_SpanAllColumns       = 1<<14,                                    // Frame will span all columns of its container table (label will still fit in current column)
+    ImGuiTreeNodeFlags_LabelSpanAllColumns  = 1<<15,                                    // Label will span all columns of its container table
     //ImGuiTreeNodeFlags_NoScrollOnOpen     = 1 << 16,  // FIXME: TODO: Disable automatic scroll on TreePop() if node got just open and contents is not visible
-    ImGuiTreeNodeFlags_NavLeftJumpsBackHere = 1<<17,                              // (WIP) Nav: left direction may move to this TreeNode() from any of its child (items submitted between TreeNode and TreePop)
+    ImGuiTreeNodeFlags_NavLeftJumpsToParent = 1<<17,                                    // Nav: left arrow moves back to parent. This is processed in TreePop() when there's an unfullfilled Left nav request remaining.
     ImGuiTreeNodeFlags_CollapsingHeader     = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog,
 
+    // [EXPERIMENTAL] Draw lines connecting TreeNode hierarchy. Discuss in GitHub issue #2920.
+    // Default value is pulled from style.TreeLinesFlags. May be overridden in TreeNode calls.
+    ImGuiTreeNodeFlags_DrawLinesNone        = 1<<18,                                    // No lines drawn
+    ImGuiTreeNodeFlags_DrawLinesFull        = 1<<19,                                    // Horizontal lines to child nodes. Vertical line drawn down to TreePop() position: cover full contents. Faster (for large trees).
+    ImGuiTreeNodeFlags_DrawLinesToNodes     = 1<<20,                                    // Horizontal lines to child nodes. Vertical line drawn down to bottom-most child node. Slower (for large trees).
+
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-    ImGuiTreeNodeFlags_AllowItemOverlap     = ImGuiTreeNodeFlags_AllowOverlap,    // Renamed in 1.89.7
-    ImGuiTreeNodeFlags_SpanTextWidth        = ImGuiTreeNodeFlags_SpanLabelWidth,  // Renamed in 1.90.7
+    ImGuiTreeNodeFlags_NavLeftJumpsBackHere = ImGuiTreeNodeFlags_NavLeftJumpsToParent,  // Renamed in 1.92.0
+    ImGuiTreeNodeFlags_SpanTextWidth        = ImGuiTreeNodeFlags_SpanLabelWidth,        // Renamed in 1.90.7
+    ImGuiTreeNodeFlags_AllowItemOverlap     = ImGuiTreeNodeFlags_AllowOverlap,          // Renamed in 1.89.7
 #endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 } ImGuiTreeNodeFlags_;
 
@@ -1406,17 +1498,24 @@ typedef enum
 typedef enum
 {
     ImGuiTabBarFlags_None                         = 0,
-    ImGuiTabBarFlags_Reorderable                  = 1<<0,  // Allow manually dragging tabs to re-order them + New tabs are appended at the end of list
-    ImGuiTabBarFlags_AutoSelectNewTabs            = 1<<1,  // Automatically select new tabs when they appear
-    ImGuiTabBarFlags_TabListPopupButton           = 1<<2,  // Disable buttons to open the tab list popup
-    ImGuiTabBarFlags_NoCloseWithMiddleMouseButton = 1<<3,  // Disable behavior of closing tabs (that are submitted with p_open != NULL) with middle mouse button. You may handle this behavior manually on user's side with if (IsItemHovered() && IsMouseClicked(2)) *p_open = false.
-    ImGuiTabBarFlags_NoTabListScrollingButtons    = 1<<4,  // Disable scrolling buttons (apply when fitting policy is ImGuiTabBarFlags_FittingPolicyScroll)
-    ImGuiTabBarFlags_NoTooltip                    = 1<<5,  // Disable tooltips when hovering a tab
-    ImGuiTabBarFlags_DrawSelectedOverline         = 1<<6,  // Draw selected overline markers over selected tab
-    ImGuiTabBarFlags_FittingPolicyResizeDown      = 1<<7,  // Resize tabs when they don't fit
-    ImGuiTabBarFlags_FittingPolicyScroll          = 1<<8,  // Add scroll buttons when tabs don't fit
-    ImGuiTabBarFlags_FittingPolicyMask_           = ImGuiTabBarFlags_FittingPolicyResizeDown | ImGuiTabBarFlags_FittingPolicyScroll,
-    ImGuiTabBarFlags_FittingPolicyDefault_        = ImGuiTabBarFlags_FittingPolicyResizeDown,
+    ImGuiTabBarFlags_Reorderable                  = 1<<0,                                  // Allow manually dragging tabs to re-order them + New tabs are appended at the end of list
+    ImGuiTabBarFlags_AutoSelectNewTabs            = 1<<1,                                  // Automatically select new tabs when they appear
+    ImGuiTabBarFlags_TabListPopupButton           = 1<<2,                                  // Disable buttons to open the tab list popup
+    ImGuiTabBarFlags_NoCloseWithMiddleMouseButton = 1<<3,                                  // Disable behavior of closing tabs (that are submitted with p_open != NULL) with middle mouse button. You may handle this behavior manually on user's side with if (IsItemHovered() && IsMouseClicked(2)) *p_open = false.
+    ImGuiTabBarFlags_NoTabListScrollingButtons    = 1<<4,                                  // Disable scrolling buttons (apply when fitting policy is ImGuiTabBarFlags_FittingPolicyScroll)
+    ImGuiTabBarFlags_NoTooltip                    = 1<<5,                                  // Disable tooltips when hovering a tab
+    ImGuiTabBarFlags_DrawSelectedOverline         = 1<<6,                                  // Draw selected overline markers over selected tab
+
+    // Fitting/Resize policy
+    ImGuiTabBarFlags_FittingPolicyMixed           = 1<<7,                                  // Shrink down tabs when they don't fit, until width is style.TabMinWidthShrink, then enable scrolling buttons.
+    ImGuiTabBarFlags_FittingPolicyShrink          = 1<<8,                                  // Shrink down tabs when they don't fit
+    ImGuiTabBarFlags_FittingPolicyScroll          = 1<<9,                                  // Enable scrolling buttons when tabs don't fit
+    ImGuiTabBarFlags_FittingPolicyMask_           = ImGuiTabBarFlags_FittingPolicyMixed | ImGuiTabBarFlags_FittingPolicyShrink | ImGuiTabBarFlags_FittingPolicyScroll,
+    ImGuiTabBarFlags_FittingPolicyDefault_        = ImGuiTabBarFlags_FittingPolicyMixed,
+
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    ImGuiTabBarFlags_FittingPolicyResizeDown      = ImGuiTabBarFlags_FittingPolicyShrink,  // Renamed in 1.92.2
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 } ImGuiTabBarFlags_;
 
 // Flags for ImGui::BeginTabItem()
@@ -1602,7 +1701,7 @@ enum                                                   // Forward declared enum 
     ImGuiKey_LeftCtrl,
     ImGuiKey_LeftShift,
     ImGuiKey_LeftAlt,
-    ImGuiKey_LeftSuper,
+    ImGuiKey_LeftSuper,                                    // Also see ImGuiMod_Ctrl, ImGuiMod_Shift, ImGuiMod_Alt, ImGuiMod_Super below!
     ImGuiKey_RightCtrl,
     ImGuiKey_RightShift,
     ImGuiKey_RightAlt,
@@ -1703,33 +1802,36 @@ enum                                                   // Forward declared enum 
     ImGuiKey_KeypadEqual,
     ImGuiKey_AppBack,                                      // Available on some keyboard/mouses. Often referred as "Browser Back"
     ImGuiKey_AppForward,
+    ImGuiKey_Oem102,                                       // Non-US backslash.
 
-    // Gamepad (some of those are analog values, 0.0f to 1.0f)                          // NAVIGATION ACTION
+    // Gamepad
+    // (analog values are 0.0f to 1.0f)
     // (download controller mapping PNG/PSD at http://dearimgui.com/controls_sheets)
-    ImGuiKey_GamepadStart,                                 // Menu (Xbox)      + (Switch)   Start/Options (PS)
-    ImGuiKey_GamepadBack,                                  // View (Xbox)      - (Switch)   Share (PS)
-    ImGuiKey_GamepadFaceLeft,                              // X (Xbox)         Y (Switch)   Square (PS)        // Tap: Toggle Menu. Hold: Windowing mode (Focus/Move/Resize windows)
-    ImGuiKey_GamepadFaceRight,                             // B (Xbox)         A (Switch)   Circle (PS)        // Cancel / Close / Exit
-    ImGuiKey_GamepadFaceUp,                                // Y (Xbox)         X (Switch)   Triangle (PS)      // Text Input / On-screen Keyboard
-    ImGuiKey_GamepadFaceDown,                              // A (Xbox)         B (Switch)   Cross (PS)         // Activate / Open / Toggle / Tweak
-    ImGuiKey_GamepadDpadLeft,                              // D-pad Left                                       // Move / Tweak / Resize Window (in Windowing mode)
-    ImGuiKey_GamepadDpadRight,                             // D-pad Right                                      // Move / Tweak / Resize Window (in Windowing mode)
-    ImGuiKey_GamepadDpadUp,                                // D-pad Up                                         // Move / Tweak / Resize Window (in Windowing mode)
-    ImGuiKey_GamepadDpadDown,                              // D-pad Down                                       // Move / Tweak / Resize Window (in Windowing mode)
-    ImGuiKey_GamepadL1,                                    // L Bumper (Xbox)  L (Switch)   L1 (PS)            // Tweak Slower / Focus Previous (in Windowing mode)
-    ImGuiKey_GamepadR1,                                    // R Bumper (Xbox)  R (Switch)   R1 (PS)            // Tweak Faster / Focus Next (in Windowing mode)
-    ImGuiKey_GamepadL2,                                    // L Trig. (Xbox)   ZL (Switch)  L2 (PS) [Analog]
-    ImGuiKey_GamepadR2,                                    // R Trig. (Xbox)   ZR (Switch)  R2 (PS) [Analog]
-    ImGuiKey_GamepadL3,                                    // L Stick (Xbox)   L3 (Switch)  L3 (PS)
-    ImGuiKey_GamepadR3,                                    // R Stick (Xbox)   R3 (Switch)  R3 (PS)
-    ImGuiKey_GamepadLStickLeft,                            // [Analog]                                         // Move Window (in Windowing mode)
-    ImGuiKey_GamepadLStickRight,                           // [Analog]                                         // Move Window (in Windowing mode)
-    ImGuiKey_GamepadLStickUp,                              // [Analog]                                         // Move Window (in Windowing mode)
-    ImGuiKey_GamepadLStickDown,                            // [Analog]                                         // Move Window (in Windowing mode)
-    ImGuiKey_GamepadRStickLeft,                            // [Analog]
-    ImGuiKey_GamepadRStickRight,                           // [Analog]
-    ImGuiKey_GamepadRStickUp,                              // [Analog]
-    ImGuiKey_GamepadRStickDown,                            // [Analog]
+    //                              // XBOX        | SWITCH  | PLAYSTA. | -> ACTION
+    ImGuiKey_GamepadStart,                                 // Menu        | +       | Options  |
+    ImGuiKey_GamepadBack,                                  // View        | -       | Share    |
+    ImGuiKey_GamepadFaceLeft,                              // X           | Y       | Square   | Tap: Toggle Menu. Hold: Windowing mode (Focus/Move/Resize windows)
+    ImGuiKey_GamepadFaceRight,                             // B           | A       | Circle   | Cancel / Close / Exit
+    ImGuiKey_GamepadFaceUp,                                // Y           | X       | Triangle | Text Input / On-screen Keyboard
+    ImGuiKey_GamepadFaceDown,                              // A           | B       | Cross    | Activate / Open / Toggle / Tweak
+    ImGuiKey_GamepadDpadLeft,                              // D-pad Left  | "       | "        | Move / Tweak / Resize Window (in Windowing mode)
+    ImGuiKey_GamepadDpadRight,                             // D-pad Right | "       | "        | Move / Tweak / Resize Window (in Windowing mode)
+    ImGuiKey_GamepadDpadUp,                                // D-pad Up    | "       | "        | Move / Tweak / Resize Window (in Windowing mode)
+    ImGuiKey_GamepadDpadDown,                              // D-pad Down  | "       | "        | Move / Tweak / Resize Window (in Windowing mode)
+    ImGuiKey_GamepadL1,                                    // L Bumper    | L       | L1       | Tweak Slower / Focus Previous (in Windowing mode)
+    ImGuiKey_GamepadR1,                                    // R Bumper    | R       | R1       | Tweak Faster / Focus Next (in Windowing mode)
+    ImGuiKey_GamepadL2,                                    // L Trigger   | ZL      | L2       | [Analog]
+    ImGuiKey_GamepadR2,                                    // R Trigger   | ZR      | R2       | [Analog]
+    ImGuiKey_GamepadL3,                                    // L Stick     | L3      | L3       |
+    ImGuiKey_GamepadR3,                                    // R Stick     | R3      | R3       |
+    ImGuiKey_GamepadLStickLeft,                            //             |         |          | [Analog] Move Window (in Windowing mode)
+    ImGuiKey_GamepadLStickRight,                           //             |         |          | [Analog] Move Window (in Windowing mode)
+    ImGuiKey_GamepadLStickUp,                              //             |         |          | [Analog] Move Window (in Windowing mode)
+    ImGuiKey_GamepadLStickDown,                            //             |         |          | [Analog] Move Window (in Windowing mode)
+    ImGuiKey_GamepadRStickLeft,                            //             |         |          | [Analog]
+    ImGuiKey_GamepadRStickRight,                           //             |         |          | [Analog]
+    ImGuiKey_GamepadRStickUp,                              //             |         |          | [Analog]
+    ImGuiKey_GamepadRStickDown,                            //             |         |          | [Analog]
 
     // Aliases: Mouse Buttons (auto-submitted from AddMouseButtonEvent() calls)
     // - This is mirroring the data also written to io.MouseDown[], io.MouseWheel, in a format allowing them to be accessed via standard key API.
@@ -1746,11 +1848,15 @@ enum                                                   // Forward declared enum 
     ImGuiKey_ReservedForModShift,
     ImGuiKey_ReservedForModAlt,
     ImGuiKey_ReservedForModSuper,
+
+    // [Internal] If you need to iterate all keys (for e.g. an input mapper) you may use ImGuiKey_NamedKey_BEGIN..ImGuiKey_NamedKey_END.
     ImGuiKey_NamedKey_END,
+    ImGuiKey_NamedKey_COUNT      = ImGuiKey_NamedKey_END-ImGuiKey_NamedKey_BEGIN,
 
     // Keyboard Modifiers (explicitly submitted by backend via AddKeyEvent() calls)
-    // - This is mirroring the data also written to io.KeyCtrl, io.KeyShift, io.KeyAlt, io.KeySuper, in a format allowing
-    //   them to be accessed via standard key API, allowing calls such as IsKeyPressed(), IsKeyReleased(), querying duration etc.
+    // - Any functions taking a ImGuiKeyChord parameter can binary-or those with regular keys, e.g. Shortcut(ImGuiMod_Ctrl | ImGuiKey_S).
+    // - Those are written back into io.KeyCtrl, io.KeyShift, io.KeyAlt, io.KeySuper for convenience,
+    //   but may be accessed via standard key API such as IsKeyPressed(), IsKeyReleased(), querying duration etc.
     // - Code polling every key (e.g. an interface to detect a key press for input mapping) might want to ignore those
     //   and prefer using the real keys (e.g. ImGuiKey_LeftCtrl, ImGuiKey_RightCtrl instead of ImGuiMod_Ctrl).
     // - In theory the value of keyboard modifiers should be roughly equivalent to a logical or of the equivalent left/right keys.
@@ -1763,11 +1869,6 @@ enum                                                   // Forward declared enum 
     ImGuiMod_Alt                 = 1<<14,                  // Option/Menu
     ImGuiMod_Super               = 1<<15,                  // Windows/Super (non-macOS), Ctrl (macOS)
     ImGuiMod_Mask_               = 0xF000,                 // 4-bits
-
-    // [Internal] If you need to iterate all keys (for e.g. an input mapper) you may use ImGuiKey_NamedKey_BEGIN..ImGuiKey_NamedKey_END.
-    ImGuiKey_NamedKey_COUNT      = ImGuiKey_NamedKey_END-ImGuiKey_NamedKey_BEGIN,
-    //ImGuiKey_KeysData_SIZE        = ImGuiKey_NamedKey_COUNT,  // Size of KeysData[]: only hold named keys
-    //ImGuiKey_KeysData_OFFSET      = ImGuiKey_NamedKey_BEGIN,  // Accesses to io.KeysData[] must use (key - ImGuiKey_NamedKey_BEGIN) index.
 
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     ImGuiKey_COUNT               = ImGuiKey_NamedKey_END,  // Obsoleted in 1.91.5 because it was extremely misleading (since named keys don't start at 0 anymore)
@@ -1821,8 +1922,6 @@ typedef enum
     // [BETA] Viewports
     // When using viewports it is recommended that your default value for ImGuiCol_WindowBg is opaque (Alpha=1.0) so transition to a viewport won't be noticeable.
     ImGuiConfigFlags_ViewportsEnable         = 1<<10,  // Viewport enable flags (require both ImGuiBackendFlags_PlatformHasViewports + ImGuiBackendFlags_RendererHasViewports set by the respective backends)
-    ImGuiConfigFlags_DpiEnableScaleViewports = 1<<14,  // [BETA: Don't use] FIXME-DPI: Reposition and resize imgui windows when the DpiScale of a viewport changed (mostly useful for the main viewport hosting other window). Note that resizing the main window itself is up to your application.
-    ImGuiConfigFlags_DpiEnableScaleFonts     = 1<<15,  // [BETA: Don't use] FIXME-DPI: Request bitmap-scaled fonts to match DpiScale. This is a very low-quality workaround. The correct way to handle DPI is _currently_ to replace the atlas and/or fonts in the Platform_OnChangedViewport callback, but this is all early work in progress.
 
     // User storage (to allow your backend/engine to communicate to code that may be shared between multiple projects. Those flags are NOT used by core Dear ImGui)
     ImGuiConfigFlags_IsSRGB                  = 1<<20,  // Application is SRGB-aware.
@@ -1831,6 +1930,8 @@ typedef enum
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     ImGuiConfigFlags_NavEnableSetMousePos    = 1<<2,   // [moved/renamed in 1.91.4] -> use bool io.ConfigNavMoveSetMousePos
     ImGuiConfigFlags_NavNoCaptureKeyboard    = 1<<3,   // [moved/renamed in 1.91.4] -> use bool io.ConfigNavCaptureKeyboard
+    ImGuiConfigFlags_DpiEnableScaleFonts     = 1<<14,  // [moved/renamed in 1.92.0] -> use bool io.ConfigDpiScaleFonts
+    ImGuiConfigFlags_DpiEnableScaleViewports = 1<<15,  // [moved/renamed in 1.92.0] -> use bool io.ConfigDpiScaleViewports
 #endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 } ImGuiConfigFlags_;
 
@@ -1842,6 +1943,7 @@ typedef enum
     ImGuiBackendFlags_HasMouseCursors         = 1<<1,   // Backend Platform supports honoring GetMouseCursor() value to change the OS cursor shape.
     ImGuiBackendFlags_HasSetMousePos          = 1<<2,   // Backend Platform supports io.WantSetMousePos requests to reposition the OS mouse position (only used if io.ConfigNavMoveSetMousePos is set).
     ImGuiBackendFlags_RendererHasVtxOffset    = 1<<3,   // Backend Renderer supports ImDrawCmd::VtxOffset. This enables output of large meshes (64K+ vertices) while still using 16-bit indices.
+    ImGuiBackendFlags_RendererHasTextures     = 1<<4,   // Backend Renderer supports ImTextureData requests to create/update/destroy textures. This enables incremental texture updates and texture reloads. See https://github.com/ocornut/imgui/blob/master/docs/BACKENDS.md for instructions on how to upgrade your custom backend.
 
     // [BETA] Viewports
     ImGuiBackendFlags_PlatformHasViewports    = 1<<10,  // Backend Platform supports multiple viewports.
@@ -1885,6 +1987,7 @@ typedef enum
     ImGuiCol_ResizeGrip,                                              // Resize grip in lower-right and lower-left corners of windows.
     ImGuiCol_ResizeGripHovered,
     ImGuiCol_ResizeGripActive,
+    ImGuiCol_InputTextCursor,                                         // InputText cursor/caret
     ImGuiCol_TabHovered,                                              // Tab background, when hovered
     ImGuiCol_Tab,                                                     // Tab background, when tab-bar is focused & tab is unselected
     ImGuiCol_TabSelected,                                             // Tab background, when tab-bar is focused & tab is selected
@@ -1904,7 +2007,8 @@ typedef enum
     ImGuiCol_TableRowBg,                                              // Table row background (even rows)
     ImGuiCol_TableRowBgAlt,                                           // Table row background (odd rows)
     ImGuiCol_TextLink,                                                // Hyperlink color
-    ImGuiCol_TextSelectedBg,
+    ImGuiCol_TextSelectedBg,                                          // Selected text inside an InputText
+    ImGuiCol_TreeLines,                                               // Tree node hierarchy outlines when using ImGuiTreeNodeFlags_DrawLines
     ImGuiCol_DragDropTarget,                                          // Rectangle highlighting a drop target
     ImGuiCol_NavCursor,                                               // Color of keyboard/gamepad navigation cursor/rectangle, when visible
     ImGuiCol_NavWindowingHighlight,                                   // Highlight window when using CTRL+TAB
@@ -1953,12 +2057,17 @@ typedef enum
     ImGuiStyleVar_ScrollbarRounding,            // float     ScrollbarRounding
     ImGuiStyleVar_GrabMinSize,                  // float     GrabMinSize
     ImGuiStyleVar_GrabRounding,                 // float     GrabRounding
+    ImGuiStyleVar_ImageBorderSize,              // float     ImageBorderSize
     ImGuiStyleVar_TabRounding,                  // float     TabRounding
     ImGuiStyleVar_TabBorderSize,                // float     TabBorderSize
+    ImGuiStyleVar_TabMinWidthBase,              // float     TabMinWidthBase
+    ImGuiStyleVar_TabMinWidthShrink,            // float     TabMinWidthShrink
     ImGuiStyleVar_TabBarBorderSize,             // float     TabBarBorderSize
     ImGuiStyleVar_TabBarOverlineSize,           // float     TabBarOverlineSize
     ImGuiStyleVar_TableAngledHeadersAngle,      // float     TableAngledHeadersAngle
     ImGuiStyleVar_TableAngledHeadersTextAlign,  // ImVec2  TableAngledHeadersTextAlign
+    ImGuiStyleVar_TreeLinesSize,                // float     TreeLinesSize
+    ImGuiStyleVar_TreeLinesRounding,            // float     TreeLinesRounding
     ImGuiStyleVar_ButtonTextAlign,              // ImVec2    ButtonTextAlign
     ImGuiStyleVar_SelectableTextAlign,          // ImVec2    SelectableTextAlign
     ImGuiStyleVar_SeparatorTextBorderSize,      // float     SeparatorTextBorderSize
@@ -1994,10 +2103,16 @@ typedef enum
     ImGuiColorEditFlags_NoDragDrop       = 1<<9,   //              // ColorEdit: disable drag and drop target. ColorButton: disable drag and drop source.
     ImGuiColorEditFlags_NoBorder         = 1<<10,  //              // ColorButton: disable border (which is enforced by default)
 
+    // Alpha preview
+    // - Prior to 1.91.8 (2025/01/21): alpha was made opaque in the preview by default using old name ImGuiColorEditFlags_AlphaPreview.
+    // - We now display the preview as transparent by default. You can use ImGuiColorEditFlags_AlphaOpaque to use old behavior.
+    // - The new flags may be combined better and allow finer controls.
+    ImGuiColorEditFlags_AlphaOpaque      = 1<<11,  //              // ColorEdit, ColorPicker, ColorButton: disable alpha in the preview,. Contrary to _NoAlpha it may still be edited when calling ColorEdit4()/ColorPicker4(). For ColorButton() this does the same as _NoAlpha.
+    ImGuiColorEditFlags_AlphaNoBg        = 1<<12,  //              // ColorEdit, ColorPicker, ColorButton: disable rendering a checkerboard background behind transparent color.
+    ImGuiColorEditFlags_AlphaPreviewHalf = 1<<13,  //              // ColorEdit, ColorPicker, ColorButton: display half opaque / half transparent preview.
+
     // User Options (right-click on widget to change some of them).
     ImGuiColorEditFlags_AlphaBar         = 1<<16,  //              // ColorEdit, ColorPicker: show vertical alpha bar/gradient in picker.
-    ImGuiColorEditFlags_AlphaPreview     = 1<<17,  //              // ColorEdit, ColorPicker, ColorButton: display preview as a transparent color over a checkerboard, instead of opaque.
-    ImGuiColorEditFlags_AlphaPreviewHalf = 1<<18,  //              // ColorEdit, ColorPicker, ColorButton: display half opaque / half checkerboard, instead of opaque.
     ImGuiColorEditFlags_HDR              = 1<<19,  //              // (WIP) ColorEdit: Currently only disable 0.0f..1.0f limits in RGBA edition (note: you probably want to use ImGuiColorEditFlags_Float flag as well).
     ImGuiColorEditFlags_DisplayRGB       = 1<<20,  // [Display]    // ColorEdit: override _display_ type among RGB/HSV/Hex. ColorPicker: select any combination using one or more of RGB/HSV/Hex.
     ImGuiColorEditFlags_DisplayHSV       = 1<<21,  // [Display]    // "
@@ -2014,12 +2129,16 @@ typedef enum
     ImGuiColorEditFlags_DefaultOptions_  = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_PickerHueBar,
 
     // [Internal] Masks
+    ImGuiColorEditFlags_AlphaMask_       = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_AlphaOpaque | ImGuiColorEditFlags_AlphaNoBg | ImGuiColorEditFlags_AlphaPreviewHalf,
     ImGuiColorEditFlags_DisplayMask_     = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_DisplayHex,
     ImGuiColorEditFlags_DataTypeMask_    = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_Float,
     ImGuiColorEditFlags_PickerMask_      = ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_PickerHueBar,
     ImGuiColorEditFlags_InputMask_       = ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_InputHSV,
 
     // Obsolete names
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    ImGuiColorEditFlags_AlphaPreview     = 0,      // [Removed in 1.91.8] This is the default now. Will display a checkerboard unless ImGuiColorEditFlags_AlphaNoBg is set.
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     //ImGuiColorEditFlags_RGB = ImGuiColorEditFlags_DisplayRGB, ImGuiColorEditFlags_HSV = ImGuiColorEditFlags_DisplayHSV, ImGuiColorEditFlags_HEX = ImGuiColorEditFlags_DisplayHex  // [renamed in 1.69]
 } ImGuiColorEditFlags_;
 
@@ -2063,6 +2182,8 @@ typedef enum
     ImGuiMouseCursor_ResizeNESW,  // When hovering over the bottom-left corner of a window
     ImGuiMouseCursor_ResizeNWSE,  // When hovering over the bottom-right corner of a window
     ImGuiMouseCursor_Hand,        // (Unused by Dear ImGui functions. Use for e.g. hyperlinks)
+    ImGuiMouseCursor_Wait,        // When waiting for something to process/load.
+    ImGuiMouseCursor_Progress,    // When waiting for something to process/load, but application is still interactive.
     ImGuiMouseCursor_NotAllowed,  // When hovering something with disallowed interaction. Usually a crossed circle.
     ImGuiMouseCursor_COUNT,
 } ImGuiMouseCursor_;
@@ -2259,6 +2380,13 @@ struct ImGuiTableColumnSortSpecs_t
 CIMGUI_API void ImVector_Construct(void* vector);  // Construct a zero-size ImVector<> (of any type). This is primarily useful when calling ImFontGlyphRangesBuilder_BuildRanges()
 CIMGUI_API void ImVector_Destruct(void* vector);   // Destruct an ImVector<> (of any type). Important: Frees the vector memory but does not call destructors on contained objects (if they have them)
 
+CIMGUI_API void ImGuiPlatformIO_SetPlatform_GetWindowWorkAreaInsets(void (*getWindowWorkAreaInsetsFunc)(ImGuiViewport* vp, ImVec4* result));  // Set ImGuiPlatformIO::Platform_GetWindowWorkAreaInsets in a C-compatible mannner
+
+CIMGUI_API void ImGuiPlatformIO_SetPlatform_GetWindowFramebufferScale(void (*getWindowFramebufferScaleFunc)(ImGuiViewport* vp, ImVec2* result));  // Set ImGuiPlatformIO::Platform_GetWindowFramebufferScale in a C-compatible mannner
+
+CIMGUI_API void ImGuiPlatformIO_SetPlatform_GetWindowPos(void (*getWindowPosFunc)(ImGuiViewport* vp, ImVec2* result));    // Set ImGuiPlatformIO::Platform_GetWindowPos in a C-compatible mannner
+CIMGUI_API void ImGuiPlatformIO_SetPlatform_GetWindowSize(void (*getWindowSizeFunc)(ImGuiViewport* vp, ImVec2* result));  // Set ImGuiPlatformIO::Platform_GetWindowSize in a C-compatible mannner
+
 #if defined(IMGUI_HAS_IMSTR)
 #if IMGUI_HAS_IMSTR
 CIMGUI_API ImStr ImStr_FromCharStr(const char* b);  // Build an ImStr from a regular const char* (no data is copied, so you need to make sure the original char* isn't altered as long as you are using the ImStr).
@@ -2295,27 +2423,31 @@ CIMGUI_API ImStr ImStr_FromCharStr(const char* b);  // Build an ImStr from a reg
 //-----------------------------------------------------------------------------
 
 IM_MSVC_RUNTIME_CHECKS_OFF
-struct ImVector_ImWchar_t { int Size; int Capacity; ImWchar* Data; };  // Instantiation of ImVector<ImWchar>
-struct ImVector_ImGuiTextFilter_ImGuiTextRange_t { int Size; int Capacity; ImGuiTextFilter_ImGuiTextRange* Data; };  // Instantiation of ImVector<ImGuiTextFilter_ImGuiTextRange>
+struct ImVector_ImGuiTextRange_t { int Size; int Capacity; ImGuiTextFilter_ImGuiTextRange* Data; };  // Instantiation of ImVector<ImGuiTextRange>
 struct ImVector_char_t { int Size; int Capacity; char* Data; };  // Instantiation of ImVector<char>
 struct ImVector_ImGuiStoragePair_t { int Size; int Capacity; ImGuiStoragePair* Data; };  // Instantiation of ImVector<ImGuiStoragePair>
 struct ImVector_ImGuiSelectionRequest_t { int Size; int Capacity; ImGuiSelectionRequest* Data; };  // Instantiation of ImVector<ImGuiSelectionRequest>
+struct ImVector_ImDrawChannel_t { int Size; int Capacity; ImDrawChannel* Data; };  // Instantiation of ImVector<ImDrawChannel>
 struct ImVector_ImDrawCmd_t { int Size; int Capacity; ImDrawCmd* Data; };  // Instantiation of ImVector<ImDrawCmd>
 struct ImVector_ImDrawIdx_t { int Size; int Capacity; ImDrawIdx* Data; };  // Instantiation of ImVector<ImDrawIdx>
-struct ImVector_ImDrawChannel_t { int Size; int Capacity; ImDrawChannel* Data; };  // Instantiation of ImVector<ImDrawChannel>
 struct ImVector_ImDrawVert_t { int Size; int Capacity; ImDrawVert* Data; };  // Instantiation of ImVector<ImDrawVert>
 struct ImVector_ImVec2_t { int Size; int Capacity; ImVec2* Data; };  // Instantiation of ImVector<ImVec2>
 struct ImVector_ImVec4_t { int Size; int Capacity; ImVec4* Data; };  // Instantiation of ImVector<ImVec4>
-struct ImVector_ImTextureID_t { int Size; int Capacity; ImTextureID* Data; };  // Instantiation of ImVector<ImTextureID>
+struct ImVector_ImTextureRef_t { int Size; int Capacity; ImTextureRef* Data; };  // Instantiation of ImVector<ImTextureRef>
 struct ImVector_ImU8_t { int Size; int Capacity; ImU8* Data; };  // Instantiation of ImVector<ImU8>
 struct ImVector_ImDrawListPtr_t { int Size; int Capacity; ImDrawList** Data; };  // Instantiation of ImVector<ImDrawList*>
+struct ImVector_ImTextureRect_t { int Size; int Capacity; ImTextureRect* Data; };  // Instantiation of ImVector<ImTextureRect>
 struct ImVector_ImU32_t { int Size; int Capacity; ImU32* Data; };  // Instantiation of ImVector<ImU32>
+struct ImVector_ImWchar_t { int Size; int Capacity; ImWchar* Data; };  // Instantiation of ImVector<ImWchar>
 struct ImVector_ImFontPtr_t { int Size; int Capacity; ImFont** Data; };  // Instantiation of ImVector<ImFont*>
-struct ImVector_ImFontAtlasCustomRect_t { int Size; int Capacity; ImFontAtlasCustomRect* Data; };  // Instantiation of ImVector<ImFontAtlasCustomRect>
 struct ImVector_ImFontConfig_t { int Size; int Capacity; ImFontConfig* Data; };  // Instantiation of ImVector<ImFontConfig>
+struct ImVector_ImDrawListSharedDataPtr_t { int Size; int Capacity; ImDrawListSharedData** Data; };  // Instantiation of ImVector<ImDrawListSharedData*>
 struct ImVector_float_t { int Size; int Capacity; float* Data; };  // Instantiation of ImVector<float>
+struct ImVector_ImU16_t { int Size; int Capacity; ImU16* Data; };  // Instantiation of ImVector<ImU16>
 struct ImVector_ImFontGlyph_t { int Size; int Capacity; ImFontGlyph* Data; };  // Instantiation of ImVector<ImFontGlyph>
+struct ImVector_ImFontConfigPtr_t { int Size; int Capacity; ImFontConfig** Data; };  // Instantiation of ImVector<ImFontConfig*>
 struct ImVector_ImGuiPlatformMonitor_t { int Size; int Capacity; ImGuiPlatformMonitor* Data; };  // Instantiation of ImVector<ImGuiPlatformMonitor>
+struct ImVector_ImTextureDataPtr_t { int Size; int Capacity; ImTextureData** Data; };  // Instantiation of ImVector<ImTextureData*>
 struct ImVector_ImGuiViewportPtr_t { int Size; int Capacity; ImGuiViewport** Data; };  // Instantiation of ImVector<ImGuiViewport*>
 IM_MSVC_RUNTIME_CHECKS_RESTORE
 
@@ -2329,65 +2461,85 @@ IM_MSVC_RUNTIME_CHECKS_RESTORE
 
 struct ImGuiStyle_t
 {
-    float             Alpha;                        // Global alpha applies to everything in Dear ImGui.
-    float             DisabledAlpha;                // Additional alpha multiplier applied by BeginDisabled(). Multiply over current value of Alpha.
-    ImVec2            WindowPadding;                // Padding within a window.
-    float             WindowRounding;               // Radius of window corners rounding. Set to 0.0f to have rectangular windows. Large values tend to lead to variety of artifacts and are not recommended.
-    float             WindowBorderSize;             // Thickness of border around windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
-    ImVec2            WindowMinSize;                // Minimum window size. This is a global setting. If you want to constrain individual windows, use SetNextWindowSizeConstraints().
-    ImVec2            WindowTitleAlign;             // Alignment for title bar text. Defaults to (0.0f,0.5f) for left-aligned,vertically centered.
-    ImGuiDir          WindowMenuButtonPosition;     // Side of the collapsing/docking button in the title bar (None/Left/Right). Defaults to ImGuiDir_Left.
-    float             ChildRounding;                // Radius of child window corners rounding. Set to 0.0f to have rectangular windows.
-    float             ChildBorderSize;              // Thickness of border around child windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
-    float             PopupRounding;                // Radius of popup window corners rounding. (Note that tooltip windows use WindowRounding)
-    float             PopupBorderSize;              // Thickness of border around popup/tooltip windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
-    ImVec2            FramePadding;                 // Padding within a framed rectangle (used by most widgets).
-    float             FrameRounding;                // Radius of frame corners rounding. Set to 0.0f to have rectangular frame (used by most widgets).
-    float             FrameBorderSize;              // Thickness of border around frames. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
-    ImVec2            ItemSpacing;                  // Horizontal and vertical spacing between widgets/lines.
-    ImVec2            ItemInnerSpacing;             // Horizontal and vertical spacing between within elements of a composed widget (e.g. a slider and its label).
-    ImVec2            CellPadding;                  // Padding within a table cell. Cellpadding.x is locked for entire table. CellPadding.y may be altered between different rows.
-    ImVec2            TouchExtraPadding;            // Expand reactive bounding box for touch-based system where touch position is not accurate enough. Unfortunately we don't sort widgets so priority on overlap will always be given to the first widget. So don't grow this too much!
-    float             IndentSpacing;                // Horizontal indentation when e.g. entering a tree node. Generally == (FontSize + FramePadding.x*2).
-    float             ColumnsMinSpacing;            // Minimum horizontal spacing between two columns. Preferably > (FramePadding.x + 1).
-    float             ScrollbarSize;                // Width of the vertical scrollbar, Height of the horizontal scrollbar.
-    float             ScrollbarRounding;            // Radius of grab corners for scrollbar.
-    float             GrabMinSize;                  // Minimum width/height of a grab box for slider/scrollbar.
-    float             GrabRounding;                 // Radius of grabs corners rounding. Set to 0.0f to have rectangular slider grabs.
-    float             LogSliderDeadzone;            // The size in pixels of the dead-zone around zero on logarithmic sliders that cross zero.
-    float             TabRounding;                  // Radius of upper corners of a tab. Set to 0.0f to have rectangular tabs.
-    float             TabBorderSize;                // Thickness of border around tabs.
-    float             TabMinWidthForCloseButton;    // Minimum width for close button to appear on an unselected tab when hovered. Set to 0.0f to always show when hovering, set to FLT_MAX to never show close button unless selected.
-    float             TabBarBorderSize;             // Thickness of tab-bar separator, which takes on the tab active color to denote focus.
-    float             TabBarOverlineSize;           // Thickness of tab-bar overline, which highlights the selected tab-bar.
-    float             TableAngledHeadersAngle;      // Angle of angled headers (supported values range from -50.0f degrees to +50.0f degrees).
-    ImVec2            TableAngledHeadersTextAlign;  // Alignment of angled headers within the cell
-    ImGuiDir          ColorButtonPosition;          // Side of the color button in the ColorEdit4 widget (left/right). Defaults to ImGuiDir_Right.
-    ImVec2            ButtonTextAlign;              // Alignment of button text when button is larger than text. Defaults to (0.5f, 0.5f) (centered).
-    ImVec2            SelectableTextAlign;          // Alignment of selectable text. Defaults to (0.0f, 0.0f) (top-left aligned). It's generally important to keep this left-aligned if you want to lay multiple items on a same line.
-    float             SeparatorTextBorderSize;      // Thickness of border in SeparatorText()
-    ImVec2            SeparatorTextAlign;           // Alignment of text within the separator. Defaults to (0.0f, 0.5f) (left aligned, center).
-    ImVec2            SeparatorTextPadding;         // Horizontal offset of text from each edge of the separator + spacing on other axis. Generally small values. .y is recommended to be == FramePadding.y.
-    ImVec2            DisplayWindowPadding;         // Apply to regular windows: amount which we enforce to keep visible when moving near edges of your screen.
-    ImVec2            DisplaySafeAreaPadding;       // Apply to every windows, menus, popups, tooltips: amount where we avoid displaying contents. Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).
-    float             DockingSeparatorSize;         // Thickness of resizing border between docked windows
-    float             MouseCursorScale;             // Scale software rendered mouse cursor (when io.MouseDrawCursor is enabled). We apply per-monitor DPI scaling over this scale. May be removed later.
-    bool              AntiAliasedLines;             // Enable anti-aliased lines/borders. Disable if you are really tight on CPU/GPU. Latched at the beginning of the frame (copied to ImDrawList).
-    bool              AntiAliasedLinesUseTex;       // Enable anti-aliased lines/borders using textures where possible. Require backend to render with bilinear filtering (NOT point/nearest filtering). Latched at the beginning of the frame (copied to ImDrawList).
-    bool              AntiAliasedFill;              // Enable anti-aliased edges around filled shapes (rounded rectangles, circles, etc.). Disable if you are really tight on CPU/GPU. Latched at the beginning of the frame (copied to ImDrawList).
-    float             CurveTessellationTol;         // Tessellation tolerance when using PathBezierCurveTo() without a specific number of segments. Decrease for highly tessellated curves (higher quality, more polygons), increase to reduce quality.
-    float             CircleTessellationMaxError;   // Maximum error (in pixels) allowed when using AddCircle()/AddCircleFilled() or drawing rounded corner rectangles with no explicit segment count specified. Decrease for higher quality but more geometry.
-    ImVec4            Colors[ImGuiCol_COUNT];
+    // Font scaling
+    // - recap: ImGui::GetFontSize() == FontSizeBase * (FontScaleMain * FontScaleDpi * other_scaling_factors)
+    float              FontSizeBase;                      // Current base font size before external global factors are applied. Use PushFont(NULL, size) to modify. Use ImGui::GetFontSize() to obtain scaled value.
+    float              FontScaleMain;                     // Main global scale factor. May be set by application once, or exposed to end-user.
+    float              FontScaleDpi;                      // Additional global scale factor from viewport/monitor contents scale. When io.ConfigDpiScaleFonts is enabled, this is automatically overwritten when changing monitor DPI.
+
+    float              Alpha;                             // Global alpha applies to everything in Dear ImGui.
+    float              DisabledAlpha;                     // Additional alpha multiplier applied by BeginDisabled(). Multiply over current value of Alpha.
+    ImVec2             WindowPadding;                     // Padding within a window.
+    float              WindowRounding;                    // Radius of window corners rounding. Set to 0.0f to have rectangular windows. Large values tend to lead to variety of artifacts and are not recommended.
+    float              WindowBorderSize;                  // Thickness of border around windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
+    float              WindowBorderHoverPadding;          // Hit-testing extent outside/inside resizing border. Also extend determination of hovered window. Generally meaningfully larger than WindowBorderSize to make it easy to reach borders.
+    ImVec2             WindowMinSize;                     // Minimum window size. This is a global setting. If you want to constrain individual windows, use SetNextWindowSizeConstraints().
+    ImVec2             WindowTitleAlign;                  // Alignment for title bar text. Defaults to (0.0f,0.5f) for left-aligned,vertically centered.
+    ImGuiDir           WindowMenuButtonPosition;          // Side of the collapsing/docking button in the title bar (None/Left/Right). Defaults to ImGuiDir_Left.
+    float              ChildRounding;                     // Radius of child window corners rounding. Set to 0.0f to have rectangular windows.
+    float              ChildBorderSize;                   // Thickness of border around child windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
+    float              PopupRounding;                     // Radius of popup window corners rounding. (Note that tooltip windows use WindowRounding)
+    float              PopupBorderSize;                   // Thickness of border around popup/tooltip windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
+    ImVec2             FramePadding;                      // Padding within a framed rectangle (used by most widgets).
+    float              FrameRounding;                     // Radius of frame corners rounding. Set to 0.0f to have rectangular frame (used by most widgets).
+    float              FrameBorderSize;                   // Thickness of border around frames. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
+    ImVec2             ItemSpacing;                       // Horizontal and vertical spacing between widgets/lines.
+    ImVec2             ItemInnerSpacing;                  // Horizontal and vertical spacing between within elements of a composed widget (e.g. a slider and its label).
+    ImVec2             CellPadding;                       // Padding within a table cell. Cellpadding.x is locked for entire table. CellPadding.y may be altered between different rows.
+    ImVec2             TouchExtraPadding;                 // Expand reactive bounding box for touch-based system where touch position is not accurate enough. Unfortunately we don't sort widgets so priority on overlap will always be given to the first widget. So don't grow this too much!
+    float              IndentSpacing;                     // Horizontal indentation when e.g. entering a tree node. Generally == (FontSize + FramePadding.x*2).
+    float              ColumnsMinSpacing;                 // Minimum horizontal spacing between two columns. Preferably > (FramePadding.x + 1).
+    float              ScrollbarSize;                     // Width of the vertical scrollbar, Height of the horizontal scrollbar.
+    float              ScrollbarRounding;                 // Radius of grab corners for scrollbar.
+    float              GrabMinSize;                       // Minimum width/height of a grab box for slider/scrollbar.
+    float              GrabRounding;                      // Radius of grabs corners rounding. Set to 0.0f to have rectangular slider grabs.
+    float              LogSliderDeadzone;                 // The size in pixels of the dead-zone around zero on logarithmic sliders that cross zero.
+    float              ImageBorderSize;                   // Thickness of border around Image() calls.
+    float              TabRounding;                       // Radius of upper corners of a tab. Set to 0.0f to have rectangular tabs.
+    float              TabBorderSize;                     // Thickness of border around tabs.
+    float              TabMinWidthBase;                   // Minimum tab width, to make tabs larger than their contents. TabBar buttons are not affected.
+    float              TabMinWidthShrink;                 // Minimum tab width after shrinking, when using ImGuiTabBarFlags_FittingPolicyMixed policy.
+    float              TabCloseButtonMinWidthSelected;    // -1: always visible. 0.0f: visible when hovered. >0.0f: visible when hovered if minimum width.
+    float              TabCloseButtonMinWidthUnselected;  // -1: always visible. 0.0f: visible when hovered. >0.0f: visible when hovered if minimum width. FLT_MAX: never show close button when unselected.
+    float              TabBarBorderSize;                  // Thickness of tab-bar separator, which takes on the tab active color to denote focus.
+    float              TabBarOverlineSize;                // Thickness of tab-bar overline, which highlights the selected tab-bar.
+    float              TableAngledHeadersAngle;           // Angle of angled headers (supported values range from -50.0f degrees to +50.0f degrees).
+    ImVec2             TableAngledHeadersTextAlign;       // Alignment of angled headers within the cell
+    ImGuiTreeNodeFlags TreeLinesFlags;                    // Default way to draw lines connecting TreeNode hierarchy. ImGuiTreeNodeFlags_DrawLinesNone or ImGuiTreeNodeFlags_DrawLinesFull or ImGuiTreeNodeFlags_DrawLinesToNodes.
+    float              TreeLinesSize;                     // Thickness of outlines when using ImGuiTreeNodeFlags_DrawLines.
+    float              TreeLinesRounding;                 // Radius of lines connecting child nodes to the vertical line.
+    ImGuiDir           ColorButtonPosition;               // Side of the color button in the ColorEdit4 widget (left/right). Defaults to ImGuiDir_Right.
+    ImVec2             ButtonTextAlign;                   // Alignment of button text when button is larger than text. Defaults to (0.5f, 0.5f) (centered).
+    ImVec2             SelectableTextAlign;               // Alignment of selectable text. Defaults to (0.0f, 0.0f) (top-left aligned). It's generally important to keep this left-aligned if you want to lay multiple items on a same line.
+    float              SeparatorTextBorderSize;           // Thickness of border in SeparatorText()
+    ImVec2             SeparatorTextAlign;                // Alignment of text within the separator. Defaults to (0.0f, 0.5f) (left aligned, center).
+    ImVec2             SeparatorTextPadding;              // Horizontal offset of text from each edge of the separator + spacing on other axis. Generally small values. .y is recommended to be == FramePadding.y.
+    ImVec2             DisplayWindowPadding;              // Apply to regular windows: amount which we enforce to keep visible when moving near edges of your screen.
+    ImVec2             DisplaySafeAreaPadding;            // Apply to every windows, menus, popups, tooltips: amount where we avoid displaying contents. Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).
+    float              DockingSeparatorSize;              // Thickness of resizing border between docked windows
+    float              MouseCursorScale;                  // Scale software rendered mouse cursor (when io.MouseDrawCursor is enabled). We apply per-monitor DPI scaling over this scale. May be removed later.
+    bool               AntiAliasedLines;                  // Enable anti-aliased lines/borders. Disable if you are really tight on CPU/GPU. Latched at the beginning of the frame (copied to ImDrawList).
+    bool               AntiAliasedLinesUseTex;            // Enable anti-aliased lines/borders using textures where possible. Require backend to render with bilinear filtering (NOT point/nearest filtering). Latched at the beginning of the frame (copied to ImDrawList).
+    bool               AntiAliasedFill;                   // Enable anti-aliased edges around filled shapes (rounded rectangles, circles, etc.). Disable if you are really tight on CPU/GPU. Latched at the beginning of the frame (copied to ImDrawList).
+    float              CurveTessellationTol;              // Tessellation tolerance when using PathBezierCurveTo() without a specific number of segments. Decrease for highly tessellated curves (higher quality, more polygons), increase to reduce quality.
+    float              CircleTessellationMaxError;        // Maximum error (in pixels) allowed when using AddCircle()/AddCircleFilled() or drawing rounded corner rectangles with no explicit segment count specified. Decrease for higher quality but more geometry.
+
+    // Colors
+    ImVec4             Colors[ImGuiCol_COUNT];
 
     // Behaviors
     // (It is possible to modify those fields mid-frame if specific behavior need it, unlike e.g. configuration fields in ImGuiIO)
-    float             HoverStationaryDelay;         // Delay for IsItemHovered(ImGuiHoveredFlags_Stationary). Time required to consider mouse stationary.
-    float             HoverDelayShort;              // Delay for IsItemHovered(ImGuiHoveredFlags_DelayShort). Usually used along with HoverStationaryDelay.
-    float             HoverDelayNormal;             // Delay for IsItemHovered(ImGuiHoveredFlags_DelayNormal). "
-    ImGuiHoveredFlags HoverFlagsForTooltipMouse;    // Default flags when using IsItemHovered(ImGuiHoveredFlags_ForTooltip) or BeginItemTooltip()/SetItemTooltip() while using mouse.
-    ImGuiHoveredFlags HoverFlagsForTooltipNav;      // Default flags when using IsItemHovered(ImGuiHoveredFlags_ForTooltip) or BeginItemTooltip()/SetItemTooltip() while using keyboard/gamepad.
+    float              HoverStationaryDelay;              // Delay for IsItemHovered(ImGuiHoveredFlags_Stationary). Time required to consider mouse stationary.
+    float              HoverDelayShort;                   // Delay for IsItemHovered(ImGuiHoveredFlags_DelayShort). Usually used along with HoverStationaryDelay.
+    float              HoverDelayNormal;                  // Delay for IsItemHovered(ImGuiHoveredFlags_DelayNormal). "
+    ImGuiHoveredFlags  HoverFlagsForTooltipMouse;         // Default flags when using IsItemHovered(ImGuiHoveredFlags_ForTooltip) or BeginItemTooltip()/SetItemTooltip() while using mouse.
+    ImGuiHoveredFlags  HoverFlagsForTooltipNav;           // Default flags when using IsItemHovered(ImGuiHoveredFlags_ForTooltip) or BeginItemTooltip()/SetItemTooltip() while using keyboard/gamepad.
+
+    // [Internal]
+    float              _MainScale;                        // FIXME-WIP: Reference scale, as applied by ScaleAllSizes().
+    float              _NextFrameFontSizeBase;            // FIXME: Temporary hack until we finish remaining work.
 };
-CIMGUI_API void ImGuiStyle_ScaleAllSizes(ImGuiStyle* self, float scale_factor);
+CIMGUI_API void ImGuiStyle_ScaleAllSizes(ImGuiStyle* self, float scale_factor);  // Scale all spacing/padding/thickness values. Do not scale fonts.
 
 //-----------------------------------------------------------------------------
 // [SECTION] ImGuiIO
@@ -2417,64 +2569,69 @@ struct ImGuiIO_t
     // Configuration                            // Default value
     //------------------------------------------------------------------
 
-    ImGuiConfigFlags  ConfigFlags;                         // = 0              // See ImGuiConfigFlags_ enum. Set by user/application. Keyboard/Gamepad navigation options, etc.
-    ImGuiBackendFlags BackendFlags;                        // = 0              // See ImGuiBackendFlags_ enum. Set by backend (imgui_impl_xxx files or custom backend) to communicate features supported by the backend.
-    ImVec2            DisplaySize;                         // <unset>          // Main display size, in pixels (generally == GetMainViewport()->Size). May change every frame.
-    float             DeltaTime;                           // = 1.0f/60.0f     // Time elapsed since last frame, in seconds. May change every frame.
-    float             IniSavingRate;                       // = 5.0f           // Minimum time between saving positions/sizes to .ini file, in seconds.
-    const char*       IniFilename;                         // = "imgui.ini"    // Path to .ini file (important: default "imgui.ini" is relative to current working dir!). Set NULL to disable automatic .ini loading/saving or if you want to manually call LoadIniSettingsXXX() / SaveIniSettingsXXX() functions.
-    const char*       LogFilename;                         // = "imgui_log.txt"// Path to .log file (default parameter to ImGui::LogToFile when no file is specified).
-    void*             UserData;                            // = NULL           // Store your own data.
+    ImGuiConfigFlags  ConfigFlags;                                    // = 0              // See ImGuiConfigFlags_ enum. Set by user/application. Keyboard/Gamepad navigation options, etc.
+    ImGuiBackendFlags BackendFlags;                                   // = 0              // See ImGuiBackendFlags_ enum. Set by backend (imgui_impl_xxx files or custom backend) to communicate features supported by the backend.
+    ImVec2            DisplaySize;                                    // <unset>          // Main display size, in pixels (== GetMainViewport()->Size). May change every frame.
+    ImVec2            DisplayFramebufferScale;                        // = (1, 1)         // Main display density. For retina display where window coordinates are different from framebuffer coordinates. This will affect font density + will end up in ImDrawData::FramebufferScale.
+    float             DeltaTime;                                      // = 1.0f/60.0f     // Time elapsed since last frame, in seconds. May change every frame.
+    float             IniSavingRate;                                  // = 5.0f           // Minimum time between saving positions/sizes to .ini file, in seconds.
+    const char*       IniFilename;                                    // = "imgui.ini"    // Path to .ini file (important: default "imgui.ini" is relative to current working dir!). Set NULL to disable automatic .ini loading/saving or if you want to manually call LoadIniSettingsXXX() / SaveIniSettingsXXX() functions.
+    const char*       LogFilename;                                    // = "imgui_log.txt"// Path to .log file (default parameter to ImGui::LogToFile when no file is specified).
+    void*             UserData;                                       // = NULL           // Store your own data.
 
     // Font system
-    ImFontAtlas*      Fonts;                               // <auto>           // Font atlas: load, rasterize and pack one or more fonts into a single texture.
-    float             FontGlobalScale;                     // = 1.0f           // Global scale all fonts
-    bool              FontAllowUserScaling;                // = false          // [OBSOLETE] Allow user scaling text of individual window with CTRL+Wheel.
-    ImFont*           FontDefault;                         // = NULL           // Font to use on NewFrame(). Use NULL to uses Fonts->Fonts[0].
-    ImVec2            DisplayFramebufferScale;             // = (1, 1)         // For retina display or other situations where window coordinates are different from framebuffer coordinates. This generally ends up in ImDrawData::FramebufferScale.
+    ImFontAtlas*      Fonts;                                          // <auto>           // Font atlas: load, rasterize and pack one or more fonts into a single texture.
+    ImFont*           FontDefault;                                    // = NULL           // Font to use on NewFrame(). Use NULL to uses Fonts->Fonts[0].
+    bool              FontAllowUserScaling;                           // = false          // [OBSOLETE] Allow user scaling text of individual window with CTRL+Wheel.
 
     // Keyboard/Gamepad Navigation options
-    bool              ConfigNavSwapGamepadButtons;         // = false          // Swap Activate<>Cancel (A<>B) buttons, matching typical "Nintendo/Japanese style" gamepad layout.
-    bool              ConfigNavMoveSetMousePos;            // = false          // Directional/tabbing navigation teleports the mouse cursor. May be useful on TV/console systems where moving a virtual mouse is difficult. Will update io.MousePos and set io.WantSetMousePos=true.
-    bool              ConfigNavCaptureKeyboard;            // = true           // Sets io.WantCaptureKeyboard when io.NavActive is set.
-    bool              ConfigNavEscapeClearFocusItem;       // = true           // Pressing Escape can clear focused item + navigation id/highlight. Set to false if you want to always keep highlight on.
-    bool              ConfigNavEscapeClearFocusWindow;     // = false          // Pressing Escape can clear focused window as well (super set of io.ConfigNavEscapeClearFocusItem).
-    bool              ConfigNavCursorVisibleAuto;          // = true           // Using directional navigation key makes the cursor visible. Mouse click hides the cursor.
-    bool              ConfigNavCursorVisibleAlways;        // = false          // Navigation cursor is always visible.
+    bool              ConfigNavSwapGamepadButtons;                    // = false          // Swap Activate<>Cancel (A<>B) buttons, matching typical "Nintendo/Japanese style" gamepad layout.
+    bool              ConfigNavMoveSetMousePos;                       // = false          // Directional/tabbing navigation teleports the mouse cursor. May be useful on TV/console systems where moving a virtual mouse is difficult. Will update io.MousePos and set io.WantSetMousePos=true.
+    bool              ConfigNavCaptureKeyboard;                       // = true           // Sets io.WantCaptureKeyboard when io.NavActive is set.
+    bool              ConfigNavEscapeClearFocusItem;                  // = true           // Pressing Escape can clear focused item + navigation id/highlight. Set to false if you want to always keep highlight on.
+    bool              ConfigNavEscapeClearFocusWindow;                // = false          // Pressing Escape can clear focused window as well (super set of io.ConfigNavEscapeClearFocusItem).
+    bool              ConfigNavCursorVisibleAuto;                     // = true           // Using directional navigation key makes the cursor visible. Mouse click hides the cursor.
+    bool              ConfigNavCursorVisibleAlways;                   // = false          // Navigation cursor is always visible.
 
     // Docking options (when ImGuiConfigFlags_DockingEnable is set)
-    bool              ConfigDockingNoSplit;                // = false          // Simplified docking mode: disable window splitting, so docking is limited to merging multiple windows together into tab-bars.
-    bool              ConfigDockingWithShift;              // = false          // Enable docking with holding Shift key (reduce visual noise, allows dropping in wider space)
-    bool              ConfigDockingAlwaysTabBar;           // = false          // [BETA] [FIXME: This currently creates regression with auto-sizing and general overhead] Make every single floating window display within a docking node.
-    bool              ConfigDockingTransparentPayload;     // = false          // [BETA] Make window or viewport transparent when docking and only display docking boxes on the target viewport. Useful if rendering of multiple viewport cannot be synced. Best used with ConfigViewportsNoAutoMerge.
+    bool              ConfigDockingNoSplit;                           // = false          // Simplified docking mode: disable window splitting, so docking is limited to merging multiple windows together into tab-bars.
+    bool              ConfigDockingWithShift;                         // = false          // Enable docking with holding Shift key (reduce visual noise, allows dropping in wider space)
+    bool              ConfigDockingAlwaysTabBar;                      // = false          // [BETA] [FIXME: This currently creates regression with auto-sizing and general overhead] Make every single floating window display within a docking node.
+    bool              ConfigDockingTransparentPayload;                // = false          // [BETA] Make window or viewport transparent when docking and only display docking boxes on the target viewport. Useful if rendering of multiple viewport cannot be synced. Best used with ConfigViewportsNoAutoMerge.
 
     // Viewport options (when ImGuiConfigFlags_ViewportsEnable is set)
-    bool              ConfigViewportsNoAutoMerge;          // = false;         // Set to make all floating imgui windows always create their own viewport. Otherwise, they are merged into the main host viewports when overlapping it. May also set ImGuiViewportFlags_NoAutoMerge on individual viewport.
-    bool              ConfigViewportsNoTaskBarIcon;        // = false          // Disable default OS task bar icon flag for secondary viewports. When a viewport doesn't want a task bar icon, ImGuiViewportFlags_NoTaskBarIcon will be set on it.
-    bool              ConfigViewportsNoDecoration;         // = true           // Disable default OS window decoration flag for secondary viewports. When a viewport doesn't want window decorations, ImGuiViewportFlags_NoDecoration will be set on it. Enabling decoration can create subsequent issues at OS levels (e.g. minimum window size).
-    bool              ConfigViewportsNoDefaultParent;      // = false          // Disable default OS parenting to main viewport for secondary viewports. By default, viewports are marked with ParentViewportId = <main_viewport>, expecting the platform backend to setup a parent/child relationship between the OS windows (some backend may ignore this). Set to true if you want the default to be 0, then all viewports will be top-level OS windows.
+    bool              ConfigViewportsNoAutoMerge;                     // = false;         // Set to make all floating imgui windows always create their own viewport. Otherwise, they are merged into the main host viewports when overlapping it. May also set ImGuiViewportFlags_NoAutoMerge on individual viewport.
+    bool              ConfigViewportsNoTaskBarIcon;                   // = false          // Disable default OS task bar icon flag for secondary viewports. When a viewport doesn't want a task bar icon, ImGuiViewportFlags_NoTaskBarIcon will be set on it.
+    bool              ConfigViewportsNoDecoration;                    // = true           // Disable default OS window decoration flag for secondary viewports. When a viewport doesn't want window decorations, ImGuiViewportFlags_NoDecoration will be set on it. Enabling decoration can create subsequent issues at OS levels (e.g. minimum window size).
+    bool              ConfigViewportsNoDefaultParent;                 // = false          // Disable default OS parenting to main viewport for secondary viewports. By default, viewports are marked with ParentViewportId = <main_viewport>, expecting the platform backend to setup a parent/child relationship between the OS windows (some backend may ignore this). Set to true if you want the default to be 0, then all viewports will be top-level OS windows.
+    bool              ConfigViewportPlatformFocusSetsImGuiFocus;      //= true // When a platform window is focused (e.g. using Alt+Tab, clicking Platform Title Bar), apply corresponding focus on imgui windows (may clear focus/active id from imgui windows location in other platform windows). In principle this is better enabled but we provide an opt-out, because some Linux window managers tend to eagerly focus windows (e.g. on mouse hover, or even a simple window pos/size change).
+
+    // DPI/Scaling options
+    // This may keep evolving during 1.92.x releases. Expect some turbulence.
+    bool              ConfigDpiScaleFonts;                            // = false          // [EXPERIMENTAL] Automatically overwrite style.FontScaleDpi when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
+    bool              ConfigDpiScaleViewports;                        // = false          // [EXPERIMENTAL] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 
     // Miscellaneous options
     // (you can visualize and interact with all options in 'Demo->Configuration')
-    bool              MouseDrawCursor;                     // = false          // Request ImGui to draw a mouse cursor for you (if you are on a platform without a mouse cursor). Cannot be easily renamed to 'io.ConfigXXX' because this is frequently used by backend implementations.
-    bool              ConfigMacOSXBehaviors;               // = defined(__APPLE__) // Swap Cmd<>Ctrl keys + OS X style text editing cursor movement using Alt instead of Ctrl, Shortcuts using Cmd/Super instead of Ctrl, Line/Text Start and End using Cmd+Arrows instead of Home/End, Double click selects by word instead of selecting whole text, Multi-selection in lists uses Cmd/Super instead of Ctrl.
-    bool              ConfigInputTrickleEventQueue;        // = true           // Enable input queue trickling: some types of events submitted during the same frame (e.g. button down + up) will be spread over multiple frames, improving interactions with low framerates.
-    bool              ConfigInputTextCursorBlink;          // = true           // Enable blinking cursor (optional as some users consider it to be distracting).
-    bool              ConfigInputTextEnterKeepActive;      // = false          // [BETA] Pressing Enter will keep item active and select contents (single-line only).
-    bool              ConfigDragClickToInputText;          // = false          // [BETA] Enable turning DragXXX widgets into text input with a simple mouse click-release (without moving). Not desirable on devices without a keyboard.
-    bool              ConfigWindowsResizeFromEdges;        // = true           // Enable resizing of windows from their edges and from the lower-left corner. This requires ImGuiBackendFlags_HasMouseCursors for better mouse cursor feedback. (This used to be a per-window ImGuiWindowFlags_ResizeFromAnySide flag)
-    bool              ConfigWindowsMoveFromTitleBarOnly;   // = false      // Enable allowing to move windows only when clicking on their title bar. Does not apply to windows without a title bar.
-    bool              ConfigWindowsCopyContentsWithCtrlC;  // = false      // [EXPERIMENTAL] CTRL+C copy the contents of focused window into the clipboard. Experimental because: (1) has known issues with nested Begin/End pairs (2) text output quality varies (3) text output is in submission order rather than spatial order.
-    bool              ConfigScrollbarScrollByPage;         // = true           // Enable scrolling page by page when clicking outside the scrollbar grab. When disabled, always scroll to clicked location. When enabled, Shift+Click scrolls to clicked location.
-    float             ConfigMemoryCompactTimer;            // = 60.0f          // Timer (in seconds) to free transient windows/tables memory buffers when unused. Set to -1.0f to disable.
+    bool              MouseDrawCursor;                                // = false          // Request ImGui to draw a mouse cursor for you (if you are on a platform without a mouse cursor). Cannot be easily renamed to 'io.ConfigXXX' because this is frequently used by backend implementations.
+    bool              ConfigMacOSXBehaviors;                          // = defined(__APPLE__) // Swap Cmd<>Ctrl keys + OS X style text editing cursor movement using Alt instead of Ctrl, Shortcuts using Cmd/Super instead of Ctrl, Line/Text Start and End using Cmd+Arrows instead of Home/End, Double click selects by word instead of selecting whole text, Multi-selection in lists uses Cmd/Super instead of Ctrl.
+    bool              ConfigInputTrickleEventQueue;                   // = true           // Enable input queue trickling: some types of events submitted during the same frame (e.g. button down + up) will be spread over multiple frames, improving interactions with low framerates.
+    bool              ConfigInputTextCursorBlink;                     // = true           // Enable blinking cursor (optional as some users consider it to be distracting).
+    bool              ConfigInputTextEnterKeepActive;                 // = false          // [BETA] Pressing Enter will keep item active and select contents (single-line only).
+    bool              ConfigDragClickToInputText;                     // = false          // [BETA] Enable turning DragXXX widgets into text input with a simple mouse click-release (without moving). Not desirable on devices without a keyboard.
+    bool              ConfigWindowsResizeFromEdges;                   // = true           // Enable resizing of windows from their edges and from the lower-left corner. This requires ImGuiBackendFlags_HasMouseCursors for better mouse cursor feedback. (This used to be a per-window ImGuiWindowFlags_ResizeFromAnySide flag)
+    bool              ConfigWindowsMoveFromTitleBarOnly;              // = false      // Enable allowing to move windows only when clicking on their title bar. Does not apply to windows without a title bar.
+    bool              ConfigWindowsCopyContentsWithCtrlC;             // = false      // [EXPERIMENTAL] CTRL+C copy the contents of focused window into the clipboard. Experimental because: (1) has known issues with nested Begin/End pairs (2) text output quality varies (3) text output is in submission order rather than spatial order.
+    bool              ConfigScrollbarScrollByPage;                    // = true           // Enable scrolling page by page when clicking outside the scrollbar grab. When disabled, always scroll to clicked location. When enabled, Shift+Click scrolls to clicked location.
+    float             ConfigMemoryCompactTimer;                       // = 60.0f          // Timer (in seconds) to free transient windows/tables memory buffers when unused. Set to -1.0f to disable.
 
     // Inputs Behaviors
     // (other variables, ones which are expected to be tweaked within UI code, are exposed in ImGuiStyle)
-    float             MouseDoubleClickTime;                // = 0.30f          // Time for a double-click, in seconds.
-    float             MouseDoubleClickMaxDist;             // = 6.0f           // Distance threshold to stay in to validate a double-click, in pixels.
-    float             MouseDragThreshold;                  // = 6.0f           // Distance threshold before considering we are dragging.
-    float             KeyRepeatDelay;                      // = 0.275f         // When holding a key/button, time before it starts repeating, in seconds (for buttons in Repeat mode, etc.).
-    float             KeyRepeatRate;                       // = 0.050f         // When holding a key/button, rate at which it repeats, in seconds.
+    float             MouseDoubleClickTime;                           // = 0.30f          // Time for a double-click, in seconds.
+    float             MouseDoubleClickMaxDist;                        // = 6.0f           // Distance threshold to stay in to validate a double-click, in pixels.
+    float             MouseDragThreshold;                             // = 6.0f           // Distance threshold before considering we are dragging.
+    float             KeyRepeatDelay;                                 // = 0.275f         // When holding a key/button, time before it starts repeating, in seconds (for buttons in Repeat mode, etc.).
+    float             KeyRepeatRate;                                  // = 0.050f         // When holding a key/button, rate at which it repeats, in seconds.
 
     //------------------------------------------------------------------
     // Debug options
@@ -2494,37 +2651,38 @@ struct ImGuiIO_t
     // - Programmer seats: keep asserts (default), or disable asserts and keep error tooltips (new and nice!)
     // - Non-programmer seats: maybe disable asserts, but make sure errors are resurfaced (tooltips, visible log entries, use callback etc.)
     // - Recovery after error/exception: record stack sizes with ErrorRecoveryStoreState(), disable assert, set log callback (to e.g. trigger high-level breakpoint), recover with ErrorRecoveryTryToRecoverState(), restore settings.
-    bool              ConfigErrorRecovery;                 // = true       // Enable error recovery support. Some errors won't be detected and lead to direct crashes if recovery is disabled.
-    bool              ConfigErrorRecoveryEnableAssert;     // = true       // Enable asserts on recoverable error. By default call IM_ASSERT() when returning from a failing IM_ASSERT_USER_ERROR()
-    bool              ConfigErrorRecoveryEnableDebugLog;   // = true       // Enable debug log output on recoverable errors.
-    bool              ConfigErrorRecoveryEnableTooltip;    // = true       // Enable tooltip on recoverable errors. The tooltip include a way to enable asserts if they were disabled.
+    bool              ConfigErrorRecovery;                            // = true       // Enable error recovery support. Some errors won't be detected and lead to direct crashes if recovery is disabled.
+    bool              ConfigErrorRecoveryEnableAssert;                // = true       // Enable asserts on recoverable error. By default call IM_ASSERT() when returning from a failing IM_ASSERT_USER_ERROR()
+    bool              ConfigErrorRecoveryEnableDebugLog;              // = true       // Enable debug log output on recoverable errors.
+    bool              ConfigErrorRecoveryEnableTooltip;               // = true       // Enable tooltip on recoverable errors. The tooltip include a way to enable asserts if they were disabled.
 
     // Option to enable various debug tools showing buttons that will call the IM_DEBUG_BREAK() macro.
     // - The Item Picker tool will be available regardless of this being enabled, in order to maximize its discoverability.
     // - Requires a debugger being attached, otherwise IM_DEBUG_BREAK() options will appear to crash your application.
     //   e.g. io.ConfigDebugIsDebuggerPresent = ::IsDebuggerPresent() on Win32, or refer to ImOsIsDebuggerPresent() imgui_test_engine/imgui_te_utils.cpp for a Unix compatible version).
-    bool              ConfigDebugIsDebuggerPresent;        // = false          // Enable various tools calling IM_DEBUG_BREAK().
+    bool              ConfigDebugIsDebuggerPresent;                   // = false          // Enable various tools calling IM_DEBUG_BREAK().
 
     // Tools to detect code submitting items with conflicting/duplicate IDs
     // - Code should use PushID()/PopID() in loops, or append "##xx" to same-label identifiers.
     // - Empty label e.g. Button("") == same ID as parent widget/node. Use Button("##xx") instead!
     // - See FAQ https://github.com/ocornut/imgui/blob/master/docs/FAQ.md#q-about-the-id-stack-system
-    bool              ConfigDebugHighlightIdConflicts;     // = true           // Highlight and show an error message when multiple items have conflicting identifiers.
+    bool              ConfigDebugHighlightIdConflicts;                // = true           // Highlight and show an error message popup when multiple items have conflicting identifiers.
+    bool              ConfigDebugHighlightIdConflictsShowItemPicker;  //=true // Show "Item Picker" button in aforementioned popup.
 
     // Tools to test correct Begin/End and BeginChild/EndChild behaviors.
     // - Presently Begin()/End() and BeginChild()/EndChild() needs to ALWAYS be called in tandem, regardless of return value of BeginXXX()
     // - This is inconsistent with other BeginXXX functions and create confusion for many users.
     // - We expect to update the API eventually. In the meanwhile we provide tools to facilitate checking user-code behavior.
-    bool              ConfigDebugBeginReturnValueOnce;     // = false          // First-time calls to Begin()/BeginChild() will return false. NEEDS TO BE SET AT APPLICATION BOOT TIME if you don't want to miss windows.
-    bool              ConfigDebugBeginReturnValueLoop;     // = false          // Some calls to Begin()/BeginChild() will return false. Will cycle through window depths then repeat. Suggested use: add "io.ConfigDebugBeginReturnValue = io.KeyShift" in your main loop then occasionally press SHIFT. Windows should be flickering while running.
+    bool              ConfigDebugBeginReturnValueOnce;                // = false          // First-time calls to Begin()/BeginChild() will return false. NEEDS TO BE SET AT APPLICATION BOOT TIME if you don't want to miss windows.
+    bool              ConfigDebugBeginReturnValueLoop;                // = false          // Some calls to Begin()/BeginChild() will return false. Will cycle through window depths then repeat. Suggested use: add "io.ConfigDebugBeginReturnValue = io.KeyShift" in your main loop then occasionally press SHIFT. Windows should be flickering while running.
 
     // Option to deactivate io.AddFocusEvent(false) handling.
     // - May facilitate interactions with a debugger when focus loss leads to clearing inputs data.
     // - Backends may have other side-effects on focus loss, so this will reduce side-effects but not necessary remove all of them.
-    bool              ConfigDebugIgnoreFocusLoss;          // = false          // Ignore io.AddFocusEvent(false), consequently not calling io.ClearInputKeys()/io.ClearInputMouse() in input processing.
+    bool              ConfigDebugIgnoreFocusLoss;                     // = false          // Ignore io.AddFocusEvent(false), consequently not calling io.ClearInputKeys()/io.ClearInputMouse() in input processing.
 
     // Option to audit .ini data
-    bool              ConfigDebugIniSettings;              // = false          // Save .ini data with extra comments (particularly helpful for Docking, but makes saving slower)
+    bool              ConfigDebugIniSettings;                         // = false          // Save .ini data with extra comments (particularly helpful for Docking, but makes saving slower)
 
     //------------------------------------------------------------------
     // Platform Identifiers
@@ -2533,11 +2691,11 @@ struct ImGuiIO_t
 
     // Nowadays those would be stored in ImGuiPlatformIO but we are leaving them here for legacy reasons.
     // Optional: Platform/Renderer backend name (informational only! will be displayed in About Window) + User data for backend/wrappers to store their own stuff.
-    const char*       BackendPlatformName;                 // = NULL
-    const char*       BackendRendererName;                 // = NULL
-    void*             BackendPlatformUserData;             // = NULL           // User data for platform backend
-    void*             BackendRendererUserData;             // = NULL           // User data for renderer backend
-    void*             BackendLanguageUserData;             // = NULL           // User data for non C++ programming language backend
+    const char*       BackendPlatformName;                            // = NULL
+    const char*       BackendRendererName;                            // = NULL
+    void*             BackendPlatformUserData;                        // = NULL           // User data for platform backend
+    void*             BackendRendererUserData;                        // = NULL           // User data for renderer backend
+    void*             BackendLanguageUserData;                        // = NULL           // User data for non C++ programming language backend
 
     //------------------------------------------------------------------
     // Input - Call before calling NewFrame()
@@ -2549,65 +2707,66 @@ struct ImGuiIO_t
     //  generally easier and more correct to use their state BEFORE calling NewFrame(). See FAQ for details!)
     //------------------------------------------------------------------
 
-    bool              WantCaptureMouse;                    // Set when Dear ImGui will use mouse inputs, in this case do not dispatch them to your main game/application (either way, always pass on mouse inputs to imgui). (e.g. unclicked mouse is hovering over an imgui window, widget is active, mouse was clicked over an imgui window, etc.).
-    bool              WantCaptureKeyboard;                 // Set when Dear ImGui will use keyboard inputs, in this case do not dispatch them to your main game/application (either way, always pass keyboard inputs to imgui). (e.g. InputText active, or an imgui window is focused and navigation is enabled, etc.).
-    bool              WantTextInput;                       // Mobile/console: when set, you may display an on-screen keyboard. This is set by Dear ImGui when it wants textual keyboard input to happen (e.g. when a InputText widget is active).
-    bool              WantSetMousePos;                     // MousePos has been altered, backend should reposition mouse on next frame. Rarely used! Set only when io.ConfigNavMoveSetMousePos is enabled.
-    bool              WantSaveIniSettings;                 // When manual .ini load/save is active (io.IniFilename == NULL), this will be set to notify your application that you can call SaveIniSettingsToMemory() and save yourself. Important: clear io.WantSaveIniSettings yourself after saving!
-    bool              NavActive;                           // Keyboard/Gamepad navigation is currently allowed (will handle ImGuiKey_NavXXX events) = a window is focused and it doesn't use the ImGuiWindowFlags_NoNavInputs flag.
-    bool              NavVisible;                          // Keyboard/Gamepad navigation highlight is visible and allowed (will handle ImGuiKey_NavXXX events).
-    float             Framerate;                           // Estimate of application framerate (rolling average over 60 frames, based on io.DeltaTime), in frame per second. Solely for convenience. Slow applications may not want to use a moving average or may want to reset underlying buffers occasionally.
-    int               MetricsRenderVertices;               // Vertices output during last call to Render()
-    int               MetricsRenderIndices;                // Indices output during last call to Render() = number of triangles * 3
-    int               MetricsRenderWindows;                // Number of visible windows
-    int               MetricsActiveWindows;                // Number of active windows
-    ImVec2            MouseDelta;                          // Mouse delta. Note that this is zero if either current or previous position are invalid (-FLT_MAX,-FLT_MAX), so a disappearing/reappearing mouse won't have a huge delta.
+    bool              WantCaptureMouse;                               // Set when Dear ImGui will use mouse inputs, in this case do not dispatch them to your main game/application (either way, always pass on mouse inputs to imgui). (e.g. unclicked mouse is hovering over an imgui window, widget is active, mouse was clicked over an imgui window, etc.).
+    bool              WantCaptureKeyboard;                            // Set when Dear ImGui will use keyboard inputs, in this case do not dispatch them to your main game/application (either way, always pass keyboard inputs to imgui). (e.g. InputText active, or an imgui window is focused and navigation is enabled, etc.).
+    bool              WantTextInput;                                  // Mobile/console: when set, you may display an on-screen keyboard. This is set by Dear ImGui when it wants textual keyboard input to happen (e.g. when a InputText widget is active).
+    bool              WantSetMousePos;                                // MousePos has been altered, backend should reposition mouse on next frame. Rarely used! Set only when io.ConfigNavMoveSetMousePos is enabled.
+    bool              WantSaveIniSettings;                            // When manual .ini load/save is active (io.IniFilename == NULL), this will be set to notify your application that you can call SaveIniSettingsToMemory() and save yourself. Important: clear io.WantSaveIniSettings yourself after saving!
+    bool              NavActive;                                      // Keyboard/Gamepad navigation is currently allowed (will handle ImGuiKey_NavXXX events) = a window is focused and it doesn't use the ImGuiWindowFlags_NoNavInputs flag.
+    bool              NavVisible;                                     // Keyboard/Gamepad navigation highlight is visible and allowed (will handle ImGuiKey_NavXXX events).
+    float             Framerate;                                      // Estimate of application framerate (rolling average over 60 frames, based on io.DeltaTime), in frame per second. Solely for convenience. Slow applications may not want to use a moving average or may want to reset underlying buffers occasionally.
+    int               MetricsRenderVertices;                          // Vertices output during last call to Render()
+    int               MetricsRenderIndices;                           // Indices output during last call to Render() = number of triangles * 3
+    int               MetricsRenderWindows;                           // Number of visible windows
+    int               MetricsActiveWindows;                           // Number of active windows
+    ImVec2            MouseDelta;                                     // Mouse delta. Note that this is zero if either current or previous position are invalid (-FLT_MAX,-FLT_MAX), so a disappearing/reappearing mouse won't have a huge delta.
 
     //------------------------------------------------------------------
     // [Internal] Dear ImGui will maintain those fields. Forward compatibility not guaranteed!
     //------------------------------------------------------------------
 
-    ImGuiContext*     Ctx;                                 // Parent UI context (needs to be set explicitly by parent).
+    ImGuiContext*     Ctx;                                            // Parent UI context (needs to be set explicitly by parent).
 
     // Main Input State
     // (this block used to be written by backend, since 1.87 it is best to NOT write to those directly, call the AddXXX functions above instead)
     // (reading from those variables is fair game, as they are extremely unlikely to be moving anywhere)
-    ImVec2            MousePos;                            // Mouse position, in pixels. Set to ImVec2(-FLT_MAX, -FLT_MAX) if mouse is unavailable (on another screen, etc.)
-    bool              MouseDown[5];                        // Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Other buttons allow us to track if the mouse is being used by your application + available to user as a convenience via IsMouse** API.
-    float             MouseWheel;                          // Mouse wheel Vertical: 1 unit scrolls about 5 lines text. >0 scrolls Up, <0 scrolls Down. Hold SHIFT to turn vertical scroll into horizontal scroll.
-    float             MouseWheelH;                         // Mouse wheel Horizontal. >0 scrolls Left, <0 scrolls Right. Most users don't have a mouse with a horizontal wheel, may not be filled by all backends.
-    ImGuiMouseSource  MouseSource;                         // Mouse actual input peripheral (Mouse/TouchScreen/Pen).
-    ImGuiID           MouseHoveredViewport;                // (Optional) Modify using io.AddMouseViewportEvent(). With multi-viewports: viewport the OS mouse is hovering. If possible _IGNORING_ viewports with the ImGuiViewportFlags_NoInputs flag is much better (few backends can handle that). Set io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport if you can provide this info. If you don't imgui will infer the value using the rectangles and last focused time of the viewports it knows about (ignoring other OS windows).
-    bool              KeyCtrl;                             // Keyboard modifier down: Control
-    bool              KeyShift;                            // Keyboard modifier down: Shift
-    bool              KeyAlt;                              // Keyboard modifier down: Alt
-    bool              KeySuper;                            // Keyboard modifier down: Cmd/Super/Windows
+    ImVec2            MousePos;                                       // Mouse position, in pixels. Set to ImVec2(-FLT_MAX, -FLT_MAX) if mouse is unavailable (on another screen, etc.)
+    bool              MouseDown[5];                                   // Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Other buttons allow us to track if the mouse is being used by your application + available to user as a convenience via IsMouse** API.
+    float             MouseWheel;                                     // Mouse wheel Vertical: 1 unit scrolls about 5 lines text. >0 scrolls Up, <0 scrolls Down. Hold SHIFT to turn vertical scroll into horizontal scroll.
+    float             MouseWheelH;                                    // Mouse wheel Horizontal. >0 scrolls Left, <0 scrolls Right. Most users don't have a mouse with a horizontal wheel, may not be filled by all backends.
+    ImGuiMouseSource  MouseSource;                                    // Mouse actual input peripheral (Mouse/TouchScreen/Pen).
+    ImGuiID           MouseHoveredViewport;                           // (Optional) Modify using io.AddMouseViewportEvent(). With multi-viewports: viewport the OS mouse is hovering. If possible _IGNORING_ viewports with the ImGuiViewportFlags_NoInputs flag is much better (few backends can handle that). Set io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport if you can provide this info. If you don't imgui will infer the value using the rectangles and last focused time of the viewports it knows about (ignoring other OS windows).
+    bool              KeyCtrl;                                        // Keyboard modifier down: Ctrl (non-macOS), Cmd (macOS)
+    bool              KeyShift;                                       // Keyboard modifier down: Shift
+    bool              KeyAlt;                                         // Keyboard modifier down: Alt
+    bool              KeySuper;                                       // Keyboard modifier down: Windows/Super (non-macOS), Ctrl (macOS)
 
     // Other state maintained from data above + IO function calls
-    ImGuiKeyChord     KeyMods;                             // Key mods flags (any of ImGuiMod_Ctrl/ImGuiMod_Shift/ImGuiMod_Alt/ImGuiMod_Super flags, same as io.KeyCtrl/KeyShift/KeyAlt/KeySuper but merged into flags. Read-only, updated by NewFrame()
-    ImGuiKeyData      KeysData[ImGuiKey_NamedKey_COUNT];   // Key state for all known keys. Use IsKeyXXX() functions to access this.
-    bool              WantCaptureMouseUnlessPopupClose;    // Alternative to WantCaptureMouse: (WantCaptureMouse == true && WantCaptureMouseUnlessPopupClose == false) when a click over void is expected to close a popup.
-    ImVec2            MousePosPrev;                        // Previous mouse position (note that MouseDelta is not necessary == MousePos-MousePosPrev, in case either position is invalid)
-    ImVec2            MouseClickedPos[5];                  // Position at time of clicking
-    double            MouseClickedTime[5];                 // Time of last click (used to figure out double-click)
-    bool              MouseClicked[5];                     // Mouse button went from !Down to Down (same as MouseClickedCount[x] != 0)
-    bool              MouseDoubleClicked[5];               // Has mouse button been double-clicked? (same as MouseClickedCount[x] == 2)
-    ImU16             MouseClickedCount[5];                // == 0 (not clicked), == 1 (same as MouseClicked[]), == 2 (double-clicked), == 3 (triple-clicked) etc. when going from !Down to Down
-    ImU16             MouseClickedLastCount[5];            // Count successive number of clicks. Stays valid after mouse release. Reset after another click is done.
-    bool              MouseReleased[5];                    // Mouse button went from Down to !Down
-    bool              MouseDownOwned[5];                   // Track if button was clicked inside a dear imgui window or over void blocked by a popup. We don't request mouse capture from the application if click started outside ImGui bounds.
-    bool              MouseDownOwnedUnlessPopupClose[5];   // Track if button was clicked inside a dear imgui window.
-    bool              MouseWheelRequestAxisSwap;           // On a non-Mac system, holding SHIFT requests WheelY to perform the equivalent of a WheelX event. On a Mac system this is already enforced by the system.
-    bool              MouseCtrlLeftAsRightClick;           // (OSX) Set to true when the current click was a ctrl-click that spawned a simulated right click
-    float             MouseDownDuration[5];                // Duration the mouse button has been down (0.0f == just clicked)
-    float             MouseDownDurationPrev[5];            // Previous time the mouse button has been down
-    ImVec2            MouseDragMaxDistanceAbs[5];          // Maximum distance, absolute, on each axis, of how much mouse has traveled from the clicking point
-    float             MouseDragMaxDistanceSqr[5];          // Squared maximum distance of how much mouse has traveled from the clicking point (used for moving thresholds)
-    float             PenPressure;                         // Touch/Pen pressure (0.0f to 1.0f, should be >0.0f only when MouseDown[0] == true). Helper storage currently unused by Dear ImGui.
-    bool              AppFocusLost;                        // Only modify via AddFocusEvent()
-    bool              AppAcceptingEvents;                  // Only modify via SetAppAcceptingEvents()
-    ImWchar16         InputQueueSurrogate;                 // For AddInputCharacterUTF16()
-    ImVector_ImWchar  InputQueueCharacters;                // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
+    ImGuiKeyChord     KeyMods;                                        // Key mods flags (any of ImGuiMod_Ctrl/ImGuiMod_Shift/ImGuiMod_Alt/ImGuiMod_Super flags, same as io.KeyCtrl/KeyShift/KeyAlt/KeySuper but merged into flags. Read-only, updated by NewFrame()
+    ImGuiKeyData      KeysData[ImGuiKey_NamedKey_COUNT];              // Key state for all known keys. MUST use 'key - ImGuiKey_NamedKey_BEGIN' as index. Use IsKeyXXX() functions to access this.
+    bool              WantCaptureMouseUnlessPopupClose;               // Alternative to WantCaptureMouse: (WantCaptureMouse == true && WantCaptureMouseUnlessPopupClose == false) when a click over void is expected to close a popup.
+    ImVec2            MousePosPrev;                                   // Previous mouse position (note that MouseDelta is not necessary == MousePos-MousePosPrev, in case either position is invalid)
+    ImVec2            MouseClickedPos[5];                             // Position at time of clicking
+    double            MouseClickedTime[5];                            // Time of last click (used to figure out double-click)
+    bool              MouseClicked[5];                                // Mouse button went from !Down to Down (same as MouseClickedCount[x] != 0)
+    bool              MouseDoubleClicked[5];                          // Has mouse button been double-clicked? (same as MouseClickedCount[x] == 2)
+    ImU16             MouseClickedCount[5];                           // == 0 (not clicked), == 1 (same as MouseClicked[]), == 2 (double-clicked), == 3 (triple-clicked) etc. when going from !Down to Down
+    ImU16             MouseClickedLastCount[5];                       // Count successive number of clicks. Stays valid after mouse release. Reset after another click is done.
+    bool              MouseReleased[5];                               // Mouse button went from Down to !Down
+    double            MouseReleasedTime[5];                           // Time of last released (rarely used! but useful to handle delayed single-click when trying to disambiguate them from double-click).
+    bool              MouseDownOwned[5];                              // Track if button was clicked inside a dear imgui window or over void blocked by a popup. We don't request mouse capture from the application if click started outside ImGui bounds.
+    bool              MouseDownOwnedUnlessPopupClose[5];              // Track if button was clicked inside a dear imgui window.
+    bool              MouseWheelRequestAxisSwap;                      // On a non-Mac system, holding SHIFT requests WheelY to perform the equivalent of a WheelX event. On a Mac system this is already enforced by the system.
+    bool              MouseCtrlLeftAsRightClick;                      // (OSX) Set to true when the current click was a Ctrl+click that spawned a simulated right click
+    float             MouseDownDuration[5];                           // Duration the mouse button has been down (0.0f == just clicked)
+    float             MouseDownDurationPrev[5];                       // Previous time the mouse button has been down
+    ImVec2            MouseDragMaxDistanceAbs[5];                     // Maximum distance, absolute, on each axis, of how much mouse has traveled from the clicking point
+    float             MouseDragMaxDistanceSqr[5];                     // Squared maximum distance of how much mouse has traveled from the clicking point (used for moving thresholds)
+    float             PenPressure;                                    // Touch/Pen pressure (0.0f to 1.0f, should be >0.0f only when MouseDown[0] == true). Helper storage currently unused by Dear ImGui.
+    bool              AppFocusLost;                                   // Only modify via AddFocusEvent()
+    bool              AppAcceptingEvents;                             // Only modify via SetAppAcceptingEvents()
+    ImWchar16         InputQueueSurrogate;                            // For AddInputCharacterUTF16()
+    ImVector_ImWchar  InputQueueCharacters;                           // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
 
     // Legacy: before 1.87, we required backend to fill io.KeyMap[] (imgui->native map) during initialization and io.KeysDown[] (native indices) every frame.
     // This is still temporarily supported as a legacy feature. However the new preferred scheme is for backend to call io.AddKeyEvent().
@@ -2619,9 +2778,11 @@ struct ImGuiIO_t
     //float     NavInputs[ImGuiNavInput_COUNT];     // [LEGACY] Since 1.88, NavInputs[] was removed. Backends from 1.60 to 1.86 won't build. Feed gamepad inputs via io.AddKeyEvent() and ImGuiKey_GamepadXXX enums.
     //void*     ImeWindowHandle;                    // [Obsoleted in 1.87] Set ImGuiViewport::PlatformHandleRaw instead. Set this to your HWND to get automatic IME cursor positioning.
 
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    float             FontGlobalScale;                                // Moved io.FontGlobalScale to style.FontScaleMain in 1.92 (June 2025)
+
     // Legacy: before 1.91.1, clipboard functions were stored in ImGuiIO instead of ImGuiPlatformIO.
     // As this is will affect all users of custom engines/backends, we are providing proper legacy redirection (will obsolete).
-#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     const char* (*GetClipboardTextFn)(void* user_data);
     void (*SetClipboardTextFn)(void* user_data, const char* text);
     void*             ClipboardUserData;
@@ -2759,13 +2920,13 @@ struct ImGuiTextFilter_ImGuiTextRange_t
     const char* e;
 };
 CIMGUI_API bool ImGuiTextFilter_ImGuiTextRange_empty(const ImGuiTextFilter_ImGuiTextRange* self);
-CIMGUI_API void ImGuiTextFilter_ImGuiTextRange_split(const ImGuiTextFilter_ImGuiTextRange* self, char separator, ImVector_ImGuiTextFilter_ImGuiTextRange* out);
+CIMGUI_API void ImGuiTextFilter_ImGuiTextRange_split(const ImGuiTextFilter_ImGuiTextRange* self, char separator, ImVector_ImGuiTextRange* out);
 // Helper: Parse and apply text filters. In format "aaaaa[,bbbb][,ccccc]"
 struct ImGuiTextFilter_t
 {
-    char InputBuf[256];
-    ImVector_ImGuiTextFilter_ImGuiTextRange Filters;
-    int  CountGrep;
+    char                    InputBuf[256];
+    ImVector_ImGuiTextRange Filters;
+    int                     CountGrep;
 };
 CIMGUI_API bool ImGuiTextFilter_Draw(ImGuiTextFilter* self, const char* label /* = "Filter (inc,-exc)" */, float width /* = 0.0f */); // Helper calling InputText+Build
 CIMGUI_API bool ImGuiTextFilter_PassFilter(const ImGuiTextFilter* self, const char* text, const char* text_end /* = NULL */);
@@ -2784,6 +2945,7 @@ CIMGUI_API const char* ImGuiTextBuffer_end(const ImGuiTextBuffer* self);        
 CIMGUI_API int         ImGuiTextBuffer_size(const ImGuiTextBuffer* self);
 CIMGUI_API bool        ImGuiTextBuffer_empty(const ImGuiTextBuffer* self);
 CIMGUI_API void        ImGuiTextBuffer_clear(ImGuiTextBuffer* self);
+CIMGUI_API void        ImGuiTextBuffer_resize(ImGuiTextBuffer* self, int size);                                           // Similar to resize(0) on ImVector: empty string but don't free buffer.
 CIMGUI_API void        ImGuiTextBuffer_reserve(ImGuiTextBuffer* self, int capacity);
 CIMGUI_API const char* ImGuiTextBuffer_c_str(const ImGuiTextBuffer* self);
 CIMGUI_API void        ImGuiTextBuffer_append(ImGuiTextBuffer* self, const char* str, const char* str_end /* = NULL */);
@@ -2867,7 +3029,7 @@ struct ImGuiListClipper_t
     int           DisplayEnd;        // End of items to display (exclusive)
     int           ItemsCount;        // [Internal] Number of items
     float         ItemsHeight;       // [Internal] Height of item after a first step and item submission can calculate it
-    float         StartPosY;         // [Internal] Cursor position at the time of Begin() or after table frozen rows are all processed
+    double        StartPosY;         // [Internal] Cursor position at the time of Begin() or after table frozen rows are all processed
     double        StartSeekOffsetY;  // [Internal] Account for frozen rows in a table and initial loss of precision in very large windows.
     void*         TempData;          // [Internal] Internal data
 };
@@ -2883,8 +3045,7 @@ CIMGUI_API void ImGuiListClipper_IncludeItemsByIndex(ImGuiListClipper* self, int
 // - In this case, after all steps are done, you'll want to call SeekCursorForItem(item_count).
 CIMGUI_API void ImGuiListClipper_SeekCursorForItem(ImGuiListClipper* self, int item_index);
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-CIMGUI_API void ImGuiListClipper_IncludeRangeByIndices(ImGuiListClipper* self, int item_begin, int item_end);       // [renamed in 1.89.9]
-CIMGUI_API void ImGuiListClipper_ForceDisplayRangeByIndices(ImGuiListClipper* self, int item_begin, int item_end);  // [renamed in 1.89.6]
+CIMGUI_API void ImGuiListClipper_IncludeRangeByIndices(ImGuiListClipper* self, int item_begin, int item_end);  // [renamed in 1.89.9]
 #endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 
 // Helpers: ImVec2/ImVec4 operators
@@ -3081,7 +3242,7 @@ CIMGUI_API void ImGuiSelectionExternalStorage_ApplyRequests(ImGuiSelectionExtern
 
 // The maximum line width to bake anti-aliased textures for. Build atlas with ImFontAtlasFlags_NoBakedLines to disable baking.
 #ifndef IM_DRAWLIST_TEX_LINES_WIDTH_MAX
-#define IM_DRAWLIST_TEX_LINES_WIDTH_MAX     (63)
+#define IM_DRAWLIST_TEX_LINES_WIDTH_MAX     (32)
 #endif // #ifndef IM_DRAWLIST_TEX_LINES_WIDTH_MAX
 // ImDrawCallback: Draw callbacks for advanced uses [configurable type: override in imconfig.h]
 // NB: You most likely do NOT need to use draw callbacks just to create your own widget or customized UI rendering,
@@ -3103,11 +3264,11 @@ typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* c
 // - VtxOffset: When 'io.BackendFlags & ImGuiBackendFlags_RendererHasVtxOffset' is enabled,
 //   this fields allow us to render meshes larger than 64K vertices while keeping 16-bit indices.
 //   Backends made for <1.71. will typically ignore the VtxOffset fields.
-// - The ClipRect/TextureId/VtxOffset fields must be contiguous as we memcmp() them together (this is asserted for).
+// - The ClipRect/TexRef/VtxOffset fields must be contiguous as we memcmp() them together (this is asserted for).
 struct ImDrawCmd_t
 {
     ImVec4         ClipRect;                // 4*4  // Clipping rectangle (x1, y1, x2, y2). Subtract ImDrawData->DisplayPos to get clipping rectangle in "viewport" coordinates
-    ImTextureID    TextureId;               // 4-8  // User-provided texture ID. Set by user in ImfontAtlas::SetTexID() for fonts or passed to Image*() functions. Ignore if never using images or multiple fonts atlas.
+    ImTextureRef   TexRef;                  // 16   // Reference to a font/texture atlas (where backend called ImTextureData::SetTexID()) or to a user-provided texture ID (via e.g. ImGui::Image() calls). Both will lead to a ImTextureID value.
     unsigned int   VtxOffset;               // 4    // Start offset in vertex buffer. ImGuiBackendFlags_RendererHasVtxOffset: always 0, otherwise may be >0 to support meshes larger than 64K vertices with 16-bit indices.
     unsigned int   IdxOffset;               // 4    // Start offset in index buffer.
     unsigned int   ElemCount;               // 4    // Number of indices (multiple of 3) to be rendered as triangles. Vertices are stored in the callee ImDrawList's vtx_buffer[] array, indices in idx_buffer[].
@@ -3117,7 +3278,8 @@ struct ImDrawCmd_t
     int            UserCallbackDataOffset;  // 4 // [Internal] Offset of callback user data when using storage, otherwise -1.
 };
 // Since 1.83: returns ImTextureID associated with this draw call. Warning: DO NOT assume this is always same as 'TextureId' (we will change this function for an upcoming feature)
-CIMGUI_API ImTextureID ImDrawCmd_GetTexID(const ImDrawCmd* self);
+// Since 1.92: removed ImDrawCmd::TextureId field, the getter function must be used!
+CIMGUI_API ImTextureID ImDrawCmd_GetTexID(const ImDrawCmd* self);  // == (TexRef._TexData ? TexRef._TexData->TexID : TexRef._TexID
 
 // Vertex layout
 #ifndef IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT
@@ -3138,7 +3300,7 @@ IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT
 struct ImDrawCmdHeader_t
 {
     ImVec4       ClipRect;
-    ImTextureID  TextureId;
+    ImTextureRef TexRef;
     unsigned int VtxOffset;
 };
 
@@ -3220,12 +3382,11 @@ struct ImDrawList_t
     ImDrawCmdHeader       _CmdHeader;         // [Internal] template of active commands. Fields should match those of CmdBuffer.back().
     ImDrawListSplitter    _Splitter;          // [Internal] for channels api (note: prefer using your own persistent instance of ImDrawListSplitter!)
     ImVector_ImVec4       _ClipRectStack;     // [Internal]
-    ImVector_ImTextureID  _TextureIdStack;    // [Internal]
+    ImVector_ImTextureRef _TextureStack;      // [Internal]
     ImVector_ImU8         _CallbacksDataBuf;  // [Internal]
     float                 _FringeScale;       // [Internal] anti-alias fringe is scaled by this value, this helps to keep things sharp while zooming at vertex buffer content
     const char*           _OwnerName;         // Pointer to owner window's name for debugging
 
-    // Obsolete names
     //inline  void  AddEllipse(const ImVec2& center, float radius_x, float radius_y, ImU32 col, float rot = 0.0f, int num_segments = 0, float thickness = 1.0f) { AddEllipse(center, ImVec2(radius_x, radius_y), col, rot, num_segments, thickness); } // OBSOLETED in 1.90.5 (Mar 2024)
     //inline  void  AddEllipseFilled(const ImVec2& center, float radius_x, float radius_y, ImU32 col, float rot = 0.0f, int num_segments = 0) { AddEllipseFilled(center, ImVec2(radius_x, radius_y), col, rot, num_segments); }                        // OBSOLETED in 1.90.5 (Mar 2024)
     //inline  void  PathEllipticalArcTo(const ImVec2& center, float radius_x, float radius_y, float rot, float a_min, float a_max, int num_segments = 0) { PathEllipticalArcTo(center, ImVec2(radius_x, radius_y), rot, a_min, a_max, num_segments); } // OBSOLETED in 1.90.5 (Mar 2024)
@@ -3235,8 +3396,8 @@ struct ImDrawList_t
 CIMGUI_API void        ImDrawList_PushClipRect(ImDrawList* self, ImVec2 clip_rect_min, ImVec2 clip_rect_max, bool intersect_with_current_clip_rect /* = false */); // Render-level scissoring. This is passed down to your render function but not used for CPU-side coarse clipping. Prefer using higher-level ImGui::PushClipRect() to affect logic (hit-testing and widget culling)
 CIMGUI_API void        ImDrawList_PushClipRectFullScreen(ImDrawList* self);
 CIMGUI_API void        ImDrawList_PopClipRect(ImDrawList* self);
-CIMGUI_API void        ImDrawList_PushTextureID(ImDrawList* self, ImTextureID texture_id);
-CIMGUI_API void        ImDrawList_PopTextureID(ImDrawList* self);
+CIMGUI_API void        ImDrawList_PushTexture(ImDrawList* self, ImTextureRef tex_ref);
+CIMGUI_API void        ImDrawList_PopTexture(ImDrawList* self);
 CIMGUI_API ImVec2      ImDrawList_GetClipRectMin(const ImDrawList* self);
 CIMGUI_API ImVec2      ImDrawList_GetClipRectMax(const ImDrawList* self);
 // Primitives
@@ -3246,50 +3407,50 @@ CIMGUI_API ImVec2      ImDrawList_GetClipRectMax(const ImDrawList* self);
 //   In older versions (until Dear ImGui 1.77) the AddCircle functions defaulted to num_segments == 12.
 //   In future versions we will use textures to provide cheaper and higher-quality circles.
 //   Use AddNgon() and AddNgonFilled() functions if you need to guarantee a specific number of sides.
-CIMGUI_API void        ImDrawList_AddLine(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImU32 col);                                                                     // Implied thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddLine(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImU32 col);                                                              // Implied thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddLineEx(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImU32 col, float thickness /* = 1.0f */);
-CIMGUI_API void        ImDrawList_AddRect(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col);                                                               // Implied rounding = 0.0f, flags = 0, thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddRect(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col);                                                        // Implied rounding = 0.0f, flags = 0, thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddRectEx(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col, float rounding /* = 0.0f */, ImDrawFlags flags /* = 0 */, float thickness /* = 1.0f */); // a: upper-left, b: lower-right (== upper-left + size)
-CIMGUI_API void        ImDrawList_AddRectFilled(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col);                                                         // Implied rounding = 0.0f, flags = 0
+CIMGUI_API void        ImDrawList_AddRectFilled(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col);                                                  // Implied rounding = 0.0f, flags = 0
 CIMGUI_API void        ImDrawList_AddRectFilledEx(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col, float rounding /* = 0.0f */, ImDrawFlags flags /* = 0 */); // a: upper-left, b: lower-right (== upper-left + size)
 CIMGUI_API void        ImDrawList_AddRectFilledMultiColor(ImDrawList* self, ImVec2 p_min, ImVec2 p_max, ImU32 col_upr_left, ImU32 col_upr_right, ImU32 col_bot_right, ImU32 col_bot_left);
-CIMGUI_API void        ImDrawList_AddQuad(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImU32 col);                                               // Implied thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddQuad(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImU32 col);                                        // Implied thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddQuadEx(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImU32 col, float thickness /* = 1.0f */);
 CIMGUI_API void        ImDrawList_AddQuadFilled(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImU32 col);
-CIMGUI_API void        ImDrawList_AddTriangle(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col);                                                      // Implied thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddTriangle(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col);                                               // Implied thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddTriangleEx(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col, float thickness /* = 1.0f */);
 CIMGUI_API void        ImDrawList_AddTriangleFilled(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col);
-CIMGUI_API void        ImDrawList_AddCircle(ImDrawList* self, ImVec2 center, float radius, ImU32 col);                                                            // Implied num_segments = 0, thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddCircle(ImDrawList* self, ImVec2 center, float radius, ImU32 col);                                                     // Implied num_segments = 0, thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddCircleEx(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments /* = 0 */, float thickness /* = 1.0f */);
 CIMGUI_API void        ImDrawList_AddCircleFilled(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments /* = 0 */);
-CIMGUI_API void        ImDrawList_AddNgon(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments);                                            // Implied thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddNgon(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments);                                     // Implied thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddNgonEx(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments, float thickness /* = 1.0f */);
 CIMGUI_API void        ImDrawList_AddNgonFilled(ImDrawList* self, ImVec2 center, float radius, ImU32 col, int num_segments);
-CIMGUI_API void        ImDrawList_AddEllipse(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col);                                                          // Implied rot = 0.0f, num_segments = 0, thickness = 1.0f
+CIMGUI_API void        ImDrawList_AddEllipse(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col);                                                   // Implied rot = 0.0f, num_segments = 0, thickness = 1.0f
 CIMGUI_API void        ImDrawList_AddEllipseEx(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col, float rot /* = 0.0f */, int num_segments /* = 0 */, float thickness /* = 1.0f */);
-CIMGUI_API void        ImDrawList_AddEllipseFilled(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col);                                                    // Implied rot = 0.0f, num_segments = 0
+CIMGUI_API void        ImDrawList_AddEllipseFilled(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col);                                             // Implied rot = 0.0f, num_segments = 0
 CIMGUI_API void        ImDrawList_AddEllipseFilledEx(ImDrawList* self, ImVec2 center, ImVec2 radius, ImU32 col, float rot /* = 0.0f */, int num_segments /* = 0 */);
-CIMGUI_API void        ImDrawList_AddText(ImDrawList* self, ImVec2 pos, ImU32 col, const char* text_begin);                                                       // Implied text_end = NULL
+CIMGUI_API void        ImDrawList_AddText(ImDrawList* self, ImVec2 pos, ImU32 col, const char* text_begin);                                                // Implied text_end = NULL
 CIMGUI_API void        ImDrawList_AddTextEx(ImDrawList* self, ImVec2 pos, ImU32 col, const char* text_begin, const char* text_end /* = NULL */);
-CIMGUI_API void        ImDrawList_AddTextImFontPtr(ImDrawList* self, ImFont* font, float font_size, ImVec2 pos, ImU32 col, const char* text_begin);               // Implied text_end = NULL, wrap_width = 0.0f, cpu_fine_clip_rect = NULL
+CIMGUI_API void        ImDrawList_AddTextImFontPtr(ImDrawList* self, ImFont* font, float font_size, ImVec2 pos, ImU32 col, const char* text_begin);        // Implied text_end = NULL, wrap_width = 0.0f, cpu_fine_clip_rect = NULL
 CIMGUI_API void        ImDrawList_AddTextImFontPtrEx(ImDrawList* self, ImFont* font, float font_size, ImVec2 pos, ImU32 col, const char* text_begin, const char* text_end /* = NULL */, float wrap_width /* = 0.0f */, const ImVec4* cpu_fine_clip_rect /* = NULL */);
 CIMGUI_API void        ImDrawList_AddBezierCubic(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImU32 col, float thickness, int num_segments /* = 0 */); // Cubic Bezier (4 control points)
-CIMGUI_API void        ImDrawList_AddBezierQuadratic(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col, float thickness, int num_segments /* = 0 */);  // Quadratic Bezier (3 control points)
+CIMGUI_API void        ImDrawList_AddBezierQuadratic(ImDrawList* self, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 col, float thickness, int num_segments /* = 0 */); // Quadratic Bezier (3 control points)
 // General polygon
 // - Only simple polygons are supported by filling functions (no self-intersections, no holes).
-// - Concave polygon fill is more expensive than convex one: it has O(N^2) complexity. Provided as a convenience fo user but not used by main library.
+// - Concave polygon fill is more expensive than convex one: it has O(N^2) complexity. Provided as a convenience for the user but not used by the main library.
 CIMGUI_API void        ImDrawList_AddPolyline(ImDrawList* self, const ImVec2* points, int num_points, ImU32 col, ImDrawFlags flags, float thickness);
 CIMGUI_API void        ImDrawList_AddConvexPolyFilled(ImDrawList* self, const ImVec2* points, int num_points, ImU32 col);
 CIMGUI_API void        ImDrawList_AddConcavePolyFilled(ImDrawList* self, const ImVec2* points, int num_points, ImU32 col);
 // Image primitives
-// - Read FAQ to understand what ImTextureID is.
+// - Read FAQ to understand what ImTextureID/ImTextureRef are.
 // - "p_min" and "p_max" represent the upper-left and lower-right corners of the rectangle.
 // - "uv_min" and "uv_max" represent the normalized texture coordinates to use for those corners. Using (0,0)->(1,1) texture coordinates will generally display the entire texture.
-CIMGUI_API void        ImDrawList_AddImage(ImDrawList* self, ImTextureID user_texture_id, ImVec2 p_min, ImVec2 p_max);                                            // Implied uv_min = ImVec2(0, 0), uv_max = ImVec2(1, 1), col = IM_COL32_WHITE
-CIMGUI_API void        ImDrawList_AddImageEx(ImDrawList* self, ImTextureID user_texture_id, ImVec2 p_min, ImVec2 p_max, ImVec2 uv_min /* = ImVec2(0, 0) */, ImVec2 uv_max /* = ImVec2(1, 1) */, ImU32 col /* = IM_COL32_WHITE */);
-CIMGUI_API void        ImDrawList_AddImageQuad(ImDrawList* self, ImTextureID user_texture_id, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4);                        // Implied uv1 = ImVec2(0, 0), uv2 = ImVec2(1, 0), uv3 = ImVec2(1, 1), uv4 = ImVec2(0, 1), col = IM_COL32_WHITE
-CIMGUI_API void        ImDrawList_AddImageQuadEx(ImDrawList* self, ImTextureID user_texture_id, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImVec2 uv1 /* = ImVec2(0, 0) */, ImVec2 uv2 /* = ImVec2(1, 0) */, ImVec2 uv3 /* = ImVec2(1, 1) */, ImVec2 uv4 /* = ImVec2(0, 1) */, ImU32 col /* = IM_COL32_WHITE */);
-CIMGUI_API void        ImDrawList_AddImageRounded(ImDrawList* self, ImTextureID user_texture_id, ImVec2 p_min, ImVec2 p_max, ImVec2 uv_min, ImVec2 uv_max, ImU32 col, float rounding, ImDrawFlags flags /* = 0 */);
+CIMGUI_API void        ImDrawList_AddImage(ImDrawList* self, ImTextureRef tex_ref, ImVec2 p_min, ImVec2 p_max);                                            // Implied uv_min = ImVec2(0, 0), uv_max = ImVec2(1, 1), col = IM_COL32_WHITE
+CIMGUI_API void        ImDrawList_AddImageEx(ImDrawList* self, ImTextureRef tex_ref, ImVec2 p_min, ImVec2 p_max, ImVec2 uv_min /* = ImVec2(0, 0) */, ImVec2 uv_max /* = ImVec2(1, 1) */, ImU32 col /* = IM_COL32_WHITE */);
+CIMGUI_API void        ImDrawList_AddImageQuad(ImDrawList* self, ImTextureRef tex_ref, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4);                        // Implied uv1 = ImVec2(0, 0), uv2 = ImVec2(1, 0), uv3 = ImVec2(1, 1), uv4 = ImVec2(0, 1), col = IM_COL32_WHITE
+CIMGUI_API void        ImDrawList_AddImageQuadEx(ImDrawList* self, ImTextureRef tex_ref, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImVec2 p4, ImVec2 uv1 /* = ImVec2(0, 0) */, ImVec2 uv2 /* = ImVec2(1, 0) */, ImVec2 uv3 /* = ImVec2(1, 1) */, ImVec2 uv4 /* = ImVec2(0, 1) */, ImU32 col /* = IM_COL32_WHITE */);
+CIMGUI_API void        ImDrawList_AddImageRounded(ImDrawList* self, ImTextureRef tex_ref, ImVec2 p_min, ImVec2 p_max, ImVec2 uv_min, ImVec2 uv_max, ImU32 col, float rounding, ImDrawFlags flags /* = 0 */);
 // Stateful path API, add points then finish with PathFillConvex() or PathStroke()
 // - Important: filled shapes must always use clockwise winding order! The anti-aliasing fringe depends on it. Counter-clockwise shapes will have "inward" anti-aliasing.
 //   so e.g. 'PathArcTo(center, radius, PI * -0.5f, PI)' is ok, whereas 'PathArcTo(center, radius, PI, PI * -0.5f)' won't have correct anti-aliasing when followed by PathFillConvex().
@@ -3300,11 +3461,11 @@ CIMGUI_API void        ImDrawList_PathFillConvex(ImDrawList* self, ImU32 col);
 CIMGUI_API void        ImDrawList_PathFillConcave(ImDrawList* self, ImU32 col);
 CIMGUI_API void        ImDrawList_PathStroke(ImDrawList* self, ImU32 col, ImDrawFlags flags /* = 0 */, float thickness /* = 1.0f */);
 CIMGUI_API void        ImDrawList_PathArcTo(ImDrawList* self, ImVec2 center, float radius, float a_min, float a_max, int num_segments /* = 0 */);
-CIMGUI_API void        ImDrawList_PathArcToFast(ImDrawList* self, ImVec2 center, float radius, int a_min_of_12, int a_max_of_12);                                 // Use precomputed angles for a 12 steps circle
-CIMGUI_API void        ImDrawList_PathEllipticalArcTo(ImDrawList* self, ImVec2 center, ImVec2 radius, float rot, float a_min, float a_max);                       // Implied num_segments = 0
+CIMGUI_API void        ImDrawList_PathArcToFast(ImDrawList* self, ImVec2 center, float radius, int a_min_of_12, int a_max_of_12);                          // Use precomputed angles for a 12 steps circle
+CIMGUI_API void        ImDrawList_PathEllipticalArcTo(ImDrawList* self, ImVec2 center, ImVec2 radius, float rot, float a_min, float a_max);                // Implied num_segments = 0
 CIMGUI_API void        ImDrawList_PathEllipticalArcToEx(ImDrawList* self, ImVec2 center, ImVec2 radius, float rot, float a_min, float a_max, int num_segments /* = 0 */); // Ellipse
-CIMGUI_API void        ImDrawList_PathBezierCubicCurveTo(ImDrawList* self, ImVec2 p2, ImVec2 p3, ImVec2 p4, int num_segments /* = 0 */);                          // Cubic Bezier (4 control points)
-CIMGUI_API void        ImDrawList_PathBezierQuadraticCurveTo(ImDrawList* self, ImVec2 p2, ImVec2 p3, int num_segments /* = 0 */);                                 // Quadratic Bezier (3 control points)
+CIMGUI_API void        ImDrawList_PathBezierCubicCurveTo(ImDrawList* self, ImVec2 p2, ImVec2 p3, ImVec2 p4, int num_segments /* = 0 */);                   // Cubic Bezier (4 control points)
+CIMGUI_API void        ImDrawList_PathBezierQuadraticCurveTo(ImDrawList* self, ImVec2 p2, ImVec2 p3, int num_segments /* = 0 */);                          // Quadratic Bezier (3 control points)
 CIMGUI_API void        ImDrawList_PathRect(ImDrawList* self, ImVec2 rect_min, ImVec2 rect_max, float rounding /* = 0.0f */, ImDrawFlags flags /* = 0 */);
 // Advanced: Draw Callbacks
 // - May be used to alter render state (change sampler, blending, current shader). May be used to emit custom rendering commands (difficult to do correctly, but possible).
@@ -3315,11 +3476,11 @@ CIMGUI_API void        ImDrawList_PathRect(ImDrawList* self, ImVec2 rect_min, Im
 //   - If userdata_size == 0: we copy/store the 'userdata' argument as-is. It will be available unmodified in ImDrawCmd::UserCallbackData during render.
 //   - If userdata_size > 0,  we copy/store 'userdata_size' bytes pointed to by 'userdata'. We store them in a buffer stored inside the drawlist. ImDrawCmd::UserCallbackData will point inside that buffer so you have to retrieve data from there. Your callback may need to use ImDrawCmd::UserCallbackDataSize if you expect dynamically-sized data.
 //   - Support for userdata_size > 0 was added in v1.91.4, October 2024. So earlier code always only allowed to copy/store a simple void*.
-CIMGUI_API void        ImDrawList_AddCallback(ImDrawList* self, ImDrawCallback callback, void* userdata);                                                         // Implied userdata_size = 0
+CIMGUI_API void        ImDrawList_AddCallback(ImDrawList* self, ImDrawCallback callback, void* userdata);                                                  // Implied userdata_size = 0
 CIMGUI_API void        ImDrawList_AddCallbackEx(ImDrawList* self, ImDrawCallback callback, void* userdata, size_t userdata_size /* = 0 */);
 // Advanced: Miscellaneous
-CIMGUI_API void        ImDrawList_AddDrawCmd(ImDrawList* self);                                                                                                   // This is useful if you need to forcefully create a new draw call (to allow for dependent rendering / blending). Otherwise primitives are merged into the same draw-call as much as possible
-CIMGUI_API ImDrawList* ImDrawList_CloneOutput(const ImDrawList* self);                                                                                            // Create a clone of the CmdBuffer/IdxBuffer/VtxBuffer.
+CIMGUI_API void        ImDrawList_AddDrawCmd(ImDrawList* self);                                                                                            // This is useful if you need to forcefully create a new draw call (to allow for dependent rendering / blending). Otherwise primitives are merged into the same draw-call as much as possible
+CIMGUI_API ImDrawList* ImDrawList_CloneOutput(const ImDrawList* self);                                                                                     // Create a clone of the CmdBuffer/IdxBuffer/VtxBuffer.
 // Advanced: Channels
 // - Use to split render into layers. By switching channels to can render out-of-order (e.g. submit FG primitives before BG primitives)
 // - Use to minimize draw calls (e.g. if going back-and-forth between multiple clipping rectangles, prefer to append into separate channels then merge at the end)
@@ -3334,21 +3495,27 @@ CIMGUI_API void        ImDrawList_ChannelsSetCurrent(ImDrawList* self, int n);
 // - All primitives needs to be reserved via PrimReserve() beforehand.
 CIMGUI_API void        ImDrawList_PrimReserve(ImDrawList* self, int idx_count, int vtx_count);
 CIMGUI_API void        ImDrawList_PrimUnreserve(ImDrawList* self, int idx_count, int vtx_count);
-CIMGUI_API void        ImDrawList_PrimRect(ImDrawList* self, ImVec2 a, ImVec2 b, ImU32 col);                                                                      // Axis aligned rectangle (composed of two triangles)
+CIMGUI_API void        ImDrawList_PrimRect(ImDrawList* self, ImVec2 a, ImVec2 b, ImU32 col);                                                               // Axis aligned rectangle (composed of two triangles)
 CIMGUI_API void        ImDrawList_PrimRectUV(ImDrawList* self, ImVec2 a, ImVec2 b, ImVec2 uv_a, ImVec2 uv_b, ImU32 col);
 CIMGUI_API void        ImDrawList_PrimQuadUV(ImDrawList* self, ImVec2 a, ImVec2 b, ImVec2 c, ImVec2 d, ImVec2 uv_a, ImVec2 uv_b, ImVec2 uv_c, ImVec2 uv_d, ImU32 col);
 CIMGUI_API void        ImDrawList_PrimWriteVtx(ImDrawList* self, ImVec2 pos, ImVec2 uv, ImU32 col);
 CIMGUI_API void        ImDrawList_PrimWriteIdx(ImDrawList* self, ImDrawIdx idx);
-CIMGUI_API void        ImDrawList_PrimVtx(ImDrawList* self, ImVec2 pos, ImVec2 uv, ImU32 col);                                                                    // Write vertex with unique index
+CIMGUI_API void        ImDrawList_PrimVtx(ImDrawList* self, ImVec2 pos, ImVec2 uv, ImU32 col);                                                             // Write vertex with unique index
+// Obsolete names
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+CIMGUI_API void ImDrawList_PushTextureID(ImDrawList* self, ImTextureRef tex_ref);  // RENAMED in 1.92.x
+CIMGUI_API void ImDrawList_PopTextureID(ImDrawList* self);                         // RENAMED in 1.92.x
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 // [Internal helpers]
+CIMGUI_API void        ImDrawList__SetDrawListSharedData(ImDrawList* self, ImDrawListSharedData* data);
 CIMGUI_API void        ImDrawList__ResetForNewFrame(ImDrawList* self);
 CIMGUI_API void        ImDrawList__ClearFreeMemory(ImDrawList* self);
 CIMGUI_API void        ImDrawList__PopUnusedDrawCmd(ImDrawList* self);
 CIMGUI_API void        ImDrawList__TryMergeDrawCmds(ImDrawList* self);
 CIMGUI_API void        ImDrawList__OnChangedClipRect(ImDrawList* self);
-CIMGUI_API void        ImDrawList__OnChangedTextureID(ImDrawList* self);
+CIMGUI_API void        ImDrawList__OnChangedTexture(ImDrawList* self);
 CIMGUI_API void        ImDrawList__OnChangedVtxOffset(ImDrawList* self);
-CIMGUI_API void        ImDrawList__SetTextureID(ImDrawList* self, ImTextureID texture_id);
+CIMGUI_API void        ImDrawList__SetTexture(ImDrawList* self, ImTextureRef tex_ref);
 CIMGUI_API int         ImDrawList__CalcCircleAutoSegmentCount(const ImDrawList* self, float radius);
 CIMGUI_API void        ImDrawList__PathArcToFastEx(ImDrawList* self, ImVec2 center, float radius, int a_min_sample, int a_max_sample, int a_step);
 CIMGUI_API void        ImDrawList__PathArcToN(ImDrawList* self, ImVec2 center, float radius, float a_min, float a_max, int num_segments);
@@ -3358,15 +3525,16 @@ CIMGUI_API void        ImDrawList__PathArcToN(ImDrawList* self, ImVec2 center, f
 // as this is one of the oldest structure exposed by the library! Basically, ImDrawList == CmdList)
 struct ImDrawData_t
 {
-    bool                   Valid;             // Only valid after Render() is called and before the next NewFrame() is called.
-    int                    CmdListsCount;     // Number of ImDrawList* to render
-    int                    TotalIdxCount;     // For convenience, sum of all ImDrawList's IdxBuffer.Size
-    int                    TotalVtxCount;     // For convenience, sum of all ImDrawList's VtxBuffer.Size
-    ImVector_ImDrawListPtr CmdLists;          // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
-    ImVec2                 DisplayPos;        // Top-left position of the viewport to render (== top-left of the orthogonal projection matrix to use) (== GetMainViewport()->Pos for the main viewport, == (0.0) in most single-viewport applications)
-    ImVec2                 DisplaySize;       // Size of the viewport to render (== GetMainViewport()->Size for the main viewport, == io.DisplaySize in most single-viewport applications)
-    ImVec2                 FramebufferScale;  // Amount of pixels for each unit of DisplaySize. Based on io.DisplayFramebufferScale. Generally (1,1) on normal display, (2,2) on OSX with Retina display.
-    ImGuiViewport*         OwnerViewport;     // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
+    bool                       Valid;             // Only valid after Render() is called and before the next NewFrame() is called.
+    int                        CmdListsCount;     // == CmdLists.Size. (OBSOLETE: exists for legacy reasons). Number of ImDrawList* to render.
+    int                        TotalIdxCount;     // For convenience, sum of all ImDrawList's IdxBuffer.Size
+    int                        TotalVtxCount;     // For convenience, sum of all ImDrawList's VtxBuffer.Size
+    ImVector_ImDrawListPtr     CmdLists;          // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
+    ImVec2                     DisplayPos;        // Top-left position of the viewport to render (== top-left of the orthogonal projection matrix to use) (== GetMainViewport()->Pos for the main viewport, == (0.0) in most single-viewport applications)
+    ImVec2                     DisplaySize;       // Size of the viewport to render (== GetMainViewport()->Size for the main viewport, == io.DisplaySize in most single-viewport applications)
+    ImVec2                     FramebufferScale;  // Amount of pixels for each unit of DisplaySize. Copied from viewport->FramebufferScale (== io.DisplayFramebufferScale for main viewport). Generally (1,1) on normal display, (2,2) on OSX with Retina display.
+    ImGuiViewport*             OwnerViewport;     // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
+    ImVector_ImTextureDataPtr* Textures;          // List of textures to update. Most of the times the list is shared by all ImDrawData, has only 1 texture and it doesn't need any update. This almost always points to ImGui::GetPlatformIO().Textures[]. May be overriden or set to NULL if you want to manually update textures.
 };
 CIMGUI_API void ImDrawData_Clear(ImDrawData* self);
 CIMGUI_API void ImDrawData_AddDrawList(ImDrawData* self, ImDrawList* draw_list);  // Helper to add an external draw list into an existing ImDrawData.
@@ -3374,45 +3542,132 @@ CIMGUI_API void ImDrawData_DeIndexAllBuffers(ImDrawData* self);                 
 CIMGUI_API void ImDrawData_ScaleClipRects(ImDrawData* self, ImVec2 fb_scale);     // Helper to scale the ClipRect field of each ImDrawCmd. Use if your final output buffer is at a different scale than Dear ImGui expects, or if there is a difference between your window resolution and framebuffer resolution.
 
 //-----------------------------------------------------------------------------
+// [SECTION] Texture API (ImTextureFormat, ImTextureStatus, ImTextureRect, ImTextureData)
+//-----------------------------------------------------------------------------
+// In principle, the only data types that user/application code should care about are 'ImTextureRef' and 'ImTextureID'.
+// They are defined above in this header file. Read their description to the difference between ImTextureRef and ImTextureID.
+// FOR ALL OTHER ImTextureXXXX TYPES: ONLY CORE LIBRARY AND RENDERER BACKENDS NEED TO KNOW AND CARE ABOUT THEM.
+//-----------------------------------------------------------------------------
+
+#undef Status // X11 headers are leaking this.                                                                         // We intentionally support a limited amount of texture formats to limit burden on CPU-side code and extension.
+// Most standard backends only support RGBA32 but we provide a single channel option for low-resource/embedded systems.
+typedef enum
+{
+    ImTextureFormat_RGBA32,  // 4 components per pixel, each is unsigned 8-bit. Total size = TexWidth * TexHeight * 4
+    ImTextureFormat_Alpha8,  // 1 component per pixel, each is unsigned 8-bit. Total size = TexWidth * TexHeight
+} ImTextureFormat;
+
+// Status of a texture to communicate with Renderer Backend.
+typedef enum
+{
+    ImTextureStatus_OK,
+    ImTextureStatus_Destroyed,    // Backend destroyed the texture.
+    ImTextureStatus_WantCreate,   // Requesting backend to create the texture. Set status OK when done.
+    ImTextureStatus_WantUpdates,  // Requesting backend to update specific blocks of pixels (write to texture portions which have never been used before). Set status OK when done.
+    ImTextureStatus_WantDestroy,  // Requesting backend to destroy the texture. Set status to Destroyed when done.
+} ImTextureStatus;
+
+// Coordinates of a rectangle within a texture.
+// When a texture is in ImTextureStatus_WantUpdates state, we provide a list of individual rectangles to copy to the graphics system.
+// You may use ImTextureData::Updates[] for the list, or ImTextureData::UpdateBox for a single bounding box.
+struct ImTextureRect_t
+{
+    unsigned short x, y;  // Upper-left coordinates of rectangle to update
+    unsigned short w, h;  // Size of rectangle to update (in pixels)
+};
+
+// Specs and pixel storage for a texture used by Dear ImGui.
+// This is only useful for (1) core library and (2) backends. End-user/applications do not need to care about this.
+// Renderer Backends will create a GPU-side version of this.
+// Why does we store two identifiers: TexID and BackendUserData?
+// - ImTextureID    TexID           = lower-level identifier stored in ImDrawCmd. ImDrawCmd can refer to textures not created by the backend, and for which there's no ImTextureData.
+// - void*          BackendUserData = higher-level opaque storage for backend own book-keeping. Some backends may have enough with TexID and not need both.
+// In columns below: who reads/writes each fields? 'r'=read, 'w'=write, 'core'=main library, 'backend'=renderer backend
+struct ImTextureData_t
+{
+    //------------------------------------------ core / backend ---------------------------------------
+    int                    UniqueID;              // w    -   // [DEBUG] Sequential index to facilitate identifying a texture when debugging/printing. Unique per atlas.
+    ImTextureStatus        Status;                // rw   rw  // ImTextureStatus_OK/_WantCreate/_WantUpdates/_WantDestroy. Always use SetStatus() to modify!
+    void*                  BackendUserData;       // -    rw  // Convenience storage for backend. Some backends may have enough with TexID.
+    ImTextureID            TexID;                 // r    w   // Backend-specific texture identifier. Always use SetTexID() to modify! The identifier will stored in ImDrawCmd::GetTexID() and passed to backend's RenderDrawData function.
+    ImTextureFormat        Format;                // w    r   // ImTextureFormat_RGBA32 (default) or ImTextureFormat_Alpha8
+    int                    Width;                 // w    r   // Texture width
+    int                    Height;                // w    r   // Texture height
+    int                    BytesPerPixel;         // w    r   // 4 or 1
+    unsigned char*         Pixels;                // w    r   // Pointer to buffer holding 'Width*Height' pixels and 'Width*Height*BytesPerPixels' bytes.
+    ImTextureRect          UsedRect;              // w    r   // Bounding box encompassing all past and queued Updates[].
+    ImTextureRect          UpdateRect;            // w    r   // Bounding box encompassing all queued Updates[].
+    ImVector_ImTextureRect Updates;               // w    r   // Array of individual updates.
+    int                    UnusedFrames;          // w    r   // In order to facilitate handling Status==WantDestroy in some backend: this is a count successive frames where the texture was not used. Always >0 when Status==WantDestroy.
+    unsigned short         RefCount;              // w    r   // Number of contexts using this texture. Used during backend shutdown.
+    bool                   UseColors;             // w    r   // Tell whether our texture data is known to use colors (rather than just white + alpha).
+    bool                   WantDestroyNextFrame;  // rw   -   // [Internal] Queued to set ImTextureStatus_WantDestroy next frame. May still be used in the current frame.
+};
+CIMGUI_API void         ImTextureData_Create(ImTextureData* self, ImTextureFormat format, int w, int h);
+CIMGUI_API void         ImTextureData_DestroyPixels(ImTextureData* self);
+CIMGUI_API void*        ImTextureData_GetPixels(ImTextureData* self);
+CIMGUI_API void*        ImTextureData_GetPixelsAt(ImTextureData* self, int x, int y);
+CIMGUI_API int          ImTextureData_GetSizeInBytes(const ImTextureData* self);
+CIMGUI_API int          ImTextureData_GetPitch(const ImTextureData* self);
+CIMGUI_API ImTextureRef ImTextureData_GetTexRef(ImTextureData* self);
+CIMGUI_API ImTextureID  ImTextureData_GetTexID(const ImTextureData* self);
+// Called by Renderer backend
+CIMGUI_API void         ImTextureData_SetTexID(ImTextureData* self, ImTextureID tex_id);       // Call after creating or destroying the texture. Never modify TexID directly!
+CIMGUI_API void         ImTextureData_SetStatus(ImTextureData* self, ImTextureStatus status);  // Call after honoring a request. Never modify Status directly!
+
+//-----------------------------------------------------------------------------
 // [SECTION] Font API (ImFontConfig, ImFontGlyph, ImFontAtlasFlags, ImFontAtlas, ImFontGlyphRangesBuilder, ImFont)
 //-----------------------------------------------------------------------------
 
+// A font input/source (we may rename this to ImFontSource in the future)
 struct ImFontConfig_t
 {
-    void*          FontData;              //          // TTF/OTF data
-    int            FontDataSize;          //          // TTF/OTF data size
-    bool           FontDataOwnedByAtlas;  // true     // TTF/OTF data ownership taken by the container ImFontAtlas (will delete memory itself).
-    int            FontNo;                // 0        // Index of font within TTF/OTF file
-    float          SizePixels;            //          // Size in pixels for rasterizer (more or less maps to the resulting font height).
-    int            OversampleH;           // 2        // Rasterize at higher quality for sub-pixel positioning. Note the difference between 2 and 3 is minimal. You can reduce this to 1 for large glyphs save memory. Read https://github.com/nothings/stb/blob/master/tests/oversample/README.md for details.
-    int            OversampleV;           // 1        // Rasterize at higher quality for sub-pixel positioning. This is not really useful as we don't use sub-pixel positions on the Y axis.
-    bool           PixelSnapH;            // false    // Align every glyph AdvanceX to pixel boundaries. Useful e.g. if you are merging a non-pixel aligned font with the default font. If enabled, you can set OversampleH/V to 1.
-    ImVec2         GlyphExtraSpacing;     // 0, 0     // Extra spacing (in pixels) between glyphs when rendered: essentially add to glyph->AdvanceX. Only X axis is supported for now.
-    ImVec2         GlyphOffset;           // 0, 0     // Offset all glyphs from this font input.
-    const ImWchar* GlyphRanges;           // NULL     // THE ARRAY DATA NEEDS TO PERSIST AS LONG AS THE FONT IS ALIVE. Pointer to a user-provided list of Unicode range (2 value per range, values are inclusive, zero-terminated list).
-    float          GlyphMinAdvanceX;      // 0        // Minimum AdvanceX for glyphs, set Min to align font icons, set both Min/Max to enforce mono-space font
-    float          GlyphMaxAdvanceX;      // FLT_MAX  // Maximum AdvanceX for glyphs
-    bool           MergeMode;             // false    // Merge into previous ImFont, so you can combine multiple inputs font into one ImFont (e.g. ASCII font + icons + Japanese glyphs). You may want to use GlyphOffset.y when merge font of different heights.
-    unsigned int   FontBuilderFlags;      // 0        // Settings for custom font builder. THIS IS BUILDER IMPLEMENTATION DEPENDENT. Leave as zero if unsure.
-    float          RasterizerMultiply;    // 1.0f     // Linearly brighten (>1.0f) or darken (<1.0f) font output. Brightening small fonts may be a good workaround to make them more readable. This is a silly thing we may remove in the future.
-    float          RasterizerDensity;     // 1.0f     // DPI scale for rasterization, not altering other font metrics: make it easy to swap between e.g. a 100% and a 400% fonts for a zooming display. IMPORTANT: If you increase this it is expected that you increase font scale accordingly, otherwise quality may look lowered.
-    ImWchar        EllipsisChar;          // 0        // Explicitly specify unicode codepoint of ellipsis character. When fonts are being merged first specified ellipsis will be used.
+    // Data Source
+    char                Name[40];              // <auto>   // Name (strictly to ease debugging, hence limited size buffer)
+    void*               FontData;              //          // TTF/OTF data
+    int                 FontDataSize;          //          // TTF/OTF data size
+    bool                FontDataOwnedByAtlas;  // true     // TTF/OTF data ownership taken by the container ImFontAtlas (will delete memory itself).
+
+    // Options
+    bool                MergeMode;             // false    // Merge into previous ImFont, so you can combine multiple inputs font into one ImFont (e.g. ASCII font + icons + Japanese glyphs). You may want to use GlyphOffset.y when merge font of different heights.
+    bool                PixelSnapH;            // false    // Align every glyph AdvanceX to pixel boundaries. Useful e.g. if you are merging a non-pixel aligned font with the default font. If enabled, you can set OversampleH/V to 1.
+    bool                PixelSnapV;            // true     // Align Scaled GlyphOffset.y to pixel boundaries.
+    ImS8                OversampleH;           // 0 (2)    // Rasterize at higher quality for sub-pixel positioning. 0 == auto == 1 or 2 depending on size. Note the difference between 2 and 3 is minimal. You can reduce this to 1 for large glyphs save memory. Read https://github.com/nothings/stb/blob/master/tests/oversample/README.md for details.
+    ImS8                OversampleV;           // 0 (1)    // Rasterize at higher quality for sub-pixel positioning. 0 == auto == 1. This is not really useful as we don't use sub-pixel positions on the Y axis.
+    ImWchar             EllipsisChar;          // 0        // Explicitly specify Unicode codepoint of ellipsis character. When fonts are being merged first specified ellipsis will be used.
+    float               SizePixels;            //          // Size in pixels for rasterizer (more or less maps to the resulting font height).
+    const ImWchar*      GlyphRanges;           // NULL     // *LEGACY* THE ARRAY DATA NEEDS TO PERSIST AS LONG AS THE FONT IS ALIVE. Pointer to a user-provided list of Unicode range (2 value per range, values are inclusive, zero-terminated list).
+    const ImWchar*      GlyphExcludeRanges;    // NULL     // Pointer to a small user-provided list of Unicode ranges (2 value per range, values are inclusive, zero-terminated list). This is very close to GlyphRanges[] but designed to exclude ranges from a font source, when merging fonts with overlapping glyphs. Use "Input Glyphs Overlap Detection Tool" to find about your overlapping ranges.
+    //ImVec2        GlyphExtraSpacing;      // 0, 0     // (REMOVED AT IT SEEMS LARGELY OBSOLETE. PLEASE REPORT IF YOU WERE USING THIS). Extra spacing (in pixels) between glyphs when rendered: essentially add to glyph->AdvanceX. Only X axis is supported for now.
+    ImVec2              GlyphOffset;           // 0, 0     // Offset (in pixels) all glyphs from this font input. Absolute value for default size, other sizes will scale this value.
+    float               GlyphMinAdvanceX;      // 0        // Minimum AdvanceX for glyphs, set Min to align font icons, set both Min/Max to enforce mono-space font. Absolute value for default size, other sizes will scale this value.
+    float               GlyphMaxAdvanceX;      // FLT_MAX  // Maximum AdvanceX for glyphs
+    float               GlyphExtraAdvanceX;    // 0        // Extra spacing (in pixels) between glyphs. Please contact us if you are using this. // FIXME-NEWATLAS: Intentionally unscaled
+    ImU32               FontNo;                // 0        // Index of font within TTF/OTF file
+    unsigned int        FontLoaderFlags;       // 0        // Settings for custom font builder. THIS IS BUILDER IMPLEMENTATION DEPENDENT. Leave as zero if unsure.
+    //unsigned int  FontBuilderFlags;       // --       // [Renamed in 1.92] Ue FontLoaderFlags.
+    float               RasterizerMultiply;    // 1.0f     // Linearly brighten (>1.0f) or darken (<1.0f) font output. Brightening small fonts may be a good workaround to make them more readable. This is a silly thing we may remove in the future.
+    float               RasterizerDensity;     // 1.0f     // [LEGACY: this only makes sense when ImGuiBackendFlags_RendererHasTextures is not supported] DPI scale multiplier for rasterization. Not altering other font metrics: makes it easy to swap between e.g. a 100% and a 400% fonts for a zooming display, or handle Retina screen. IMPORTANT: If you change this it is expected that you increase/decrease font scale roughly to the inverse of this, otherwise quality may look lowered.
 
     // [Internal]
-    char           Name[40];              // Name (strictly to ease debugging)
-    ImFont*        DstFont;
+    ImFontFlags         Flags;                 // Font flags (don't use just yet, will be exposed in upcoming 1.92.X updates)
+    ImFont*             DstFont;               // Target font (as we merging fonts, multiple ImFontConfig may target the same font)
+    const ImFontLoader* FontLoader;            // Custom font backend for this source (default source is the one stored in ImFontAtlas)
+    void*               FontLoaderData;        // Font loader opaque storage (per font config)
 };
 
 // Hold rendering data for one glyph.
-// (Note: some language parsers may fail to convert the 31+1 bitfield members, in this case maybe drop store a single u32 or we can rework this)
+// (Note: some language parsers may fail to convert the bitfield members, in this case maybe drop store a single u32 or we can rework this)
 struct ImFontGlyph_t
 {
     unsigned int Colored : 1;     // Flag to indicate glyph is colored and should generally ignore tinting (make it usable with no shift on little-endian as this is used in loops)
     unsigned int Visible : 1;     // Flag to indicate glyph has no visible pixels (e.g. space). Allow early out when rendering.
-    unsigned int Codepoint : 30;  // 0x0000..0x10FFFF
-    float        AdvanceX;        // Distance to next character (= data from font + ImFontConfig::GlyphExtraSpacing.x baked in)
-    float        X0, Y0, X1, Y1;  // Glyph corners
-    float        U0, V0, U1, V1;  // Texture coordinates
+    unsigned int SourceIdx : 4;   // Index of source in parent font
+    unsigned int Codepoint : 26;  // 0x0000..0x10FFFF
+    float        AdvanceX;        // Horizontal distance to advance cursor/layout position.
+    float        X0, Y0, X1, Y1;  // Glyph corners. Offsets from current cursor/layout position.
+    float        U0, V0, U1, V1;  // Texture coordinates for the current value of ImFontAtlas->TexRef. Cached equivalent of calling GetCustomRect() with PackId.
+    int          PackId;          // [Internal] ImFontAtlasRectId value (FIXME: Cold data, could be moved elsewhere?)
 };
 
 // Helper to build glyph ranges from text/string data. Feed your application strings/characters to it then call BuildRanges().
@@ -3429,20 +3684,20 @@ CIMGUI_API void ImFontGlyphRangesBuilder_AddText(ImFontGlyphRangesBuilder* self,
 CIMGUI_API void ImFontGlyphRangesBuilder_AddRanges(ImFontGlyphRangesBuilder* self, const ImWchar* ranges);                              // Add ranges, e.g. builder.AddRanges(ImFontAtlas::GetGlyphRangesDefault()) to force add all of ASCII/Latin+Ext
 CIMGUI_API void ImFontGlyphRangesBuilder_BuildRanges(ImFontGlyphRangesBuilder* self, ImVector_ImWchar* out_ranges);                     // Output new ranges (ImVector_Construct()/ImVector_Destruct() can be used to safely construct out_ranges)
 
-// See ImFontAtlas::AddCustomRectXXX functions.
-struct ImFontAtlasCustomRect_t
-{
-    unsigned short X, Y;              // Output   // Packed position in Atlas
+// An opaque identifier to a rectangle in the atlas. -1 when invalid.
+// The rectangle may move and UV may be invalidated, use GetCustomRect() to retrieve it.
+typedef int ImFontAtlasRectId;
+#define ImFontAtlasRectId_Invalid -1
 
-    // [Internal]
-    unsigned short Width, Height;     // Input    // Desired rectangle dimension
-    unsigned int   GlyphID : 31;      // Input    // For custom font glyphs only (ID < 0x110000)
-    unsigned int   GlyphColored : 1;  // Input  // For custom font glyphs only: glyph is colored, removed tinting.
-    float          GlyphAdvanceX;     // Input    // For custom font glyphs only: glyph xadvance
-    ImVec2         GlyphOffset;       // Input    // For custom font glyphs only: glyph display offset
-    ImFont*        Font;              // Input    // For custom font glyphs only: target font
+// Output of ImFontAtlas::GetCustomRect() when using custom rectangles.
+// Those values may not be cached/stored as they are only valid for the current value of atlas->TexRef
+// (this is in theory derived from ImTextureRect but we use separate structures for reasons)
+struct ImFontAtlasRect_t
+{
+    unsigned short x, y;      // Position (in current texture)
+    unsigned short w, h;      // Size
+    ImVec2         uv0, uv1;  // UV coordinates (in current texture)
 };
-CIMGUI_API bool ImFontAtlasCustomRect_IsPacked(const ImFontAtlasCustomRect* self);
 
 // Flags for ImFontAtlas build
 typedef enum
@@ -3457,12 +3712,14 @@ typedef enum
 //  - One or more fonts.
 //  - Custom graphics data needed to render the shapes needed by Dear ImGui.
 //  - Mouse cursor shapes for software cursor rendering (unless setting 'Flags |= ImFontAtlasFlags_NoMouseCursors' in the font atlas).
-// It is the user-code responsibility to setup/build the atlas, then upload the pixel data into a texture accessible by your graphics api.
-//  - Optionally, call any of the AddFont*** functions. If you don't call any, the default font embedded in the code will be loaded for you.
-//  - Call GetTexDataAsAlpha8() or GetTexDataAsRGBA32() to build and retrieve pixels data.
-//  - Upload the pixels data into a texture within your graphics system (see imgui_impl_xxxx.cpp examples)
+//  - If you don't call any AddFont*** functions, the default font embedded in the code will be loaded for you.
+// It is the rendering backend responsibility to upload texture into your graphics API:
+//  - ImGui_ImplXXXX_RenderDrawData() functions generally iterate platform_io->Textures[] to create/update/destroy each ImTextureData instance.
+//  - Backend then set ImTextureData's TexID and BackendUserData.
+//  - Texture id are passed back to you during rendering to identify the texture. Read FAQ entry about ImTextureID/ImTextureRef for more details.
+// Legacy path:
+//  - Call Build() + GetTexDataAsAlpha8() or GetTexDataAsRGBA32() to build and retrieve pixels data.
 //  - Call SetTexID(my_tex_id); and pass the pointer/identifier to your texture in a format natural to your graphics API.
-//    This value will be passed back to you during rendering to identify the texture. Read FAQ entry about ImTextureID for more details.
 // Common pitfalls:
 // - If you pass a 'glyph_ranges' array to AddFont*** functions, you need to make sure that your array persist up until the
 //   atlas is build (when calling GetTexData*** or Build()). We only copy the pointer, not the data.
@@ -3477,144 +3734,235 @@ struct ImFontAtlas_t
     //-------------------------------------------
 
     //-------------------------------------------
-    // [BETA] Custom Rectangles/Glyphs API
+    // [ALPHA] Custom Rectangles/Glyphs API
     //-------------------------------------------
 
     //-------------------------------------------
     // Members
     //-------------------------------------------
 
-    ImFontAtlasFlags       Flags;                                          // Build flags (see ImFontAtlasFlags_)
-    ImTextureID            TexID;                                          // User data to refer to the texture once it has been uploaded to user's graphic systems. It is passed back to you during rendering via the ImDrawCmd structure.
-    int                    TexDesiredWidth;                                // Texture width desired by user before Build(). Must be a power-of-two. If have many glyphs your graphics API have texture size restrictions you may want to increase texture width to decrease height.
-    int                    TexGlyphPadding;                                // FIXME: Should be called "TexPackPadding". Padding between glyphs within texture in pixels. Defaults to 1. If your rendering method doesn't rely on bilinear filtering you may set this to 0 (will also need to set AntiAliasedLinesUseTex = false).
-    bool                   Locked;                                         // Marked as Locked by ImGui::NewFrame() so attempt to modify the atlas will assert.
-    void*                  UserData;                                       // Store your own atlas related user-data (if e.g. you have multiple font atlas).
+    // Input
+    ImFontAtlasFlags          Flags;                                          // Build flags (see ImFontAtlasFlags_)
+    ImTextureFormat           TexDesiredFormat;                               // Desired texture format (default to ImTextureFormat_RGBA32 but may be changed to ImTextureFormat_Alpha8).
+    int                       TexGlyphPadding;                                // FIXME: Should be called "TexPackPadding". Padding between glyphs within texture in pixels. Defaults to 1. If your rendering method doesn't rely on bilinear filtering you may set this to 0 (will also need to set AntiAliasedLinesUseTex = false).
+    int                       TexMinWidth;                                    // Minimum desired texture width. Must be a power of two. Default to 512.
+    int                       TexMinHeight;                                   // Minimum desired texture height. Must be a power of two. Default to 128.
+    int                       TexMaxWidth;                                    // Maximum desired texture width. Must be a power of two. Default to 8192.
+    int                       TexMaxHeight;                                   // Maximum desired texture height. Must be a power of two. Default to 8192.
+    void*                     UserData;                                       // Store your own atlas related user-data (if e.g. you have multiple font atlas).
+
+    // Output
+    // - Because textures are dynamically created/resized, the current texture identifier may changed at *ANY TIME* during the frame.
+    // - This should not affect you as you can always use the latest value. But note that any precomputed UV coordinates are only valid for the current TexRef.
+#ifdef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    ImTextureRef              TexRef;                                         // Latest texture identifier == TexData->GetTexRef().
+#else
+    union                     // Latest texture identifier == TexData->GetTexRef(). // RENAMED TexID to TexRef in 1.92.x
+    {
+        ImTextureRef TexRef;
+        ImTextureRef TexID;
+    };
+#endif // #ifdef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    ImTextureData*            TexData;                                        // Latest texture.
 
     // [Internal]
-    // NB: Access texture data via GetTexData*() calls! Which will setup a default font for you.
-    bool                   TexReady;                                       // Set when texture was built matching current font input
-    bool                   TexPixelsUseColors;                             // Tell whether our texture data is known to use colors (rather than just alpha channel), in order to help backend select a format.
-    unsigned char*         TexPixelsAlpha8;                                // 1 component per pixel, each component is unsigned 8-bit. Total size = TexWidth * TexHeight
-    unsigned int*          TexPixelsRGBA32;                                // 4 component per pixel, each component is unsigned 8-bit. Total size = TexWidth * TexHeight * 4
-    int                    TexWidth;                                       // Texture width calculated during Build().
-    int                    TexHeight;                                      // Texture height calculated during Build().
-    ImVec2                 TexUvScale;                                     // = (1.0f/TexWidth, 1.0f/TexHeight)
-    ImVec2                 TexUvWhitePixel;                                // Texture coordinates to a white pixel
-    ImVector_ImFontPtr     Fonts;                                          // Hold all the fonts returned by AddFont*. Fonts[0] is the default font upon calling ImGui::NewFrame(), use ImGui::PushFont()/PopFont() to change the current font.
-    ImVector_ImFontAtlasCustomRect CustomRects;                            // Rectangles for packing custom texture data into the atlas.
-    ImVector_ImFontConfig  ConfigData;                                     // Configuration data
-    ImVec4                 TexUvLines[IM_DRAWLIST_TEX_LINES_WIDTH_MAX+1];  // UVs for baked anti-aliased lines
-
-    // [Internal] Font builder
-    const ImFontBuilderIO* FontBuilderIO;                                  // Opaque interface to a font builder (default to stb_truetype, can be changed to use FreeType by defining IMGUI_ENABLE_FREETYPE).
-    unsigned int           FontBuilderFlags;                               // Shared flags (for all fonts) for custom font builder. THIS IS BUILD IMPLEMENTATION DEPENDENT. Per-font override is also available in ImFontConfig.
-
-    // [Internal] Packing data
-    int                    PackIdMouseCursors;                             // Custom texture rectangle ID for white pixel and mouse cursors
-    int                    PackIdLines;                                    // Custom texture rectangle ID for baked anti-aliased lines
+    ImVector_ImTextureDataPtr TexList;                                        // Texture list (most often TexList.Size == 1). TexData is always == TexList.back(). DO NOT USE DIRECTLY, USE GetDrawData().Textures[]/GetPlatformIO().Textures[] instead!
+    bool                      Locked;                                         // Marked as locked during ImGui::NewFrame()..EndFrame() scope if TexUpdates are not supported. Any attempt to modify the atlas will assert.
+    bool                      RendererHasTextures;                            // Copy of (BackendFlags & ImGuiBackendFlags_RendererHasTextures) from supporting context.
+    bool                      TexIsBuilt;                                     // Set when texture was built matching current font input. Mostly useful for legacy IsBuilt() call.
+    bool                      TexPixelsUseColors;                             // Tell whether our texture data is known to use colors (rather than just alpha channel), in order to help backend select a format or conversion process.
+    ImVec2                    TexUvScale;                                     // = (1.0f/TexData->TexWidth, 1.0f/TexData->TexHeight). May change as new texture gets created.
+    ImVec2                    TexUvWhitePixel;                                // Texture coordinates to a white pixel. May change as new texture gets created.
+    ImVector_ImFontPtr        Fonts;                                          // Hold all the fonts returned by AddFont*. Fonts[0] is the default font upon calling ImGui::NewFrame(), use ImGui::PushFont()/PopFont() to change the current font.
+    ImVector_ImFontConfig     Sources;                                        // Source/configuration data
+    ImVec4                    TexUvLines[IM_DRAWLIST_TEX_LINES_WIDTH_MAX+1];  // UVs for baked anti-aliased lines
+    int                       TexNextUniqueID;                                // Next value to be stored in TexData->UniqueID
+    int                       FontNextUniqueID;                               // Next value to be stored in ImFont->FontID
+    ImVector_ImDrawListSharedDataPtr DrawListSharedDatas;                     // List of users for this atlas. Typically one per Dear ImGui context.
+    ImFontAtlasBuilder*       Builder;                                        // Opaque interface to our data that doesn't need to be public and may be discarded when rebuilding.
+    const ImFontLoader*       FontLoader;                                     // Font loader opaque interface (default to use FreeType when IMGUI_ENABLE_FREETYPE is defined, otherwise default to use stb_truetype). Use SetFontLoader() to change this at runtime.
+    const char*               FontLoaderName;                                 // Font loader name (for display e.g. in About box) == FontLoader->Name
+    void*                     FontLoaderData;                                 // Font backend opaque storage
+    unsigned int              FontLoaderFlags;                                // Shared flags (for all fonts) for font loader. THIS IS BUILD IMPLEMENTATION DEPENDENT (e.g. Per-font override is also available in ImFontConfig).
+    int                       RefCount;                                       // Number of contexts using this atlas
+    ImGuiContext*             OwnerContext;                                   // Context which own the atlas will be in charge of updating and destroying it.
 
     // [Obsolete]
-    //typedef ImFontAtlasCustomRect    CustomRect;         // OBSOLETED in 1.72+
-    //typedef ImFontGlyphRangesBuilder GlyphRangesBuilder; // OBSOLETED in 1.67+
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    // Legacy: You can request your rectangles to be mapped as font glyph (given a font + Unicode point), so you can render e.g. custom colorful icons and use them as regular glyphs. --> Prefer using a custom ImFontLoader.
+    ImFontAtlasRect           TempRect;                                       // For old GetCustomRectByIndex() API
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    //unsigned int                      FontBuilderFlags;        // OBSOLETED in 1.92.X: Renamed to FontLoaderFlags.
+    //int                               TexDesiredWidth;         // OBSOLETED in 1.92.X: Force texture width before calling Build(). Must be a power-of-two. If have many glyphs your graphics API have texture size restrictions you may want to increase texture width to decrease height)
+    //typedef ImFontAtlasRect           ImFontAtlasCustomRect;   // OBSOLETED in 1.92.X
+    //typedef ImFontAtlasCustomRect     CustomRect;              // OBSOLETED in 1.72+
+    //typedef ImFontGlyphRangesBuilder  GlyphRangesBuilder;      // OBSOLETED in 1.67+
 };
-CIMGUI_API ImFont*                ImFontAtlas_AddFont(ImFontAtlas* self, const ImFontConfig* font_cfg);
-CIMGUI_API ImFont*                ImFontAtlas_AddFontDefault(ImFontAtlas* self, const ImFontConfig* font_cfg /* = NULL */);
-CIMGUI_API ImFont*                ImFontAtlas_AddFontFromFileTTF(ImFontAtlas* self, const char* filename, float size_pixels, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */);
-CIMGUI_API ImFont*                ImFontAtlas_AddFontFromMemoryTTF(ImFontAtlas* self, void* font_data, int font_data_size, float size_pixels, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // Note: Transfer ownership of 'ttf_data' to ImFontAtlas! Will be deleted after destruction of the atlas. Set font_cfg->FontDataOwnedByAtlas=false to keep ownership of your data and it won't be freed.
-CIMGUI_API ImFont*                ImFontAtlas_AddFontFromMemoryCompressedTTF(ImFontAtlas* self, const void* compressed_font_data, int compressed_font_data_size, float size_pixels, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // 'compressed_font_data' still owned by caller. Compress with binary_to_compressed_c.cpp.
-CIMGUI_API ImFont*                ImFontAtlas_AddFontFromMemoryCompressedBase85TTF(ImFontAtlas* self, const char* compressed_font_data_base85, float size_pixels, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // 'compressed_font_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with -base85 parameter.
-CIMGUI_API void                   ImFontAtlas_ClearInputData(ImFontAtlas* self);                                                                                     // Clear input data (all ImFontConfig structures including sizes, TTF data, glyph ranges, etc.) = all the data used to build the texture and fonts.
-CIMGUI_API void                   ImFontAtlas_ClearTexData(ImFontAtlas* self);                                                                                       // Clear output texture data (CPU side). Saves RAM once the texture has been copied to graphics memory.
-CIMGUI_API void                   ImFontAtlas_ClearFonts(ImFontAtlas* self);                                                                                         // Clear output font data (glyphs storage, UV coordinates).
-CIMGUI_API void                   ImFontAtlas_Clear(ImFontAtlas* self);                                                                                              // Clear all input and output.
-// Build atlas, retrieve pixel data.
-// User is in charge of copying the pixels into graphics memory (e.g. create a texture with your engine). Then store your texture handle with SetTexID().
-// The pitch is always = Width * BytesPerPixels (1 or 4)
-// Building in RGBA32 format is provided for convenience and compatibility, but note that unless you manually manipulate or copy color data into
-// the texture (e.g. when using the AddCustomRect*** api), then the RGB pixels emitted will always be white (~75% of memory/bandwidth waste.
-CIMGUI_API bool                   ImFontAtlas_Build(ImFontAtlas* self);                                                                                              // Build pixels data. This is called automatically for you by the GetTexData*** functions.
-CIMGUI_API void                   ImFontAtlas_GetTexDataAsAlpha8(ImFontAtlas* self, unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel /* = NULL */); // 1 byte per-pixel
-CIMGUI_API void                   ImFontAtlas_GetTexDataAsRGBA32(ImFontAtlas* self, unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel /* = NULL */); // 4 bytes-per-pixel
-CIMGUI_API bool                   ImFontAtlas_IsBuilt(const ImFontAtlas* self);                                                                                      // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent...
-CIMGUI_API void                   ImFontAtlas_SetTexID(ImFontAtlas* self, ImTextureID id);
+CIMGUI_API ImFont*           ImFontAtlas_AddFont(ImFontAtlas* self, const ImFontConfig* font_cfg);
+CIMGUI_API ImFont*           ImFontAtlas_AddFontDefault(ImFontAtlas* self, const ImFontConfig* font_cfg /* = NULL */);
+CIMGUI_API ImFont*           ImFontAtlas_AddFontFromFileTTF(ImFontAtlas* self, const char* filename, float size_pixels /* = 0.0f */, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */);
+CIMGUI_API ImFont*           ImFontAtlas_AddFontFromMemoryTTF(ImFontAtlas* self, void* font_data, int font_data_size, float size_pixels /* = 0.0f */, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // Note: Transfer ownership of 'ttf_data' to ImFontAtlas! Will be deleted after destruction of the atlas. Set font_cfg->FontDataOwnedByAtlas=false to keep ownership of your data and it won't be freed.
+CIMGUI_API ImFont*           ImFontAtlas_AddFontFromMemoryCompressedTTF(ImFontAtlas* self, const void* compressed_font_data, int compressed_font_data_size, float size_pixels /* = 0.0f */, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // 'compressed_font_data' still owned by caller. Compress with binary_to_compressed_c.cpp.
+CIMGUI_API ImFont*           ImFontAtlas_AddFontFromMemoryCompressedBase85TTF(ImFontAtlas* self, const char* compressed_font_data_base85, float size_pixels /* = 0.0f */, const ImFontConfig* font_cfg /* = NULL */, const ImWchar* glyph_ranges /* = NULL */); // 'compressed_font_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with -base85 parameter.
+CIMGUI_API void              ImFontAtlas_RemoveFont(ImFontAtlas* self, ImFont* font);
+CIMGUI_API void              ImFontAtlas_Clear(ImFontAtlas* self);                                                                      // Clear everything (input fonts, output glyphs/textures)
+CIMGUI_API void              ImFontAtlas_CompactCache(ImFontAtlas* self);                                                               // Compact cached glyphs and texture.
+CIMGUI_API void              ImFontAtlas_SetFontLoader(ImFontAtlas* self, const ImFontLoader* font_loader);                             // Change font loader at runtime.
+// As we are transitioning toward a new font system, we expect to obsolete those soon:
+CIMGUI_API void              ImFontAtlas_ClearInputData(ImFontAtlas* self);                                                             // [OBSOLETE] Clear input data (all ImFontConfig structures including sizes, TTF data, glyph ranges, etc.) = all the data used to build the texture and fonts.
+CIMGUI_API void              ImFontAtlas_ClearFonts(ImFontAtlas* self);                                                                 // [OBSOLETE] Clear input+output font data (same as ClearInputData() + glyphs storage, UV coordinates).
+CIMGUI_API void              ImFontAtlas_ClearTexData(ImFontAtlas* self);                                                               // [OBSOLETE] Clear CPU-side copy of the texture data. Saves RAM once the texture has been copied to graphics memory.
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+// Legacy path for build atlas + retrieving pixel data.
+// - User is in charge of copying the pixels into graphics memory (e.g. create a texture with your engine). Then store your texture handle with SetTexID().
+// - The pitch is always = Width * BytesPerPixels (1 or 4)
+// - Building in RGBA32 format is provided for convenience and compatibility, but note that unless you manually manipulate or copy color data into
+//   the texture (e.g. when using the AddCustomRect*** api), then the RGB pixels emitted will always be white (~75% of memory/bandwidth waste.
+// - From 1.92 with backends supporting ImGuiBackendFlags_RendererHasTextures:
+//   - Calling Build(), GetTexDataAsAlpha8(), GetTexDataAsRGBA32() is not needed.
+//   - In backend: replace calls to ImFontAtlas::SetTexID() with calls to ImTextureData::SetTexID() after honoring texture creation.
+CIMGUI_API bool ImFontAtlas_Build(ImFontAtlas* self);                                  // Build pixels data. This is called automatically for you by the GetTexData*** functions.
+CIMGUI_API void ImFontAtlas_GetTexDataAsAlpha8(ImFontAtlas* self, unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel /* = NULL */); // 1 byte per-pixel
+CIMGUI_API void ImFontAtlas_GetTexDataAsRGBA32(ImFontAtlas* self, unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel /* = NULL */); // 4 bytes-per-pixel
+CIMGUI_API void ImFontAtlas_SetTexID(ImFontAtlas* self, ImTextureID id);               // Called by legacy backends. May be called before texture creation.
+CIMGUI_API void ImFontAtlas_SetTexIDImTextureRef(ImFontAtlas* self, ImTextureRef id);  // Called by legacy backends.
+CIMGUI_API bool ImFontAtlas_IsBuilt(const ImFontAtlas* self);                          // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent..
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+// Since 1.92: specifying glyph ranges is only useful/necessary if your backend doesn't support ImGuiBackendFlags_RendererHasTextures!
+CIMGUI_API const ImWchar*    ImFontAtlas_GetGlyphRangesDefault(ImFontAtlas* self);                                                      // Basic Latin, Extended Latin
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 // Helpers to retrieve list of common Unicode ranges (2 value per range, values are inclusive, zero-terminated list)
 // NB: Make sure that your string are UTF-8 and NOT in your local code page.
 // Read https://github.com/ocornut/imgui/blob/master/docs/FONTS.md/#about-utf-8-encoding for details.
 // NB: Consider using ImFontGlyphRangesBuilder to build glyph ranges from textual data.
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesDefault(ImFontAtlas* self);                                                                              // Basic Latin, Extended Latin
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesGreek(ImFontAtlas* self);                                                                                // Default + Greek and Coptic
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesKorean(ImFontAtlas* self);                                                                               // Default + Korean characters
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesJapanese(ImFontAtlas* self);                                                                             // Default + Hiragana, Katakana, Half-Width, Selection of 2999 Ideographs
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesChineseFull(ImFontAtlas* self);                                                                          // Default + Half-Width + Japanese Hiragana/Katakana + full set of about 21000 CJK Unified Ideographs
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesChineseSimplifiedCommon(ImFontAtlas* self);                                                              // Default + Half-Width + Japanese Hiragana/Katakana + set of 2500 CJK Unified Ideographs for common simplified Chinese
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesCyrillic(ImFontAtlas* self);                                                                             // Default + about 400 Cyrillic characters
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesThai(ImFontAtlas* self);                                                                                 // Default + Thai characters
-CIMGUI_API const ImWchar*         ImFontAtlas_GetGlyphRangesVietnamese(ImFontAtlas* self);                                                                           // Default + Vietnamese characters
-// You can request arbitrary rectangles to be packed into the atlas, for your own purposes.
-// - After calling Build(), you can query the rectangle position and render your pixels.
-// - If you render colored output, set 'atlas->TexPixelsUseColors = true' as this may help some backends decide of preferred texture format.
-// - You can also request your rectangles to be mapped as font glyph (given a font + Unicode point),
-//   so you can render e.g. custom colorful icons and use them as regular glyphs.
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesGreek(ImFontAtlas* self);                    // Default + Greek and Coptic
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesKorean(ImFontAtlas* self);                   // Default + Korean characters
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesJapanese(ImFontAtlas* self);                 // Default + Hiragana, Katakana, Half-Width, Selection of 2999 Ideographs
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesChineseFull(ImFontAtlas* self);              // Default + Half-Width + Japanese Hiragana/Katakana + full set of about 21000 CJK Unified Ideographs
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesChineseSimplifiedCommon(ImFontAtlas* self);  // Default + Half-Width + Japanese Hiragana/Katakana + set of 2500 CJK Unified Ideographs for common simplified Chinese
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesCyrillic(ImFontAtlas* self);                 // Default + about 400 Cyrillic characters
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesThai(ImFontAtlas* self);                     // Default + Thai characters
+CIMGUI_API const ImWchar* ImFontAtlas_GetGlyphRangesVietnamese(ImFontAtlas* self);               // Default + Vietnamese characters
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+// Register and retrieve custom rectangles
+// - You can request arbitrary rectangles to be packed into the atlas, for your own purpose.
+// - Since 1.92.X, packing is done immediately in the function call (previously packing was done during the Build call)
+// - You can render your pixels into the texture right after calling the AddCustomRect() functions.
+// - VERY IMPORTANT:
+//   - Texture may be created/resized at any time when calling ImGui or ImFontAtlas functions.
+//   - IT WILL INVALIDATE RECTANGLE DATA SUCH AS UV COORDINATES. Always use latest values from GetCustomRect().
+//   - UV coordinates are associated to the current texture identifier aka 'atlas->TexRef'. Both TexRef and UV coordinates are typically changed at the same time.
+// - If you render colored output into your custom rectangles: set 'atlas->TexPixelsUseColors = true' as this may help some backends decide of preferred texture format.
 // - Read docs/FONTS.md for more details about using colorful icons.
-// - Note: this API may be redesigned later in order to support multi-monitor varying DPI settings.
-CIMGUI_API int                    ImFontAtlas_AddCustomRectRegular(ImFontAtlas* self, int width, int height);
-CIMGUI_API int                    ImFontAtlas_AddCustomRectFontGlyph(ImFontAtlas* self, ImFont* font, ImWchar id, int width, int height, float advance_x, ImVec2 offset /* = ImVec2(0, 0) */);
-CIMGUI_API ImFontAtlasCustomRect* ImFontAtlas_GetCustomRectByIndex(ImFontAtlas* self, int index);
-// [Internal]
-CIMGUI_API void                   ImFontAtlas_CalcCustomRectUV(const ImFontAtlas* self, const ImFontAtlasCustomRect* rect, ImVec2* out_uv_min, ImVec2* out_uv_max);
-CIMGUI_API bool                   ImFontAtlas_GetMouseCursorTexData(ImFontAtlas* self, ImGuiMouseCursor cursor, ImVec2* out_offset, ImVec2* out_size, ImVec2 out_uv_border[2], ImVec2 out_uv_fill[2]);
+// - Note: this API may be reworked further in order to facilitate supporting e.g. multi-monitor, varying DPI settings.
+// - (Pre-1.92 names) ------------> (1.92 names)
+//   - GetCustomRectByIndex()   --> Use GetCustomRect()
+//   - CalcCustomRectUV()       --> Use GetCustomRect() and read uv0, uv1 fields.
+//   - AddCustomRectRegular()   --> Renamed to AddCustomRect()
+//   - AddCustomRectFontGlyph() --> Prefer using custom ImFontLoader inside ImFontConfig
+//   - ImFontAtlasCustomRect    --> Renamed to ImFontAtlasRect
+CIMGUI_API ImFontAtlasRectId ImFontAtlas_AddCustomRect(ImFontAtlas* self, int width, int height, ImFontAtlasRect* out_r /* = NULL */);  // Register a rectangle. Return -1 (ImFontAtlasRectId_Invalid) on error.
+CIMGUI_API void              ImFontAtlas_RemoveCustomRect(ImFontAtlas* self, ImFontAtlasRectId id);                                     // Unregister a rectangle. Existing pixels will stay in texture until resized / garbage collected.
+CIMGUI_API bool              ImFontAtlas_GetCustomRect(const ImFontAtlas* self, ImFontAtlasRectId id, ImFontAtlasRect* out_r);          // Get rectangle coordinates for current texture. Valid immediately, never store this (read above)!
+// [Obsolete]
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+CIMGUI_API ImFontAtlasRectId      ImFontAtlas_AddCustomRectRegular(ImFontAtlas* self, int w, int h);                                                                                          // RENAMED in 1.92.X
+CIMGUI_API const ImFontAtlasRect* ImFontAtlas_GetCustomRectByIndex(ImFontAtlas* self, ImFontAtlasRectId id);                                                                                  // OBSOLETED in 1.92.X
+CIMGUI_API void                   ImFontAtlas_CalcCustomRectUV(const ImFontAtlas* self, const ImFontAtlasRect* r, ImVec2* out_uv_min, ImVec2* out_uv_max);                                    // OBSOLETED in 1.92.X
+CIMGUI_API ImFontAtlasRectId      ImFontAtlas_AddCustomRectFontGlyph(ImFontAtlas* self, ImFont* font, ImWchar codepoint, int w, int h, float advance_x, ImVec2 offset /* = ImVec2(0, 0) */);  // OBSOLETED in 1.92.X: Use custom ImFontLoader in ImFontConfig
+CIMGUI_API ImFontAtlasRectId      ImFontAtlas_AddCustomRectFontGlyphForSize(ImFontAtlas* self, ImFont* font, float font_size, ImWchar codepoint, int w, int h, float advance_x, ImVec2 offset /* = ImVec2(0, 0) */); // ADDED AND OBSOLETED in 1.92.X
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 
-// Font runtime data and rendering
-// ImFontAtlas automatically loads a default embedded font for you when you call GetTexDataAsAlpha8() or GetTexDataAsRGBA32().
-struct ImFont_t
+// Font runtime data for a given size
+// Important: pointers to ImFontBaked are only valid for the current frame.
+struct ImFontBaked_t
 {
     // [Internal] Members: Hot ~20/24 bytes (for CalcTextSize)
-    ImVector_float       IndexAdvanceX;                                         // 12-16 // out //            // Sparse. Glyphs->AdvanceX in a directly indexable way (cache-friendly for CalcTextSize functions which only this info, and are often bottleneck in large UI).
-    float                FallbackAdvanceX;                                      // 4     // out // = FallbackGlyph->AdvanceX
-    float                FontSize;                                              // 4     // in  //            // Height of characters/line, set during loading (don't change after loading)
+    ImVector_float       IndexAdvanceX;             // 12-16 // out // Sparse. Glyphs->AdvanceX in a directly indexable way (cache-friendly for CalcTextSize functions which only this info, and are often bottleneck in large UI).
+    float                FallbackAdvanceX;          // 4     // out // FindGlyph(FallbackChar)->AdvanceX
+    float                Size;                      // 4     // in  // Height of characters/line, set during loading (doesn't change after loading)
+    float                RasterizerDensity;         // 4     // in  // Density this is baked at
 
-    // [Internal] Members: Hot ~28/40 bytes (for RenderText loop)
-    ImVector_ImWchar     IndexLookup;                                           // 12-16 // out //            // Sparse. Index glyphs by Unicode code-point.
-    ImVector_ImFontGlyph Glyphs;                                                // 12-16 // out //            // All glyphs.
-    const ImFontGlyph*   FallbackGlyph;                                         // 4-8   // out // = FindGlyph(FontFallbackChar)
+    // [Internal] Members: Hot ~28/36 bytes (for RenderText loop)
+    ImVector_ImU16       IndexLookup;               // 12-16 // out // Sparse. Index glyphs by Unicode code-point.
+    ImVector_ImFontGlyph Glyphs;                    // 12-16 // out // All glyphs.
+    int                  FallbackGlyphIndex;        // 4     // out // Index of FontFallbackChar
 
-    // [Internal] Members: Cold ~32/40 bytes
-    // Conceptually ConfigData[] is the list of font sources merged to create this font.
-    ImFontAtlas*         ContainerAtlas;                                        // 4-8   // out //            // What we has been loaded into
-    const ImFontConfig*  ConfigData;                                            // 4-8   // in  //            // Pointer within ContainerAtlas->ConfigData to ConfigDataCount instances
-    short                ConfigDataCount;                                       // 2     // in  // ~ 1        // Number of ImFontConfig involved in creating this font. Bigger than 1 when merging multiple font sources into one ImFont.
-    short                EllipsisCharCount;                                     // 1     // out // 1 or 3
-    ImWchar              EllipsisChar;                                          // 2-4   // out // = '...'/'.'// Character used for ellipsis rendering.
-    ImWchar              FallbackChar;                                          // 2-4   // out // = FFFD/'?' // Character used if a glyph isn't found.
-    float                EllipsisWidth;                                         // 4     // out               // Width
-    float                EllipsisCharStep;                                      // 4     // out               // Step between characters when EllipsisCount > 0
-    bool                 DirtyLookupTables;                                     // 1     // out //
-    float                Scale;                                                 // 4     // in  // = 1.f      // Base font scale, multiplied by the per-window font scale which you can adjust with SetWindowFontScale()
-    float                Ascent, Descent;                                       // 4+4   // out //            // Ascent: distance from top to bottom of e.g. 'A' [0..FontSize] (unscaled)
-    int                  MetricsTotalSurface;                                   // 4     // out //            // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
-    ImU8                 Used4kPagesMap[(IM_UNICODE_CODEPOINT_MAX +1)/4096/8];  // 2 bytes if ImWchar=ImWchar16, 34 bytes if ImWchar==ImWchar32. Store 1-bit for each block of 4K codepoints that has one active glyph. This is mainly used to facilitate iterations across all used codepoints.
+    // [Internal] Members: Cold
+    float                Ascent, Descent;           // 4+4   // out // Ascent: distance from top to bottom of e.g. 'A' [0..FontSize] (unscaled)
+    unsigned int         MetricsTotalSurface : 26;  // 3  // out // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
+    unsigned int         WantDestroy : 1;           // 0  //     // Queued for destroy
+    unsigned int         LoadNoFallback : 1;        // 0  //     // Disable loading fallback in lower-level calls.
+    unsigned int         LoadNoRenderOnLayout : 1;  // 0  //     // Enable a two-steps mode where CalcTextSize() calls will load AdvanceX *without* rendering/packing glyphs. Only advantagous if you know that the glyph is unlikely to actually be rendered, otherwise it is slower because we'd do one query on the first CalcTextSize and one query on the first Draw.
+    int                  LastUsedFrame;             // 4  //     // Record of that time this was bounds
+    ImGuiID              BakedId;                   // 4     //     // Unique ID for this baked storage
+    ImFont*              ContainerFont;             // 4-8   // in  // Parent font
+    void*                FontLoaderDatas;           // 4-8   //     // Font loader opaque storage (per baked font * sources): single contiguous buffer allocated by imgui, passed to loader.
 };
-CIMGUI_API const ImFontGlyph* ImFont_FindGlyph(ImFont* self, ImWchar c);
-CIMGUI_API const ImFontGlyph* ImFont_FindGlyphNoFallback(ImFont* self, ImWchar c);
-CIMGUI_API float              ImFont_GetCharAdvance(ImFont* self, ImWchar c);
-CIMGUI_API bool               ImFont_IsLoaded(const ImFont* self);
-CIMGUI_API const char*        ImFont_GetDebugName(const ImFont* self);
+CIMGUI_API void         ImFontBaked_ClearOutputData(ImFontBaked* self);
+CIMGUI_API ImFontGlyph* ImFontBaked_FindGlyph(ImFontBaked* self, ImWchar c);            // Return U+FFFD glyph if requested glyph doesn't exists.
+CIMGUI_API ImFontGlyph* ImFontBaked_FindGlyphNoFallback(ImFontBaked* self, ImWchar c);  // Return NULL if glyph doesn't exist
+CIMGUI_API float        ImFontBaked_GetCharAdvance(ImFontBaked* self, ImWchar c);
+CIMGUI_API bool         ImFontBaked_IsGlyphLoaded(ImFontBaked* self, ImWchar c);
+
+// Font flags
+// (in future versions as we redesign font loading API, this will become more important and better documented. for now please consider this as internal/advanced use)
+typedef enum
+{
+    ImFontFlags_None           = 0,
+    ImFontFlags_NoLoadError    = 1<<1,  // Disable throwing an error/assert when calling AddFontXXX() with missing file/data. Calling code is expected to check AddFontXXX() return value.
+    ImFontFlags_NoLoadGlyphs   = 1<<2,  // [Internal] Disable loading new glyphs.
+    ImFontFlags_LockBakedSizes = 1<<3,  // [Internal] Disable loading new baked sizes, disable garbage collecting current ones. e.g. if you want to lock a font to a single size. Important: if you use this to preload given sizes, consider the possibility of multiple font density used on Retina display.
+} ImFontFlags_;
+
+// Font runtime data and rendering
+// - ImFontAtlas automatically loads a default embedded font for you if you didn't load one manually.
+// - Since 1.92.X a font may be rendered as any size! Therefore a font doesn't have one specific size.
+// - Use 'font->GetFontBaked(size)' to retrieve the ImFontBaked* corresponding to a given size.
+// - If you used g.Font + g.FontSize (which is frequent from the ImGui layer), you can use g.FontBaked as a shortcut, as g.FontBaked == g.Font->GetFontBaked(g.FontSize).
+struct ImFont_t
+{
+    // [Internal] Members: Hot ~12-20 bytes
+    ImFontBaked*             LastBaked;                                             // 4-8   // Cache last bound baked. NEVER USE DIRECTLY. Use GetFontBaked().
+    ImFontAtlas*             ContainerAtlas;                                        // 4-8   // What we have been loaded into.
+    ImFontFlags              Flags;                                                 // 4     // Font flags.
+    float                    CurrentRasterizerDensity;                              // Current rasterizer density. This is a varying state of the font.
+
+    // [Internal] Members: Cold ~24-52 bytes
+    // Conceptually Sources[] is the list of font sources merged to create this font.
+    ImGuiID                  FontId;                                                // Unique identifier for the font
+    float                    LegacySize;                                            // 4     // in  // Font size passed to AddFont(). Use for old code calling PushFont() expecting to use that size. (use ImGui::GetFontBaked() to get font baked at current bound size).
+    ImVector_ImFontConfigPtr Sources;                                               // 16    // in  // List of sources. Pointers within ContainerAtlas->Sources[]
+    ImWchar                  EllipsisChar;                                          // 2-4   // out // Character used for ellipsis rendering ('...').
+    ImWchar                  FallbackChar;                                          // 2-4   // out // Character used if a glyph isn't found (U+FFFD, '?')
+    ImU8                     Used8kPagesMap[(IM_UNICODE_CODEPOINT_MAX +1)/8192/8];  // 1 bytes if ImWchar=ImWchar16, 16 bytes if ImWchar==ImWchar32. Store 1-bit for each block of 4K codepoints that has one active glyph. This is mainly used to facilitate iterations across all used codepoints.
+    bool                     EllipsisAutoBake;                                      // 1     //     // Mark when the "..." glyph needs to be generated.
+    ImGuiStorage             RemapPairs;                                            // 16    //     // Remapping pairs when using AddRemapChar(), otherwise empty.
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+    float                    Scale;                                                 // 4     // in  // Legacy base font scale (~1.0f), multiplied by the per-window font scale which you can adjust with SetWindowFontScale()
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+};
+CIMGUI_API bool         ImFont_IsGlyphInFont(ImFont* self, ImWchar c);
+CIMGUI_API bool         ImFont_IsLoaded(const ImFont* self);
+CIMGUI_API const char*  ImFont_GetDebugName(const ImFont* self);                                                                           // Fill ImFontConfig::Name.
+// [Internal] Don't use!
 // 'max_width' stops rendering after a certain width (could be turned into a 2d size). FLT_MAX to disable.
 // 'wrap_width' enable automatic word-wrapping across multiple lines to fit into given width. 0.0f to disable.
-CIMGUI_API ImVec2             ImFont_CalcTextSizeA(ImFont* self, float size, float max_width, float wrap_width, const char* text_begin);          // Implied text_end = NULL, remaining = NULL
-CIMGUI_API ImVec2             ImFont_CalcTextSizeAEx(ImFont* self, float size, float max_width, float wrap_width, const char* text_begin, const char* text_end /* = NULL */, const char** remaining /* = NULL */); // utf8
-CIMGUI_API const char*        ImFont_CalcWordWrapPositionA(ImFont* self, float scale, const char* text, const char* text_end, float wrap_width);
-CIMGUI_API void               ImFont_RenderChar(ImFont* self, ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, ImWchar c);
-CIMGUI_API void               ImFont_RenderText(ImFont* self, ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, ImVec4 clip_rect, const char* text_begin, const char* text_end, float wrap_width /* = 0.0f */, bool cpu_fine_clip /* = false */);
+CIMGUI_API ImFontBaked* ImFont_GetFontBaked(ImFont* self, float font_size);                                                                // Implied density = -1.0f
+CIMGUI_API ImFontBaked* ImFont_GetFontBakedEx(ImFont* self, float font_size, float density /* = -1.0f */);                                 // Get or create baked data for given size
+CIMGUI_API ImVec2       ImFont_CalcTextSizeA(ImFont* self, float size, float max_width, float wrap_width, const char* text_begin);         // Implied text_end = NULL, remaining = NULL
+CIMGUI_API ImVec2       ImFont_CalcTextSizeAEx(ImFont* self, float size, float max_width, float wrap_width, const char* text_begin, const char* text_end /* = NULL */, const char** remaining /* = NULL */); // utf8
+CIMGUI_API const char*  ImFont_CalcWordWrapPosition(ImFont* self, float size, const char* text, const char* text_end, float wrap_width);
+CIMGUI_API void         ImFont_RenderChar(ImFont* self, ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, ImWchar c);              // Implied cpu_fine_clip = NULL
+CIMGUI_API void         ImFont_RenderCharEx(ImFont* self, ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, ImWchar c, const ImVec4* cpu_fine_clip /* = NULL */);
+CIMGUI_API void         ImFont_RenderText(ImFont* self, ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, ImVec4 clip_rect, const char* text_begin, const char* text_end, float wrap_width /* = 0.0f */, bool cpu_fine_clip /* = false */);
+#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+CIMGUI_API const char* ImFont_CalcWordWrapPositionA(ImFont* self, float scale, const char* text, const char* text_end, float wrap_width);
+#endif // #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 // [Internal] Don't use!
-CIMGUI_API void               ImFont_BuildLookupTable(ImFont* self);
-CIMGUI_API void               ImFont_ClearOutputData(ImFont* self);
-CIMGUI_API void               ImFont_GrowIndex(ImFont* self, int new_size);
-CIMGUI_API void               ImFont_AddGlyph(ImFont* self, const ImFontConfig* src_cfg, ImWchar c, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, float advance_x);
-CIMGUI_API void               ImFont_AddRemapChar(ImFont* self, ImWchar dst, ImWchar src, bool overwrite_dst /* = true */);                       // Makes 'dst' character/glyph points to 'src' character/glyph. Currently needs to be called AFTER fonts have been built.
-CIMGUI_API void               ImFont_SetGlyphVisible(ImFont* self, ImWchar c, bool visible);
-CIMGUI_API bool               ImFont_IsGlyphRangeUnused(ImFont* self, unsigned int c_begin, unsigned int c_last);
+CIMGUI_API void         ImFont_ClearOutputData(ImFont* self);
+CIMGUI_API void         ImFont_AddRemapChar(ImFont* self, ImWchar from_codepoint, ImWchar to_codepoint);                                   // Makes 'from_codepoint' character points to 'to_codepoint' glyph.
+CIMGUI_API bool         ImFont_IsGlyphRangeUnused(ImFont* self, unsigned int c_begin, unsigned int c_last);
 
 //-----------------------------------------------------------------------------
 // [SECTION] Viewports
@@ -3655,6 +4003,7 @@ struct ImGuiViewport_t
     ImGuiViewportFlags Flags;                  // See ImGuiViewportFlags_
     ImVec2             Pos;                    // Main Area: Position of the viewport (Dear ImGui coordinates are the same as OS desktop/native coordinates)
     ImVec2             Size;                   // Main Area: Size of the viewport.
+    ImVec2             FramebufferScale;       // Density of the viewport for Retina display (always 1,1 on Windows, may be 2,2 etc on macOS/iOS). This will affect font rasterizer density.
     ImVec2             WorkPos;                // Work Area: Position of the viewport minus task bars, menus bars, status bars (>= Pos)
     ImVec2             WorkSize;               // Work Area: Size of the viewport minus task bars, menu bars, status bars (<= Size)
     float              DpiScale;               // 1.0f = 96 DPI = No extra scale.
@@ -3668,8 +4017,8 @@ struct ImGuiViewport_t
     // The library never uses those fields, they are merely storage to facilitate backend implementation.
     void*              RendererUserData;       // void* to hold custom data structure for the renderer (e.g. swap chain, framebuffers etc.). generally set by your Renderer_CreateWindow function.
     void*              PlatformUserData;       // void* to hold custom data structure for the OS / platform (e.g. windowing info, render context). generally set by your Platform_CreateWindow function.
-    void*              PlatformHandle;         // void* to hold higher-level, platform window handle (e.g. HWND, GLFWWindow*, SDL_Window*), for FindViewportByPlatformHandle().
-    void*              PlatformHandleRaw;      // void* to hold lower-level, platform-native window handle (under Win32 this is expected to be a HWND, unused for other platforms), when using an abstraction layer like GLFW or SDL (where PlatformHandle would be a SDL_Window*)
+    void*              PlatformHandle;         // void* to hold higher-level, platform window handle (e.g. HWND for Win32 backend, Uint32 WindowID for SDL, GLFWWindow* for GLFW), for FindViewportByPlatformHandle().
+    void*              PlatformHandleRaw;      // void* to hold lower-level, platform-native window handle (always HWND on Win32 platform, unused for other platforms).
     bool               PlatformWindowCreated;  // Platform window has been created (Platform_CreateWindow() has been called). This is false during the first frame where a viewport is being created.
     bool               PlatformRequestMove;    // Platform window requested move (e.g. window was moved by the OS / host window manager, authoritative position will be OS window position)
     bool               PlatformRequestResize;  // Platform window requested resize (e.g. window was resized by the OS / host window manager, authoritative size will be OS window size)
@@ -3733,7 +4082,7 @@ CIMGUI_API ImVec2 ImGuiViewport_GetWorkCenter(const ImGuiViewport* self);
 struct ImGuiPlatformIO_t
 {
     //------------------------------------------------------------------
-    // Interface with OS and Platform backend (basic)
+    // Input - Interface with OS and Platform backend (most common stuff)
     //------------------------------------------------------------------
 
     // Optional: Access OS clipboard
@@ -3743,7 +4092,7 @@ struct ImGuiPlatformIO_t
     void*                                                               Platform_ClipboardUserData;
 
     // Optional: Open link/folder/file in OS Shell
-    // (default to use ShellExecuteA() on Windows, system() on Linux/Mac)
+    // (default to use ShellExecuteW() on Windows, system() on Linux/Mac)
     bool (*Platform_OpenInShellFn)(ImGuiContext* ctx, const char* path);
     void*                                                               Platform_OpenInShellUserData;
 
@@ -3758,14 +4107,18 @@ struct ImGuiPlatformIO_t
     ImWchar                                                             Platform_LocaleDecimalPoint;  // '.'
 
     //------------------------------------------------------------------
-    // Interface with Renderer Backend
+    // Input - Interface with Renderer Backend
     //------------------------------------------------------------------
+
+    // Optional: Maximum texture size supported by renderer (used to adjust how we size textures). 0 if not known.
+    int                                                                 Renderer_TextureMaxWidth;
+    int                                                                 Renderer_TextureMaxHeight;
 
     // Written by some backends during ImGui_ImplXXXX_RenderDrawData() call to point backend_specific ImGui_ImplXXXX_RenderState* structure.
     void*                                                               Renderer_RenderState;
 
     //------------------------------------------------------------------
-    // Input - Interface with OS/backends (Multi-Viewport support!)
+    // Input - Interface with Platform & Renderer backends for Multi-Viewport support
     //------------------------------------------------------------------
 
     // For reference, the second column shows which function are generally calling the Platform Functions:
@@ -3785,9 +4138,10 @@ struct ImGuiPlatformIO_t
     void (*Platform_DestroyWindow)(ImGuiViewport* vp);                                                // N . U . D  //
     void (*Platform_ShowWindow)(ImGuiViewport* vp);                                                   // . . U . .  // Newly created windows are initially hidden so SetWindowPos/Size/Title can be called on them before showing the window
     void (*Platform_SetWindowPos)(ImGuiViewport* vp, ImVec2 pos);                                     // . . U . .  // Set platform window position (given the upper-left corner of client area)
-    ImVec2 (*Platform_GetWindowPos)(ImGuiViewport* vp);                                               // N . . . .  //
+    ImVec2 (*Platform_GetWindowPos)(ImGuiViewport* vp);                                               // N . . . .  // (Use ImGuiPlatformIO_SetPlatform_GetWindowPos() to set this from C, otherwise you will likely encounter stack corruption)
     void (*Platform_SetWindowSize)(ImGuiViewport* vp, ImVec2 size);                                   // . . U . .  // Set platform window client area size (ignoring OS decorations such as OS title bar etc.)
-    ImVec2 (*Platform_GetWindowSize)(ImGuiViewport* vp);                                              // N . . . .  // Get platform window client area size
+    ImVec2 (*Platform_GetWindowSize)(ImGuiViewport* vp);                                              // N . . . .  // Get platform window client area size (Use ImGuiPlatformIO_SetPlatform_GetWindowSize() to set this from C, otherwise you will likely encounter stack corruption)
+    ImVec2 (*Platform_GetWindowFramebufferScale)(ImGuiViewport* vp);                                  // N . . . .  // Return viewport density. Always 1,1 on Windows, often 2,2 on Retina display on macOS/iOS. MUST BE INTEGER VALUES. (Use ImGuiPlatformIO_SetPlatform_GetWindowFramebufferScale() to set this from C, otherwise you will likely encounter stack corruption)
     void (*Platform_SetWindowFocus)(ImGuiViewport* vp);                                               // N . . . .  // Move window to front and set input focus
     bool (*Platform_GetWindowFocus)(ImGuiViewport* vp);                                               // . . U . .  //
     bool (*Platform_GetWindowMinimized)(ImGuiViewport* vp);                                           // N . . . .  // Get platform window minimized state. When minimized, we generally won't attempt to get/set size and contents will be culled more easily
@@ -3798,7 +4152,7 @@ struct ImGuiPlatformIO_t
     void (*Platform_SwapBuffers)(ImGuiViewport* vp, void* render_arg);                                // . . . R .  // (Optional) Call Present/SwapBuffers (platform side! This is often unused!). 'render_arg' is the value passed to RenderPlatformWindowsDefault().
     float (*Platform_GetWindowDpiScale)(ImGuiViewport* vp);                                           // N . . . .  // (Optional) [BETA] FIXME-DPI: DPI handling: Return DPI scale for this viewport. 1.0f = 96 DPI.
     void (*Platform_OnChangedViewport)(ImGuiViewport* vp);                                            // . F . . .  // (Optional) [BETA] FIXME-DPI: DPI handling: Called during Begin() every time the viewport we are outputting into changes, so backend has a chance to swap fonts to adjust style.
-    ImVec4 (*Platform_GetWindowWorkAreaInsets)(ImGuiViewport* vp);                                    // N . . . .  // (Optional) [BETA] Get initial work area inset for the viewport (won't be covered by main menu bar, dockspace over viewport etc.). Default to (0,0),(0,0). 'safeAreaInsets' in iOS land, 'DisplayCutout' in Android land.
+    ImVec4 (*Platform_GetWindowWorkAreaInsets)(ImGuiViewport* vp);                                    // N . . . .  // (Optional) [BETA] Get initial work area inset for the viewport (won't be covered by main menu bar, dockspace over viewport etc.). Default to (0,0),(0,0). 'safeAreaInsets' in iOS land, 'DisplayCutout' in Android land. (Use ImGuiPlatformIO_SetPlatform_GetWindowWorkAreaInsets() to set this from C, otherwise you will likely encounter stack corruption)
     int (*Platform_CreateVkSurface)(ImGuiViewport* vp, ImU64 vk_inst, const void* vk_allocators, ImU64* out_vk_surface); // (Optional) For a Vulkan Renderer to call into Platform code (since the surface creation needs to tie them both).
 
     // Renderer Backend functions (e.g. DirectX, OpenGL, Vulkan) ------------ Called by -----
@@ -3814,8 +4168,12 @@ struct ImGuiPlatformIO_t
     ImVector_ImGuiPlatformMonitor                                       Monitors;
 
     //------------------------------------------------------------------
-    // Output - List of viewports to render into platform windows
+    // Output
     //------------------------------------------------------------------
+
+    // Textures list (the list is updated by calling ImGui::EndFrame or ImGui::Render)
+    // The ImGui_ImplXXXX_RenderDrawData() function of each backend generally access this via ImDrawData::Textures which points to this. The array is available here mostly because backends will want to destroy textures on shutdown.
+    ImVector_ImTextureDataPtr                                           Textures;                     // List of textures used by Dear ImGui (most often 1) + contents of external texture list is automatically appended into this.
 
     // Viewports list (the list is updated by calling ImGui::EndFrame or ImGui::Render)
     // (in the future we will attempt to organize this feature to remove the need for a "main viewport")
@@ -3832,12 +4190,14 @@ struct ImGuiPlatformMonitor_t
     void*  PlatformHandle;     // Backend dependant data (e.g. HMONITOR, GLFWmonitor*, SDL Display Index, NSScreen*)
 };
 
-// (Optional) Support for IME (Input Method Editor) via the platform_io.Platform_SetImeDataFn() function.
+// (Optional) Support for IME (Input Method Editor) via the platform_io.Platform_SetImeDataFn() function. Handler is called during EndFrame().
 struct ImGuiPlatformImeData_t
 {
-    bool   WantVisible;      // A widget wants the IME to be visible
-    ImVec2 InputPos;         // Position of the input cursor
-    float  InputLineHeight;  // Line height
+    bool    WantVisible;      // A widget wants the IME to be visible.
+    bool    WantTextInput;    // A widget wants text input, not necessarily IME to be visible. This is automatically set to the upcoming value of io.WantTextInput.
+    ImVec2  InputPos;         // Position of input cursor (for IME).
+    float   InputLineHeight;  // Line height (for IME).
+    ImGuiID ViewportId;       // ID of platform window/viewport.
 };
 
 //-----------------------------------------------------------------------------
@@ -3847,6 +4207,11 @@ struct ImGuiPlatformImeData_t
 //-----------------------------------------------------------------------------
 
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+// OBSOLETED in 1.92.0 (from June 2025)
+CIMGUI_API void   igPushFont(ImFont* font);
+CIMGUI_API void   igSetWindowFontScale(float scale);                                                          // Set font scale factor for current window. Prefer using PushFont(NULL, style.FontSizeBase * factor) or use style.FontScaleMain to scale all windows.
+// OBSOLETED in 1.91.9 (from February 2025)
+CIMGUI_API void   igImageImVec4(ImTextureRef tex_ref, ImVec2 image_size, ImVec2 uv0, ImVec2 uv1, ImVec4 tint_col, ImVec4 border_col); // <-- 'border_col' was removed in favor of ImGuiCol_ImageBorder. If you use 'tint_col', use ImageWithBg() instead.
 // OBSOLETED in 1.91.0 (from July 2024)
 CIMGUI_API void   igPushButtonRepeat(bool repeat);
 CIMGUI_API void   igPopButtonRepeat(void);
@@ -3859,8 +4224,8 @@ CIMGUI_API ImVec2 igGetWindowContentRegionMax(void);                            
 CIMGUI_API bool   igBeginChildFrame(ImGuiID id, ImVec2 size);                                                 // Implied window_flags = 0
 CIMGUI_API bool   igBeginChildFrameEx(ImGuiID id, ImVec2 size, ImGuiWindowFlags window_flags /* = 0 */);
 CIMGUI_API void   igEndChildFrame(void);
-//static inline bool BeginChild(const char* str_id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags){ return BeginChild(str_id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags); } // Unnecessary as true == ImGuiChildFlags_Borders
-//static inline bool BeginChild(ImGuiID id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags)        { return BeginChild(id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags);     } // Unnecessary as true == ImGuiChildFlags_Borders
+//inline bool       BeginChild(const char* str_id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags){ return BeginChild(str_id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags); } // Unnecessary as true == ImGuiChildFlags_Borders
+//inline bool       BeginChild(ImGuiID id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags)        { return BeginChild(id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags);     } // Unnecessary as true == ImGuiChildFlags_Borders
 CIMGUI_API void   igShowStackToolWindow(bool* p_open /* = NULL */);
 CIMGUI_API bool   igComboObsolete(const char* label, int* current_item, bool (*old_callback)(void* user_data, int idx, const char** out_text), void* user_data, int items_count); // Implied popup_max_height_in_items = -1
 CIMGUI_API bool   igComboObsoleteEx(const char* label, int* current_item, bool (*old_callback)(void* user_data, int idx, const char** out_text), void* user_data, int items_count, int popup_max_height_in_items /* = -1 */);
@@ -3868,11 +4233,11 @@ CIMGUI_API bool   igListBoxObsolete(const char* label, int* current_item, bool (
 CIMGUI_API bool   igListBoxObsoleteEx(const char* label, int* current_item, bool (*old_callback)(void* user_data, int idx, const char** out_text), void* user_data, int items_count, int height_in_items /* = -1 */);
 // OBSOLETED in 1.89.7 (from June 2023)
 CIMGUI_API void   igSetItemAllowOverlap(void);                                                                // Use SetNextItemAllowOverlap() before item.
-// OBSOLETED in 1.89.4 (from March 2023)
-CIMGUI_API void   igPushAllowKeyboardFocus(bool tab_stop);
-CIMGUI_API void   igPopAllowKeyboardFocus(void);
 
 // Some of the older obsolete names along with their replacement (commented out so they are not reported in IDE)
+//-- OBSOLETED in 1.89.4 (from March 2023)
+//static inline void  PushAllowKeyboardFocus(bool tab_stop)                                       { PushItemFlag(ImGuiItemFlags_NoTabStop, !tab_stop); }
+//static inline void  PopAllowKeyboardFocus()                                                     { PopItemFlag(); }
 //-- OBSOLETED in 1.89 (from August 2022)
 //IMGUI_API bool      ImageButton(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), int frame_padding = -1, const ImVec4& bg_col = ImVec4(0, 0, 0, 0), const ImVec4& tint_col = ImVec4(1, 1, 1, 1)); // --> Use new ImageButton() signature (explicit item id, regular FramePadding). Refer to code in 1.91 if you want to grab a copy of this version.
 //-- OBSOLETED in 1.88 (from May 2022)
@@ -3933,6 +4298,25 @@ CIMGUI_API void   igPopAllowKeyboardFocus(void);
 //static inline ImFont*GetWindowFont()                      { return GetFont(); }                                               // OBSOLETED in 1.48
 //static inline float GetWindowFontSize()                   { return GetFontSize(); }                                           // OBSOLETED in 1.48
 //static inline void  SetScrollPosHere()                    { SetScrollHere(); }                                                // OBSOLETED in 1.42
+
+//-- OBSOLETED in 1.92.x: ImFontAtlasCustomRect becomes ImTextureRect
+// - ImFontAtlasCustomRect::X,Y          --> ImTextureRect::x,y
+// - ImFontAtlasCustomRect::Width,Height --> ImTextureRect::w,h
+// - ImFontAtlasCustomRect::GlyphColored --> if you need to write to this, instead you can write to 'font->Glyphs.back()->Colored' after calling AddCustomRectFontGlyph()
+// We could make ImTextureRect an union to use old names, but 1) this would be confusing 2) the fix is easy 3) ImFontAtlasCustomRect was always a rather esoteric api.
+typedef ImFontAtlasRect ImFontAtlasCustomRect;
+/*struct ImFontAtlasCustomRect
+{
+    unsigned short  X, Y;           // Output   // Packed position in Atlas
+    unsigned short  Width, Height;  // Input    // [Internal] Desired rectangle dimension
+    unsigned int    GlyphID:31;     // Input    // [Internal] For custom font glyphs only (ID < 0x110000)
+    unsigned int    GlyphColored:1; // Input    // [Internal] For custom font glyphs only: glyph is colored, removed tinting.
+    float           GlyphAdvanceX;  // Input    // [Internal] For custom font glyphs only: glyph xadvance
+    ImVec2          GlyphOffset;    // Input    // [Internal] For custom font glyphs only: glyph display offset
+    ImFont*         Font;           // Input    // [Internal] For custom font glyphs only: target font
+    ImFontAtlasCustomRect()         { X = Y = 0xFFFF; Width = Height = 0; GlyphID = 0; GlyphColored = 0; GlyphAdvanceX = 0.0f; GlyphOffset = ImVec2(0, 0); Font = NULL; }
+    bool IsPacked() const           { return X != 0xFFFF; }
+};*/
 
 //-- OBSOLETED in 1.82 (from Mars 2021): flags for AddRect(), AddRectFilled(), AddImageRounded(), PathRect()
 //typedef ImDrawFlags ImDrawCornerFlags;
