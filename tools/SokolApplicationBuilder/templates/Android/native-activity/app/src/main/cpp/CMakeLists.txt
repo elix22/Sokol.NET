@@ -20,16 +20,19 @@ project(sokol)
 # build native_app_glue as a static lib
 set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
 
+add_definitions(-DCIMGUI_VARGS0)
+
 set(EXT_ROOT_DIR "../../../../../../../../ext")
 
 set(IMGUI_SOURCE_FILES
-        ${EXT_ROOT_DIR}/dcimgui/src/cimgui.cpp
-        ${EXT_ROOT_DIR}/dcimgui/src/imgui_demo.cpp
-        ${EXT_ROOT_DIR}/dcimgui/src/imgui_draw.cpp
-        ${EXT_ROOT_DIR}/dcimgui/src/imgui_tables.cpp
-        ${EXT_ROOT_DIR}/dcimgui/src/imgui_widgets.cpp
-        ${EXT_ROOT_DIR}/dcimgui/src/imgui.cpp
+        ${EXT_ROOT_DIR}/cimgui/cimgui.cpp
+        ${EXT_ROOT_DIR}/cimgui/imgui/imgui_demo.cpp
+        ${EXT_ROOT_DIR}/cimgui/imgui/imgui_draw.cpp
+        ${EXT_ROOT_DIR}/cimgui/imgui/imgui_tables.cpp
+        ${EXT_ROOT_DIR}/cimgui/imgui/imgui_widgets.cpp
+        ${EXT_ROOT_DIR}/cimgui/imgui/imgui.cpp
 )
+
 
 set_source_files_properties(${IMGUI_SOURCE_FILES}
     PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++ -Wno-unused-function -Wincompatible-pointer-types-discards-qualifiers"
@@ -49,7 +52,7 @@ set(CMAKE_SHARED_LINKER_FLAGS
 add_library(sokol SHARED sokol_android_main.c ${IMGUI_SOURCE_FILES})
 
 target_include_directories(sokol PRIVATE
-    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR}/dcimgui/src ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf .)
+    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR}/cimgui ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf .)
 
 target_compile_options(sokol PRIVATE
     -Werror

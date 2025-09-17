@@ -3,4 +3,4 @@
 #endif
 #include "sokol_defines.h"
 #include "../ext/sokol/sokol_gfx.h"
-#include "sokol_gl.h"
+#include "../ext/sokol/util/sokol_gl.h"

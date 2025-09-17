@@ -25,14 +25,24 @@ else()
     add_definitions(-DSOKOL_GLCORE)
 endif()
 
+add_definitions(-DCIMGUI_VARGS0)
+
+# set(IMGUI_SOURCE_FILES 
+#         dcimgui/src/cimgui.cpp
+#         dcimgui/src/imgui_demo.cpp
+#         dcimgui/src/imgui_draw.cpp
+#         dcimgui/src/imgui_tables.cpp
+#         dcimgui/src/imgui_widgets.cpp
+#         dcimgui/src/imgui.cpp
+# )
 
 set(IMGUI_SOURCE_FILES 
-        dcimgui/src/cimgui.cpp
-        dcimgui/src/imgui_demo.cpp
-        dcimgui/src/imgui_draw.cpp
-        dcimgui/src/imgui_tables.cpp
-        dcimgui/src/imgui_widgets.cpp
-        dcimgui/src/imgui.cpp
+        cimgui/cimgui.cpp
+        cimgui/imgui/imgui_demo.cpp
+        cimgui/imgui/imgui_draw.cpp
+        cimgui/imgui/imgui_tables.cpp
+        cimgui/imgui/imgui_widgets.cpp
+        cimgui/imgui/imgui.cpp
 )
 
 # set_source_files_properties(basisu/basisu_transcoder.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
@@ -68,10 +78,10 @@ target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-quali
 
 target_link_libraries(sokol)
 
-target_include_directories(sokol PRIVATE sokol)
+target_include_directories(sokol PRIVATE sokol )
 
 # Add public include directory for consumers
-target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
+target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol/util ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
 
 
 if (WIN32)
@@ -163,9 +173,10 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     # Ensure static library has correct name without 'lib' prefix for Emscripten
     set(CMAKE_STATIC_LIBRARY_PREFIX "")
     # Emscripten-specific compile and link options for static library
-    target_compile_options(sokol PRIVATE -x c)
+    target_compile_options(sokol PRIVATE -x c -s ASSERTIONS=0)
     
-    # Ensure static library has correct name without 'lib' prefix
+    # For static libraries, EXPORTED_FUNCTIONS and --js-library don't apply - they apply to the final executable
+    # The JavaScript library will be included at the application level
     set_target_properties(sokol PROPERTIES 
         PREFIX ""
         LINK_FLAGS "-s WASM=1"

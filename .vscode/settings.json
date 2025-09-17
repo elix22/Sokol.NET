@@ -82,7 +82,10 @@
         "list": "cpp",
         "ranges": "cpp",
         "cgltf.h": "c",
-        "future": "c"
+        "future": "c",
+        "sokol_imgui.h": "c",
+        "sokol_shape.h": "c",
+        "cimgui.h": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5502

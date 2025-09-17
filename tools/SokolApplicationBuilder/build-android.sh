@@ -1,1 +1,1 @@
- dotnet run -- --task build --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/instancing --install --device 03a824947d25
+ dotnet run -- --task build --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/cube  --install --device R8YW60MZRDV

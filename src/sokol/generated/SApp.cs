@@ -844,8 +844,25 @@ public static extern void sapp_set_clipboard_string([M(U.LPUTF8Str)] string str)
 #else
 [DllImport("sokol", EntryPoint = "sapp_get_clipboard_string", CallingConvention = CallingConvention.Cdecl)]
 #endif
-[return:M(U.LPUTF8Str)]
-public static extern string sapp_get_clipboard_string();
+private static extern IntPtr sapp_get_clipboard_string_native();
+
+public static string sapp_get_clipboard_string()
+{
+    IntPtr ptr = sapp_get_clipboard_string_native();
+    if (ptr == IntPtr.Zero)
+        return "";
+
+    // Manual UTF-8 to string conversion to avoid marshalling corruption
+    try
+    {
+        return Marshal.PtrToStringUTF8(ptr) ?? "";
+    }
+    catch
+    {
+        // Fallback in case of any marshalling issues
+        return "";
+    }
+}
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_set_window_title", CallingConvention = CallingConvention.Cdecl)]
@@ -873,8 +890,25 @@ public static extern int sapp_get_num_dropped_files();
 #else
 [DllImport("sokol", EntryPoint = "sapp_get_dropped_file_path", CallingConvention = CallingConvention.Cdecl)]
 #endif
-[return:M(U.LPUTF8Str)]
-public static extern string sapp_get_dropped_file_path(int index);
+private static extern IntPtr sapp_get_dropped_file_path_native(int index);
+
+public static string sapp_get_dropped_file_path(int index)
+{
+    IntPtr ptr = sapp_get_dropped_file_path_native(index);
+    if (ptr == IntPtr.Zero)
+        return "";
+
+    // Manual UTF-8 to string conversion to avoid marshalling corruption
+    try
+    {
+        return Marshal.PtrToStringUTF8(ptr) ?? "";
+    }
+    catch
+    {
+        // Fallback in case of any marshalling issues
+        return "";
+    }
+}
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_run", CallingConvention = CallingConvention.Cdecl)]

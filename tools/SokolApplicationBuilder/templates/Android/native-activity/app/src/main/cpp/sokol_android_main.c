@@ -28,10 +28,13 @@
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
-// #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-// #include "cimgui.h"
-// #define SOKOL_IMGUI_IMPL
-// #include "sokol_imgui.h"
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#include "cimgui.h"
+#ifndef ImTextureID_Invalid
+#define ImTextureID_Invalid     ((ImTextureID)0)
+#endif
+#define SOKOL_IMGUI_IMPL
+#include "sokol_imgui.h"
 
 #ifdef __cplusplus
 extern "C"

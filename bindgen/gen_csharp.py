@@ -59,7 +59,7 @@ name_ignores = [
 ]
 
 name_overrides = {
-    'sgl_error':    'sgl_get_error',   # 'error' is reserved in Zig
+    'sgl_error':    'sgl_get_error',  
     'sgl_deg':      'sgl_as_degrees',
     'sgl_rad':      'sgl_as_radians',
     'sapp_isvalid': 'sapp_is_valid',
@@ -616,8 +616,33 @@ def gen_func_csharp(decl, prefix):
         l("}")
         l("#else")
         if csharp_res_type == "string":
-            l("[return:M(U.LPUTF8Str)]")
-        l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
+            # Manual string marshalling for non-WebAssembly and WebAssembly platforms
+            l(f"private static extern IntPtr {csharp_func_name}_native({funcdecl_args_csharp(decl, prefix)});")
+            l("")
+            l(f"public static string {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
+            l("{")
+            if decl['params']:
+                param_names = [check_name_override(param['name']) for param in decl['params']]
+                param_list = ", ".join(param_names)
+                l(f"    IntPtr ptr = {csharp_func_name}_native({param_list});")
+            else:
+                l(f"    IntPtr ptr = {csharp_func_name}_native();")
+            l("    if (ptr == IntPtr.Zero)")
+            l("        return \"\";")
+            l("")
+            l("    // Manual UTF-8 to string conversion to avoid marshalling corruption")
+            l("    try")
+            l("    {")
+            l("        return Marshal.PtrToStringUTF8(ptr) ?? \"\";")
+            l("    }")
+            l("    catch")
+            l("    {")
+            l("        // Fallback in case of any marshalling issues")
+            l("        return \"\";")
+            l("    }")
+            l("}")
+        else:
+            l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
         l("#endif")
         l("")
         return
@@ -643,16 +668,65 @@ def gen_func_csharp(decl, prefix):
         l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#endif")
         if csharp_res_type == "string":
-            l("[return:M(U.LPUTF8Str)]")
-        l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
+            # Manual string marshalling for WebAssembly to avoid corruption
+            l(f"private static extern IntPtr {csharp_func_name}_native({funcdecl_args_csharp(decl, prefix)});")
+            l("")
+            l(f"public static string {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
+            l("{")
+            if decl['params']:
+                param_names = [check_name_override(param['name']) for param in decl['params']]
+                param_list = ", ".join(param_names)
+                l(f"    IntPtr ptr = {csharp_func_name}_native({param_list});")
+            else:
+                l(f"    IntPtr ptr = {csharp_func_name}_native();")
+            l("    if (ptr == IntPtr.Zero)")
+            l("        return \"\";")
+            l("")
+            l("    // Manual UTF-8 to string conversion to avoid marshalling corruption")
+            l("    try")
+            l("    {")
+            l("        return Marshal.PtrToStringUTF8(ptr) ?? \"\";")
+            l("    }")
+            l("    catch")
+            l("    {")
+            l("        // Fallback in case of any marshalling issues")
+            l("        return \"\";")
+            l("    }")
+            l("}")
+        else:
+            l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
         l("#endif")
         l("")
         return
       
     if csharp_res_type == "string":
-        l("[return:M(U.LPUTF8Str)]")
-
-    l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
+        # Manual string marshalling for all platforms to avoid corruption
+        l(f"private static extern IntPtr {csharp_func_name}_native({funcdecl_args_csharp(decl, prefix)});")
+        l("")
+        l(f"public static string {csharp_func_name}({funcdecl_args_csharp(decl, prefix)})")
+        l("{")
+        if decl['params']:
+            param_names = [check_name_override(param['name']) for param in decl['params']]
+            param_list = ", ".join(param_names)
+            l(f"    IntPtr ptr = {csharp_func_name}_native({param_list});")
+        else:
+            l(f"    IntPtr ptr = {csharp_func_name}_native();")
+        l("    if (ptr == IntPtr.Zero)")
+        l("        return \"\";")
+        l("")
+        l("    // Manual UTF-8 to string conversion to avoid marshalling corruption")
+        l("    try")
+        l("    {")
+        l("        return Marshal.PtrToStringUTF8(ptr) ?? \"\";")
+        l("    }")
+        l("    catch")
+        l("    {")
+        l("        // Fallback in case of any marshalling issues")
+        l("        return \"\";")
+        l("    }")
+        l("}")
+    else:
+        l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
     l("")
 
 def pre_parse(inp):

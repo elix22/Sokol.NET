@@ -306,8 +306,25 @@ public static extern sgp_error sgp_get_last_error();
 #else
 [DllImport("sokol", EntryPoint = "sgp_get_error_message", CallingConvention = CallingConvention.Cdecl)]
 #endif
-[return:M(U.LPUTF8Str)]
-public static extern string sgp_get_error_message(sgp_error error);
+private static extern IntPtr sgp_get_error_message_native(sgp_error error);
+
+public static string sgp_get_error_message(sgp_error error)
+{
+    IntPtr ptr = sgp_get_error_message_native(error);
+    if (ptr == IntPtr.Zero)
+        return "";
+
+    // Manual UTF-8 to string conversion to avoid marshalling corruption
+    try
+    {
+        return Marshal.PtrToStringUTF8(ptr) ?? "";
+    }
+    catch
+    {
+        // Fallback in case of any marshalling issues
+        return "";
+    }
+}
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgp_make_pipeline", CallingConvention = CallingConvention.Cdecl)]

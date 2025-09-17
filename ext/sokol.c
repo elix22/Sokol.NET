@@ -1,4 +1,18 @@
 
+#ifdef __EMSCRIPTEN__
+// Emscripten utility functions for EM_JS code in sokol_app.h
+// These are provided by the JavaScript library sokol_js_lib.js
+// and linked automatically when building with Emscripten
+
+#include <emscripten.h>
+
+// Forward declarations - actual implementations are in sokol_js_lib.js
+extern int stringToUTF8OnStack(const char* str);
+extern void withStackSave(void (*func)(void));
+extern void* findCanvasEventTarget(const char* target);
+
+#endif
+
 #define SOKOL_IMPL
 #define SOKOL_DLL
 #ifndef __ANDROID__
@@ -7,6 +21,7 @@
 #define SOKOL_NO_DEPRECATED
 #define SOKOL_TRACE_HOOKS
 #define SOKOL_FETCH_API_DECL
+
 
 #include "sokol_defines.h"
 #include "sokol_app.h"
@@ -29,11 +44,13 @@
 #include "cgltf.h"
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#include "dcimgui/src/cimgui.h"
-
-//TBD ELI , needs fixing
+#include "cimgui/cimgui.h"
+#ifndef ImTextureID_Invalid
+#define ImTextureID_Invalid     ((ImTextureID)0)
+#endif
 #define SOKOL_IMGUI_IMPL
 #include "sokol_imgui.h"
+
 
 int sdtx_print_wrapper(const char* str)
 {
@@ -48,4 +65,5 @@ sapp_desc sokol_main(int argc, char* argv[]) {
     return desc;
 }
 #endif
+
 
