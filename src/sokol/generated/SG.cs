@@ -50,7 +50,6 @@ public const int SG_MAX_COLOR_ATTACHMENTS = 4;
 public const int SG_MAX_UNIFORMBLOCK_MEMBERS = 16;
 public const int SG_MAX_VERTEX_ATTRIBUTES = 16;
 public const int SG_MAX_MIPMAPS = 16;
-public const int SG_MAX_TEXTUREARRAY_LAYERS = 128;
 public const int SG_MAX_VERTEXBUFFER_BINDSLOTS = 8;
 public const int SG_MAX_UNIFORMBLOCK_BINDSLOTS = 8;
 public const int SG_MAX_VIEW_BINDSLOTS = 28;
@@ -310,17 +309,6 @@ public enum sg_sampler_type
     SG_SAMPLERTYPE_COMPARISON,
     _SG_SAMPLERTYPE_NUM,
     _SG_SAMPLERTYPE_FORCE_U32,
-}
-public enum sg_cube_face
-{
-    SG_CUBEFACE_POS_X,
-    SG_CUBEFACE_NEG_X,
-    SG_CUBEFACE_POS_Y,
-    SG_CUBEFACE_NEG_Y,
-    SG_CUBEFACE_POS_Z,
-    SG_CUBEFACE_NEG_Z,
-    SG_CUBEFACE_NUM,
-    _SG_CUBEFACE_FORCE_U32 = 2147483647,
 }
 public enum sg_primitive_type
 {
@@ -894,9 +882,9 @@ public enum sg_view_type
 public struct sg_image_data
 {
     #pragma warning disable 169
-    public struct subimageCollection
+    public struct mip_levelsCollection
     {
-        public ref sg_range this[int x, int y] { get { fixed (sg_range* pTP = &_item0) return ref *(pTP + x + (y * 6)); } }
+        public ref sg_range this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 16)[index];
         private sg_range _item0;
         private sg_range _item1;
         private sg_range _item2;
@@ -913,89 +901,9 @@ public struct sg_image_data
         private sg_range _item13;
         private sg_range _item14;
         private sg_range _item15;
-        private sg_range _item16;
-        private sg_range _item17;
-        private sg_range _item18;
-        private sg_range _item19;
-        private sg_range _item20;
-        private sg_range _item21;
-        private sg_range _item22;
-        private sg_range _item23;
-        private sg_range _item24;
-        private sg_range _item25;
-        private sg_range _item26;
-        private sg_range _item27;
-        private sg_range _item28;
-        private sg_range _item29;
-        private sg_range _item30;
-        private sg_range _item31;
-        private sg_range _item32;
-        private sg_range _item33;
-        private sg_range _item34;
-        private sg_range _item35;
-        private sg_range _item36;
-        private sg_range _item37;
-        private sg_range _item38;
-        private sg_range _item39;
-        private sg_range _item40;
-        private sg_range _item41;
-        private sg_range _item42;
-        private sg_range _item43;
-        private sg_range _item44;
-        private sg_range _item45;
-        private sg_range _item46;
-        private sg_range _item47;
-        private sg_range _item48;
-        private sg_range _item49;
-        private sg_range _item50;
-        private sg_range _item51;
-        private sg_range _item52;
-        private sg_range _item53;
-        private sg_range _item54;
-        private sg_range _item55;
-        private sg_range _item56;
-        private sg_range _item57;
-        private sg_range _item58;
-        private sg_range _item59;
-        private sg_range _item60;
-        private sg_range _item61;
-        private sg_range _item62;
-        private sg_range _item63;
-        private sg_range _item64;
-        private sg_range _item65;
-        private sg_range _item66;
-        private sg_range _item67;
-        private sg_range _item68;
-        private sg_range _item69;
-        private sg_range _item70;
-        private sg_range _item71;
-        private sg_range _item72;
-        private sg_range _item73;
-        private sg_range _item74;
-        private sg_range _item75;
-        private sg_range _item76;
-        private sg_range _item77;
-        private sg_range _item78;
-        private sg_range _item79;
-        private sg_range _item80;
-        private sg_range _item81;
-        private sg_range _item82;
-        private sg_range _item83;
-        private sg_range _item84;
-        private sg_range _item85;
-        private sg_range _item86;
-        private sg_range _item87;
-        private sg_range _item88;
-        private sg_range _item89;
-        private sg_range _item90;
-        private sg_range _item91;
-        private sg_range _item92;
-        private sg_range _item93;
-        private sg_range _item94;
-        private sg_range _item95;
     }
     #pragma warning restore 169
-    public subimageCollection subimage;
+    public mip_levelsCollection mip_levels;
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_image_desc
@@ -1978,6 +1886,11 @@ public enum sg_log_item
     SG_LOGITEM_VALIDATE_IMAGEDATA_DATA_SIZE,
     SG_LOGITEM_VALIDATE_IMAGEDESC_CANARY,
     SG_LOGITEM_VALIDATE_IMAGEDESC_IMMUTABLE_DYNAMIC_STREAM,
+    SG_LOGITEM_VALIDATE_IMAGEDESC_IMAGETYPE_2D_NUMSLICES,
+    SG_LOGITEM_VALIDATE_IMAGEDESC_IMAGETYPE_CUBE_NUMSLICES,
+    SG_LOGITEM_VALIDATE_IMAGEDESC_IMAGETYPE_ARRAY_NUMSLICES,
+    SG_LOGITEM_VALIDATE_IMAGEDESC_IMAGETYPE_3D_NUMSLICES,
+    SG_LOGITEM_VALIDATE_IMAGEDESC_NUMSLICES,
     SG_LOGITEM_VALIDATE_IMAGEDESC_WIDTH,
     SG_LOGITEM_VALIDATE_IMAGEDESC_HEIGHT,
     SG_LOGITEM_VALIDATE_IMAGEDESC_NONRT_PIXELFORMAT,

@@ -197,7 +197,7 @@ public static unsafe class DynTextApp
         fixed (uint* pixels = state._pixels)
         {
             var img_data = default(sg_image_data);
-            img_data.subimage[0, 0] = SG_RANGE(pixels, IMAGE_WIDTH * IMAGE_HEIGHT);
+            img_data.mip_levels[0] = SG_RANGE(pixels, IMAGE_WIDTH * IMAGE_HEIGHT);
             sg_update_image(state.img, img_data);
         }
 

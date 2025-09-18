@@ -210,7 +210,7 @@ public static unsafe class LoadPngSApp
             image_desc.width = png_width;
             image_desc.height = png_height;
             image_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-            image_desc.data.subimage[0, 0] = new sg_range() { ptr = Unsafe.AsPointer(ref image.Data[0]), size = (uint)(png_width * png_height * 4) };
+            image_desc.data.mip_levels[0] = new sg_range() { ptr = Unsafe.AsPointer(ref image.Data[0]), size = (uint)(png_width * png_height * 4) };
 
             sg_image img = sg_make_image(image_desc);
 

@@ -6,6 +6,7 @@
 */
 #include <stdint.h>
 #include <stdbool.h>
+#include "sokol_gfx.h"
 
 #if defined(__cplusplus)
 extern "C" {

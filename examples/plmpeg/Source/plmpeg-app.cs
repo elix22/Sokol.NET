@@ -265,7 +265,7 @@ public static unsafe partial class PlMpegApp
         {
             state.images[slot].last_upd_frame = state.cur_frame;
             sg_image_data image_data = default;
-            image_data.subimage[0, 0] = new sg_range() { ptr = plane->data, size = (uint)(plane->width * plane->height * sizeof(byte)) };
+            image_data.mip_levels[0] = new sg_range() { ptr = plane->data, size = (uint)(plane->width * plane->height * sizeof(byte)) };
             sg_update_image(state.images[slot].img, image_data);
         }
     }
