@@ -59,6 +59,9 @@ namespace Imgui
 		HasSetMousePos = 4,
 		RendererHasVtxOffset = 8,
 		RendererHasTextures = 16,
+		PlatformHasViewports = 1024,
+		HasMouseHoveredViewport = 2048,
+		RendererHasViewports = 4096,
 	}
 
 	[Flags]
@@ -130,24 +133,26 @@ namespace Imgui
 		TabDimmed = 38,
 		TabDimmedSelected = 39,
 		TabDimmedSelectedOverline = 40,
-		PlotLines = 41,
-		PlotLinesHovered = 42,
-		PlotHistogram = 43,
-		PlotHistogramHovered = 44,
-		TableHeaderBg = 45,
-		TableBorderStrong = 46,
-		TableBorderLight = 47,
-		TableRowBg = 48,
-		TableRowBgAlt = 49,
-		TextLink = 50,
-		TextSelectedBg = 51,
-		TreeLines = 52,
-		DragDropTarget = 53,
-		NavCursor = 54,
-		NavWindowingHighlight = 55,
-		NavWindowingDimBg = 56,
-		ModalWindowDimBg = 57,
-		COUNT = 58,
+		DockingPreview = 41,
+		DockingEmptyBg = 42,
+		PlotLines = 43,
+		PlotLinesHovered = 44,
+		PlotHistogram = 45,
+		PlotHistogramHovered = 46,
+		TableHeaderBg = 47,
+		TableBorderStrong = 48,
+		TableBorderLight = 49,
+		TableRowBg = 50,
+		TableRowBgAlt = 51,
+		TextLink = 52,
+		TextSelectedBg = 53,
+		TreeLines = 54,
+		DragDropTarget = 55,
+		NavCursor = 56,
+		NavWindowingHighlight = 57,
+		NavWindowingDimBg = 58,
+		ModalWindowDimBg = 59,
+		COUNT = 60,
 	}
 
 	[Flags]
@@ -219,6 +224,8 @@ namespace Imgui
 		NoMouse = 16,
 		NoMouseCursorChange = 32,
 		NoKeyboard = 64,
+		DockingEnable = 128,
+		ViewportsEnable = 1024,
 		IsSRGB = 1048576,
 		IsTouchScreen = 2097152,
 	}
@@ -251,6 +258,19 @@ namespace Imgui
 	}
 
 	[Flags]
+	public enum ImGuiDockNodeFlags
+	{
+		None = 0,
+		KeepAliveOnly = 1,
+		NoDockingOverCentralNode = 4,
+		PassthruCentralNode = 8,
+		NoDockingSplit = 16,
+		NoResize = 32,
+		AutoHideTabBar = 64,
+		NoUndocking = 128,
+	}
+
+	[Flags]
 	public enum ImGuiDragDropFlags
 	{
 		None = 0,
@@ -276,6 +296,7 @@ namespace Imgui
 		RootWindow = 2,
 		AnyWindow = 4,
 		NoPopupHierarchy = 8,
+		DockHierarchy = 16,
 		RootAndChildWindows = 3,
 	}
 
@@ -303,6 +324,7 @@ namespace Imgui
 		RootWindow = 2,
 		AnyWindow = 4,
 		NoPopupHierarchy = 8,
+		DockHierarchy = 16,
 		AllowWhenBlockedByPopup = 32,
 		AllowWhenBlockedByActiveItem = 128,
 		AllowWhenOverlappedByItem = 256,
@@ -700,7 +722,8 @@ namespace Imgui
 		SeparatorTextBorderSize = 35,
 		SeparatorTextAlign = 36,
 		SeparatorTextPadding = 37,
-		COUNT = 38,
+		DockingSeparatorSize = 38,
+		COUNT = 39,
 	}
 
 	[Flags]
@@ -860,6 +883,17 @@ namespace Imgui
 		IsPlatformWindow = 1,
 		IsPlatformMonitor = 2,
 		OwnedByApp = 4,
+		NoDecoration = 8,
+		NoTaskBarIcon = 16,
+		NoFocusOnAppearing = 32,
+		NoFocusOnClick = 64,
+		NoInputs = 128,
+		NoRendererClear = 256,
+		NoAutoMerge = 512,
+		TopMost = 1024,
+		CanHostOtherWindows = 2048,
+		IsMinimized = 4096,
+		IsFocused = 8192,
 	}
 
 	[Flags]
@@ -885,9 +919,11 @@ namespace Imgui
 		NoNavInputs = 65536,
 		NoNavFocus = 131072,
 		UnsavedDocument = 262144,
+		NoDocking = 524288,
 		NoNav = 196608,
 		NoDecoration = 43,
 		NoInputs = 197120,
+		DockNodeHost = 8388608,
 		ChildWindow = 16777216,
 		Tooltip = 33554432,
 		Popup = 67108864,

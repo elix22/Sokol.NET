@@ -56,6 +56,11 @@ public static unsafe class CImguiApp
             }
         });
 
+        ImGuiIO* io= igGetIO_Nil();
+        io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;    // Enable Docking
+
+        state.show_test_window = 1;
+
         state.pass_action = default;
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         state.pass_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };

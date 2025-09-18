@@ -1,1 +1,1 @@
- dotnet run -- --task build --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/cimgui  --install --device R5CT82F1XWL
+ dotnet run -- --task build --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/cimgui  --install --device R8YW60MZRDV

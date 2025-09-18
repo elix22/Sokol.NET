@@ -278,6 +278,17 @@ namespace Imgui
 		public byte ConfigNavEscapeClearFocusWindow;
 		public byte ConfigNavCursorVisibleAuto;
 		public byte ConfigNavCursorVisibleAlways;
+		public byte ConfigDockingNoSplit;
+		public byte ConfigDockingWithShift;
+		public byte ConfigDockingAlwaysTabBar;
+		public byte ConfigDockingTransparentPayload;
+		public byte ConfigViewportsNoAutoMerge;
+		public byte ConfigViewportsNoTaskBarIcon;
+		public byte ConfigViewportsNoDecoration;
+		public byte ConfigViewportsNoDefaultParent;
+		public byte ConfigViewportPlatformFocusSetsImGuiFocus;
+		public byte ConfigDpiScaleFonts;
+		public byte ConfigDpiScaleViewports;
 		public byte MouseDrawCursor;
 		public byte ConfigMacOSXBehaviors;
 		public byte ConfigInputTrickleEventQueue;
@@ -329,6 +340,7 @@ namespace Imgui
 		public float MouseWheel;
 		public float MouseWheelH;
 		public ImGuiMouseSource MouseSource;
+		public uint MouseHoveredViewport;
 		public byte KeyCtrl;
 		public byte KeyShift;
 		public byte KeyAlt;
@@ -509,6 +521,11 @@ namespace Imgui
 		public byte MouseCtrlLeftAsRightClick;
 		public fixed float MouseDownDuration[5];
 		public fixed float MouseDownDurationPrev[5];
+		public Vector2 MouseDragMaxDistanceAbs_0;
+		public Vector2 MouseDragMaxDistanceAbs_1;
+		public Vector2 MouseDragMaxDistanceAbs_2;
+		public Vector2 MouseDragMaxDistanceAbs_3;
+		public Vector2 MouseDragMaxDistanceAbs_4;
 		public fixed float MouseDragMaxDistanceSqr[5];
 		public float PenPressure;
 		public byte AppFocusLost;
@@ -594,7 +611,34 @@ namespace Imgui
 		public int Renderer_TextureMaxWidth;
 		public int Renderer_TextureMaxHeight;
 		public void* Renderer_RenderState;
+		public IntPtr Platform_CreateWindow;
+		public IntPtr Platform_DestroyWindow;
+		public IntPtr Platform_ShowWindow;
+		public IntPtr Platform_SetWindowPos;
+		public IntPtr Platform_GetWindowPos;
+		public IntPtr Platform_SetWindowSize;
+		public IntPtr Platform_GetWindowSize;
+		public IntPtr Platform_GetWindowFramebufferScale;
+		public IntPtr Platform_SetWindowFocus;
+		public IntPtr Platform_GetWindowFocus;
+		public IntPtr Platform_GetWindowMinimized;
+		public IntPtr Platform_SetWindowTitle;
+		public IntPtr Platform_SetWindowAlpha;
+		public IntPtr Platform_UpdateWindow;
+		public IntPtr Platform_RenderWindow;
+		public IntPtr Platform_SwapBuffers;
+		public IntPtr Platform_GetWindowDpiScale;
+		public IntPtr Platform_OnChangedViewport;
+		public IntPtr Platform_GetWindowWorkAreaInsets;
+		public IntPtr Platform_CreateVkSurface;
+		public IntPtr Renderer_CreateWindow;
+		public IntPtr Renderer_DestroyWindow;
+		public IntPtr Renderer_SetWindowSize;
+		public IntPtr Renderer_RenderWindow;
+		public IntPtr Renderer_SwapBuffers;
+		public ImVector Monitors;
 		public ImVector_ImTextureDataPtr Textures;
+		public ImVector Viewports;
 	}
 
 	public unsafe partial struct ImGuiPlatformImeData
@@ -604,6 +648,16 @@ namespace Imgui
 		public Vector2 InputPos;
 		public float InputLineHeight;
 		public uint ViewportId;
+	}
+
+	public unsafe partial struct ImGuiPlatformMonitor
+	{
+		public Vector2 MainPos;
+		public Vector2 MainSize;
+		public Vector2 WorkPos;
+		public Vector2 WorkSize;
+		public float DpiScale;
+		public void* PlatformHandle;
 	}
 
 	public unsafe partial struct ImGuiSelectionBasicStorage
@@ -698,6 +752,7 @@ namespace Imgui
 		public Vector2 SeparatorTextPadding;
 		public Vector2 DisplayWindowPadding;
 		public Vector2 DisplaySafeAreaPadding;
+		public float DockingSeparatorSize;
 		public float MouseCursorScale;
 		public byte AntiAliasedLines;
 		public byte AntiAliasedLinesUseTex;
@@ -762,6 +817,8 @@ namespace Imgui
 		public Vector4 Colors_55;
 		public Vector4 Colors_56;
 		public Vector4 Colors_57;
+		public Vector4 Colors_58;
+		public Vector4 Colors_59;
 		public float HoverStationaryDelay;
 		public float HoverDelayShort;
 		public float HoverDelayNormal;
@@ -813,8 +870,30 @@ namespace Imgui
 		public Vector2 FramebufferScale;
 		public Vector2 WorkPos;
 		public Vector2 WorkSize;
+		public float DpiScale;
+		public uint ParentViewportId;
+		public ImDrawData* DrawData;
+		public void* RendererUserData;
+		public void* PlatformUserData;
 		public void* PlatformHandle;
 		public void* PlatformHandleRaw;
+		public byte PlatformWindowCreated;
+		public byte PlatformRequestMove;
+		public byte PlatformRequestResize;
+		public byte PlatformRequestClose;
+	}
+
+	public unsafe partial struct ImGuiWindowClass
+	{
+		public uint ClassId;
+		public uint ParentViewportId;
+		public uint FocusRouteParentWindowId;
+		public ImGuiViewportFlags ViewportFlagsOverrideSet;
+		public ImGuiViewportFlags ViewportFlagsOverrideClear;
+		public ImGuiTabItemFlags TabItemFlagsOverrideSet;
+		public ImGuiDockNodeFlags DockNodeFlagsOverrideSet;
+		public byte DockingAlwaysTabBar;
+		public byte DockingAllowUnclassed;
 	}
 
 	public unsafe partial struct ImTextureData
