@@ -136,6 +136,7 @@
                 </EmccFlags>
                 <EmccExtraLDFlags>
                     -lidbfs.js
+                    --js-library wwwroot/sokol_js_lib.js
                     -s EXPORTED_RUNTIME_METHODS='['ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
                 </EmccExtraLDFlags>
             </PropertyGroup>
@@ -157,12 +158,10 @@
                     -s MAXIMUM_MEMORY=2048MB
                     -s ALLOW_MEMORY_GROWTH=1
                     -s TOTAL_MEMORY=520MB
-                    -s STACK_SIZE=16MB
-                    -s TOTAL_STACK=16MB
-                    -s STACK_OVERFLOW_CHECK=2
                 </EmccFlags>
                 <EmccExtraLDFlags>
                     -lexports.js
+                    --js-library wwwroot/sokol_js_lib.js
                     -s EXPORTED_RUNTIME_METHODS='['mono_jiterp_placeholder_trace','ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
                 </EmccExtraLDFlags>
             </PropertyGroup>
