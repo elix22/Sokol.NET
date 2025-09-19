@@ -8,3 +8,6 @@
 	path = ext/cimgui
 	url = git@github.com:elix22/cimgui.git
 	branch = v1.92.2b
+[submodule "tools/emsdk"]
+	path = tools/emsdk
+	url = https://github.com/emscripten-core/emsdk.git
