@@ -125,9 +125,6 @@
     <Compile Remove="shaders/compiled/linux/**/*.cs" Condition="'$(HostShaderFolder)' != 'linux'" />
     <Compile Remove="shaders/compiled/android/**/*.cs" Condition="'$(HostShaderFolder)' != 'android'" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="shaders\compiled\windows\" />
-  </ItemGroup>
 
 
   <!-- Compile shaders into the host-specific folder before build -->
