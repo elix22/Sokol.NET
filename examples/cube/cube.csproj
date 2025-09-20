@@ -13,13 +13,6 @@
     <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
     <TrimMode>partial</TrimMode>
     <TrimmerRemoveSymbols>false</TrimmerRemoveSymbols>
-    <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
-    <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
-    <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
-    <OSArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</OSArch>
-    <IsWindowsHost>$([MSBuild]::IsOSPlatform('Windows'))</IsWindowsHost>
-		<IsLinuxHost>$([MSBuild]::IsOSPlatform('Linux'))</IsLinuxHost>
-		<IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
     <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
     <IsAndroid>$(RuntimeIdentifier.ToLower().StartsWith('android'))</IsAndroid>
 		<IsAndroid Condition="'$(IsAndroid)'=='false'">$(RuntimeIdentifier.ToLower().StartsWith('linux-bionic'))</IsAndroid>
@@ -27,7 +20,6 @@
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    
     <!-- Exclude build artifacts from project view -->
     <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user</DefaultItemExcludes> 
   </PropertyGroup>
@@ -53,33 +45,8 @@
   </PropertyGroup>
 
     <!-- Import Android NDK pressets -->
-   <Import Project="scripts/BionicNativeAot.targets"/>
+   <Import Project="scripts/BionicNativeAot.targets" />
 
-  <ItemGroup>
-    <AssetsSourceFiles Include="Assets/**/*.*" />
-  </ItemGroup>
-
-  <ItemGroup>
-     <ShaderFiles Include="shaders/**/*.glsl" />
-  </ItemGroup>
-
-  <ItemGroup>
-      <Compile Include="../../src/sokol/*.cs" >
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-      <Compile Include="../../src/sokol/generated/*.cs">
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-  </ItemGroup>
-
-    <ItemGroup>
-      <Compile Include="../../src/ImGuiNET/*.cs" >
-        <Link>ImGuiNET\%(Filename)%(Extension)</Link>
-      </Compile>
-      <Compile Include="../../src/ImGuiNET/Generated/*.cs">
-        <Link>ImGuiNET\Generated\%(Filename)%(Extension)</Link>
-      </Compile>
-  </ItemGroup>
 
   	<!--Following blocks are exclusive for Android building-->
 	<PropertyGroup Condition="$(IsAndroid) == 'true'">
@@ -95,7 +62,7 @@
 		<!--Hack for removing init and fini sections into the exports file-->
 		<ExportsPatch>'s/global: _init; _fini;/global: /g;'</ExportsPatch>
     <!--Google new requirement , 16 KB page sizes for 64 bit native shared libraries-->
-		<LdFlags Condition="$(RuntimeIdentifier.EndsWith('x64')) or $(RuntimeIdentifier.EndsWith('arm64'))" >$(LdFlags) -Wl,-z,max-page-size=16384</LdFlags>
+		<LdFlags Condition="$(RuntimeIdentifier.EndsWith('x64')) or $(RuntimeIdentifier.EndsWith('arm64'))">$(LdFlags) -Wl,-z,max-page-size=16384</LdFlags>
     <!-- Architecture mapping -->
     <LibraryOutputBase>Android/native-activity/app/libs</LibraryOutputBase>
     <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm64'))">$(LibraryOutputBase)/arm64-v8a</ArchitectureOutputPath>
@@ -151,23 +118,42 @@
 
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
-    <Compile Remove="shaders/compiled/web/**/*.cs"/>
+    <Compile Remove="shaders/compiled/web/**/*.cs" />
     <Compile Remove="shaders/compiled/ios/**/*.cs" Condition="'$(HostShaderFolder)' != 'ios'" />
     <Compile Remove="shaders/compiled/osx/**/*.cs" Condition="'$(HostShaderFolder)' != 'osx'" />
     <Compile Remove="shaders/compiled/windows/**/*.cs" Condition="'$(HostShaderFolder)' != 'windows'" />
     <Compile Remove="shaders/compiled/linux/**/*.cs" Condition="'$(HostShaderFolder)' != 'linux'" />
     <Compile Remove="shaders/compiled/android/**/*.cs" Condition="'$(HostShaderFolder)' != 'android'" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="shaders\compiled\windows\" />
+  </ItemGroup>
 
 
   <!-- Compile shaders into the host-specific folder before build -->
-  <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
-          Inputs="@(ShaderFiles)"
-          Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
+  <Target Name="CompileShaders" BeforeTargets="BeforeBuild" Inputs="@(ShaderFiles)" Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
         <!-- Ensure the output folder exists -->
     <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
     <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
-    <Exec Command="../../tools/bin/sokol-shdc --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+  </Target>
+
+  <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishWindows" AfterTargets="Publish" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
   <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
@@ -189,27 +175,19 @@
   </Target>
 
 
-  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" 
-          Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
       <PropertyGroup>
           <BuiltLibrary>$(PublishDir)/$(LibraryName).so</BuiltLibrary>
       </PropertyGroup>
-      <Error Condition="!Exists('$(BuiltLibrary)')" 
-            Text="Built library not found at $(BuiltLibrary)" />
+      <Error Condition="!Exists('$(BuiltLibrary)')" Text="Built library not found at $(BuiltLibrary)" />
       <MakeDir Directories="$(ArchitectureOutputPath)" />
-      <Copy SourceFiles="$(BuiltLibrary)"
-            DestinationFolder="$(ArchitectureOutputPath)"
-            SkipUnchangedFiles="true" />
-      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" 
-              Importance="high" />
+      <Copy SourceFiles="$(BuiltLibrary)" DestinationFolder="$(ArchitectureOutputPath)" SkipUnchangedFiles="true" />
+      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" Importance="high" />
   </Target>
 
   <Target Name="CopyAssetsToAndroidFolder" AfterTargets="Publish" Condition="'$(IsAndroid)'=='true'">
     <Message Text="Copying assets to Android app/src/main/assets folder..." Importance="high" />
-    <Copy 
-      SourceFiles="@(AssetsSourceFiles)" 
-      DestinationFiles="@(AssetsSourceFiles->'Android/native-activity/app/src/main/assets\%(RecursiveDir)%(Filename)%(Extension)')"
-      SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFiles="@(AssetsSourceFiles->'Android/native-activity/app/src/main/assets\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
 

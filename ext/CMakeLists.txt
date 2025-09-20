@@ -5,6 +5,11 @@ project(sokol)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 11)
 
+if (MSVC)
+    set(CMAKE_C_FLAGS "/W3")
+    set(CMAKE_CXX_FLAGS "/W3")
+endif()
+
 if (CMAKE_SYSTEM_NAME STREQUAL Linux)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
@@ -46,8 +51,10 @@ set(IMGUI_SOURCE_FILES
 )
 
 # set_source_files_properties(basisu/basisu_transcoder.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
-set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
-set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+if (NOT MSVC)
+    set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+    set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+endif()
 if (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(FILEUTIL_SRCS "util/fileutil_osx.m")
 else()
@@ -74,7 +81,9 @@ endif()
 
 set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
 
-target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-qualifiers)
+if (NOT MSVC)
+    target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-qualifiers)
+endif()
 
 target_link_libraries(sokol)
 
@@ -102,24 +111,24 @@ if (WIN32)
     )
     
     # Windows post-build commands
-    add_custom_command(TARGET sokol POST_BUILD
-        # Log source file details
-        COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
-        COMMAND dir /B /S $<TARGET_FILE:sokol>
-        
-        # Create directory and copy
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/
-        
-        # Verify destination file
-        COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
-        COMMAND dir /B /S ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
-        
-        # Verify files are identical
-        COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
-        
-        COMMENT "Installing and verifying library for Windows"
-    )
+    # add_custom_command(TARGET sokol POST_BUILD
+    #     # Log source file details
+    #     COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
+    #     COMMAND dir /B /S $<TARGET_FILE:sokol>
+    #     
+    #     # Create directory and copy
+    #     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}
+    #     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/
+    #     
+    #     # Verify destination file
+    #     COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
+    #     COMMAND dir /B /S ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+    #     
+    #     # Verify files are identical
+    #     COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/windows/${CMAKE_SYSTEM_PROCESSOR}/sokol.dll
+    #     
+    #     COMMENT "Installing and verifying library for Windows"
+    # )
 elseif (APPLE)
     if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         target_compile_options(sokol PRIVATE -x objective-c)

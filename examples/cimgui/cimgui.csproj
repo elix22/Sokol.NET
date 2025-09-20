@@ -27,7 +27,11 @@
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    
+    <HostOS Condition="'$(IsWindowsHost)'=='true'">windows</HostOS>
+    <HostOS Condition="'$(IsLinuxHost)'=='true'">linux</HostOS>
+    <HostOS Condition="'$(IsOSXHost)'=='true'">osx</HostOS>
+    <SokolShdcPath>../../tools/bin/$(HostOS)/$(OSArch)/sokol-shdc</SokolShdcPath>
+    <SokolShdcPath Condition="'$(IsWindowsHost)'=='true'">$(SokolShdcPath).exe</SokolShdcPath>
     <!-- Exclude build artifacts from project view -->
     <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user</DefaultItemExcludes> 
   </PropertyGroup>
@@ -52,31 +56,9 @@
     <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsLinux)'=='true'">glsl430</ShaderSlang>
   </PropertyGroup>
 
-    <!-- Import Android NDK pressets -->
-   <Import Project="scripts/BionicNativeAot.targets"/>
+  <!-- Import Android NDK pressets -->
+  <Import Project="scripts/BionicNativeAot.targets"/>
 
-  <ItemGroup>
-    <AssetsSourceFiles Include="Assets/**/*.*" />
-  </ItemGroup>
-
-  <ItemGroup>
-     <ShaderFiles Include="shaders/**/*.glsl" />
-  </ItemGroup>
-
-  <ItemGroup>
-      <Compile Include="../../src/sokol/*.cs" >
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-      <Compile Include="../../src/sokol/generated/*.cs">
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-  </ItemGroup>
-
-    <ItemGroup>
-      <Compile Include="../../src/imgui/*.cs" >
-        <Link>Imgui\%(Filename)%(Extension)</Link>
-      </Compile>
-    </ItemGroup>
 
   	<!--Following blocks are exclusive for Android building-->
 	<PropertyGroup Condition="$(IsAndroid) == 'true'">
@@ -164,9 +146,29 @@
         <!-- Ensure the output folder exists -->
     <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
     <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
-    <Exec Command="../../tools/bin/sokol-shdc --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
   </Target>
 
+
+  <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishWindows" AfterTargets="Publish" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  
   <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
       <PropertyGroup>
         <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>

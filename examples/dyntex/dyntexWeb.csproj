@@ -31,26 +31,6 @@
 
 
     <ItemGroup>
-        <Compile Include="../../src/sokol/*.cs" >
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-      <Compile Include="../../src/sokol/generated/*.cs">
-        <Link>Sokol\%(Filename)%(Extension)</Link>
-      </Compile>
-      <Compile Remove="../../src/sokol/obj/**/*.cs" />
-      <Compile Remove="../../src/sokol/bin/**/*.cs" />
-    </ItemGroup>
-
-
-    <ItemGroup>
-        <AssetsSourceFiles Include="Assets/**/*.*">
-            <Link>Assets\%(RecursiveDir)%(FileName)%(Extension)</Link>
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </AssetsSourceFiles>
-    </ItemGroup>
-
-
-    <ItemGroup>
       <ShaderFiles Include="shaders/**/*.glsl" />
     </ItemGroup>
 
@@ -94,7 +74,7 @@
         <!-- Ensure the output folder exists -->
     <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
     <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
-    <Exec Command="../../tools/bin/sokol-shdc --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
   </Target>
     
   <Target  Name="CopyIndexHTML" AfterTargets="AfterBuild">
@@ -162,7 +142,7 @@
                 <EmccExtraLDFlags>
                     -lexports.js
                     --js-library wwwroot/sokol_js_lib.js
-                    -s EXPORTED_RUNTIME_METHODS='['mono_jiterp_placeholder_trace','ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
+                    -s EXPORTED_RUNTIME_METHODS='[ 'ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
                 </EmccExtraLDFlags>
             </PropertyGroup>
         </When>

@@ -12,8 +12,6 @@ using static Sokol.SG.sg_compare_func;
 using static Sokol.Utils;
 using System.Diagnostics;
 using static Sokol.SImgui;
-// using ImGuiNET;
-
 using static Imgui.ImguiNative;
 using Imgui;
 
