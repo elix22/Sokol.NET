@@ -127,14 +127,6 @@
   </ItemGroup>
 
 
-  <!-- Compile shaders into the host-specific folder before build -->
-  <Target Name="CompileShaders" BeforeTargets="BeforeBuild" Inputs="@(ShaderFiles)" Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
-        <!-- Ensure the output folder exists -->
-    <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
-    <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
-    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
-  </Target>
-
   <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
         <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
@@ -186,6 +178,9 @@
     <Message Text="Copying assets to Android app/src/main/assets folder..." Importance="high" />
     <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFiles="@(AssetsSourceFiles->'Android/native-activity/app/src/main/assets\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
+
+  <!-- Import Android build configuration -->
+  <Import Project="Android.Build.targets" />
 
 
 </Project>

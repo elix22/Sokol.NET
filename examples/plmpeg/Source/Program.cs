@@ -11,8 +11,11 @@ public static unsafe class MainClass
     {
         // elix22 - some hack that is needed in case that the application is published as NativeAOT on an desktop platform
 #if !WEB
-        var applicationPath = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
-        System.IO.Directory.SetCurrentDirectory(applicationPath);
+        if(!System.Diagnostics.Debugger.IsAttached)
+        {
+            var applicationPath = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+            System.IO.Directory.SetCurrentDirectory(applicationPath);
+        }
 #endif
         SApp.sapp_run(CreateAppDesc());
     }

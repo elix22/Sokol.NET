@@ -53,4 +53,15 @@
         </AssetsSourceFiles>
    </ItemGroup>
 
+  <!-- Compile shaders into the host-specific folder before build -->
+  <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
+          Inputs="@(ShaderFiles)"
+          Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
+        <!-- Ensure the output folder exists -->
+    <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
+    <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+  </Target>
+
+
 </Project>
