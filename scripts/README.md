@@ -20,6 +20,7 @@ This directory contains both Bash and PowerShell versions of the Android install
 - `interactive-ios-install.sh` - iOS installation script (Release)
 - `interactive-ios-install-debug.sh` - iOS installation script (Debug)
 - `list-ios-devices.sh` - iOS device and simulator listing
+- `clear-ios-cache.sh` - Clear cached iOS Development Team IDs
 
 ### Node.js Scripts (All Platforms)
 - `serve-web-browser.js` - Node.js web server for VS Code launch configurations
@@ -57,6 +58,33 @@ Both Android and iOS script versions provide the same functionality:
 - ✅ Device model name detection
 - ✅ Colored output and emojis
 - ✅ Error handling and user feedback
+
+## iOS Development Team ID Caching
+
+The iOS installation scripts automatically cache your Apple Development Team ID to avoid repetitive prompting:
+
+### How It Works
+- **First Run**: Prompts for Team ID and caches it per project
+- **Subsequent Runs**: Uses cached Team ID automatically
+- **Cache Location**: `~/.sokol-charp-cache/{project-name}.teamid`
+- **Per-Project**: Each example project maintains its own cache
+
+### Cache Management
+```bash
+# Clear all cached team IDs
+./scripts/clear-ios-cache.sh
+
+# Clear specific project cache
+rm ~/.sokol-charp-cache/cube.teamid
+
+# Clear entire cache directory
+rm -rf ~/.sokol-charp-cache/
+```
+
+### Cache Format
+- **File**: `{project-name}.teamid` (e.g., `cube.teamid`)
+- **Content**: 10-character alphanumeric Team ID
+- **Validation**: Format checking before caching
 
 ## Web Server Scripts
 
