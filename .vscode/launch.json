@@ -1,0 +1,89 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Cube (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-cube",
+            "program": "${workspaceFolder}/examples/cube/bin/Debug/net9.0/cube.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/cube/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Run Dyntex (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-dyntex",
+            "program": "${workspaceFolder}/examples/dyntex/bin/Debug/net9.0/dyntex.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/dyntex/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Run CImGui (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-cimgui",
+            "program": "${workspaceFolder}/examples/cimgui/bin/Debug/net9.0/cimgui.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/cimgui/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Run LoadPNG (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-loadpng",
+            "program": "${workspaceFolder}/examples/loadpng/bin/Debug/net9.0/loadpng.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/loadpng/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Run Instancing (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-instancing",
+            "program": "${workspaceFolder}/examples/instancing/bin/Debug/net9.0/instancing.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/instancing/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Run PlMpeg (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-plmpeg",
+            "program": "${workspaceFolder}/examples/plmpeg/bin/Debug/net9.0/plmpeg.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/plmpeg/bin/Debug/net9.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        }
+    ]
+}
