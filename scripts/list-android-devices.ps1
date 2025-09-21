@@ -1,30 +1,54 @@
-# List connected Android devices for VS Code input selection
-# Returns device IDs that can be used with adb
+# List Android Devices Script (PowerShell)
+Write-Host "🔍 Checking for connected Android devices..." -ForegroundColor Cyan
 
-# Get list of connected devices (excluding header and offline devices)
-$devices = adb devices | Where-Object { $_ -match '\tdevice$' } | ForEach-Object { ($_ -split '\t')[0] }
-
-if (-not $devices) {
-    Write-Host "No connected Android devices found."
-    Write-Host "Please connect an Android device and enable USB debugging."
+# Check if adb is available
+try {
+    $null = & adb version 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "adb not found"
+    }
+}
+catch {
+    Write-Host "❌ Error: adb command not found." -ForegroundColor Red
+    Write-Host "Please install Android SDK Platform Tools and add them to your PATH." -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "Connected Android devices:"
-Write-Host "========================="
+# Get device list
+$devicesOutput = & adb devices 2>$null
+$devices = $devicesOutput | Select-String '\tdevice$' | ForEach-Object { ($_ -split '\t')[0] }
 
-# Enhanced device listing with model names when possible
-foreach ($device in $devices) {
-    # Try to get device model name
-    $model = (adb -s $device shell getprop ro.product.model 2>$null) -replace "`r", ""
-    $manufacturer = (adb -s $device shell getprop ro.product.manufacturer 2>$null) -replace "`r", ""
-    
-    if ($model -and $manufacturer) {
-        Write-Host "Device ID: $device ($manufacturer $model)"
-    } else {
-        Write-Host "Device ID: $device"
-    }
+if ($devices.Count -eq 0) {
+    Write-Host "❌ No Android devices connected!" -ForegroundColor Red
+    Write-Host "Please connect an Android device and enable USB debugging." -ForegroundColor Yellow
 }
-
-Write-Host ""
-Write-Host "To use a specific device, copy the Device ID and use it in the VS Code task prompt."
+else {
+    Write-Host "✅ Found $($devices.Count) Android device$(if ($devices.Count -gt 1) { 's' }):" -ForegroundColor Green
+    Write-Host "================================================================" -ForegroundColor Cyan
+    
+    foreach ($device in $devices) {
+        # Get device information
+        $model = & adb -s $device shell getprop ro.product.model 2>$null
+        $manufacturer = & adb -s $device shell getprop ro.product.manufacturer 2>$null
+        $androidVersion = & adb -s $device shell getprop ro.build.version.release 2>$null
+        $apiLevel = & adb -s $device shell getprop ro.build.version.sdk 2>$null
+        
+        Write-Host ""
+        Write-Host "Device ID: $device" -ForegroundColor White
+        
+        if ($model -and $manufacturer) {
+            $model = $model.Trim()
+            $manufacturer = $manufacturer.Trim()
+            Write-Host "  Model: $manufacturer $model" -ForegroundColor Gray
+        }
+        
+        if ($androidVersion -and $apiLevel) {
+            $androidVersion = $androidVersion.Trim()
+            $apiLevel = $apiLevel.Trim()
+            Write-Host "  Android: $androidVersion (API $apiLevel)" -ForegroundColor Gray
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Cyan
+}
