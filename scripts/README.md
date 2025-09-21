@@ -16,47 +16,44 @@ This directory contains both Bash and PowerShell versions of the Android install
 - `list-android-devices.ps1` - Device listing script
 - `serve-web-example.ps1` - Web server for WebAssembly examples
 
+### iOS Scripts (macOS only)
+- `interactive-ios-install.sh` - iOS installation script (Release)
+- `interactive-ios-install-debug.sh` - iOS installation script (Debug)
+- `list-ios-devices.sh` - iOS device and simulator listing
+
 ### Node.js Scripts (All Platforms)
 - `serve-web-browser.js` - Node.js web server for VS Code launch configurations
 
-## How VS Code Tasks Work
+## iOS Task System
 
-The tasks in `.vscode/tasks.json` use platform-specific configurations:
+The iOS tasks in `.vscode/tasks.json` use macOS-specific configurations:
 
 ```json
 {
-    "label": "Android: Install (Example)",
+    "label": "iOS: Install (Example)",
     "type": "shell",
-    "windows": {
-        "command": "powershell",
-        "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/cube/cube.csproj"]
-    },
-    "linux": {
-        "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-        "args": ["examples/cube/cube.csproj"]
-    },
     "osx": {
-        "command": "${workspaceFolder}/scripts/interactive-android-install.sh", 
+        "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
         "args": ["examples/cube/cube.csproj"]
     }
 }
 
-// Debug version uses interactive-android-install-debug scripts
+// Debug version uses interactive-ios-install-debug scripts
 {
-    "label": "Android: Install Debug (Example)",
-    "windows": {
-        "command": "powershell",
-        "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/cube/cube.csproj"]
-    },
-    // ... similar structure for debug
+    "label": "iOS: Install Debug (Example)",
+    "type": "shell",
+    "osx": {
+        "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+        "args": ["examples/cube/cube.csproj"]
+    }
 }
 ```
 
 ## Features
 
-Both script versions provide the same functionality:
-- ✅ Automatic single device installation
-- ✅ Interactive device selection for multiple devices
+Both Android and iOS script versions provide the same functionality:
+- ✅ Automatic single device/simulator installation
+- ✅ Interactive device/simulator selection for multiple devices
 - ✅ Device model name detection
 - ✅ Colored output and emojis
 - ✅ Error handling and user feedback
@@ -112,5 +109,6 @@ Tasks handle building, preparation, and serving:
 - **All Platforms**: Android SDK Platform Tools (adb) in PATH
 - **Windows**: PowerShell 5.0+ (included in Windows 10/11)
 - **macOS/Linux**: Bash shell (standard)
+- **iOS (macOS only)**: Xcode command line tools, ios-deploy (`brew install ios-deploy`)
 - **WebAssembly**: Node.js (for browser launch configurations)
 - **Web Serving**: Python 3.x or PowerShell (for manual web tasks)

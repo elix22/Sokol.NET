@@ -26,6 +26,23 @@
             "problemMatcher": []
         },
         {
+            "label": "iOS: List Devices",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/list-ios-devices.sh"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "compile-cube-shaders",
             "command": "dotnet",
             "type": "process",
@@ -831,6 +848,258 @@
             },
             "osx": {
                 "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/plmpeg/plmpeg.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (Cube)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/cube/cube.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (Dyntex)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/dyntex/dyntex.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (CImGui)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/cimgui/cimgui.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (LoadPNG)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/loadpng/loadpng.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (Instancing)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/instancing/instancing.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install (PlMpeg)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/plmpeg/plmpeg.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (Cube)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/cube/cube.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (Dyntex)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/dyntex/dyntex.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (CImGui)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/cimgui/cimgui.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (LoadPNG)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/loadpng/loadpng.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (Instancing)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/instancing/instancing.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (PlMpeg)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
                 "args": ["examples/plmpeg/plmpeg.csproj"]
             },
             "group": "build",

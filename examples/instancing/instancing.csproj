@@ -191,5 +191,8 @@
   <!-- Import Android build configuration -->
   <Import Project="Android.Build.targets" />
 
+  <!-- Import iOS build configuration -->
+  <Import Project="iOS.Build.targets" />
+
 
 </Project>

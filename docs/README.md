@@ -5,7 +5,9 @@ This folder contains guides and reference documentation for building, running, a
 ## Key Guides
 
 - [WebAssembly Local Server & VS Code Integration](./web-server-setup.md)
-- Android, Desktop, and other platform guides (see other files in this folder)
+- [Android Device Selection & Installation](./ANDROID_DEVICE_SELECTION.md)
+- [iOS Device Selection & Installation](./ios-device-selection.md)
+- Desktop, and other platform guides (see other files in this folder)
 
 ## Quick Start
 
