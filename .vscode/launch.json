@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Cube (Desktop)",
+            "name": "Cube (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-cube",
@@ -16,7 +16,7 @@
             }
         },
         {
-            "name": "Run Dyntex (Desktop)",
+            "name": "Dyntex (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-dyntex",
@@ -30,7 +30,7 @@
             }
         },
         {
-            "name": "Run CImGui (Desktop)",
+            "name": "CImGui (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-cimgui",
@@ -44,7 +44,7 @@
             }
         },
         {
-            "name": "Run LoadPNG (Desktop)",
+            "name": "LoadPNG (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-loadpng",
@@ -58,7 +58,7 @@
             }
         },
         {
-            "name": "Run Instancing (Desktop)",
+            "name": "Instancing (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-instancing",
@@ -72,7 +72,7 @@
             }
         },
         {
-            "name": "Run PlMpeg (Desktop)",
+            "name": "PlMpeg (Desktop)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-plmpeg",

@@ -321,7 +321,7 @@ public static unsafe class DynTextApp
             cleanup_cb = &Cleanup,
             width = 800,
             height = 600,
-            window_title = "Dynamic Texture (sokol-app)p",
+            window_title = "Dynamic Texture (sokol-app)",
             icon = { sokol_default = true },
         };
     }
