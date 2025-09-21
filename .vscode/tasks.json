@@ -378,6 +378,180 @@
                 "cwd": "${workspaceFolder}"
             },
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (Cube)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/cube/cube.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/cube/cube.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/cube/cube.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (Dyntex)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/dyntex/dyntex.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/dyntex/dyntex.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/dyntex/dyntex.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (CImGui)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/cimgui/cimgui.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/cimgui/cimgui.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/cimgui/cimgui.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (LoadPNG)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/loadpng/loadpng.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/loadpng/loadpng.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/loadpng/loadpng.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (Instancing)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/instancing/instancing.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/instancing/instancing.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/instancing/instancing.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Install Debug (PlMpeg)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/plmpeg/plmpeg.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/plmpeg/plmpeg.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/plmpeg/plmpeg.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
         }
 	]
 }
