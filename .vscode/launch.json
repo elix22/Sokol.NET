@@ -84,6 +84,66 @@
             "env": {
                 "DOTNET_ENVIRONMENT": "Development"
             }
+        },
+        {
+            "name": "Cube (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["cube"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-cube-web"
+        },
+        {
+            "name": "Dyntex (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["dyntex"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-dyntex-web"
+        },
+        {
+            "name": "CImGui (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["cimgui"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-cimgui-web"
+        },
+        {
+            "name": "LoadPNG (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["loadpng"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-loadpng-web"
+        },
+        {
+            "name": "Instancing (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["instancing"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-instancing-web"
+        },
+        {
+            "name": "PlMpeg (Browser)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/serve-web-browser.js",
+            "args": ["plmpeg"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-plmpeg-web"
         }
     ]
 }

@@ -158,6 +158,72 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-cube-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/cube/cubeweb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-dyntex-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/dyntex/dyntexWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-cimgui-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/cimgui/cimguiweb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-loadpng-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/loadpng/loadpngWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-instancing-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/instancing/instancingWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-plmpeg-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/plmpeg/plmpegWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -204,6 +270,234 @@
                 "compile-plmpeg-shaders",
                 "build-plmpeg"
             ]
+        },
+        {
+            "label": "prepare-cube-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-cube-shaders",
+                "build-cube-web"
+            ]
+        },
+        {
+            "label": "prepare-dyntex-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-dyntex-shaders",
+                "build-dyntex-web"
+            ]
+        },
+        {
+            "label": "prepare-cimgui-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-cimgui-shaders",
+                "build-cimgui-web"
+            ]
+        },
+        {
+            "label": "prepare-loadpng-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-loadpng-shaders",
+                "build-loadpng-web"
+            ]
+        },
+        {
+            "label": "prepare-instancing-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-instancing-shaders",
+                "build-instancing-web"
+            ]
+        },
+        {
+            "label": "prepare-plmpeg-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-plmpeg-shaders",
+                "build-plmpeg-web"
+            ]
+        },
+        {
+            "label": "Serve Web: Cube",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/cube"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/cube"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/cube"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: Dyntex",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/dyntex"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/dyntex"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/dyntex"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: CImGui",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/cimgui"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/cimgui"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/cimgui"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: LoadPNG",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/loadpng"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/loadpng"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/loadpng"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: Instancing",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/instancing"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/instancing"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/instancing"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: PlMpeg",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/plmpeg"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/plmpeg"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/plmpeg"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
         },
         {
             "label": "Android: Install (Cube)",
