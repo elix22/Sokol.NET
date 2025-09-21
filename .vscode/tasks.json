@@ -2,6 +2,21 @@
 	"version": "2.0.0",
 	"tasks": [
         {
+            "label": "Android: List Devices",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/list-android-devices.sh",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "compile-cube-shaders",
             "command": "dotnet",
             "type": "process",
@@ -182,19 +197,15 @@
             ]
         },
         {
-            "label": "Android: Build Release (Cube)",
+            "label": "Android: Install (Cube)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cube/cube.csproj",
-                "-t:BuildAndroid"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/cube/cube.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
@@ -205,19 +216,15 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Build Debug (Cube)",
+            "label": "Android: Install (Dyntex)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cube/cube.csproj",
-                "-t:BuildAndroidDebug"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/dyntex/dyntex.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
@@ -228,19 +235,15 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Build & Install Release (Cube)",
+            "label": "Android: Install (CImGui)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cube/cube.csproj",
-                "-t:BuildAndroidInstall"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/cimgui/cimgui.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
@@ -251,19 +254,15 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Build & Install Debug (Cube)",
+            "label": "Android: Install (LoadPNG)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cube/cube.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/loadpng/loadpng.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
@@ -274,19 +273,15 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Build Release (Dyntex)",
+            "label": "Android: Install (Instancing)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/dyntex/dyntex.csproj",
-                "-t:BuildAndroid"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/instancing/instancing.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
@@ -297,433 +292,15 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Build Debug (Dyntex)",
+            "label": "Android: Install (PlMpeg)",
             "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/dyntex/dyntex.csproj",
-                "-t:BuildAndroidDebug"
-            ],
+            "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+            "args": ["examples/plmpeg/plmpeg.csproj"],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Release (Dyntex)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/dyntex/dyntex.csproj",
-                "-t:BuildAndroidInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Debug (Dyntex)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/dyntex/dyntex.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Release (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cimgui/cimgui.csproj",
-                "-t:BuildAndroid"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Debug (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cimgui/cimgui.csproj",
-                "-t:BuildAndroidDebug"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Release (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cimgui/cimgui.csproj",
-                "-t:BuildAndroidInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Debug (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/cimgui/cimgui.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Release (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/loadpng/loadpng.csproj",
-                "-t:BuildAndroid"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Debug (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/loadpng/loadpng.csproj",
-                "-t:BuildAndroidDebug"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Release (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/loadpng/loadpng.csproj",
-                "-t:BuildAndroidInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Debug (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/loadpng/loadpng.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Release (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/instancing/instancing.csproj",
-                "-t:BuildAndroid"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Debug (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/instancing/instancing.csproj",
-                "-t:BuildAndroidDebug"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Release (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/instancing/instancing.csproj",
-                "-t:BuildAndroidInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Debug (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/instancing/instancing.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Release (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/plmpeg/plmpeg.csproj",
-                "-t:BuildAndroid"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build Debug (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/plmpeg/plmpeg.csproj",
-                "-t:BuildAndroidDebug"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Release (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/plmpeg/plmpeg.csproj",
-                "-t:BuildAndroidInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build & Install Debug (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "msbuild",
-                "examples/plmpeg/plmpeg.csproj",
-                "-t:BuildAndroidDebugInstall"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
+                "focus": true,
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": false
