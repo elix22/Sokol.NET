@@ -53,6 +53,72 @@
             ],
             "problemMatcher": "$msCompile"
         },
+        {
+            "label": "compile-cube-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/cube/cubeweb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-dyntex-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/dyntex/dyntexWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-cimgui-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/cimgui/cimguiweb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-loadpng-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/loadpng/loadpngWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-instancing-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/instancing/instancingWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-plmpeg-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/plmpeg/plmpegWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
 		{
             "label": "compile-dyntex-shaders",
             "command": "dotnet",
@@ -292,7 +358,7 @@
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-cube-shaders",
+                "compile-cube-web-shaders",
                 "build-cube-web"
             ]
         },
@@ -300,7 +366,7 @@
             "label": "prepare-dyntex-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-dyntex-shaders",
+                "compile-dyntex-web-shaders",
                 "build-dyntex-web"
             ]
         },
@@ -308,7 +374,7 @@
             "label": "prepare-cimgui-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-cimgui-shaders",
+                "compile-cimgui-web-shaders",
                 "build-cimgui-web"
             ]
         },
@@ -316,7 +382,7 @@
             "label": "prepare-loadpng-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-loadpng-shaders",
+                "compile-loadpng-web-shaders",
                 "build-loadpng-web"
             ]
         },
@@ -324,7 +390,7 @@
             "label": "prepare-instancing-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-instancing-shaders",
+                "compile-instancing-web-shaders",
                 "build-instancing-web"
             ]
         },
@@ -332,7 +398,7 @@
             "label": "prepare-plmpeg-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-plmpeg-shaders",
+                "compile-plmpeg-web-shaders",
                 "build-plmpeg-web"
             ]
         },
