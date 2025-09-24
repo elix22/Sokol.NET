@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "dotnet-serve": {
+      "commandName": "Project",
+      "commandLineArgs": "-p 5043 --reverse-proxy /api/{**all}=http://localhost:5000",
+      "workingDirectory": "$(MSBuildProjectDirectory)"
+    }
+  }
+}
