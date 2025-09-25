@@ -45,13 +45,9 @@
       <ShaderFiles Include="shaders/**/*.glsl" />
    </ItemGroup>
 
-   <!-- Common Assets ItemGroup -->
-   <ItemGroup>
-        <AssetsSourceFiles Include="Assets/**/*.*">
-            <Link>Assets\%(RecursiveDir)%(FileName)%(Extension)</Link>
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </AssetsSourceFiles>
-   </ItemGroup>
+  <ItemGroup>
+    <AssetsSourceFiles Include="Assets/**/*.*" />
+  </ItemGroup>
 
   <!-- Compile shaders into the host-specific folder before build -->
   <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
