@@ -90,7 +90,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cube/bin/Debug/net8.0/wwwroot", "-p", "8080"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cube/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8080"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-cube-web"
@@ -100,7 +100,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/dyntex/bin/Debug/net8.0/wwwroot", "-p", "8081"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/dyntex/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8081"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-dyntex-web"
@@ -110,7 +110,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cimgui/bin/Debug/net8.0/wwwroot", "-p", "8082"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cimgui/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8082"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-cimgui-web"
@@ -120,7 +120,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/loadpng/bin/Debug/net8.0/wwwroot", "-p", "8083"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/loadpng/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8083"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-loadpng-web"
@@ -130,7 +130,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/instancing/bin/Debug/net8.0/wwwroot", "-p", "8084"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/instancing/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8084"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-instancing-web"
@@ -140,7 +140,7 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/plmpeg/bin/Debug/net8.0/wwwroot", "-p", "8085"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/plmpeg/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8085"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-plmpeg-web"

@@ -1,7 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <ImportDirectoryBuildProps Condition="'$(ImportDirectoryBuildProps)' == ''">true</ImportDirectoryBuildProps>
         <TargetFramework>net8.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <TargetOS>browser</TargetOS>
+        <TargetArchitecture>wasm</TargetArchitecture>
+        <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <InvariantGlobalization>true</InvariantGlobalization>
         <WasmBuildNative>true</WasmBuildNative>
@@ -30,14 +34,18 @@
     </ItemGroup>
 
 
-    <ItemGroup>
-      <ShaderFiles Include="shaders/**/*.glsl" />
-    </ItemGroup>
-
     <PropertyGroup>
       <HostShaderFolder>web</HostShaderFolder>
       <ShaderSlang>glsl300es</ShaderSlang>
     </PropertyGroup>
+
+    <ItemGroup>
+      <None Remove="scripts/**/*" />
+      <None Remove="Android/**/*" />
+      <None Remove="ios/**/*" />
+      <None Remove="obj/**/*" />
+      <None Remove="bin/**/*" />
+    </ItemGroup>
 
     <ItemGroup>
       <None Remove="scripts/**/*" />
@@ -68,11 +76,10 @@
   </ItemGroup>
 
     
-  <Target  Name="CopyIndexHTML" AfterTargets="AfterBuild">
-    <Copy SourceFiles="wwwroot/index.html" DestinationFolder="$(OutDir)/wwwroot" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="wwwroot/main.js" DestinationFolder="$(OutDir)/wwwroot" SkipUnchangedFiles="true" />
-     <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)/wwwroot/%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
-  </Target>
+  <ItemGroup>
+    <WasmExtraFilesToDeploy Include="wwwroot/main.js" />
+    <WasmExtraFilesToDeploy Include="wwwroot/index.html" />
+  </ItemGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
       <DefineConstants>DEBUG;TRACE;WEB</DefineConstants>
@@ -136,4 +143,14 @@
         </When>
     </Choose>
     
+  <!-- Copy assets with folder structure -->
+  <Target Name="CopyAssetsWithStructure" AfterTargets="_WasmGenerateAppBundle">
+    <Message Text="Copying assets to AppBundle..." Importance="high" />
+    <ItemGroup>
+      <AssetFiles Include="Assets/**/*.*" />
+    </ItemGroup>
+    <Message Text="Found @(AssetFiles->Count()) asset files" Importance="high" />
+    <Copy SourceFiles="@(AssetFiles)" DestinationFiles="$(OutDir)AppBundle/%(RecursiveDir)%(Filename)%(Extension)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
