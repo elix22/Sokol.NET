@@ -1,5 +1,3 @@
-
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -93,6 +91,9 @@ namespace SokolApplicationBuilder
 
         [Option("project", Required = false, HelpText = "Project name to build (if not specified, auto-detect based on folder contents)")]
         public string ProjectName { get; set; } = "";
+
+        [Option("linker-flags", Required = false, HelpText = "Additional linker flags to pass to the compiler")]
+        public string LinkerFlags { get; set; } = "";
 
         // Computed properties
         public string Path => ProjectPath;

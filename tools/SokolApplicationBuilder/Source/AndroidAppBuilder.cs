@@ -306,7 +306,7 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
                         
                         // Copy the published library to the Android libs directory
-                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net9.0", arch, "publish");
+                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net10.0", arch, "publish");
                         string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "libs");
                         string abiName = arch switch
                         {

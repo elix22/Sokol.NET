@@ -78,7 +78,7 @@ namespace SokolApplicationBuilder
                 buildType = "Release";
             }
 
-            // Net9.0 doesnt work so for now we will use Net8.0
+            // net10.0 doesnt work so for now we will use Net8.0
             // sudo dotnet workload install wasm-tools-net8
             string targetFramework = (opts.Framework != "") ? opts.Framework : "net8.0";
 

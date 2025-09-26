@@ -53,7 +53,7 @@ namespace SokolApplicationBuilder
             {
                 buildType = "Release";
             }
-            string targetFramework = (opts.Framework != "") ? opts.Framework : "net9.0";
+            string targetFramework = (opts.Framework != "") ? opts.Framework : "net10.0";
 
             if (opts.OutputPath != "")
             {

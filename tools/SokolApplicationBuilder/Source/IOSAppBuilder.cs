@@ -278,8 +278,14 @@ namespace SokolApplicationBuilder
 
                 string projectFile = Path.Combine(projectDir, projectName + ".csproj");
 
+                string publishArgs = $"publish \"{projectFile}\" -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"";
+                if (!string.IsNullOrEmpty(opts.LinkerFlags))
+                {
+                    publishArgs += $" -p:LinkerFlags=\"{opts.LinkerFlags}\"";
+                }
+
                 var result = Cli.Wrap("dotnet")
-                    .WithArguments($"publish \"{projectFile}\" -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"")
+                    .WithArguments(publishArgs)
                     .WithWorkingDirectory(projectDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -313,7 +319,7 @@ namespace SokolApplicationBuilder
                 string frameworkDir = Path.Combine(frameworksDir, $"{projectName}.framework");
                 Directory.CreateDirectory(frameworkDir);
 
-                string libPath = Path.Combine(projectDir, "bin", "Release", "net9.0", "ios-arm64", "publish", $"lib{projectName}.dylib");
+                string libPath = Path.Combine(projectDir, "bin", "Release", "net10.0", "ios-arm64", "publish", $"lib{projectName}.dylib");
 
                 if (!File.Exists(libPath))
                 {
@@ -326,20 +332,6 @@ namespace SokolApplicationBuilder
                 File.Copy(libPath, destLib, true);
 
                 // Use install_name_tool to modify the library
-                var installNameResult = Cli.Wrap("install_name_tool")
-                    .WithArguments($"-rpath @executable_path @executable_path/Frameworks \"{destLib}\"")
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                    .ExecuteBufferedAsync()
-                    .GetAwaiter()
-                    .GetResult();
-
-                if (installNameResult.ExitCode != 0)
-                {
-                    Log.LogError($"install_name_tool rpath failed: {installNameResult.StandardError}");
-                    return false;
-                }
-
                 var idResult = Cli.Wrap("install_name_tool")
                     .WithArguments($"-id @rpath/{projectName}.framework/{projectName} \"{destLib}\"")
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
