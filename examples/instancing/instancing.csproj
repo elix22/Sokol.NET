@@ -20,7 +20,6 @@
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    
     <!-- Exclude build artifacts from project view -->
     <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user</DefaultItemExcludes> 
   </PropertyGroup>

@@ -64,6 +64,11 @@
       <Compile Remove="bin/**/*" />
       <Content Remove="obj/**/*" />
       <Content Remove="bin/**/*" />
+      <None Remove="Directory.Build.props"/>
+      <None Remove="Directory.Build.targets"/>
+      <None Remove="Android.Build.targets"/>
+      <None Remove="IOS.Build.targets"/>
+      <None Remove="runtimeconfig.template.json"/>
     </ItemGroup>
 
   <!-- Exclude shaders from other platform folders -->

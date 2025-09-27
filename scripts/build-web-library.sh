@@ -38,7 +38,7 @@ mkdir -p build-emscripten
 
 # Configure with emcmake
 echo "Configuring with emcmake..."
-emcmake cmake -B build-emscripten -S ext/
+emcmake cmake -B build-emscripten -S ext/ -DCMAKE_BUILD_TYPE=Release
 
 # Build
 echo "Building..."
