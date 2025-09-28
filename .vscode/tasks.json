@@ -119,6 +119,17 @@
             ],
             "problemMatcher": "$msCompile"
         },
+        {
+            "label": "compile-drawcallperf-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/drawcallperf/drawcallperfWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
 		{
             "label": "compile-dyntex-shaders",
             "command": "dotnet",
@@ -170,6 +181,17 @@
             "args": [
                 "msbuild",
 				"examples/plmpeg/plmpeg.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-drawcallperf-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/drawcallperf/drawcallperf.csproj",
                 "-t:CompileShaders"
             ],
             "problemMatcher": "$msCompile"
@@ -241,6 +263,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-drawcallperf",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/drawcallperf/drawcallperf.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube-web",
             "command": "dotnet",
             "type": "process",
@@ -307,6 +340,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-drawcallperf-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/drawcallperf/drawcallperfWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -355,6 +399,14 @@
             ]
         },
         {
+            "label": "prepare-drawcallperf",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-drawcallperf-shaders",
+                "build-drawcallperf"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -400,6 +452,14 @@
             "dependsOn": [
                 "compile-plmpeg-web-shaders",
                 "build-plmpeg-web"
+            ]
+        },
+        {
+            "label": "prepare-drawcallperf-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-drawcallperf-web-shaders",
+                "build-drawcallperf-web"
             ]
         },
         {
@@ -757,6 +817,35 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "Android: Install (Drawcallperf)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "Android: Install Debug (Cube)",
             "type": "shell",
             "windows": {
@@ -931,6 +1020,35 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "Android: Install Debug (Drawcallperf)",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "iOS: Install (Cube)",
             "type": "shell",
             "osx": {
@@ -1057,6 +1175,27 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "iOS: Install (Drawcallperf)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "iOS: Install Debug (Cube)",
             "type": "shell",
             "osx": {
@@ -1167,6 +1306,27 @@
             "osx": {
                 "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
                 "args": ["examples/plmpeg/plmpeg.csproj"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "iOS: Install Debug (Drawcallperf)",
+            "type": "shell",
+            "osx": {
+                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
+                "args": ["examples/drawcallperf/drawcallperf.csproj"]
             },
             "group": "build",
             "presentation": {

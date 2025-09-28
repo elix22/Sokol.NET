@@ -86,6 +86,20 @@
             }
         },
         {
+            "name": "Drawcallperf (Desktop)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-drawcallperf",
+            "program": "${workspaceFolder}/examples/drawcallperf/bin/Debug/net10.0/drawcallperf.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/examples/drawcallperf/bin/Debug/net10.0",
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
             "name": "Cube (Browser)",
             "type": "coreclr",
             "request": "launch",
@@ -144,6 +158,16 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-plmpeg-web"
+        },
+        {
+            "name": "Drawcallperf (Browser)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "dotnet",
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/drawcallperf/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8086"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "prepare-drawcallperf-web"
         }
     ]
 }

@@ -2,6 +2,7 @@ using Sokol;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using System.Diagnostics;
 using static Sokol.SApp;
 using static Sokol.SG;
 using static Sokol.SGlue;
@@ -358,6 +359,12 @@ public static unsafe class DrawcallPerf
         sgimgui_discard(state.sgimgui);
         simgui_shutdown();
         sg_shutdown();
+
+        // Force a complete shutdown if debugging
+        if (Debugger.IsAttached)
+        {
+            Environment.Exit(0);
+        }
     }
 
     public static sapp_desc sokol_main()
