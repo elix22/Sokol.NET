@@ -15,7 +15,6 @@ using System.Diagnostics;
 
 public static unsafe class CubeSapp
 {
-    private static IntPtr _descPtr = IntPtr.Zero;
     struct _state
     {
         public float rx, ry;
@@ -190,11 +189,6 @@ public static unsafe class CubeSapp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
 
         sg_shutdown();
         

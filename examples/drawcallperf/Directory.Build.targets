@@ -1,0 +1,19 @@
+<Project>
+  <!-- Common Android Build Tasks for All IDEs -->
+  
+  <!-- Make Android targets visible in Visual Studio Task Runner Explorer -->
+  <Target Name="ShowAndroidTargetsInTaskRunner" BeforeTargets="Build">
+    <Message Text="Android Build Targets Available:" Importance="high" />
+    <Message Text="  - BuildAndroid (Release APK)" Importance="high" />
+    <Message Text="  - BuildAndroidDebug (Debug APK)" Importance="high" />
+    <Message Text="  - BuildAndroidInstall (Release APK + Install)" Importance="high" />
+    <Message Text="  - BuildAndroidDebugInstall (Debug APK + Install)" Importance="high" />
+  </Target>
+
+  <!-- Shortcuts for Visual Studio Task Runner -->
+  <Target Name="android-build-release" DependsOnTargets="BuildAndroid" />
+  <Target Name="android-build-debug" DependsOnTargets="BuildAndroidDebug" />
+  <Target Name="android-install-release" DependsOnTargets="BuildAndroidInstall" />
+  <Target Name="android-install-debug" DependsOnTargets="BuildAndroidDebugInstall" />
+
+</Project>

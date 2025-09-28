@@ -51,11 +51,23 @@ extern void* findCanvasEventTarget(const char* target);
 #define SOKOL_IMGUI_IMPL
 #include "sokol_imgui.h"
 
+#define SOKOL_GFX_IMGUI_IMPL
+#include "sokol_gfx_imgui.h"
+
 
 int sdtx_print_wrapper(const char* str)
 {
     return sdtx_printf("%s", str);
 }
+
+static sgimgui_t sgimgui_ctx = {0};
+
+SOKOL_API_IMPL sgimgui_t * sgimgui_init_csharp(void) {
+ 
+    sgimgui_init(&sgimgui_ctx, &(sgimgui_desc_t){0});
+    return &sgimgui_ctx;
+}
+
 
 // TBD elix22
 #ifdef __ANDROID__

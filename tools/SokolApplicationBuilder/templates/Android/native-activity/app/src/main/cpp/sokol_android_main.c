@@ -1,6 +1,7 @@
 
 #define SOKOL_IMPL
 #define SOKOL_GLES3
+#define SOKOL_TRACE_HOOKS
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
@@ -35,6 +36,9 @@
 #endif
 #define SOKOL_IMGUI_IMPL
 #include "sokol_imgui.h"
+
+#define SOKOL_GFX_IMGUI_IMPL
+#include "sokol_gfx_imgui.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -203,4 +207,13 @@ char* get_asset_relative_path(const char* target_filename) {
         path = strdup("");
     }
     return path;
+}
+
+
+static sgimgui_t sgimgui_ctx = {0};
+
+SOKOL_API_IMPL sgimgui_t * sgimgui_init_csharp() {
+ 
+    sgimgui_init(&sgimgui_ctx, &(sgimgui_desc_t){0});
+    return &sgimgui_ctx;
 }

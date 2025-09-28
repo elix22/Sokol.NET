@@ -27,6 +27,7 @@ module_names = {
     'cgltf_':   'CGltf',
     'sbasisu_': 'SBasisu',
     'simgui_':  'SImgui',
+    'sgimgui_': 'SGImgui'
 }
 
 
@@ -47,6 +48,7 @@ c_source_paths = {
     'cgltf_':   'c/cgltf.c',
     'sbasisu_': 'c/sokol_basisu.c',
     'simgui_':  'c/sokol_imgui.c',
+    'sgimgui_': 'c/sokol_gfx_imgui.c'
 }
 
 name_ignores = [
@@ -56,6 +58,9 @@ name_ignores = [
     'sg_trace_hooks',
     'cgltf_camera',
     'sg_color', # will be create manually inorder to support additional vonversion to Vector3,Vector4,float[] , Span
+    'sgimgui_init',
+    'sgimgui_t', # struct
+
 ]
 
 name_overrides = {
@@ -126,6 +131,8 @@ prim_types = {
     'char **':       'IntPtr',
     'void **':      'IntPtr',
     'cgltf_float *' : 'float *',    
+    'uint8_t *':   'byte*',
+    'sgimgui_t *': 'IntPtr'
 }
 
 
@@ -363,7 +370,7 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
         if arg_prefix is None:  # This is a return type
             return f"ref {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
         else:  # This is a parameter
-            return f"out {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
+            return f"ref {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
     elif is_prim_ptr(arg_type):
         return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     elif is_const_prim_ptr(arg_type):
@@ -656,9 +663,9 @@ def gen_func_csharp(decl, prefix):
         if decl['params']:
             param_names = [check_name_override(param['name']) for param in decl['params']]
             param_list = ", ".join(param_names)
-            l(f"    {csharp_func_name}_internal(out result, {param_list});")
+            l(f"    {csharp_func_name}_internal(ref result, {param_list});")
         else:
-            l(f"    {csharp_func_name}_internal(out result);")
+            l(f"    {csharp_func_name}_internal(ref result);")
         l("    return result;")
         l("}")
         l("#else")

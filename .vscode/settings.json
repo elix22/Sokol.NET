@@ -85,7 +85,8 @@
         "future": "c",
         "sokol_imgui.h": "c",
         "sokol_shape.h": "c",
-        "cimgui.h": "c"
+        "cimgui.h": "c",
+        "sokol_gfx_imgui.h": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5502

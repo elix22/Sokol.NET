@@ -1725,6 +1725,16 @@ public struct sg_frame_stats_wgpu
     public sg_frame_stats_wgpu_bindings bindings;
 }
 [StructLayout(LayoutKind.Sequential)]
+public struct sg_resource_stats
+{
+    public uint total_alive;
+    public uint total_free;
+    public uint allocated;
+    public uint deallocated;
+    public uint inited;
+    public uint uninited;
+}
+[StructLayout(LayoutKind.Sequential)]
 public struct sg_frame_stats
 {
     public uint frame_index;
@@ -1743,6 +1753,12 @@ public struct sg_frame_stats
     public uint size_update_buffer;
     public uint size_append_buffer;
     public uint size_update_image;
+    public sg_resource_stats buffers;
+    public sg_resource_stats images;
+    public sg_resource_stats samplers;
+    public sg_resource_stats views;
+    public sg_resource_stats shaders;
+    public sg_resource_stats pipelines;
     public sg_frame_stats_gl gl;
     public sg_frame_stats_d3d11 d3d11;
     public sg_frame_stats_metal metal;

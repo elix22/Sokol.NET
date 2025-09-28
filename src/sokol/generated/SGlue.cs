@@ -14,7 +14,7 @@ public static unsafe partial class SGlue
 public static sg_environment sglue_environment()
 {
     sg_environment result = default;
-    sglue_environment_internal(out result);
+    sglue_environment_internal(ref result);
     return result;
 }
 #else
@@ -30,7 +30,7 @@ public static extern sg_environment sglue_environment();
 public static sg_swapchain sglue_swapchain()
 {
     sg_swapchain result = default;
-    sglue_swapchain_internal(out result);
+    sglue_swapchain_internal(ref result);
     return result;
 }
 #else
@@ -47,14 +47,14 @@ public static extern sg_swapchain sglue_swapchain();
 #else
 [DllImport("sokol", EntryPoint = "sglue_environment_internal", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void sglue_environment_internal(out sg_environment env);
+public static extern void sglue_environment_internal(ref sg_environment env);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void sglue_swapchain_internal(out sg_swapchain swapchain);
+public static extern void sglue_swapchain_internal(ref sg_swapchain swapchain);
 
 }
 }

@@ -1,0 +1,62 @@
+
+<Project>
+   <PropertyGroup>
+      <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)</BaseIntermediateOutputPath>
+      
+      <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
+      <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
+      <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
+
+      <!-- Host OS Detection -->
+      <IsWindowsHost>$([MSBuild]::IsOSPlatform('Windows'))</IsWindowsHost>
+      <IsLinuxHost>$([MSBuild]::IsOSPlatform('Linux'))</IsLinuxHost>
+      <IsOSXHost>$([MSBuild]::IsOSPlatform('OSX'))</IsOSXHost>
+      <OSArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</OSArch>
+      
+      <!-- Host OS Mapping -->
+      <HostOS Condition="'$(IsWindowsHost)'=='true'">windows</HostOS>
+      <HostOS Condition="'$(IsLinuxHost)'=='true'">linux</HostOS>
+      <HostOS Condition="'$(IsOSXHost)'=='true'">osx</HostOS>
+      
+      <!-- Sokol Shader Compiler Path -->
+      <SokolShdcPath>../../tools/bin/$(HostOS)/$(OSArch)/sokol-shdc</SokolShdcPath>
+      <SokolShdcPath Condition="'$(IsWindowsHost)'=='true'">$(SokolShdcPath).exe</SokolShdcPath>
+   </PropertyGroup>
+
+   <ItemGroup>
+        <Compile Include="../../src/sokol/*.cs" >
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Include="../../src/sokol/generated/*.cs">
+        <Link>Sokol\%(Filename)%(Extension)</Link>
+      </Compile>
+      <Compile Remove="../../src/sokol/obj/**/*.cs" />
+      <Compile Remove="../../src/sokol/bin/**/*.cs" />
+   </ItemGroup>
+
+   <ItemGroup>
+    <Compile Include="../../src/imgui/*.cs" >
+        <Link>Imgui\%(Filename)%(Extension)</Link>
+    </Compile>
+   </ItemGroup>
+
+
+   <ItemGroup>
+      <ShaderFiles Include="shaders/**/*.glsl" />
+   </ItemGroup>
+
+  <ItemGroup>
+    <AssetsSourceFiles Include="Assets/**/*.*" />
+  </ItemGroup>
+
+   <!-- Compile shaders into the host-specific folder before build -->
+  <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
+          Inputs="@(ShaderFiles)"
+          Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
+        <!-- Ensure the output folder exists -->
+    <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
+    <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+  </Target>
+
+</Project>
