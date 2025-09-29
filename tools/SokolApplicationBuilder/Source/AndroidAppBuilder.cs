@@ -248,6 +248,24 @@ namespace SokolApplicationBuilder
                 // Replace APP_NAME placeholder but preserve ANativeActivity_onCreate function name
                 content = content.Replace("${APP_NAME}", appName);
                 content = content.Replace("lib${APP_NAME}.so", $"lib{appName}.so");
+                // Set EXT_ROOT_DIR to absolute path
+                string extPath;
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (string.IsNullOrEmpty(homeDir) || !Directory.Exists(homeDir))
+                {
+                    homeDir = Environment.GetEnvironmentVariable("HOME") ?? "";
+                }
+                string configFile = Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+                if (File.Exists(configFile))
+                {
+                    string sokolNetHome = File.ReadAllText(configFile).Trim();
+                    extPath = Path.GetFullPath(Path.Combine(sokolNetHome, "ext"));
+                }
+                else
+                {
+                    extPath = Path.GetFullPath(Path.Combine(opts.ProjectPath, "..", "..", "..", "ext"));
+                }
+                content = content.Replace("set(EXT_ROOT_DIR \"../../../../../../../../ext\")", $"set(EXT_ROOT_DIR \"{extPath}\")");
                 // Don't replace ANativeActivity_onCreate - it must remain unchanged
                 File.WriteAllText(cmakePath, content);
             }
@@ -306,7 +324,7 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
                         
                         // Copy the published library to the Android libs directory
-                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net10.0", arch, "publish");
+                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net9.0", arch, "publish");
                         string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "libs");
                         string abiName = arch switch
                         {

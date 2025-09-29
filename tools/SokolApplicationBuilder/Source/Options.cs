@@ -25,7 +25,7 @@ namespace SokolApplicationBuilder
         [Option("type", Required = false, HelpText = "Set type release/debug")]
         public string Type { get; set; } = "";
 
-        [Option("path", Default = "", Required = true, HelpText = "Set project path")]
+        [Option("path", Default = "", Required = false, HelpText = "Set project path")]
         public string ProjectPath { get; set; } = "";
 
         [Option("output", Required = false, HelpText = "Set output path for build binaries")]

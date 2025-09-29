@@ -48,6 +48,50 @@ namespace SokolApplicationBuilder
         {
             if (opts.Task != string.Empty)
             {
+                // Validate required options for specific tasks
+                if (opts.Task != "register" && string.IsNullOrEmpty(opts.ProjectPath))
+                {
+                    Console.WriteLine("ERROR: --path is required for task '" + opts.Task + "'");
+                    return;
+                }
+
+                // Check if sokolnet_home config exists, if not, run register task first
+                if (opts.Task != "register")
+                {
+                    string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    if (string.IsNullOrEmpty(homeDir) || !Directory.Exists(homeDir))
+                    {
+                        homeDir = Environment.GetEnvironmentVariable("HOME") ?? "";
+                    }
+                    string sokolNetHomeFile = Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+                    
+                    if (!File.Exists(sokolNetHomeFile))
+                    {
+                        Console.WriteLine("SokolNetHome configuration not found. Running register task first...");
+                        
+                        // Create a temporary options object for register task
+                        var registerOpts = new Options
+                        {
+                            Task = "register",
+                            ProjectPath = opts.ProjectPath // Use the same path if provided
+                        };
+                        
+                        // Run register task
+                        var registerTask = new RegisterTask(registerOpts);
+                        registerTask.BuildEngine = buildEngine;
+                        bool registerResult = registerTask.Execute();
+                        
+                        if (!registerResult)
+                        {
+                            Console.WriteLine("ERROR: Failed to create SokolNetHome configuration. Cannot proceed with task '" + opts.Task + "'.");
+                            return;
+                        }
+                        
+                        Console.WriteLine("SokolNetHome configuration created successfully. Continuing with task '" + opts.Task + "'...");
+                        Console.WriteLine();
+                    }
+                }
+
                 switch (opts.Task)
                 {
                     case "build":
@@ -100,6 +144,14 @@ namespace SokolApplicationBuilder
                         {
 
                             var task = new CleanTask(opts);
+                            task.BuildEngine = buildEngine;
+                            task.Execute();
+                        }
+                        break;
+
+                    case "register":
+                        {
+                            var task = new RegisterTask(opts);
                             task.BuildEngine = buildEngine;
                             task.Execute();
                         }
