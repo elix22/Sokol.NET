@@ -125,10 +125,10 @@
 
 
   <!-- Import Android build configuration -->
-  <Import Project="Android.Build.targets" />
+  <Import Project="$(SokolNetHome)/Android.Build.targets" />
 
   <!-- Import iOS build configuration -->
-  <Import Project="iOS.Build.targets" />
+  <Import Project="$(SokolNetHome)/iOS.Build.targets" />
 
   <ItemGroup>
       <PackageReference Include="StbImageSharp" Version="2.30.15" />

@@ -1,0 +1,12 @@
+<Project>
+
+    <PropertyGroup>
+        <SokolRootPath>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</SokolRootPath>
+        <SokolLibsPath>$([MSBuild]::NormalizeDirectory('$(SokolRootPath)', 'libs'))</SokolLibsPath>
+        <SokolScriptsPath>$([MSBuild]::NormalizeDirectory('$(SokolRootPath)', 'src', 'mono'))</SokolScriptsPath>
+        <SokolToolsPath>$([MSBuild]::NormalizeDirectory('$(SokolRootPath)', 'tools'))</SokolToolsPath>
+        <SokoExamplesPath>$([MSBuild]::NormalizeDirectory('$(SokolRootPath)', 'examples'))</SokoExamplesPath>
+        <SokolBindGeneratorPath>$([MSBuild]::NormalizeDirectory('$(SokolRootPath)', 'bindgen'))</SokolBindGeneratorPath>
+    </PropertyGroup>
+</Project>
+
