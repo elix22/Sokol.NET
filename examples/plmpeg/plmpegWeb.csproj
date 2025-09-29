@@ -26,7 +26,9 @@
         <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
         <!-- Exclude build artifacts from project view -->
         <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
-        <SokolNetHome Condition="Exists('$(HOME)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HOME)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
+        <HomeDir>$(UserProfile)</HomeDir>
+        <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
+        <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
         <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
     </PropertyGroup>
 
