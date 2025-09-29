@@ -24,12 +24,16 @@
         <IsWeb>true</IsWeb>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-        <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes> 
+        <!-- Exclude build artifacts from project view -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
+        <SokolNetHome Condition="Exists('$(HOME)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HOME)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
+        <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
     </PropertyGroup>
 
+    <Import Project="$(SokolNetHome)/Directory.Build.props" />
 
     <ItemGroup>
-      <NativeFileReference Include="../../libs/emscripten/x86/sokol.a">
+      <NativeFileReference Include="$(SokolLibsPath)emscripten/x86/sokol.a">
         <Link>libs\sokol.a</Link>
       </NativeFileReference>
     </ItemGroup>
@@ -41,35 +45,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <None Remove="scripts/**/*" />
-      <None Remove="Android/**/*" />
-      <None Remove="ios/**/*" />
-      <None Remove="obj/**/*" />
-      <None Remove="bin/**/*" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="scripts/**/*" />
-      <None Remove="Android/**/*" />
-      <Content Remove="Android/**/*" />
       <Compile Remove="Android/**/*" />
-      <None Remove="ios/**/*" />
-      <Content Remove="ios/**/*" />
       <Compile Remove="ios/**/*" />
-      <None Remove="obj/**/*" />
-      <None Remove="bin/**/*" />
-      <None Remove="wwwroot/**/*" />
-      <Content Remove="wwwroot/**/*" />
-      <None Remove="*.user" />
       <Compile Remove="obj/**/*" />
       <Compile Remove="bin/**/*" />
-      <Content Remove="obj/**/*" />
-      <Content Remove="bin/**/*" />
-      <None Remove="Directory.Build.props"/>
-      <None Remove="Directory.Build.targets"/>
-      <None Remove="Android.Build.targets"/>
-      <None Remove="IOS.Build.targets"/>
-      <None Remove="runtimeconfig.template.json"/>
     </ItemGroup>
 
   <!-- Exclude shaders from other platform folders -->

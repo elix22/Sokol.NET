@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType Condition="'$(BuildAsLibrary)' != 'true'">Exe</OutputType>
     <OutputType Condition="'$(BuildAsLibrary)' == 'true'">Library</OutputType>
@@ -19,10 +18,14 @@
     <IsIOS Condition="$(DefineConstants.Contains('__IOS__'))">true</IsIOS>
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute> 
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <!-- Exclude build artifacts from project view -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes> 
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
+    <SokolNetHome Condition="Exists('$(HOME)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HOME)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
+    <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
   </PropertyGroup>
+
+  <Import Project="$(SokolNetHome)/Directory.Build.props" />
 
     <!-- Library-specific settings -->
   <PropertyGroup Condition="'$(BuildAsLibrary)' == 'true'">
@@ -44,51 +47,6 @@
     <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsLinux)'=='true'">glsl430</ShaderSlang>
   </PropertyGroup>
 
-    <!-- Import Android NDK pressets -->
-   <Import Project="scripts/BionicNativeAot.targets"/>
-
-
-  	<!--Following blocks are exclusive for Android building-->
-	<PropertyGroup Condition="$(IsAndroid) == 'true'">
-    <!--Use ndk-sample expected library name -->
-		<CppCompilerAndLinker Condition="$(IsWindowsHost) == 'true'">./scripts/android_fake_clang.cmd</CppCompilerAndLinker>
-		<CppCompilerAndLinker Condition="$(IsLinuxHost) == 'true'">./scripts/android_fake_clang.sh</CppCompilerAndLinker>
-		<CppCompilerAndLinker Condition="$(IsOSXHost) == 'true'">./scripts/android_fake_clang.command</CppCompilerAndLinker>
-		<NdkHost Condition="$(IsWindowsHost) == 'true'">windows-x86_64</NdkHost>
-		<NdkHost Condition="$(IsLinuxHost) == 'true'">linux-x86_64</NdkHost>
-		<NdkHost Condition="$(IsOSXHost) == 'true'">darwin-x86_64</NdkHost>
-		<ObjCopyName Condition="'$(ObjCopyName)' == ''">$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(NdkHost)/bin/llvm-objcopy</ObjCopyName>
-		<SysRoot Condition="'$(SysRoot)' == ''">$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(NdkHost)/sysroot</SysRoot>
-		<!--Hack for removing init and fini sections into the exports file-->
-		<ExportsPatch>'s/global: _init; _fini;/global: /g;'</ExportsPatch>
-    <!--Google new requirement , 16 KB page sizes for 64 bit native shared libraries-->
-		<LdFlags Condition="$(RuntimeIdentifier.EndsWith('x64')) or $(RuntimeIdentifier.EndsWith('arm64'))" >$(LdFlags) -Wl,-z,max-page-size=16384</LdFlags>
-    <!-- Architecture mapping -->
-    <LibraryOutputBase>Android/native-activity/app/libs</LibraryOutputBase>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm64'))">$(LibraryOutputBase)/arm64-v8a</ArchitectureOutputPath>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('arm'))">$(LibraryOutputBase)/armeabi-v7a</ArchitectureOutputPath>
-    <ArchitectureOutputPath Condition="$(RuntimeIdentifier.EndsWith('x64'))">$(LibraryOutputBase)/x86_64</ArchitectureOutputPath>
-	</PropertyGroup>
-
-    <ItemGroup Condition="'$(IsAndroid)' == 'true'">
-    <!-- https://github.com/exelix11/SysDVR/blob/master/Client/Client.csproj -->
-    <!-- Android needs a proper soname property or it will refuse to load the library -->
-    <LinkerArg Include="-Wl,-soname,$(LibraryName).so,--undefined-version" />
-    </ItemGroup>
-
-  	<Target Name="RemoveSections" Condition="$(IsAndroid) == 'true' And $(RemoveSections) == 'true'" AfterTargets="IlcCompile" BeforeTargets="LinkNative">
-		<!--Reads as lines the generated exports file-->
-		<ReadLinesFromFile File="$(ExportsFile)">
-			<Output TaskParameter="Lines" PropertyName="ExportsLines" />
-		</ReadLinesFromFile>
-		<!--Gets a single text from the exports lines-->
-		<PropertyGroup>
-			<ExportsText Condition="$(ExportsLines) != ''">@(ExportsLines)</ExportsText>
-		</PropertyGroup>
-		<!--The sed tool is used as invalid lines remover-->
-		<Exec Command="sed -i -z $(ExportsPatch) $(ExportsFile)" />
-	</Target>
-
   <PropertyGroup>
     <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_ios'">ios</HostShaderFolder>
     <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_macos'">osx</HostShaderFolder>
@@ -98,27 +56,15 @@
   </PropertyGroup>
 
     <ItemGroup>
-      <None Remove="scripts/**/*" />
-      <None Remove="Android/**/*" />
-      <Content Remove="Android/**/*" />
       <Compile Remove="Android/**/*" />
-      <None Remove="ios/**/*" />
-      <Content Remove="ios/**/*" />
       <Compile Remove="ios/**/*" />
-      <None Remove="obj/**/*" />
-      <None Remove="bin/**/*" />
-      <None Remove="wwwroot/**/*" />
-      <Content Remove="wwwroot/**/*" />
-      <None Remove="*.user" />
       <Compile Remove="obj/**/*" />
       <Compile Remove="bin/**/*" />
-      <Content Remove="obj/**/*" />
-      <Content Remove="bin/**/*" />
     </ItemGroup>
 
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
-    <Compile Remove="shaders/compiled/web/**/*.cs"/>
+    <Compile Remove="shaders/compiled/web/**/*.cs" />
     <Compile Remove="shaders/compiled/ios/**/*.cs" Condition="'$(HostShaderFolder)' != 'ios'" />
     <Compile Remove="shaders/compiled/osx/**/*.cs" Condition="'$(HostShaderFolder)' != 'osx'" />
     <Compile Remove="shaders/compiled/windows/**/*.cs" Condition="'$(HostShaderFolder)' != 'windows'" />
@@ -129,7 +75,7 @@
 
   <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
-        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/sokol.dll</libSokol>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
@@ -138,16 +84,16 @@
 
   <Target Name="CopyCustomContentPublishWindows" AfterTargets="Publish" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
-        <libSokol>../../libs/windows/$(OSArch)/sokol.dll</libSokol>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/sokol.dll</libSokol>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
-  
+
   <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
       <PropertyGroup>
-        <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/libsokol.dylib</libSokol>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found are you sure URHONET_HOME_ROOT is pointing to the right place ?" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
@@ -156,7 +102,7 @@
 
   <Target Name="CopyCustomContentPublishMacOS" AfterTargets="Publish" Condition="'$(IsOSX)'=='true'">
       <PropertyGroup>
-        <libSokol>../../libs/macos/$(OSArch)/libsokol.dylib</libSokol>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/libsokol.dylib</libSokol>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
@@ -164,34 +110,22 @@
   </Target>
 
 
-  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" 
-          Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
       <PropertyGroup>
           <BuiltLibrary>$(PublishDir)/$(LibraryName).so</BuiltLibrary>
       </PropertyGroup>
-      <Error Condition="!Exists('$(BuiltLibrary)')" 
-            Text="Built library not found at $(BuiltLibrary)" />
+      <Error Condition="!Exists('$(BuiltLibrary)')" Text="Built library not found at $(BuiltLibrary)" />
       <MakeDir Directories="$(ArchitectureOutputPath)" />
-      <Copy SourceFiles="$(BuiltLibrary)"
-            DestinationFolder="$(ArchitectureOutputPath)"
-            SkipUnchangedFiles="true" />
-      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" 
-              Importance="high" />
+      <Copy SourceFiles="$(BuiltLibrary)" DestinationFolder="$(ArchitectureOutputPath)" SkipUnchangedFiles="true" />
+      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" Importance="high" />
   </Target>
 
-  <Target Name="CopyAssetsToAndroidFolder" AfterTargets="Publish" Condition="'$(IsAndroid)'=='true'">
-    <Message Text="Copying assets to Android app/src/main/assets folder..." Importance="high" />
-    <Copy 
-      SourceFiles="@(AssetsSourceFiles)" 
-      DestinationFiles="@(AssetsSourceFiles->'Android/native-activity/app/src/main/assets\%(RecursiveDir)%(Filename)%(Extension)')"
-      SkipUnchangedFiles="true" />
-  </Target>
+
 
   <!-- Import Android build configuration -->
   <Import Project="Android.Build.targets" />
 
   <!-- Import iOS build configuration -->
   <Import Project="iOS.Build.targets" />
-
 
 </Project>
