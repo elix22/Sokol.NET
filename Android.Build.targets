@@ -56,9 +56,9 @@
   	<!--Following blocks are exclusive for Android building-->
 	<PropertyGroup Condition="$(IsAndroid) == 'true'">
     <!--Use ndk-sample expected library name -->
-		<CppCompilerAndLinker Condition="$(IsWindowsHost) == 'true'">./scripts/android_fake_clang.cmd</CppCompilerAndLinker>
-		<CppCompilerAndLinker Condition="$(IsLinuxHost) == 'true'">./scripts/android_fake_clang.sh</CppCompilerAndLinker>
-		<CppCompilerAndLinker Condition="$(IsOSXHost) == 'true'">./scripts/android_fake_clang.command</CppCompilerAndLinker>
+		<CppCompilerAndLinker Condition="$(IsWindowsHost) == 'true'">$(SokolNetHome)/scripts/android_fake_clang.cmd</CppCompilerAndLinker>
+		<CppCompilerAndLinker Condition="$(IsLinuxHost) == 'true'">$(SokolNetHome)/scripts/android_fake_clang.sh</CppCompilerAndLinker>
+		<CppCompilerAndLinker Condition="$(IsOSXHost) == 'true'">$(SokolNetHome)/scripts/android_fake_clang.command</CppCompilerAndLinker>
 		<NdkHost Condition="$(IsWindowsHost) == 'true'">windows-x86_64</NdkHost>
 		<NdkHost Condition="$(IsLinuxHost) == 'true'">linux-x86_64</NdkHost>
 		<NdkHost Condition="$(IsOSXHost) == 'true'">darwin-x86_64</NdkHost>

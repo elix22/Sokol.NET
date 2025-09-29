@@ -1,0 +1,82 @@
+<Project>
+  <!-- iOS Build Configuration using SokolApplicationBuilder -->
+  <PropertyGroup>
+    <SokolBuilderPath Condition="'$(SokolBuilderPath)' == ''">../../tools/SokolApplicationBuilder</SokolBuilderPath>
+    <IOSDeviceId Condition="'$(IOSDeviceId)' == ''"></IOSDeviceId>
+    <IOSSimulatorId Condition="'$(IOSSimulatorId)' == ''"></IOSSimulatorId>
+    <IOSBuildType Condition="'$(IOSBuildType)' == ''">release</IOSBuildType>
+    <IOSOrientation Condition="'$(IOSOrientation)' == ''">landscape</IOSOrientation>
+    <IOSDevelopmentTeam Condition="'$(IOSDevelopmentTeam)' == ''"></IOSDevelopmentTeam>
+  </PropertyGroup>
+
+  <!-- Build iOS App (Release) - No Install -->
+  <Target Name="BuildIOS">
+    <PropertyGroup>
+      <IOSBuildCommand>dotnet run -- --task build --type $(IOSBuildType) --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)"</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building iOS App (Release) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+  <!-- Build iOS App (Debug) - No Install -->
+  <Target Name="BuildIOSDebug">
+    <PropertyGroup>
+      <IOSBuildCommand>dotnet run -- --task build --type debug --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)"</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building iOS App (Debug) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+  <!-- Build and Install iOS App on Physical Device (Release) -->
+  <Target Name="BuildIOSInstall">
+    <PropertyGroup>
+      <IOSBuildCommand Condition="'$(IOSDeviceId)' != ''">dotnet run -- --task build --type $(IOSBuildType) --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run --ios-device $(IOSDeviceId)</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDeviceId)' == ''">dotnet run -- --task build --type $(IOSBuildType) --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building and Installing iOS App on Physical Device (Release) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+  <!-- Build and Install iOS App on Physical Device (Debug) -->
+  <Target Name="BuildIOSDebugInstall">
+    <PropertyGroup>
+      <IOSBuildCommand Condition="'$(IOSDeviceId)' != ''">dotnet run -- --task build --type debug --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run --ios-device $(IOSDeviceId)</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDeviceId)' == ''">dotnet run -- --task build --type debug --architecture ios --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building and Installing iOS App on Physical Device (Debug) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+  <!-- Build and Install iOS App on Simulator (Release) -->
+  <Target Name="BuildIOSSimulator">
+    <PropertyGroup>
+      <IOSBuildCommand Condition="'$(IOSSimulatorId)' != ''">dotnet run -- --task build --type $(IOSBuildType) --architecture ios-simulator --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run --ios-device $(IOSSimulatorId)</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSSimulatorId)' == ''">dotnet run -- --task build --type $(IOSBuildType) --architecture ios-simulator --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building and Installing iOS App on Simulator (Release) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+  <!-- Build and Install iOS App on Simulator (Debug) -->
+  <Target Name="BuildIOSSimulatorDebug">
+    <PropertyGroup>
+      <IOSBuildCommand Condition="'$(IOSSimulatorId)' != ''">dotnet run -- --task build --type debug --architecture ios-simulator --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run --ios-device $(IOSSimulatorId)</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSSimulatorId)' == ''">dotnet run -- --task build --type debug --architecture ios-simulator --orientation $(IOSOrientation) --path "$(MSBuildProjectDirectory)" --compile --install --run</IOSBuildCommand>
+      <IOSBuildCommand Condition="'$(IOSDevelopmentTeam)' != ''">$(IOSBuildCommand) --development-team $(IOSDevelopmentTeam)</IOSBuildCommand>
+    </PropertyGroup>
+    <Message Text="Building and Installing iOS App on Simulator (Debug) with SokolApplicationBuilder..." Importance="high" />
+    <Message Text="Command: $(IOSBuildCommand)" Importance="high" />
+    <Exec Command="$(IOSBuildCommand)" WorkingDirectory="$(SokolBuilderPath)" />
+  </Target>
+
+</Project>
