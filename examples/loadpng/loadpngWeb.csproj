@@ -140,8 +140,4 @@
     <Copy SourceFiles="@(AssetFiles)" DestinationFiles="$(OutDir)AppBundle/%(RecursiveDir)%(Filename)%(Extension)" SkipUnchangedFiles="true" />
   </Target>
 
-  <ItemGroup>
-      <PackageReference Include="StbImageSharp" Version="2.30.15" />
-  </ItemGroup>
-
 </Project>

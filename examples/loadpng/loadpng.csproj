@@ -130,8 +130,4 @@
   <!-- Import iOS build configuration -->
   <Import Project="$(SokolNetHome)/iOS.Build.targets" />
 
-  <ItemGroup>
-      <PackageReference Include="StbImageSharp" Version="2.30.15" />
-  </ItemGroup>
-
 </Project>

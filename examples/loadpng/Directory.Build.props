@@ -59,4 +59,10 @@
     <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
   </Target>
   
+
+<!-- nuget package for loading png files -->
+  <ItemGroup>
+      <PackageReference Include="StbImageSharp" Version="2.30.15" />
+  </ItemGroup>
+
 </Project>

@@ -33,6 +33,7 @@ set(IMGUI_SOURCE_FILES
         ${EXT_ROOT_DIR}/cimgui/imgui/imgui.cpp
 )
 
+ set(FILEUTIL_SRCS ${EXT_ROOT_DIR}/util/fileutil.c ${EXT_ROOT_DIR}/util/fileutil.h)
 
 set_source_files_properties(${IMGUI_SOURCE_FILES}
     PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++ -Wno-unused-function -Wincompatible-pointer-types-discards-qualifiers"
@@ -49,7 +50,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-add_library(sokol SHARED sokol_android_main.c ${IMGUI_SOURCE_FILES})
+add_library(sokol SHARED  ${EXT_ROOT_DIR}/sokol.c ${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp ${IMGUI_SOURCE_FILES} ${FILEUTIL_SRCS})
 
 target_include_directories(sokol PRIVATE
     ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR}/cimgui ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf .)
