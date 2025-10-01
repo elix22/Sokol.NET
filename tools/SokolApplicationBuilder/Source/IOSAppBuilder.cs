@@ -110,12 +110,9 @@ namespace SokolApplicationBuilder
 
                 Log.LogMessage(MessageImportance.High, $"Building iOS app for project: {projectName}");
 
-                // Set development team if provided
-                if (!string.IsNullOrEmpty(opts.DevelopmentTeam))
-                {
-                    DEVELOPMENT_TEAM = opts.DevelopmentTeam;
-                    Log.LogMessage(MessageImportance.High, $"Using development team: {DEVELOPMENT_TEAM}");
-                }
+                // Setup development team (with caching support)
+                if (!SetupDevelopmentTeam(projectName))
+                    return false;
 
                 // Create iOS build directory structure
                 string iosDir = Path.Combine(projectDir, "ios");
@@ -145,23 +142,16 @@ namespace SokolApplicationBuilder
                 if (!GenerateXcodeProject(iosDir, projectName))
                     return false;
 
-                // Compile Xcode project if requested
-                if (opts.Compile)
-                {
-                    if (!CompileXcodeProject(iosDir, projectName))
-                        return false;
+                // Compile Xcode project (always compile when building)
+                if (!CompileXcodeProject(iosDir, projectName))
+                    return false;
 
-                    // Install on device if requested
-                    if (opts.Install)
-                    {
-                        if (!InstallOnDevice(iosDir, projectName, opts.Run))
-                            return false;
-                    }
-                }
-                else
+                // Install on device if requested
+                if (opts.Install)
                 {
-                    Log.LogMessage(MessageImportance.High, "Xcode project generated. To compile manually:");
-                    Log.LogMessage(MessageImportance.High, $"cd {Path.Combine(iosDir, "build-xcode-ios-app")} && xcodebuild -configuration Release -sdk iphoneos -arch arm64");
+                    // Always launch app after installation (matching Android behavior)
+                    if (!InstallOnDevice(iosDir, projectName, true))
+                        return false;
                 }
 
                 Log.LogMessage(MessageImportance.High, "iOS build completed successfully!");
@@ -649,8 +639,9 @@ namespace SokolApplicationBuilder
                 }
 
                 // Select device(s) based on user preference
-                List<(string Id, string Name)> selectedDevices;
+                List<(string Id, string Name)> selectedDevices = new List<(string Id, string Name)>();
 
+                // Check if user specified a device ID
                 if (!string.IsNullOrEmpty(opts.IOSDeviceId))
                 {
                     // User specified a specific device
@@ -665,23 +656,63 @@ namespace SokolApplicationBuilder
                         return false;
                     }
                     selectedDevices = new List<(string Id, string Name)> { matchingDevice };
-                    Log.LogMessage(MessageImportance.High, $"Using specified iOS device: {matchingDevice.Name} ({matchingDevice.Id})");
+                    Log.LogMessage(MessageImportance.High, $"✅ Using specified iOS device: {matchingDevice.Name} ({matchingDevice.Id})");
+                }
+                else if (availableDevices.Count == 1)
+                {
+                    // If only one device, use it automatically
+                    selectedDevices.Add(availableDevices[0]);
+                    Log.LogMessage(MessageImportance.High, $"✅ Found single device: {availableDevices[0].Name} ({availableDevices[0].Id})");
                 }
                 else
                 {
-                    // Use all available devices when multiple are connected
-                    selectedDevices = availableDevices;
-                    if (availableDevices.Count == 1)
+                    // Multiple devices - handle interactive or automatic selection
+                    Log.LogMessage(MessageImportance.High, $"📱 Multiple iOS devices detected ({availableDevices.Count} devices):");
+                    Log.LogMessage(MessageImportance.High, "======================================================");
+
+                    for (int i = 0; i < availableDevices.Count; i++)
                     {
-                        Log.LogMessage(MessageImportance.High, $"Using available iOS device: {availableDevices[0].Name} ({availableDevices[0].Id})");
+                        Log.LogMessage(MessageImportance.High, $"{i + 1}) {availableDevices[i].Name} ({availableDevices[i].Id})");
+                    }
+                    Log.LogMessage(MessageImportance.High, $"{availableDevices.Count + 1}) All devices");
+
+                    if (opts.Interactive)
+                    {
+                        // Interactive mode - prompt user for selection
+                        Console.WriteLine();
+                        int selection = -1;
+                        while (selection < 1 || selection > availableDevices.Count + 1)
+                        {
+                            Console.Write($"Select device (1-{availableDevices.Count + 1}): ");
+                            string? input = Console.ReadLine();
+                            if (int.TryParse(input, out selection) && selection >= 1 && selection <= availableDevices.Count + 1)
+                            {
+                                if (selection == availableDevices.Count + 1)
+                                {
+                                    // All devices selected
+                                    selectedDevices = availableDevices.ToList();
+                                    Log.LogMessage(MessageImportance.High, $"✅ Selected all devices ({availableDevices.Count} devices)");
+                                }
+                                else
+                                {
+                                    selectedDevices.Add(availableDevices[selection - 1]);
+                                    Log.LogMessage(MessageImportance.High, $"✅ Selected device: {availableDevices[selection - 1].Name} ({availableDevices[selection - 1].Id})");
+                                }
+                                break;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"❌ Invalid selection. Please enter a number between 1 and {availableDevices.Count + 1}.");
+                                selection = -1;
+                            }
+                        }
                     }
                     else
                     {
-                        Log.LogMessage(MessageImportance.High, $"Installing on all {availableDevices.Count} connected iOS devices:");
-                        foreach (var device in availableDevices)
-                        {
-                            Log.LogMessage(MessageImportance.Normal, $"  - {device.Name} ({device.Id})");
-                        }
+                        // Non-interactive mode - use first device with warning
+                        selectedDevices.Add(availableDevices[0]);
+                        Log.LogMessage(MessageImportance.High, $"⚠️  Using first device: {availableDevices[0].Name} ({availableDevices[0].Id})");
+                        Log.LogWarning("Multiple devices found. Using the first one. Use --ios-device <device_id> to specify which device to use, or use --interactive for device selection.");
                     }
                 }
 
@@ -881,6 +912,108 @@ namespace SokolApplicationBuilder
             string fallbackProject = Path.GetFileNameWithoutExtension(csprojFiles[0]);
             Log.LogMessage(MessageImportance.Normal, $"Using first project as fallback: {fallbackProject}");
             return fallbackProject;
+        }
+
+        private string GetTeamIdCacheFile(string projectName)
+        {
+            string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string cacheDir = Path.Combine(homeDir, ".sokol-charp-cache");
+            Directory.CreateDirectory(cacheDir);
+            return Path.Combine(cacheDir, $"{projectName}.teamid");
+        }
+
+        private string? GetCachedTeamId(string projectName)
+        {
+            try
+            {
+                string cacheFile = GetTeamIdCacheFile(projectName);
+                if (File.Exists(cacheFile))
+                {
+                    string cachedTeamId = File.ReadAllText(cacheFile).Trim();
+                    // Validate team ID format (should be 10 alphanumeric characters)
+                    if (!string.IsNullOrEmpty(cachedTeamId) && 
+                        System.Text.RegularExpressions.Regex.IsMatch(cachedTeamId, @"^[A-Z0-9]{10}$"))
+                    {
+                        return cachedTeamId;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogMessage(MessageImportance.Normal, $"Failed to read cached team ID: {ex.Message}");
+            }
+            return null;
+        }
+
+        private void SaveTeamIdToCache(string projectName, string teamId)
+        {
+            try
+            {
+                string cacheFile = GetTeamIdCacheFile(projectName);
+                File.WriteAllText(cacheFile, teamId);
+                Log.LogMessage(MessageImportance.Normal, "💾 Team ID cached for future use");
+            }
+            catch (Exception ex)
+            {
+                Log.LogMessage(MessageImportance.Normal, $"Failed to cache team ID: {ex.Message}");
+            }
+        }
+
+        private bool SetupDevelopmentTeam(string projectName)
+        {
+            // If team ID provided via command line, use it
+            if (!string.IsNullOrEmpty(opts.DevelopmentTeam))
+            {
+                DEVELOPMENT_TEAM = opts.DevelopmentTeam;
+                Log.LogMessage(MessageImportance.High, $"Using development team from command line: {DEVELOPMENT_TEAM}");
+                SaveTeamIdToCache(projectName, DEVELOPMENT_TEAM);
+                return true;
+            }
+
+            // Try to get cached team ID
+            string? cachedTeamId = GetCachedTeamId(projectName);
+            if (cachedTeamId != null)
+            {
+                DEVELOPMENT_TEAM = cachedTeamId;
+                Log.LogMessage(MessageImportance.High, $"✅ Using cached Development Team ID: {DEVELOPMENT_TEAM}");
+                string cacheFile = GetTeamIdCacheFile(projectName);
+                Log.LogMessage(MessageImportance.Normal, $"   (Delete {cacheFile} to reset)");
+                return true;
+            }
+
+            // Interactive mode - prompt for team ID
+            if (opts.Interactive)
+            {
+                Console.WriteLine();
+                Console.WriteLine("🔑 iOS Development Team ID Required");
+                Console.WriteLine("===================================");
+                Console.WriteLine("Enter your Apple Developer Team ID (found in developer.apple.com/account):");
+                Console.Write("Development Team ID: ");
+                
+                string? teamId = Console.ReadLine()?.Trim();
+                
+                if (string.IsNullOrEmpty(teamId))
+                {
+                    Log.LogError("❌ Development Team ID is required for iOS builds");
+                    return false;
+                }
+
+                // Validate team ID format
+                if (!System.Text.RegularExpressions.Regex.IsMatch(teamId, @"^[A-Z0-9]{10}$"))
+                {
+                    Log.LogWarning("⚠️  Team ID format looks incorrect (should be 10 alphanumeric characters)");
+                    Log.LogWarning("   Continuing anyway, but this may cause build failures...");
+                }
+
+                DEVELOPMENT_TEAM = teamId;
+                SaveTeamIdToCache(projectName, teamId);
+                return true;
+            }
+
+            // Non-interactive mode without team ID
+            Log.LogError("❌ Development Team ID is required for iOS builds");
+            Log.LogError("   Provide it via --development-team flag or use --interactive mode");
+            return false;
         }
 
         private void CopyDirectory(string sourceDir, string destDir)

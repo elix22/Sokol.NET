@@ -654,6 +654,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cube"
             ],
             "group": "build",
@@ -682,6 +683,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/dyntex"
             ],
             "group": "build",
@@ -710,6 +712,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cimgui"
             ],
             "group": "build",
@@ -738,6 +741,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/loadpng"
             ],
             "group": "build",
@@ -766,6 +770,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/instancing"
             ],
             "group": "build",
@@ -794,6 +799,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/plmpeg"
             ],
             "group": "build",
@@ -822,6 +828,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/drawcallperf"
             ],
             "group": "build",
@@ -851,6 +858,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cube"
             ],
             "group": "build",
@@ -880,6 +888,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/dyntex"
             ],
             "group": "build",
@@ -909,6 +918,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cimgui"
             ],
             "group": "build",
@@ -938,6 +948,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/loadpng"
             ],
             "group": "build",
@@ -967,6 +978,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/instancing"
             ],
             "group": "build",
@@ -996,6 +1008,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/plmpeg"
             ],
             "group": "build",
@@ -1025,6 +1038,7 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
+                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/drawcallperf"
             ],
             "group": "build",
@@ -1247,10 +1261,18 @@
         {
             "label": "iOS: Install (Cube)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/cube"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1268,10 +1290,18 @@
         {
             "label": "iOS: Install (Dyntex)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/dyntex"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1289,10 +1319,18 @@
         {
             "label": "iOS: Install (CImGui)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/cimgui"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1310,10 +1348,18 @@
         {
             "label": "iOS: Install (LoadPNG)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/loadpng"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1331,10 +1377,18 @@
         {
             "label": "iOS: Install (Instancing)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/instancing"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1352,10 +1406,18 @@
         {
             "label": "iOS: Install (PlMpeg)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/plmpeg"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1373,10 +1435,18 @@
         {
             "label": "iOS: Install (Drawcallperf)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/drawcallperf"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1394,10 +1464,19 @@
         {
             "label": "iOS: Install Debug (Cube)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/cube"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1415,10 +1494,19 @@
         {
             "label": "iOS: Install Debug (Dyntex)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/dyntex"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1436,10 +1524,19 @@
         {
             "label": "iOS: Install Debug (CImGui)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/cimgui"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1457,10 +1554,19 @@
         {
             "label": "iOS: Install Debug (LoadPNG)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/loadpng"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1478,10 +1584,19 @@
         {
             "label": "iOS: Install Debug (Instancing)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/instancing"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1499,10 +1614,19 @@
         {
             "label": "iOS: Install Debug (PlMpeg)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/plmpeg"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1520,10 +1644,19 @@
         {
             "label": "iOS: Install Debug (Drawcallperf)",
             "type": "shell",
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-ios-install-debug.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "ios",
+                "--install",
+                "--interactive",
+                "--orientation", "landscape",
+                "--path", "${workspaceFolder}/examples/drawcallperf"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
