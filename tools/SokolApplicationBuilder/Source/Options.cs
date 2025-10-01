@@ -95,6 +95,9 @@ namespace SokolApplicationBuilder
         [Option("linker-flags", Required = false, HelpText = "Additional linker flags to pass to the compiler")]
         public string LinkerFlags { get; set; } = "";
 
+        [Option("interactive", Required = false, HelpText = "Enable interactive device selection when multiple devices are connected")]
+        public bool Interactive { get; set; } = false;
+
         // Computed properties
         public string Path => ProjectPath;
         public string TemplatesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", "templates");

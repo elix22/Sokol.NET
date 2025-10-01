@@ -645,18 +645,17 @@
         {
             "label": "Android: Install (Cube)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/cube/cube.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cube"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -674,18 +673,17 @@
         {
             "label": "Android: Install (Dyntex)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/dyntex/dyntex.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/dyntex"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -703,18 +701,17 @@
         {
             "label": "Android: Install (CImGui)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/cimgui/cimgui.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cimgui"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -732,18 +729,17 @@
         {
             "label": "Android: Install (LoadPNG)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/loadpng/loadpng.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/loadpng"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -761,18 +757,17 @@
         {
             "label": "Android: Install (Instancing)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/instancing/instancing.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/instancing"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -790,18 +785,17 @@
         {
             "label": "Android: Install (PlMpeg)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/plmpeg/plmpeg.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/plmpeg"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -819,18 +813,17 @@
         {
             "label": "Android: Install (Drawcallperf)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install.ps1", "examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/drawcallperf"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -848,18 +841,18 @@
         {
             "label": "Android: Install Debug (Cube)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/cube/cube.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cube"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -877,18 +870,18 @@
         {
             "label": "Android: Install Debug (Dyntex)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/dyntex/dyntex.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/dyntex"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -906,18 +899,18 @@
         {
             "label": "Android: Install Debug (CImGui)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/cimgui/cimgui.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cimgui"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -935,18 +928,18 @@
         {
             "label": "Android: Install Debug (LoadPNG)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/loadpng/loadpng.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/loadpng"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -964,18 +957,18 @@
         {
             "label": "Android: Install Debug (Instancing)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/instancing/instancing.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/instancing"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -993,18 +986,18 @@
         {
             "label": "Android: Install Debug (PlMpeg)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/plmpeg/plmpeg.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/plmpeg"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1022,18 +1015,18 @@
         {
             "label": "Android: Install Debug (Drawcallperf)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-debug.ps1", "examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-debug.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "debug",
+                "--architecture", "android",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/drawcallperf"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1051,18 +1044,18 @@
         {
             "label": "Android AAB: Install (Cube)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/cube/cube.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/cube/cube.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cube"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1080,18 +1073,18 @@
         {
             "label": "Android AAB: Install (Dyntex)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/dyntex/dyntex.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/dyntex/dyntex.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/dyntex"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1109,18 +1102,18 @@
         {
             "label": "Android AAB: Install (CImGui)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/cimgui/cimgui.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/cimgui/cimgui.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/cimgui"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1138,18 +1131,18 @@
         {
             "label": "Android AAB: Install (LoadPNG)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/loadpng/loadpng.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/loadpng/loadpng.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/loadpng"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1167,18 +1160,18 @@
         {
             "label": "Android AAB: Install (Instancing)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/instancing/instancing.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/instancing/instancing.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/instancing"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1196,18 +1189,18 @@
         {
             "label": "Android AAB: Install (PlMpeg)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/plmpeg/plmpeg.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/plmpeg/plmpeg.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/plmpeg"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -1225,18 +1218,18 @@
         {
             "label": "Android AAB: Install (Drawcallperf)",
             "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/interactive-android-install-aab.ps1", "examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/interactive-android-install-aab.sh",
-                "args": ["examples/drawcallperf/drawcallperf.csproj"]
-            },
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--architecture", "android",
+                "--subtask", "aab",
+                "--install",
+                "--interactive",
+                "--path", "${workspaceFolder}/examples/drawcallperf"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,

@@ -619,10 +619,9 @@ namespace SokolApplicationBuilder
             }
         }
 
-        void InstallOnDevice(string appName, string buildType)
+        // Helper method to get connected devices and select one interactively or automatically
+        string SelectAndroidDevice()
         {
-            Log.LogMessage(MessageImportance.High, "Installing on Android device...");
-
             // Check if adb is available and get device list
             string deviceListOutput = "";
             try
@@ -642,17 +641,17 @@ namespace SokolApplicationBuilder
                 if (adbCheckResult.ExitCode != 0)
                 {
                     Log.LogError("Failed to get device list from ADB.");
-                    return;
+                    return "";
                 }
             }
             catch (Exception ex)
             {
                 Log.LogError($"ADB not found or failed: {ex.Message}");
-                return;
+                return "";
             }
 
-            // Parse device list
-            var devices = new List<string>();
+            // Parse device list and get device info
+            var devices = new List<(string id, string manufacturer, string model)>();
             var lines = deviceListOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
@@ -661,7 +660,37 @@ namespace SokolApplicationBuilder
                     var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 2 && parts[1] == "device")
                     {
-                        devices.Add(parts[0]);
+                        string deviceId = parts[0];
+                        string manufacturer = "";
+                        string model = "";
+
+                        // Try to get device info
+                        try
+                        {
+                            var modelBuilder = new System.Text.StringBuilder();
+                            var modelResult = Cli.Wrap("adb")
+                                .WithArguments($"-s {deviceId} shell getprop ro.product.model")
+                                .WithStandardOutputPipe(PipeTarget.ToDelegate(line => modelBuilder.AppendLine(line)))
+                                .ExecuteAsync()
+                                .GetAwaiter()
+                                .GetResult();
+                            model = modelBuilder.ToString().Trim();
+
+                            var mfgBuilder = new System.Text.StringBuilder();
+                            var mfgResult = Cli.Wrap("adb")
+                                .WithArguments($"-s {deviceId} shell getprop ro.product.manufacturer")
+                                .WithStandardOutputPipe(PipeTarget.ToDelegate(line => mfgBuilder.AppendLine(line)))
+                                .ExecuteAsync()
+                                .GetAwaiter()
+                                .GetResult();
+                            manufacturer = mfgBuilder.ToString().Trim();
+                        }
+                        catch
+                        {
+                            // Ignore errors getting device info
+                        }
+
+                        devices.Add((deviceId, manufacturer, model));
                     }
                 }
             }
@@ -669,45 +698,99 @@ namespace SokolApplicationBuilder
             if (devices.Count == 0)
             {
                 Log.LogError("No Android devices found. Please connect a device and enable USB debugging.");
-                return;
+                return "";
             }
 
             string selectedDeviceId = "";
+
+            // Check if user specified a device ID
             if (!string.IsNullOrEmpty(opts.DeviceId))
             {
-                // User specified a device ID
-                if (devices.Contains(opts.DeviceId))
+                if (devices.Any(d => d.id == opts.DeviceId))
                 {
                     selectedDeviceId = opts.DeviceId;
                     Log.LogMessage(MessageImportance.High, $"Using specified device: {selectedDeviceId}");
+                    return selectedDeviceId;
                 }
                 else
                 {
                     Log.LogError($"Specified device '{opts.DeviceId}' not found. Available devices:");
-                    for (int i = 0; i < devices.Count; i++)
+                    foreach (var device in devices)
                     {
-                        Log.LogError($"  {devices[i]}");
+                        string deviceInfo = !string.IsNullOrEmpty(device.manufacturer) && !string.IsNullOrEmpty(device.model)
+                            ? $"{device.id} ({device.manufacturer} {device.model})"
+                            : device.id;
+                        Log.LogError($"  {deviceInfo}");
                     }
-                    return;
+                    return "";
                 }
             }
-            else if (devices.Count == 1)
+
+            // If only one device, use it automatically
+            if (devices.Count == 1)
             {
-                selectedDeviceId = devices[0];
-                Log.LogMessage(MessageImportance.High, $"Found device: {selectedDeviceId}");
+                selectedDeviceId = devices[0].id;
+                string deviceInfo = !string.IsNullOrEmpty(devices[0].manufacturer) && !string.IsNullOrEmpty(devices[0].model)
+                    ? $"{devices[0].id} ({devices[0].manufacturer} {devices[0].model})"
+                    : devices[0].id;
+                Log.LogMessage(MessageImportance.High, $"✅ Found single device: {deviceInfo}");
+                return selectedDeviceId;
+            }
+
+            // Multiple devices - handle interactive or automatic selection
+            Log.LogMessage(MessageImportance.High, $"📱 Multiple devices detected ({devices.Count} devices):");
+            Log.LogMessage(MessageImportance.High, "======================================================");
+
+            for (int i = 0; i < devices.Count; i++)
+            {
+                string deviceInfo = !string.IsNullOrEmpty(devices[i].manufacturer) && !string.IsNullOrEmpty(devices[i].model)
+                    ? $"{devices[i].id} ({devices[i].manufacturer} {devices[i].model})"
+                    : devices[i].id;
+                Log.LogMessage(MessageImportance.High, $"{i + 1}) {deviceInfo}");
+            }
+
+            if (opts.Interactive)
+            {
+                // Interactive mode - prompt user for selection
+                Console.WriteLine();
+                int selection = -1;
+                while (selection < 1 || selection > devices.Count)
+                {
+                    Console.Write($"Select device (1-{devices.Count}): ");
+                    string? input = Console.ReadLine();
+                    if (int.TryParse(input, out selection) && selection >= 1 && selection <= devices.Count)
+                    {
+                        selectedDeviceId = devices[selection - 1].id;
+                        Log.LogMessage(MessageImportance.High, $"✅ Selected device: {selectedDeviceId}");
+                        break;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"❌ Invalid selection. Please enter a number between 1 and {devices.Count}.");
+                        selection = -1;
+                    }
+                }
             }
             else
             {
-                Log.LogMessage(MessageImportance.High, $"Found {devices.Count} connected devices:");
-                for (int i = 0; i < devices.Count; i++)
-                {
-                    Log.LogMessage(MessageImportance.High, $"{i + 1}. {devices[i]}");
-                }
+                // Non-interactive mode - use first device with warning
+                selectedDeviceId = devices[0].id;
+                Log.LogMessage(MessageImportance.High, $"⚠️  Using first device: {selectedDeviceId}");
+                Log.LogWarning("Multiple devices found. Using the first one. Use --device <device_id> to specify which device to use, or use --interactive for device selection.");
+            }
 
-                // Use the first device as fallback
-                selectedDeviceId = devices[0];
-                Log.LogMessage(MessageImportance.High, $"Using first device: {selectedDeviceId}");
-                Log.LogWarning("Multiple devices found. Using the first one. Use --device <device_id> to specify which device to use.");
+            return selectedDeviceId;
+        }
+
+        void InstallOnDevice(string appName, string buildType)
+        {
+            Log.LogMessage(MessageImportance.High, "Installing on Android device...");
+
+            // Get selected device using helper method
+            string selectedDeviceId = SelectAndroidDevice();
+            if (string.IsNullOrEmpty(selectedDeviceId))
+            {
+                return; // Error already logged by SelectAndroidDevice
             }
 
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
@@ -775,79 +858,11 @@ namespace SokolApplicationBuilder
         {
             Log.LogMessage(MessageImportance.High, "Installing AAB on Android device...");
 
-            // Check if adb is available and get device list
-            string deviceListOutput = "";
-            try
+            // Get selected device using helper method
+            string selectedDeviceId = SelectAndroidDevice();
+            if (string.IsNullOrEmpty(selectedDeviceId))
             {
-                var stringBuilder = new System.Text.StringBuilder();
-                var adbCheckResult = Cli.Wrap("adb")
-                    .WithArguments("devices")
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(line => stringBuilder.AppendLine(line)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-
-                deviceListOutput = stringBuilder.ToString();
-                Log.LogMessage(MessageImportance.Normal, $"ADB devices output: {deviceListOutput}");
-
-                if (adbCheckResult.ExitCode != 0)
-                {
-                    Log.LogError("Failed to get device list from ADB.");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.LogError($"ADB not found or failed: {ex.Message}");
-                return;
-            }
-
-            // Parse device list
-            var devices = new List<string>();
-            var lines = deviceListOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                if (!line.Contains("List of devices") && !string.IsNullOrWhiteSpace(line))
-                {
-                    var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2 && parts[1] == "device")
-                    {
-                        devices.Add(parts[0]);
-                    }
-                }
-            }
-
-            if (devices.Count == 0)
-            {
-                Log.LogError("No Android devices found. Please connect a device and enable USB debugging.");
-                return;
-            }
-
-            string selectedDeviceId = "";
-            if (!string.IsNullOrEmpty(opts.DeviceId))
-            {
-                if (devices.Contains(opts.DeviceId))
-                {
-                    selectedDeviceId = opts.DeviceId;
-                    Log.LogMessage(MessageImportance.High, $"Using specified device: {selectedDeviceId}");
-                }
-                else
-                {
-                    Log.LogError($"Specified device '{opts.DeviceId}' not found.");
-                    return;
-                }
-            }
-            else if (devices.Count == 1)
-            {
-                selectedDeviceId = devices[0];
-                Log.LogMessage(MessageImportance.High, $"Found device: {selectedDeviceId}");
-            }
-            else
-            {
-                selectedDeviceId = devices[0];
-                Log.LogMessage(MessageImportance.High, $"Using first device: {selectedDeviceId}");
-                Log.LogWarning("Multiple devices found. Using the first one. Use --device <device_id> to specify which device to use.");
+                return; // Error already logged by SelectAndroidDevice
             }
 
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");

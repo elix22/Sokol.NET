@@ -1,1 +1,1 @@
- dotnet run -- --task build --subtask aab --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/drawcallperf  --install --device R8YW60MZRDV
+dotnet run -- --task build --subtask aab --type release --architecture android --orientation landscape --path /Users/elialoni/Development/Graphics/sokol-charp/examples/drawcallperf --install --interactive
