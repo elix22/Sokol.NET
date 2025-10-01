@@ -620,7 +620,7 @@ namespace SokolApplicationBuilder
         }
 
         // Helper method to get connected devices and select one interactively or automatically
-        string SelectAndroidDevice()
+        List<string> SelectAndroidDevice()
         {
             // Check if adb is available and get device list
             string deviceListOutput = "";
@@ -641,13 +641,13 @@ namespace SokolApplicationBuilder
                 if (adbCheckResult.ExitCode != 0)
                 {
                     Log.LogError("Failed to get device list from ADB.");
-                    return "";
+                    return new List<string>();
                 }
             }
             catch (Exception ex)
             {
                 Log.LogError($"ADB not found or failed: {ex.Message}");
-                return "";
+                return new List<string>();
             }
 
             // Parse device list and get device info
@@ -698,19 +698,19 @@ namespace SokolApplicationBuilder
             if (devices.Count == 0)
             {
                 Log.LogError("No Android devices found. Please connect a device and enable USB debugging.");
-                return "";
+                return new List<string>();
             }
 
-            string selectedDeviceId = "";
+            List<string> selectedDeviceIds = new List<string>();
 
             // Check if user specified a device ID
             if (!string.IsNullOrEmpty(opts.DeviceId))
             {
                 if (devices.Any(d => d.id == opts.DeviceId))
                 {
-                    selectedDeviceId = opts.DeviceId;
-                    Log.LogMessage(MessageImportance.High, $"Using specified device: {selectedDeviceId}");
-                    return selectedDeviceId;
+                    selectedDeviceIds.Add(opts.DeviceId);
+                    Log.LogMessage(MessageImportance.High, $"Using specified device: {opts.DeviceId}");
+                    return selectedDeviceIds;
                 }
                 else
                 {
@@ -722,19 +722,19 @@ namespace SokolApplicationBuilder
                             : device.id;
                         Log.LogError($"  {deviceInfo}");
                     }
-                    return "";
+                    return new List<string>();
                 }
             }
 
             // If only one device, use it automatically
             if (devices.Count == 1)
             {
-                selectedDeviceId = devices[0].id;
+                selectedDeviceIds.Add(devices[0].id);
                 string deviceInfo = !string.IsNullOrEmpty(devices[0].manufacturer) && !string.IsNullOrEmpty(devices[0].model)
                     ? $"{devices[0].id} ({devices[0].manufacturer} {devices[0].model})"
                     : devices[0].id;
                 Log.LogMessage(MessageImportance.High, $"✅ Found single device: {deviceInfo}");
-                return selectedDeviceId;
+                return selectedDeviceIds;
             }
 
             // Multiple devices - handle interactive or automatic selection
@@ -748,25 +748,35 @@ namespace SokolApplicationBuilder
                     : devices[i].id;
                 Log.LogMessage(MessageImportance.High, $"{i + 1}) {deviceInfo}");
             }
+            Log.LogMessage(MessageImportance.High, $"{devices.Count + 1}) All devices");
 
             if (opts.Interactive)
             {
                 // Interactive mode - prompt user for selection
                 Console.WriteLine();
                 int selection = -1;
-                while (selection < 1 || selection > devices.Count)
+                while (selection < 1 || selection > devices.Count + 1)
                 {
-                    Console.Write($"Select device (1-{devices.Count}): ");
+                    Console.Write($"Select device (1-{devices.Count + 1}): ");
                     string? input = Console.ReadLine();
-                    if (int.TryParse(input, out selection) && selection >= 1 && selection <= devices.Count)
+                    if (int.TryParse(input, out selection) && selection >= 1 && selection <= devices.Count + 1)
                     {
-                        selectedDeviceId = devices[selection - 1].id;
-                        Log.LogMessage(MessageImportance.High, $"✅ Selected device: {selectedDeviceId}");
+                        if (selection == devices.Count + 1)
+                        {
+                            // All devices selected
+                            selectedDeviceIds = devices.Select(d => d.id).ToList();
+                            Log.LogMessage(MessageImportance.High, $"✅ Selected all devices ({devices.Count} devices)");
+                        }
+                        else
+                        {
+                            selectedDeviceIds.Add(devices[selection - 1].id);
+                            Log.LogMessage(MessageImportance.High, $"✅ Selected device: {devices[selection - 1].id}");
+                        }
                         break;
                     }
                     else
                     {
-                        Console.WriteLine($"❌ Invalid selection. Please enter a number between 1 and {devices.Count}.");
+                        Console.WriteLine($"❌ Invalid selection. Please enter a number between 1 and {devices.Count + 1}.");
                         selection = -1;
                     }
                 }
@@ -774,21 +784,21 @@ namespace SokolApplicationBuilder
             else
             {
                 // Non-interactive mode - use first device with warning
-                selectedDeviceId = devices[0].id;
-                Log.LogMessage(MessageImportance.High, $"⚠️  Using first device: {selectedDeviceId}");
+                selectedDeviceIds.Add(devices[0].id);
+                Log.LogMessage(MessageImportance.High, $"⚠️  Using first device: {devices[0].id}");
                 Log.LogWarning("Multiple devices found. Using the first one. Use --device <device_id> to specify which device to use, or use --interactive for device selection.");
             }
 
-            return selectedDeviceId;
+            return selectedDeviceIds;
         }
 
         void InstallOnDevice(string appName, string buildType)
         {
             Log.LogMessage(MessageImportance.High, "Installing on Android device...");
 
-            // Get selected device using helper method
-            string selectedDeviceId = SelectAndroidDevice();
-            if (string.IsNullOrEmpty(selectedDeviceId))
+            // Get selected device(s) using helper method
+            List<string> selectedDeviceIds = SelectAndroidDevice();
+            if (selectedDeviceIds == null || selectedDeviceIds.Count == 0)
             {
                 return; // Error already logged by SelectAndroidDevice
             }
@@ -814,43 +824,61 @@ namespace SokolApplicationBuilder
                 return;
             }
 
-            // Install APK on selected device
-            var installResult = Cli.Wrap("adb")
-                .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
-                .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                .ExecuteAsync()
-                .GetAwaiter()
-                .GetResult();
-
-            if (installResult.ExitCode == 0)
+            // Install APK on all selected devices
+            int successCount = 0;
+            int failCount = 0;
+            
+            foreach (var selectedDeviceId in selectedDeviceIds)
             {
-                Log.LogMessage(MessageImportance.High, "APK installed successfully!");
-
-                // Try to launch the app on selected device
-                string packageName = $"com.elix22.{appName}";
-
-                try
+                if (selectedDeviceIds.Count > 1)
                 {
-                    var launchResult = Cli.Wrap("adb")
-                        .WithArguments($"-s {selectedDeviceId} shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1")
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                        .ExecuteAsync()
-                        .GetAwaiter()
-                        .GetResult();
-
-                    Log.LogMessage(MessageImportance.High, $"App launch completed with exit code: {launchResult.ExitCode}");
-                    Log.LogMessage(MessageImportance.High, "App launched successfully!");
+                    Log.LogMessage(MessageImportance.High, $"\n📱 Installing on device: {selectedDeviceId}");
                 }
-                catch
+                
+                var installResult = Cli.Wrap("adb")
+                    .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (installResult.ExitCode == 0)
                 {
-                    Log.LogWarning($"Could not launch app automatically. Package: {packageName}");
+                    Log.LogMessage(MessageImportance.High, $"✅ APK installed successfully on {selectedDeviceId}!");
+                    successCount++;
+
+                    // Try to launch the app on selected device
+                    string packageName = $"com.elix22.{appName}";
+
+                    try
+                    {
+                        var launchResult = Cli.Wrap("adb")
+                            .WithArguments($"-s {selectedDeviceId} shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+
+                        Log.LogMessage(MessageImportance.High, $"App launch completed with exit code: {launchResult.ExitCode}");
+                        Log.LogMessage(MessageImportance.High, $"✅ App launched successfully on {selectedDeviceId}!");
+                    }
+                    catch
+                    {
+                        Log.LogWarning($"Could not launch app automatically on {selectedDeviceId}. Package: {packageName}");
+                    }
+                }
+                else
+                {
+                    Log.LogError($"❌ Failed to install APK on device {selectedDeviceId}!");
+                    failCount++;
                 }
             }
-            else
+            
+            if (selectedDeviceIds.Count > 1)
             {
-                Log.LogError("Failed to install APK on device!");
+                Log.LogMessage(MessageImportance.High, $"\n📊 Installation Summary: {successCount} succeeded, {failCount} failed (Total: {selectedDeviceIds.Count} devices)");
             }
         }
 
@@ -858,9 +886,9 @@ namespace SokolApplicationBuilder
         {
             Log.LogMessage(MessageImportance.High, "Installing AAB on Android device...");
 
-            // Get selected device using helper method
-            string selectedDeviceId = SelectAndroidDevice();
-            if (string.IsNullOrEmpty(selectedDeviceId))
+            // Get selected device(s) using helper method
+            List<string> selectedDeviceIds = SelectAndroidDevice();
+            if (selectedDeviceIds == null || selectedDeviceIds.Count == 0)
             {
                 return; // Error already logged by SelectAndroidDevice
             }
@@ -903,37 +931,48 @@ namespace SokolApplicationBuilder
 
             Log.LogMessage(MessageImportance.High, $"Using bundletool: {bundletoolPath}");
 
-            // Create a temporary directory for the conversion
-            string tempDir = Path.Combine(Path.GetTempPath(), $"aab_install_{Guid.NewGuid()}");
-            Directory.CreateDirectory(tempDir);
+            // Install AAB on all selected devices
+            int successCount = 0;
+            int failCount = 0;
 
-            try
+            foreach (var selectedDeviceId in selectedDeviceIds)
             {
-                // Get device specifications for bundletool
-                string deviceSpecFile = Path.Combine(tempDir, "device-spec.json");
-                
-                // Get device ABI
-                var abiBuilder = new System.Text.StringBuilder();
-                Cli.Wrap("adb")
-                    .WithArguments($"-s {selectedDeviceId} shell getprop ro.product.cpu.abi")
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(abiBuilder))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-                string deviceAbi = abiBuilder.ToString().Trim();
+                if (selectedDeviceIds.Count > 1)
+                {
+                    Log.LogMessage(MessageImportance.High, $"\n📱 Installing on device: {selectedDeviceId}");
+                }
 
-                // Get SDK version
-                var sdkBuilder = new System.Text.StringBuilder();
-                Cli.Wrap("adb")
-                    .WithArguments($"-s {selectedDeviceId} shell getprop ro.build.version.sdk")
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(sdkBuilder))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-                string sdkVersion = sdkBuilder.ToString().Trim();
+                // Create a temporary directory for the conversion
+                string tempDir = Path.Combine(Path.GetTempPath(), $"aab_install_{selectedDeviceId}_{Guid.NewGuid()}");
+                Directory.CreateDirectory(tempDir);
 
-                // Create device spec file
-                string deviceSpec = $@"{{
+                try
+                {
+                    // Get device specifications for bundletool
+                    string deviceSpecFile = Path.Combine(tempDir, "device-spec.json");
+                    
+                    // Get device ABI
+                    var abiBuilder = new System.Text.StringBuilder();
+                    Cli.Wrap("adb")
+                        .WithArguments($"-s {selectedDeviceId} shell getprop ro.product.cpu.abi")
+                        .WithStandardOutputPipe(PipeTarget.ToStringBuilder(abiBuilder))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    string deviceAbi = abiBuilder.ToString().Trim();
+
+                    // Get SDK version
+                    var sdkBuilder = new System.Text.StringBuilder();
+                    Cli.Wrap("adb")
+                        .WithArguments($"-s {selectedDeviceId} shell getprop ro.build.version.sdk")
+                        .WithStandardOutputPipe(PipeTarget.ToStringBuilder(sdkBuilder))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    string sdkVersion = sdkBuilder.ToString().Trim();
+
+                    // Create device spec file
+                    string deviceSpec = $@"{{
   ""supportedAbis"": [""{deviceAbi}""],
   ""supportedLocales"": [""en-US""],
   ""deviceFeatures"": [],
@@ -941,96 +980,106 @@ namespace SokolApplicationBuilder
   ""screenDensity"": 420,
   ""sdkVersion"": {sdkVersion}
 }}";
-                File.WriteAllText(deviceSpecFile, deviceSpec);
+                    File.WriteAllText(deviceSpecFile, deviceSpec);
 
-                // Convert AAB to APK using bundletool (universal mode for all architectures)
-                string apksPath = Path.Combine(tempDir, "app.apks");
-                
-                var bundletoolResult = Cli.Wrap("java")
-                    .WithArguments($"-jar \"{bundletoolPath}\" build-apks --bundle=\"{aabPath}\" --output=\"{apksPath}\" --mode=universal")
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
+                    // Convert AAB to APK using bundletool (universal mode for all architectures)
+                    string apksPath = Path.Combine(tempDir, "app.apks");
+                    
+                    var bundletoolResult = Cli.Wrap("java")
+                        .WithArguments($"-jar \"{bundletoolPath}\" build-apks --bundle=\"{aabPath}\" --output=\"{apksPath}\" --mode=universal")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
 
-                if (bundletoolResult.ExitCode != 0)
-                {
-                    Log.LogError("❌ Failed to convert AAB to APK using bundletool");
-                    return;
+                    if (bundletoolResult.ExitCode != 0)
+                    {
+                        Log.LogError($"❌ Failed to convert AAB to APK using bundletool for {selectedDeviceId}");
+                        failCount++;
+                        continue;
+                    }
+
+                    // Extract the universal APK from the .apks file
+                    string apkPath = Path.Combine(tempDir, "universal.apk");
+                    
+                    var unzipResult = Cli.Wrap("unzip")
+                        .WithArguments($"-q \"{apksPath}\" -d \"{tempDir}\"")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (!File.Exists(apkPath))
+                    {
+                        Log.LogError($"❌ Failed to extract universal APK from bundle for {selectedDeviceId}");
+                        failCount++;
+                        continue;
+                    }
+
+                    Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
+
+                    // Install the converted APK
+                    Log.LogMessage(MessageImportance.High, "Installing APK on device...");
+                    var installResult = Cli.Wrap("adb")
+                        .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (installResult.ExitCode == 0)
+                    {
+                        Log.LogMessage(MessageImportance.High, $"✅ AAB installed successfully on {selectedDeviceId}!");
+                        successCount++;
+
+                        // Try to launch the app
+                        string packageName = $"com.elix22.{appName}";
+                        Log.LogMessage(MessageImportance.High, $"Launching app (package: {packageName})...");
+
+                        try
+                        {
+                            var launchResult = Cli.Wrap("adb")
+                                .WithArguments($"-s {selectedDeviceId} shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1")
+                                .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                                .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                                .ExecuteAsync()
+                                .GetAwaiter()
+                                .GetResult();
+
+                            Log.LogMessage(MessageImportance.High, $"✅ App launched successfully on {selectedDeviceId}!");
+                        }
+                        catch
+                        {
+                            Log.LogWarning($"Could not launch app automatically on {selectedDeviceId}. Package: {packageName}");
+                        }
+                    }
+                    else
+                    {
+                        Log.LogError($"❌ Error: Failed to install APK on device {selectedDeviceId}!");
+                        failCount++;
+                    }
                 }
-
-                // Extract the universal APK from the .apks file
-                string apkPath = Path.Combine(tempDir, "universal.apk");
-                
-                var unzipResult = Cli.Wrap("unzip")
-                    .WithArguments($"-q \"{apksPath}\" -d \"{tempDir}\"")
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-
-                if (!File.Exists(apkPath))
+                finally
                 {
-                    Log.LogError("❌ Failed to extract universal APK from bundle");
-                    return;
-                }
-
-                Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
-
-                // Install the converted APK
-                Log.LogMessage(MessageImportance.High, "Installing APK on device...");
-                var installResult = Cli.Wrap("adb")
-                    .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-
-                if (installResult.ExitCode == 0)
-                {
-                    Log.LogMessage(MessageImportance.High, "✅ AAB installed successfully on device!");
-
-                    // Try to launch the app
-                    string packageName = $"com.elix22.{appName}";
-                    Log.LogMessage(MessageImportance.High, $"Launching app (package: {packageName})...");
-
+                    // Clean up temporary files
                     try
                     {
-                        var launchResult = Cli.Wrap("adb")
-                            .WithArguments($"-s {selectedDeviceId} shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1")
-                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                            .ExecuteAsync()
-                            .GetAwaiter()
-                            .GetResult();
-
-                        Log.LogMessage(MessageImportance.High, "App launched successfully!");
+                        if (Directory.Exists(tempDir))
+                            Directory.Delete(tempDir, true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        Log.LogWarning($"Could not launch app automatically. Package: {packageName}");
+                        Log.LogWarning($"Failed to clean up temporary directory: {ex.Message}");
                     }
-                }
-                else
-                {
-                    Log.LogError("❌ Error: Failed to install APK on device!");
                 }
             }
-            finally
+
+            if (selectedDeviceIds.Count > 1)
             {
-                // Clean up temporary files
-                try
-                {
-                    if (Directory.Exists(tempDir))
-                        Directory.Delete(tempDir, true);
-                }
-                catch (Exception ex)
-                {
-                    Log.LogWarning($"Failed to clean up temporary directory: {ex.Message}");
-                }
+                Log.LogMessage(MessageImportance.High, $"\n📊 Installation Summary: {successCount} succeeded, {failCount} failed (Total: {selectedDeviceIds.Count} devices)");
             }
         }
 

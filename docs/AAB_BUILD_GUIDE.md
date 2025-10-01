@@ -22,9 +22,11 @@ The easiest way to build and install AAB files is using the built-in VS Code tas
 These tasks will:
 - Automatically detect connected Android devices
 - Show a device selector if multiple devices are connected
+- Allow you to **install on a specific device OR all connected devices at once**
 - Build the AAB file
 - Convert to APK using bundletool
-- Install on the selected device
+- Install on the selected device(s)
+- Launch the app on each device
 
 ## Prerequisites
 
@@ -111,6 +113,45 @@ dotnet run --project tools/SokolApplicationBuilder \
   --install \
   --path /path/to/your/project
 ```
+
+#### Installing on Multiple Devices
+
+When you have multiple Android devices connected, you can:
+
+1. **Interactive Mode** - Select a specific device or install on all devices:
+   ```bash
+   dotnet run --project tools/SokolApplicationBuilder \
+     --task build \
+     --architecture android \
+     --subtask aab \
+     --install \
+     --interactive \
+     --path /path/to/your/project
+   ```
+   
+   The device selector will show:
+   ```
+   📱 Multiple devices detected (2 devices):
+   ======================================================
+   1) 03a824947d25 (Xiaomi Redmi 6A)
+   2) R8YW60MZRDV (samsung SM-X200)
+   3) All devices
+   
+   Select device (1-3): 3
+   ✅ Selected all devices (2 devices)
+   ```
+
+2. **Install on all devices automatically** - The "All devices" option will:
+   - Build the AAB once
+   - Convert to APK for each device
+   - Install on each device sequentially
+   - Launch the app on each device
+   - Show a summary of successful/failed installations
+
+This is particularly useful for:
+- Testing on multiple device types simultaneously
+- QA testing across different Android versions
+- Deploying to a device farm or test lab
 
 ### Option 2: Manual Testing with bundletool
 
