@@ -75,10 +75,12 @@ namespace SokolApplicationBuilder
                 // Parse command line arguments (similar to shell script)
                 bool installApp = opts.Install;
                 string buildType = !string.IsNullOrEmpty(opts.Type) ? opts.Type.ToLower() : "debug";
+                bool buildAAB = opts.SubTask?.ToLower() == "aab"; // Check if AAB build is requested
 
                 Log.LogMessage(MessageImportance.High, $"Build type: {buildType}");
+                Log.LogMessage(MessageImportance.High, $"Build format: {(buildAAB ? "AAB" : "APK")}");
                 if (installApp)
-                    Log.LogMessage(MessageImportance.High, "Will install APK/AAB on device after build");
+                    Log.LogMessage(MessageImportance.High, $"Will install {(buildAAB ? "AAB" : "APK")} on device after build");
 
                 // Get app name
                 string appName = GetAppName();
@@ -97,16 +99,29 @@ namespace SokolApplicationBuilder
                 // Publish .NET assemblies for different architectures
                 PublishAssemblies();
 
-                // Build Android app
-                BuildAndroidApp(appName, buildType);
+                // Build Android app (APK or AAB)
+                if (buildAAB)
+                    BuildAndroidAAB(appName, buildType);
+                else
+                    BuildAndroidApp(appName, buildType);
 
                 // Sign if release
                 if (buildType == "release")
-                    SignReleaseApp();
+                {
+                    if (buildAAB)
+                        SignReleaseAAB();
+                    else
+                        SignReleaseApp();
+                }
 
                 // Install if requested
                 if (installApp)
-                    InstallOnDevice(appName, buildType);
+                {
+                    if (buildAAB)
+                        InstallAABOnDevice(appName, buildType);
+                    else
+                        InstallOnDevice(appName, buildType);
+                }
 
                 return true;
             }
@@ -406,19 +421,53 @@ namespace SokolApplicationBuilder
             }
         }
 
-        void SignReleaseApp()
+        void BuildAndroidAAB(string appName, string buildType)
         {
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
-            string unsignedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
 
-            if (!File.Exists(unsignedApkPath))
+            Log.LogMessage(MessageImportance.Normal, $"Android path: {androidPath}");
+            Log.LogMessage(MessageImportance.Normal, $"Android path exists: {Directory.Exists(androidPath)}");
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew path: {Path.Combine(androidPath, "gradlew")}");
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew exists: {File.Exists(Path.Combine(androidPath, "gradlew"))}");
+
+            if (buildType == "release")
             {
-                Log.LogError("Unsigned release APK not found!");
-                return;
+                Log.LogMessage(MessageImportance.High, "Building release AAB...");
+                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
+
+                var result = Cli.Wrap(gradlewPath)
+                    .WithArguments($"bundleRelease -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithWorkingDirectory(androidPath)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                Log.LogMessage(MessageImportance.High, $"Release AAB build completed with exit code: {result.ExitCode}");
             }
+            else
+            {
+                Log.LogMessage(MessageImportance.High, "Building debug AAB...");
+                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
-            Log.LogMessage(MessageImportance.High, "Signing release APK...");
+                var result = Cli.Wrap(gradlewPath)
+                    .WithArguments($"bundleDebug -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithWorkingDirectory(androidPath)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
+                Log.LogMessage(MessageImportance.High, $"Debug AAB build completed with exit code: {result.ExitCode}");
+            }
+        }
+
+        string EnsureDebugKeystore()
+        {
             // Create debug keystore if it doesn't exist
             string debugKeystore = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".android", "debug.keystore");
             if (!File.Exists(debugKeystore))
@@ -435,6 +484,23 @@ namespace SokolApplicationBuilder
 
                 Log.LogMessage(MessageImportance.High, $"Keystore creation completed with exit code: {keystoreResult.ExitCode}");
             }
+            return debugKeystore;
+        }
+
+        void SignReleaseApp()
+        {
+            string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
+            string unsignedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
+
+            if (!File.Exists(unsignedApkPath))
+            {
+                Log.LogError("Unsigned release APK not found!");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, "Signing release APK...");
+
+            string debugKeystore = EnsureDebugKeystore();
 
             // Sign the APK
             string signedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release.apk");
@@ -516,6 +582,40 @@ namespace SokolApplicationBuilder
             else
             {
                 Log.LogError("Failed to sign APK with both apksigner and jarsigner!");
+            }
+        }
+
+        void SignReleaseAAB()
+        {
+            string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
+            string aabPath = Path.Combine(androidPath, "app", "build", "outputs", "bundle", "release", "app-release.aab");
+
+            if (!File.Exists(aabPath))
+            {
+                Log.LogError("Release AAB not found!");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, "Signing release AAB...");
+
+            string debugKeystore = EnsureDebugKeystore();
+
+            // Sign the AAB with jarsigner (AAB files use JAR signing)
+            var jarsignerResult = Cli.Wrap("jarsigner")
+                .WithArguments($"-keystore \"{debugKeystore}\" -storepass android -keypass android -digestalg SHA-256 -sigalg SHA256withRSA \"{aabPath}\" androiddebugkey")
+                .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                .ExecuteAsync()
+                .GetAwaiter()
+                .GetResult();
+
+            if (jarsignerResult.ExitCode == 0)
+            {
+                Log.LogMessage(MessageImportance.High, "✅ AAB signed successfully with jarsigner!");
+            }
+            else
+            {
+                Log.LogError("❌ Warning: Failed to sign AAB. Using unsigned AAB.");
             }
         }
 
@@ -669,6 +769,276 @@ namespace SokolApplicationBuilder
             {
                 Log.LogError("Failed to install APK on device!");
             }
+        }
+
+        void InstallAABOnDevice(string appName, string buildType)
+        {
+            Log.LogMessage(MessageImportance.High, "Installing AAB on Android device...");
+
+            // Check if adb is available and get device list
+            string deviceListOutput = "";
+            try
+            {
+                var stringBuilder = new System.Text.StringBuilder();
+                var adbCheckResult = Cli.Wrap("adb")
+                    .WithArguments("devices")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(line => stringBuilder.AppendLine(line)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                deviceListOutput = stringBuilder.ToString();
+                Log.LogMessage(MessageImportance.Normal, $"ADB devices output: {deviceListOutput}");
+
+                if (adbCheckResult.ExitCode != 0)
+                {
+                    Log.LogError("Failed to get device list from ADB.");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogError($"ADB not found or failed: {ex.Message}");
+                return;
+            }
+
+            // Parse device list
+            var devices = new List<string>();
+            var lines = deviceListOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                if (!line.Contains("List of devices") && !string.IsNullOrWhiteSpace(line))
+                {
+                    var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && parts[1] == "device")
+                    {
+                        devices.Add(parts[0]);
+                    }
+                }
+            }
+
+            if (devices.Count == 0)
+            {
+                Log.LogError("No Android devices found. Please connect a device and enable USB debugging.");
+                return;
+            }
+
+            string selectedDeviceId = "";
+            if (!string.IsNullOrEmpty(opts.DeviceId))
+            {
+                if (devices.Contains(opts.DeviceId))
+                {
+                    selectedDeviceId = opts.DeviceId;
+                    Log.LogMessage(MessageImportance.High, $"Using specified device: {selectedDeviceId}");
+                }
+                else
+                {
+                    Log.LogError($"Specified device '{opts.DeviceId}' not found.");
+                    return;
+                }
+            }
+            else if (devices.Count == 1)
+            {
+                selectedDeviceId = devices[0];
+                Log.LogMessage(MessageImportance.High, $"Found device: {selectedDeviceId}");
+            }
+            else
+            {
+                selectedDeviceId = devices[0];
+                Log.LogMessage(MessageImportance.High, $"Using first device: {selectedDeviceId}");
+                Log.LogWarning("Multiple devices found. Using the first one. Use --device <device_id> to specify which device to use.");
+            }
+
+            string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
+
+            // Find AAB file
+            string aabPath = "";
+            if (buildType == "release")
+            {
+                aabPath = Path.Combine(androidPath, "app", "build", "outputs", "bundle", "release", "app-release.aab");
+            }
+            else
+            {
+                aabPath = Path.Combine(androidPath, "app", "build", "outputs", "bundle", "debug", "app-debug.aab");
+            }
+
+            if (!File.Exists(aabPath))
+            {
+                Log.LogError($"AAB file not found at: {aabPath}");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, $"Found AAB: {aabPath}");
+
+            // Convert AAB to APK and install using bundletool
+            Log.LogMessage(MessageImportance.High, "Converting AAB to APK for device installation...");
+
+            // Find bundletool
+            string bundletoolPath = FindBundletool();
+
+            if (string.IsNullOrEmpty(bundletoolPath))
+            {
+                Log.LogError("bundletool not found. AAB files cannot be directly installed on devices.");
+                Log.LogError("To install AAB files, you need to:");
+                Log.LogError("1. Install bundletool: https://developer.android.com/tools/bundletool");
+                Log.LogError("2. Or upload to Google Play Console for testing");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, $"Using bundletool: {bundletoolPath}");
+
+            // Create a temporary directory for the conversion
+            string tempDir = Path.Combine(Path.GetTempPath(), $"aab_install_{Guid.NewGuid()}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                // Get device specifications for bundletool
+                string deviceSpecFile = Path.Combine(tempDir, "device-spec.json");
+                
+                // Get device ABI
+                var abiBuilder = new System.Text.StringBuilder();
+                Cli.Wrap("adb")
+                    .WithArguments($"-s {selectedDeviceId} shell getprop ro.product.cpu.abi")
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(abiBuilder))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+                string deviceAbi = abiBuilder.ToString().Trim();
+
+                // Get SDK version
+                var sdkBuilder = new System.Text.StringBuilder();
+                Cli.Wrap("adb")
+                    .WithArguments($"-s {selectedDeviceId} shell getprop ro.build.version.sdk")
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(sdkBuilder))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+                string sdkVersion = sdkBuilder.ToString().Trim();
+
+                // Create device spec file
+                string deviceSpec = $@"{{
+  ""supportedAbis"": [""{deviceAbi}""],
+  ""supportedLocales"": [""en-US""],
+  ""deviceFeatures"": [],
+  ""glExtensions"": [],
+  ""screenDensity"": 420,
+  ""sdkVersion"": {sdkVersion}
+}}";
+                File.WriteAllText(deviceSpecFile, deviceSpec);
+
+                // Convert AAB to APK using bundletool (universal mode for all architectures)
+                string apksPath = Path.Combine(tempDir, "app.apks");
+                
+                var bundletoolResult = Cli.Wrap("java")
+                    .WithArguments($"-jar \"{bundletoolPath}\" build-apks --bundle=\"{aabPath}\" --output=\"{apksPath}\" --mode=universal")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (bundletoolResult.ExitCode != 0)
+                {
+                    Log.LogError("❌ Failed to convert AAB to APK using bundletool");
+                    return;
+                }
+
+                // Extract the universal APK from the .apks file
+                string apkPath = Path.Combine(tempDir, "universal.apk");
+                
+                var unzipResult = Cli.Wrap("unzip")
+                    .WithArguments($"-q \"{apksPath}\" -d \"{tempDir}\"")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (!File.Exists(apkPath))
+                {
+                    Log.LogError("❌ Failed to extract universal APK from bundle");
+                    return;
+                }
+
+                Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
+
+                // Install the converted APK
+                Log.LogMessage(MessageImportance.High, "Installing APK on device...");
+                var installResult = Cli.Wrap("adb")
+                    .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (installResult.ExitCode == 0)
+                {
+                    Log.LogMessage(MessageImportance.High, "✅ AAB installed successfully on device!");
+
+                    // Try to launch the app
+                    string packageName = $"com.elix22.{appName}";
+                    Log.LogMessage(MessageImportance.High, $"Launching app (package: {packageName})...");
+
+                    try
+                    {
+                        var launchResult = Cli.Wrap("adb")
+                            .WithArguments($"-s {selectedDeviceId} shell monkey -p {packageName} -c android.intent.category.LAUNCHER 1")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+
+                        Log.LogMessage(MessageImportance.High, "App launched successfully!");
+                    }
+                    catch
+                    {
+                        Log.LogWarning($"Could not launch app automatically. Package: {packageName}");
+                    }
+                }
+                else
+                {
+                    Log.LogError("❌ Error: Failed to install APK on device!");
+                }
+            }
+            finally
+            {
+                // Clean up temporary files
+                try
+                {
+                    if (Directory.Exists(tempDir))
+                        Directory.Delete(tempDir, true);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogWarning($"Failed to clean up temporary directory: {ex.Message}");
+                }
+            }
+        }
+
+        string FindBundletool()
+        {
+            // First check local tools folder
+            string localBundletool = Path.Combine(opts.ProjectPath, "..", "..", "tools", "bundletool.jar");
+            if (File.Exists(localBundletool))
+                return Path.GetFullPath(localBundletool);
+
+            // Then check Android SDK
+            string androidSdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT") 
+                ?? Environment.GetEnvironmentVariable("ANDROID_HOME")
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Android", "sdk");
+
+            if (Directory.Exists(androidSdk))
+            {
+                var bundletoolFiles = Directory.GetFiles(androidSdk, "bundletool*.jar", SearchOption.AllDirectories);
+                if (bundletoolFiles.Length > 0)
+                    return bundletoolFiles[0];
+            }
+
+            return null;
         }
 
 

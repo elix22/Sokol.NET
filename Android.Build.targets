@@ -5,12 +5,14 @@
     <AndroidDeviceId Condition="'$(AndroidDeviceId)' == ''"></AndroidDeviceId>
     <AndroidBuildType Condition="'$(AndroidBuildType)' == ''">release</AndroidBuildType>
     <AndroidOrientation Condition="'$(AndroidOrientation)' == ''">landscape</AndroidOrientation>
+    <SubTask Condition="'$(SubTask)' == ''"></SubTask>
   </PropertyGroup>
 
   <!-- Build Android APK (Release) - No Install -->
   <Target Name="BuildAndroid">
     <PropertyGroup>
-      <AndroidBuildCommand>dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)"</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(SubTask)' != ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(SubTask)' == ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)"</AndroidBuildCommand>
     </PropertyGroup>
     <Message Text="Building Android APK (Release) with SokolApplicationBuilder..." Importance="high" />
     <Message Text="Command: $(AndroidBuildCommand)" Importance="high" />
@@ -20,7 +22,8 @@
   <!-- Build Android APK (Debug) - No Install -->
   <Target Name="BuildAndroidDebug">
     <PropertyGroup>
-      <AndroidBuildCommand>dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)"</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(SubTask)' != ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(SubTask)' == ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)"</AndroidBuildCommand>
     </PropertyGroup>
     <Message Text="Building Android APK (Debug) with SokolApplicationBuilder..." Importance="high" />
     <Message Text="Command: $(AndroidBuildCommand)" Importance="high" />
@@ -30,8 +33,10 @@
   <!-- Build and Install Android APK (Release) -->
   <Target Name="BuildAndroidInstall">
     <PropertyGroup>
-      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId)</AndroidBuildCommand>
-      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != '' AND '$(SubTask)' != ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId) --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != '' AND '$(SubTask)' == ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == '' AND '$(SubTask)' != ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == '' AND '$(SubTask)' == ''">dotnet run -- --task build --type $(AndroidBuildType) --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install</AndroidBuildCommand>
     </PropertyGroup>
     <Message Text="Building and Installing Android APK (Release) with SokolApplicationBuilder..." Importance="high" />
     <Message Text="Command: $(AndroidBuildCommand)" Importance="high" />
@@ -41,8 +46,10 @@
   <!-- Build and Install Android APK (Debug) -->
   <Target Name="BuildAndroidDebugInstall">
     <PropertyGroup>
-      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId)</AndroidBuildCommand>
-      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != '' AND '$(SubTask)' != ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId) --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' != '' AND '$(SubTask)' == ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --device $(AndroidDeviceId)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == '' AND '$(SubTask)' != ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install --subtask $(SubTask)</AndroidBuildCommand>
+      <AndroidBuildCommand Condition="'$(AndroidDeviceId)' == '' AND '$(SubTask)' == ''">dotnet run -- --task build --type debug --architecture android --orientation $(AndroidOrientation) --path "$(MSBuildProjectDirectory)" --install</AndroidBuildCommand>
     </PropertyGroup>
     <Message Text="Building and Installing Android APK (Debug) with SokolApplicationBuilder..." Importance="high" />
     <Message Text="Command: $(AndroidBuildCommand)" Importance="high" />

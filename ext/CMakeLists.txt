@@ -32,14 +32,6 @@ endif()
 
 add_definitions(-DCIMGUI_VARGS0)
 
-# set(IMGUI_SOURCE_FILES 
-#         dcimgui/src/cimgui.cpp
-#         dcimgui/src/imgui_demo.cpp
-#         dcimgui/src/imgui_draw.cpp
-#         dcimgui/src/imgui_tables.cpp
-#         dcimgui/src/imgui_widgets.cpp
-#         dcimgui/src/imgui.cpp
-# )
 
 set(IMGUI_SOURCE_FILES 
         cimgui/cimgui.cpp
@@ -50,7 +42,6 @@ set(IMGUI_SOURCE_FILES
         cimgui/imgui/imgui.cpp
 )
 
-# set_source_files_properties(basisu/basisu_transcoder.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
 if (NOT MSVC)
     set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
     set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
