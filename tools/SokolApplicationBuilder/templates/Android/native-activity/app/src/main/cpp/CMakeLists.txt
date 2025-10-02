@@ -20,6 +20,14 @@ project(sokol)
 # build native_app_glue as a static lib
 set(${CMAKE_C_FLAGS}, "${CMAKE_C_FLAGS}")
 
+# Extract NDK major version for conditional compilation
+if(DEFINED ANDROID_NDK)
+    file(READ "${ANDROID_NDK}/source.properties" NDK_SOURCE_PROPERTIES)
+    string(REGEX MATCH "Pkg\\.Revision = ([0-9]+)" _ ${NDK_SOURCE_PROPERTIES})
+    set(ANDROID_NDK_MAJOR_VERSION ${CMAKE_MATCH_1})
+    message(STATUS "Detected Android NDK major version: ${ANDROID_NDK_MAJOR_VERSION}")
+endif()
+
 add_definitions(-DCIMGUI_VARGS0)
 
 set(EXT_ROOT_DIR "../../../../../../../../ext")
@@ -38,6 +46,14 @@ set(IMGUI_SOURCE_FILES
 set_source_files_properties(${IMGUI_SOURCE_FILES}
     PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++ -Wno-unused-function -Wincompatible-pointer-types-discards-qualifiers"
 )
+
+# Suppress deprecated builtins warning in basisu for NDK 25+ (required for NDK 29+)
+# This warning flag is not recognized by older NDK versions
+if(ANDROID_NDK_MAJOR_VERSION GREATER_EQUAL 25)
+    set_source_files_properties(${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp
+        PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-Wno-deprecated-builtins"
+    )
+endif()
 
 add_library(native_app_glue STATIC
     ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)

@@ -27,6 +27,9 @@ REM  Each time that the Sokol.Net folder is moved to a different folder , this s
 set SOKOLNET_CONFIG_FOLDER=.sokolnet_config
 set HOME=%homedrive%%homepath%
 set currPwd=%~dp0
+REM Remove trailing backslash if present
+if "%currPwd:~-1%"=="\" set "currPwd=%currPwd:~0,-1%"
+REM Convert backslashes to forward slashes for consistency
 set "currPwd=%currPwd:\=/%"
 
 echo %currPwd%
@@ -42,11 +45,13 @@ if NOT "%currPwd%"=="%currPwd: =%" (
 @RD /S /Q %HOME%\%SOKOLNET_CONFIG_FOLDER%
 mkdir %HOME%\%SOKOLNET_CONFIG_FOLDER%
 
+REM Copy template file and replace placeholder
+copy /Y templates\SokolNetHome.config %HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config >nul
 
-echo ^<SokolNetHome^>>%HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config
-echo    ^<add key="SokolNetHome" value="%currPwd%" /^>>>%HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config
-echo ^</SokolNetHome^>>>%HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config
+REM Replace TEMPLATE_SOKOLNET_HOME with actual path using PowerShell
+powershell -Command "(Get-Content '%HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config') -replace 'TEMPLATE_SOKOLNET_HOME', '%currPwd%' | Set-Content '%HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config'"
 
+REM Create sokolnet_home file
 echo %currPwd%>%HOME%\%SOKOLNET_CONFIG_FOLDER%\sokolnet_home
 
 if NOT exist %HOME%\.sokolnet_config\sokolnet_home (
@@ -55,14 +60,19 @@ if NOT exist %HOME%\.sokolnet_config\sokolnet_home (
 )
 
 if NOT exist %HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config (
-    echo ERROR Sokol.Net configuration failed
+    echo Sokol.Net configuration failure!
     goto done
 )
 
+echo.
+echo Sokol.Net configured!
+echo.
+echo cat %HOME%\.sokolnet_config\sokolnet_home
 type %HOME%\.sokolnet_config\sokolnet_home
+echo.
+echo cat %HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config
 type %HOME%\%SOKOLNET_CONFIG_FOLDER%\SokolNetHome.config
-
-echo Sokol.Net configured !!
+echo.
 
 
 :done

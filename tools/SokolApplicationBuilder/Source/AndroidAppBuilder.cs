@@ -24,6 +24,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
@@ -49,6 +50,7 @@ namespace SokolApplicationBuilder
         string VERSION_NAME = string.Empty;
 
         string URHONET_HOME_PATH = string.Empty;
+        string DETECTED_NDK_VERSION = string.Empty;
 
 
         public AndroidBuildTask(Options opts)
@@ -57,6 +59,291 @@ namespace SokolApplicationBuilder
             Utils.opts = opts;
         }
 
+        private string GetGradlewScriptName()
+        {
+            // On Windows, use gradlew.bat; on Unix-like systems, use gradlew
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "gradlew.bat" : "gradlew";
+        }
+
+        private string GetSokolNetHome()
+        {
+            string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrEmpty(homeDir) || !Directory.Exists(homeDir))
+            {
+                homeDir = Environment.GetEnvironmentVariable("HOME") ?? "";
+            }
+            string configFile = Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+            if (File.Exists(configFile))
+            {
+                return File.ReadAllText(configFile).Trim();
+            }
+            // Fallback to relative path
+            return Path.GetFullPath(Path.Combine(opts.ProjectPath, "..", "..", ".."));
+        }
+
+        private string FindJava17OrHigher()
+        {
+            // Check JAVA_HOME first
+            string javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
+            if (!string.IsNullOrEmpty(javaHome) && Directory.Exists(javaHome))
+            {
+                int version = GetJavaVersion(javaHome);
+                if (version >= 17)
+                {
+                    Log.LogMessage(MessageImportance.High, $"✅ Using Java {version} from JAVA_HOME: {javaHome}");
+                    return javaHome;
+                }
+                else if (version > 0)
+                {
+                    Log.LogWarning($"⚠️  JAVA_HOME points to Java {version}, but Android Gradle Plugin requires Java 17+");
+                }
+            }
+
+            // Search common Java installation locations
+            var searchPaths = new List<string>();
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Windows common locations
+                searchPaths.Add(@"C:\Program Files\Microsoft");
+                searchPaths.Add(@"C:\Program Files\Eclipse Adoptium");
+                searchPaths.Add(@"C:\Program Files\Java");
+                searchPaths.Add(@"C:\Program Files (x86)\Java");
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                searchPaths.Add(Path.Combine(localAppData, "Programs"));
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // macOS common locations
+                searchPaths.Add("/Library/Java/JavaVirtualMachines");
+                searchPaths.Add("/usr/local/Cellar/openjdk");
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                searchPaths.Add(Path.Combine(homeDir, ".sdkman/candidates/java"));
+            }
+            else // Linux
+            {
+                searchPaths.Add("/usr/lib/jvm");
+                searchPaths.Add("/usr/java");
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                searchPaths.Add(Path.Combine(homeDir, ".sdkman/candidates/java"));
+            }
+
+            var javaInstallations = new List<(string path, int version)>();
+
+            foreach (string searchPath in searchPaths)
+            {
+                if (!Directory.Exists(searchPath))
+                    continue;
+
+                try
+                {
+                    foreach (string dir in Directory.GetDirectories(searchPath, "*", SearchOption.TopDirectoryOnly))
+                    {
+                        int version = GetJavaVersion(dir);
+                        if (version >= 17)
+                        {
+                            javaInstallations.Add((dir, version));
+                            Log.LogMessage(MessageImportance.Normal, $"Found Java {version} at: {dir}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.LogMessage(MessageImportance.Low, $"Failed to search {searchPath}: {ex.Message}");
+                }
+            }
+
+            if (javaInstallations.Count > 0)
+            {
+                // Prefer Java 17, then latest version
+                var selected = javaInstallations
+                    .OrderByDescending(j => j.version == 17 ? 1000 : j.version)
+                    .First();
+                
+                Log.LogMessage(MessageImportance.High, $"✅ Selected Java {selected.version}: {selected.path}");
+                return selected.path;
+            }
+
+            Log.LogWarning("⚠️  No Java 17+ installation found. Gradle may fail.");
+            return null;
+        }
+
+        private int GetJavaVersion(string javaHome)
+        {
+            try
+            {
+                // Look for release file (present in modern JDKs)
+                string releaseFile = Path.Combine(javaHome, "release");
+                if (File.Exists(releaseFile))
+                {
+                    string content = File.ReadAllText(releaseFile);
+                    var match = System.Text.RegularExpressions.Regex.Match(content, @"JAVA_VERSION=""(\d+)");
+                    if (match.Success)
+                    {
+                        return int.Parse(match.Groups[1].Value);
+                    }
+                }
+
+                // Try running java -version
+                string javaExe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? Path.Combine(javaHome, "bin", "java.exe")
+                    : Path.Combine(javaHome, "bin", "java");
+
+                if (File.Exists(javaExe))
+                {
+                    var result = Cli.Wrap(javaExe)
+                        .WithArguments("-version")
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    string output = result.StandardError + result.StandardOutput;
+                    var match = System.Text.RegularExpressions.Regex.Match(output, @"version ""(\d+)");
+                    if (match.Success)
+                    {
+                        return int.Parse(match.Groups[1].Value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogMessage(MessageImportance.Low, $"Failed to get Java version from {javaHome}: {ex.Message}");
+            }
+
+            return 0;
+        }
+
+        private string FindBestAndroidNDK(string currentNdkHome = null, string currentNdkRoot = null)
+        {
+            // First, check if environment variables point to a suitable NDK (≥25)
+            string envNdk = currentNdkHome ?? currentNdkRoot;
+            if (!string.IsNullOrEmpty(envNdk) && Directory.Exists(envNdk))
+            {
+                string sourcePropsFile = Path.Combine(envNdk, "source.properties");
+                if (File.Exists(sourcePropsFile))
+                {
+                    try
+                    {
+                        string content = File.ReadAllText(sourcePropsFile);
+                        var match = System.Text.RegularExpressions.Regex.Match(content, @"Pkg\.Revision\s*=\s*(\d+)\.(\d+)\.(\d+)");
+                        if (match.Success)
+                        {
+                            int majorVersion = int.Parse(match.Groups[1].Value);
+                            string fullVersion = $"{match.Groups[1].Value}.{match.Groups[2].Value}.{match.Groups[3].Value}";
+                            if (majorVersion >= 25)
+                            {
+                                DETECTED_NDK_VERSION = fullVersion;
+                                Log.LogMessage(MessageImportance.High, $"✅ Using NDK version {fullVersion} from environment variables (meets minimum: 25)");
+                                return envNdk;
+                            }
+                            else
+                            {
+                                Log.LogWarning($"⚠️  Environment NDK version {fullVersion} is too old (< 25). Searching for a newer NDK...");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.LogWarning($"Failed to parse NDK version from environment: {ex.Message}");
+                    }
+                }
+            }
+
+            // Environment NDK not suitable, search for best available NDK
+            Log.LogMessage(MessageImportance.Normal, "Searching Android SDK for suitable NDK (≥25)...");
+            
+            // Try to find Android SDK location
+            string androidSdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT") 
+                ?? Environment.GetEnvironmentVariable("ANDROID_HOME")
+                ?? Environment.GetEnvironmentVariable("ANDROID_SDK");
+
+            // If not found in environment, try common locations
+            if (string.IsNullOrEmpty(androidSdk) || !Directory.Exists(androidSdk))
+            {
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    androidSdk = Path.Combine(homeDir, "AppData", "Local", "Android", "Sdk");
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    androidSdk = Path.Combine(homeDir, "Library", "Android", "sdk");
+                }
+                else // Linux
+                {
+                    androidSdk = Path.Combine(homeDir, "Android", "Sdk");
+                }
+            }
+
+            if (!Directory.Exists(androidSdk))
+            {
+                Log.LogWarning($"Android SDK not found at: {androidSdk}");
+                return null;
+            }
+
+            string ndkDir = Path.Combine(androidSdk, "ndk");
+            if (!Directory.Exists(ndkDir))
+            {
+                Log.LogWarning($"Android NDK directory not found at: {ndkDir}");
+                return null;
+            }
+
+            // Find all NDK versions
+            var ndkVersions = new List<(string path, int majorVersion, string fullVersion)>();
+            
+            foreach (string ndkPath in Directory.GetDirectories(ndkDir))
+            {
+                string versionDirName = Path.GetFileName(ndkPath);
+                string sourcePropsFile = Path.Combine(ndkPath, "source.properties");
+                
+                if (File.Exists(sourcePropsFile))
+                {
+                    try
+                    {
+                        string content = File.ReadAllText(sourcePropsFile);
+                        var match = System.Text.RegularExpressions.Regex.Match(content, @"Pkg\.Revision\s*=\s*(\d+)\.(\d+)\.(\d+)");
+                        if (match.Success)
+                        {
+                            int majorVersion = int.Parse(match.Groups[1].Value);
+                            string fullVersion = $"{match.Groups[1].Value}.{match.Groups[2].Value}.{match.Groups[3].Value}";
+                            ndkVersions.Add((ndkPath, majorVersion, fullVersion));
+                            Log.LogMessage(MessageImportance.Normal, $"Found NDK version {fullVersion} at: {ndkPath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.LogWarning($"Failed to parse NDK version from {sourcePropsFile}: {ex.Message}");
+                    }
+                }
+            }
+
+            if (ndkVersions.Count == 0)
+            {
+                Log.LogWarning("No valid NDK installations found");
+                return null;
+            }
+
+            // Prefer NDK 29, then 26-28, then 25, then any version >= 25
+            var preferredNdk = ndkVersions
+                .Where(ndk => ndk.majorVersion >= 25)
+                .OrderByDescending(ndk => ndk.majorVersion == 29 ? 1000 : ndk.majorVersion) // Give NDK 29 highest priority
+                .FirstOrDefault();
+
+            if (preferredNdk.path != null)
+            {
+                DETECTED_NDK_VERSION = preferredNdk.fullVersion;
+                Log.LogMessage(MessageImportance.High, $"✅ Selected NDK version {preferredNdk.fullVersion} (minimum required: 25)");
+                return preferredNdk.path;
+            }
+
+            // If no NDK >= 25 found, warn and use the latest available
+            var latestNdk = ndkVersions.OrderByDescending(ndk => ndk.majorVersion).First();
+            DETECTED_NDK_VERSION = latestNdk.fullVersion;
+            Log.LogWarning($"⚠️  No NDK version >= 25 found. Using NDK {latestNdk.fullVersion}, but this may cause runtime errors!");
+            Log.LogWarning($"⚠️  Please install NDK 29 or higher for best compatibility.");
+            return latestNdk.path;
+        }
 
         public override bool Equals(object? obj)
         {
@@ -255,6 +542,41 @@ namespace SokolApplicationBuilder
                 File.WriteAllText(stringsPath, content);
             }
 
+            // Update gradle.properties with Java 17+ path
+            string gradlePropertiesPath = Path.Combine(androidPath, "gradle.properties");
+            if (File.Exists(gradlePropertiesPath))
+            {
+                string javaHome = FindJava17OrHigher();
+                if (!string.IsNullOrEmpty(javaHome))
+                {
+                    // Convert to forward slashes and escape backslashes for gradle.properties
+                    string javaHomePath = javaHome.Replace("\\", "\\\\");
+                    
+                    string content = File.ReadAllText(gradlePropertiesPath);
+                    
+                    // Check if org.gradle.java.home line exists (commented or uncommented)
+                    var regex = new System.Text.RegularExpressions.Regex(@"^\s*#?\s*org\.gradle\.java\.home\s*=.*$", System.Text.RegularExpressions.RegexOptions.Multiline);
+                    if (regex.IsMatch(content))
+                    {
+                        // Replace existing line (commented or uncommented)
+                        content = regex.Replace(content, $"org.gradle.java.home={javaHomePath}");
+                    }
+                    else
+                    {
+                        // Add it to the file
+                        content += $"\norg.gradle.java.home={javaHomePath}\n";
+                    }
+                    
+                    File.WriteAllText(gradlePropertiesPath, content);
+                    Log.LogMessage(MessageImportance.High, $"📦 Configured Gradle to use Java from: {javaHome}");
+                }
+                else
+                {
+                    Log.LogWarning("⚠️  Could not find Java 17+. Android build may fail.");
+                    Log.LogWarning("   Please install Java 17 or higher and set JAVA_HOME environment variable.");
+                }
+            }
+
             // Update CMakeLists.txt
             string cmakePath = Path.Combine(androidPath, "app", "src", "main", "cpp", "CMakeLists.txt");
             if (File.Exists(cmakePath))
@@ -280,6 +602,8 @@ namespace SokolApplicationBuilder
                 {
                     extPath = Path.GetFullPath(Path.Combine(opts.ProjectPath, "..", "..", "..", "ext"));
                 }
+                // CMake requires forward slashes or escaped backslashes on Windows
+                extPath = extPath.Replace("\\", "/");
                 content = content.Replace("set(EXT_ROOT_DIR \"../../../../../../../../ext\")", $"set(EXT_ROOT_DIR \"{extPath}\")");
                 // Don't replace ANativeActivity_onCreate - it must remain unchanged
                 File.WriteAllText(cmakePath, content);
@@ -317,6 +641,34 @@ namespace SokolApplicationBuilder
         {
             string[] architectures = { "linux-bionic-arm64", "linux-bionic-arm", "linux-bionic-x64" };
 
+            // Add scripts directory to PATH for android_fake_clang.cmd access on Windows
+            string sokolNetHome = GetSokolNetHome();
+            string scriptsDir = Path.Combine(sokolNetHome, "scripts");
+            string currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+            string newPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) 
+                ? $"{scriptsDir};{currentPath}" 
+                : $"{scriptsDir}:{currentPath}";
+
+            // Check for NDK in environment variables and validate version
+            string ndkHome = Environment.GetEnvironmentVariable("ANDROID_NDK_HOME");
+            string ndkRoot = Environment.GetEnvironmentVariable("ANDROID_NDK_ROOT");
+            
+            // FindBestAndroidNDK will check if environment NDK is suitable (≥25)
+            // If not, it will search for a better one
+            string bestNdk = FindBestAndroidNDK(ndkHome, ndkRoot);
+            
+            if (!string.IsNullOrEmpty(bestNdk))
+            {
+                ndkHome = bestNdk;
+                ndkRoot = bestNdk;
+            }
+            else
+            {
+                Log.LogError("❌ No suitable Android NDK found! Please install NDK 25 or higher.");
+                Log.LogError("   You can install it via Android Studio SDK Manager or set ANDROID_NDK_HOME environment variable.");
+                throw new Exception("No suitable Android NDK found");
+            }
+
             foreach (string arch in architectures)
             {
                 Log.LogMessage(MessageImportance.High, $"Publishing for {arch}...");
@@ -328,6 +680,12 @@ namespace SokolApplicationBuilder
                     var result = Cli.Wrap("dotnet")
                         .WithArguments($"publish \"{projectFile}\" -r {arch} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
                         .WithWorkingDirectory(opts.ProjectPath)
+                        .WithEnvironmentVariables(env => 
+                        {
+                            env.Set("PATH", newPath);
+                            if (!string.IsNullOrEmpty(ndkHome)) env.Set("ANDROID_NDK_HOME", ndkHome);
+                            if (!string.IsNullOrEmpty(ndkRoot)) env.Set("ANDROID_NDK_ROOT", ndkRoot);
+                        })
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                         .ExecuteAsync()
@@ -339,7 +697,7 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
                         
                         // Copy the published library to the Android libs directory
-                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net9.0", arch, "publish");
+                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net10.0", arch, "publish");
                         string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "libs");
                         string abiName = arch switch
                         {
@@ -382,17 +740,28 @@ namespace SokolApplicationBuilder
 
             Log.LogMessage(MessageImportance.Normal, $"Android path: {androidPath}");
             Log.LogMessage(MessageImportance.Normal, $"Android path exists: {Directory.Exists(androidPath)}");
-            Log.LogMessage(MessageImportance.Normal, $"Gradlew path: {Path.Combine(androidPath, "gradlew")}");
-            Log.LogMessage(MessageImportance.Normal, $"Gradlew exists: {File.Exists(Path.Combine(androidPath, "gradlew"))}");
+            string gradlewScript = GetGradlewScriptName();
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew path: {Path.Combine(androidPath, gradlewScript)}");
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew exists: {File.Exists(Path.Combine(androidPath, gradlewScript))}");
+
+            // Build Gradle arguments with NDK version if available
+            string ndkVersionArg = !string.IsNullOrEmpty(DETECTED_NDK_VERSION) 
+                ? $"-PndkVersionOverride=\"{DETECTED_NDK_VERSION}\"" 
+                : "";
+            
+            if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
+            {
+                Log.LogMessage(MessageImportance.High, $"📦 Configuring Gradle to use NDK version: {DETECTED_NDK_VERSION}");
+            }
 
             if (buildType == "release")
             {
                 Log.LogMessage(MessageImportance.High, "Building release APK...");
-                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                string gradlewPath = Path.Combine(androidPath, gradlewScript);
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleRelease")
+                    .WithArguments($"assembleRelease {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -405,11 +774,11 @@ namespace SokolApplicationBuilder
             else
             {
                 Log.LogMessage(MessageImportance.High, "Building debug APK...");
-                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                string gradlewPath = Path.Combine(androidPath, gradlewScript);
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleDebug")
+                    .WithArguments($"assembleDebug {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -427,17 +796,28 @@ namespace SokolApplicationBuilder
 
             Log.LogMessage(MessageImportance.Normal, $"Android path: {androidPath}");
             Log.LogMessage(MessageImportance.Normal, $"Android path exists: {Directory.Exists(androidPath)}");
-            Log.LogMessage(MessageImportance.Normal, $"Gradlew path: {Path.Combine(androidPath, "gradlew")}");
-            Log.LogMessage(MessageImportance.Normal, $"Gradlew exists: {File.Exists(Path.Combine(androidPath, "gradlew"))}");
+            string gradlewScript = GetGradlewScriptName();
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew path: {Path.Combine(androidPath, gradlewScript)}");
+            Log.LogMessage(MessageImportance.Normal, $"Gradlew exists: {File.Exists(Path.Combine(androidPath, gradlewScript))}");
+
+            // Build Gradle arguments with NDK version if available
+            string ndkVersionArg = !string.IsNullOrEmpty(DETECTED_NDK_VERSION) 
+                ? $"-PndkVersionOverride=\"{DETECTED_NDK_VERSION}\"" 
+                : "";
+            
+            if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
+            {
+                Log.LogMessage(MessageImportance.High, $"📦 Configuring Gradle to use NDK version: {DETECTED_NDK_VERSION}");
+            }
 
             if (buildType == "release")
             {
                 Log.LogMessage(MessageImportance.High, "Building release AAB...");
-                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                string gradlewPath = Path.Combine(androidPath, gradlewScript);
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"bundleRelease -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithArguments($"bundleRelease -PcmakeArgs=\"-DAPP_NAME={appName}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -450,11 +830,11 @@ namespace SokolApplicationBuilder
             else
             {
                 Log.LogMessage(MessageImportance.High, "Building debug AAB...");
-                string gradlewPath = Path.Combine(androidPath, "gradlew");
+                string gradlewPath = Path.Combine(androidPath, gradlewScript);
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"bundleDebug -PcmakeArgs=\"-DAPP_NAME={appName}\"")
+                    .WithArguments($"bundleDebug -PcmakeArgs=\"-DAPP_NAME={appName}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -657,8 +1037,9 @@ namespace SokolApplicationBuilder
             {
                 if (!line.Contains("List of devices") && !string.IsNullOrWhiteSpace(line))
                 {
-                    var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2 && parts[1] == "device")
+                    // Split by any whitespace (tab or spaces)
+                    var parts = line.Split(new[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && parts[1].Trim() == "device")
                     {
                         string deviceId = parts[0];
                         string manufacturer = "";

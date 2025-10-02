@@ -5,6 +5,10 @@ plugins {
 android {
     namespace 'com.example.native_activity'
     compileSdk 34
+    // NDK version is dynamically set during build via -PndkVersionOverride
+    // Default is 29.0.14033849 if not specified
+    ndkVersion project.hasProperty('ndkVersionOverride') ? 
+        project.property('ndkVersionOverride') : "29.0.14033849"
 
     defaultConfig {
         applicationId = 'com.example.native_activity'

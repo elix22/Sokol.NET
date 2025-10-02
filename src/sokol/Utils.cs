@@ -181,7 +181,7 @@ namespace Sokol
         {
             int totalBytes = Marshal.SizeOf<T>() * count;
             byte[] byteBuffer = new byte[totalBytes];
-            return MemoryMarshal.Cast<byte, T>(byteBuffer);
+            return MemoryMarshal.Cast<byte, T>(byteBuffer.AsSpan());
         }
 
         public static string String(this sspine_string str)

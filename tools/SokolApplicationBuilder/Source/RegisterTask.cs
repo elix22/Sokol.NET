@@ -67,13 +67,9 @@ namespace SokolApplicationBuilder
             // Find the root folder by looking for project markers
             string rootDir = FindProjectRoot(currentDir);
 
+            rootDir = rootDir.Replace('\\', '/');
             // Handle Windows paths
             string pathToWrite = rootDir;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                // Convert to Windows path format if needed
-                pathToWrite = rootDir.Replace('/', '\\');
-            }
 
             // Replace template placeholder
             string content = File.ReadAllText(configPath);
