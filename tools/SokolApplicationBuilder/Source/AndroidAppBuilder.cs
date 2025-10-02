@@ -1216,8 +1216,32 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.High, $"\n📱 Installing on device: {selectedDeviceId}");
                 }
                 
+                // Uninstall existing app to avoid signature mismatch errors
+                string packageName = $"com.elix22.{appName}";
+                Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
+                try
+                {
+                    var uninstallResult = Cli.Wrap("adb")
+                        .WithArguments($"-s {selectedDeviceId} uninstall {packageName}")
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    
+                    if (uninstallResult.ExitCode == 0)
+                    {
+                        Log.LogMessage(MessageImportance.Normal, "✅ Existing app uninstalled");
+                    }
+                }
+                catch
+                {
+                    // Ignore uninstall errors (app might not be installed)
+                    Log.LogMessage(MessageImportance.Normal, "ℹ️  No existing app to uninstall");
+                }
+                
                 var installResult = Cli.Wrap("adb")
-                    .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
+                    .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")  
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteAsync()
@@ -1230,7 +1254,7 @@ namespace SokolApplicationBuilder
                     successCount++;
 
                     // Try to launch the app on selected device
-                    string packageName = $"com.elix22.{appName}";
+                    // packageName already declared above for uninstall
 
                     try
                     {
@@ -1401,10 +1425,34 @@ namespace SokolApplicationBuilder
 
                     Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
 
+                    // Uninstall existing app to avoid signature mismatch errors
+                    string packageName = $"com.elix22.{appName}";
+                    Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
+                    try
+                    {
+                        var uninstallResult = Cli.Wrap("adb")
+                            .WithArguments($"-s {selectedDeviceId} uninstall {packageName}")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+                        
+                        if (uninstallResult.ExitCode == 0)
+                        {
+                            Log.LogMessage(MessageImportance.Normal, "✅ Existing app uninstalled");
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore uninstall errors (app might not be installed)
+                        Log.LogMessage(MessageImportance.Normal, "ℹ️  No existing app to uninstall");
+                    }
+
                     // Install the converted APK
                     Log.LogMessage(MessageImportance.High, "Installing APK on device...");
                     var installResult = Cli.Wrap("adb")
-                        .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")
+                        .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")  
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                         .ExecuteAsync()
@@ -1417,7 +1465,7 @@ namespace SokolApplicationBuilder
                         successCount++;
 
                         // Try to launch the app
-                        string packageName = $"com.elix22.{appName}";
+                        // packageName already declared above for uninstall
                         Log.LogMessage(MessageImportance.High, $"Launching app (package: {packageName})...");
 
                         try
