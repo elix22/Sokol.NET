@@ -21,6 +21,9 @@
       <!-- Sokol Shader Compiler Path -->
       <SokolShdcPath>../../tools/bin/$(HostOS)/$(OSArch)/sokol-shdc</SokolShdcPath>
       <SokolShdcPath Condition="'$(IsWindowsHost)'=='true'">$(SokolShdcPath).exe</SokolShdcPath>
+
+      <!-- Fullscreen immersive mode - no status/nav bars -->
+      <AndroidFullscreen>true</AndroidFullscreen>
    </PropertyGroup>
 
    <ItemGroup>

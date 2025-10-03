@@ -4,9 +4,21 @@ This folder contains guides and reference documentation for building, running, a
 
 ## Key Guides
 
-- [WebAssembly Local Server & VS Code Integration](./web-server-setup.md)
-- [Android Device Selection & Installation](./ANDROID_DEVICE_SELECTION.md)
+### Android
+- [Android Properties Configuration](./ANDROID_PROPERTIES.md) - Configure Android builds with Directory.Build.props (permissions, SDK versions, fullscreen, orientation)
+- [Android Screen Orientation](./ANDROID_SCREEN_ORIENTATION.md) - Quick reference for screen orientation configuration
+- [Android Device Selection & Installation](./ANDROID_DEVICE_SELECTION.md) - Multi-device installation guide
+- [AAB Build Guide](./AAB_BUILD_GUIDE.md) - Android App Bundle build guide
+
+### iOS
 - [iOS Device Selection & Installation](./ios-device-selection.md)
+
+### Web/WebAssembly
+- [WebAssembly Local Server & VS Code Integration](./web-server-setup.md)
+- [WebAssembly Browser Guide](./WEBASSEMBLY_BROWSER_GUIDE.md)
+
+### General
+- [Multi-Device Install](./MULTI_DEVICE_INSTALL.md)
 - Desktop, and other platform guides (see other files in this folder)
 
 ## Quick Start

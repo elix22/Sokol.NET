@@ -33,6 +33,7 @@ using CliWrap;
 using CliWrap.Buffered;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace SokolApplicationBuilder
 {
@@ -500,27 +501,17 @@ namespace SokolApplicationBuilder
         {
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
+            // Read Android properties from Directory.Build.props
+            var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
+
             // Update AndroidManifest.xml
             string manifestPath = Path.Combine(androidPath, "app", "src", "main", "AndroidManifest.xml");
             if (File.Exists(manifestPath))
             {
-                string content = File.ReadAllText(manifestPath);
-                // Replace the @string/app_name references with the actual app name (without extra quotes)
-                content = content.Replace("@string/app_name", appName);
-
-                // Configure orientation
-                string androidOrientation = opts.ValidatedOrientation switch
-                {
-                    "portrait" => "portrait",
-                    "landscape" => "landscape",
-                    "both" => "unspecified", // Android uses "unspecified" to allow both orientations
-                    _ => "unspecified"
-                };
-
-                // Replace orientation placeholder
-                content = content.Replace("ANDROID_ORIENTATION_PLACEHOLDER", androidOrientation);
-
-                File.WriteAllText(manifestPath, content);
+                // Generate manifest content dynamically
+                string manifestContent = GenerateAndroidManifest(appName, androidProperties);
+                File.WriteAllText(manifestPath, manifestContent);
+                Log.LogMessage(MessageImportance.High, "✅ Generated AndroidManifest.xml with properties from Directory.Build.props");
             }
 
             // Update build.gradle
@@ -1000,6 +991,223 @@ namespace SokolApplicationBuilder
         }
 
         // Helper method to get connected devices and select one interactively or automatically
+        Dictionary<string, string> ReadAndroidPropertiesFromDirectoryBuildProps()
+        {
+            var properties = new Dictionary<string, string>();
+            string directoryBuildPropsPath = Path.Combine(opts.ProjectPath, "Directory.Build.props");
+
+            if (!File.Exists(directoryBuildPropsPath))
+            {
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No Directory.Build.props found, using default Android configuration");
+                return properties;
+            }
+
+            try
+            {
+                XDocument doc = XDocument.Load(directoryBuildPropsPath);
+                var propertyGroup = doc.Root?.Element("PropertyGroup");
+
+                if (propertyGroup != null)
+                {
+                    // Read all properties that start with "Android"
+                    foreach (var element in propertyGroup.Elements())
+                    {
+                        if (element.Name.LocalName.StartsWith("Android", StringComparison.OrdinalIgnoreCase))
+                        {
+                            properties[element.Name.LocalName] = element.Value;
+                        }
+                    }
+                }
+
+                Log.LogMessage(MessageImportance.Normal, $"📋 Read {properties.Count} Android properties from Directory.Build.props");
+                foreach (var prop in properties)
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   - {prop.Key}: {prop.Value}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to parse Directory.Build.props: {ex.Message}");
+            }
+
+            return properties;
+        }
+
+        string GenerateAndroidManifest(string appName, Dictionary<string, string> androidProperties)
+        {
+            var manifest = new StringBuilder();
+            manifest.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+            manifest.AppendLine("<!-- BEGIN_INCLUDE(manifest) -->");
+            manifest.AppendLine("<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"");
+            manifest.AppendLine("    android:versionCode=\"1\"");
+            manifest.AppendLine("          android:versionName=\"1.0\">");
+            manifest.AppendLine();
+
+            // SDK versions
+            string minSdk = androidProperties.GetValueOrDefault("AndroidMinSdkVersion", "26");
+            string targetSdk = androidProperties.GetValueOrDefault("AndroidTargetSdkVersion", "34");
+            manifest.AppendLine($"  <uses-sdk android:minSdkVersion=\"{minSdk}\" android:targetSdkVersion=\"{targetSdk}\"/>");
+
+            // Permissions - read from Directory.Build.props
+            var permissions = GetAndroidPermissions(androidProperties);
+            foreach (var permission in permissions)
+            {
+                manifest.AppendLine($"  <uses-permission android:name=\"{permission}\"/>");
+            }
+
+            // Features (optional)
+            var features = GetAndroidFeatures(androidProperties);
+            foreach (var feature in features)
+            {
+                bool required = !feature.Contains("not-required");
+                string featureName = feature.Replace(":not-required", "");
+                manifest.AppendLine($"  <uses-feature android:name=\"{featureName}\" android:required=\"{required.ToString().ToLower()}\"/>");
+            }
+
+            manifest.AppendLine("  <!--");
+            manifest.AppendLine("  This .apk has no Java/Kotlin code, so set hasCode to false.");
+            manifest.AppendLine();
+            manifest.AppendLine("  If you copy from this sample and later add Java/Kotlin code, or add a");
+            manifest.AppendLine("  dependency on a library that does (such as androidx), be sure to set");
+            manifest.AppendLine("  `android:hasCode` to `true` (or just remove it, since that's the default).");
+            manifest.AppendLine("  -->");
+
+            // Application section
+            bool allowBackup = bool.Parse(androidProperties.GetValueOrDefault("AndroidAllowBackup", "false"));
+            bool fullBackupContent = bool.Parse(androidProperties.GetValueOrDefault("AndroidFullBackupContent", "false"));
+            bool hasCode = bool.Parse(androidProperties.GetValueOrDefault("AndroidHasCode", "false"));
+            bool keepScreenOn = bool.Parse(androidProperties.GetValueOrDefault("AndroidKeepScreenOn", "true"));
+            bool fullscreen = bool.Parse(androidProperties.GetValueOrDefault("AndroidFullscreen", "false"));
+
+            manifest.AppendLine("  <application");
+            manifest.AppendLine($"      android:allowBackup=\"{allowBackup.ToString().ToLower()}\"");
+            manifest.AppendLine($"      android:fullBackupContent=\"{fullBackupContent.ToString().ToLower()}\"");
+            manifest.AppendLine($"      android:icon=\"@mipmap/ic_launcher\"");
+            manifest.AppendLine($"      android:label=\"{appName}\"");
+            manifest.AppendLine($"      android:hasCode=\"{hasCode.ToString().ToLower()}\"");
+            
+            // Add fullscreen theme if enabled
+            if (fullscreen)
+            {
+                manifest.AppendLine($"      android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">");
+            }
+            else
+            {
+                manifest.AppendLine(">");
+            }
+            manifest.AppendLine();
+
+            // Activity
+            manifest.AppendLine("    <!-- Our activity is the built-in NativeActivity framework class.");
+            manifest.AppendLine("         This will take care of integrating with our NDK code. -->");
+
+            // Configure orientation - command-line flag takes precedence over Directory.Build.props
+            string androidOrientation;
+            if (!string.IsNullOrEmpty(opts.Orientation) && opts.Orientation != "both")
+            {
+                // Use command-line orientation if explicitly set (and not default "both")
+                androidOrientation = opts.ValidatedOrientation switch
+                {
+                    "portrait" => "portrait",
+                    "landscape" => "landscape",
+                    "both" => "unspecified",
+                    _ => "unspecified"
+                };
+            }
+            else if (androidProperties.TryGetValue("AndroidScreenOrientation", out string? propOrientation) && !string.IsNullOrWhiteSpace(propOrientation))
+            {
+                // Use orientation from Directory.Build.props
+                androidOrientation = propOrientation.ToLower() switch
+                {
+                    "portrait" => "portrait",
+                    "landscape" => "landscape",
+                    "reverselandscape" => "reverseLandscape",
+                    "reverseportrait" => "reversePortrait",
+                    "sensorlandscape" => "sensorLandscape",
+                    "sensorportrait" => "sensorPortrait",
+                    "sensor" => "sensor",
+                    "fullsensor" => "fullSensor",
+                    "nosensor" => "nosensor",
+                    "user" => "user",
+                    "fulluser" => "fullUser",
+                    "locked" => "locked",
+                    "unspecified" => "unspecified",
+                    "behind" => "behind",
+                    _ => "unspecified"
+                };
+            }
+            else
+            {
+                // Default fallback
+                androidOrientation = "unspecified";
+            }
+
+            manifest.AppendLine("    <activity android:name=\"android.app.NativeActivity\"");
+            manifest.AppendLine($"              android:label=\"{appName}\"");
+            manifest.AppendLine("              android:configChanges=\"orientation|keyboardHidden|screenSize|screenLayout\"");
+            manifest.AppendLine($"              android:screenOrientation=\"{androidOrientation}\"");
+            manifest.AppendLine($"              android:keepScreenOn=\"{keepScreenOn.ToString().ToLower()}\"");
+            manifest.AppendLine("        android:exported=\"true\">");
+            manifest.AppendLine("      <!-- Tell NativeActivity the name of our .so -->");
+            manifest.AppendLine("      <meta-data android:name=\"android.app.lib_name\"");
+            manifest.AppendLine("                 android:value=\"sokol\" />");
+            manifest.AppendLine("      <intent-filter>");
+            manifest.AppendLine("        <action android:name=\"android.intent.action.MAIN\" />");
+            manifest.AppendLine("        <category android:name=\"android.intent.category.LAUNCHER\" />");
+            manifest.AppendLine("      </intent-filter>");
+            manifest.AppendLine("    </activity>");
+            manifest.AppendLine("  </application>");
+            manifest.AppendLine();
+            manifest.AppendLine("</manifest>");
+            manifest.AppendLine("<!-- END_INCLUDE(manifest) -->");
+
+            return manifest.ToString();
+        }
+
+        List<string> GetAndroidPermissions(Dictionary<string, string> properties)
+        {
+            var permissions = new List<string>();
+
+            // Check for AndroidPermissions property (semicolon-separated list)
+            if (properties.TryGetValue("AndroidPermissions", out string? permissionsStr) && !string.IsNullOrWhiteSpace(permissionsStr))
+            {
+                var perms = permissionsStr.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrEmpty(p));
+                permissions.AddRange(perms);
+            }
+
+            // If no permissions specified, use defaults
+            if (permissions.Count == 0)
+            {
+                permissions.AddRange(new[]
+                {
+                    "android.permission.RECORD_AUDIO",
+                    "android.permission.WAKE_LOCK",
+                    "android.permission.INTERNET",
+                    "android.permission.WRITE_EXTERNAL_STORAGE"
+                });
+            }
+
+            return permissions;
+        }
+
+        List<string> GetAndroidFeatures(Dictionary<string, string> properties)
+        {
+            var features = new List<string>();
+
+            // Check for AndroidFeatures property (semicolon-separated list)
+            if (properties.TryGetValue("AndroidFeatures", out string? featuresStr) && !string.IsNullOrWhiteSpace(featuresStr))
+            {
+                var feats = featuresStr.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(f => f.Trim())
+                    .Where(f => !string.IsNullOrEmpty(f));
+                features.AddRange(feats);
+            }
+
+            return features;
+        }
+
         List<string> SelectAndroidDevice()
         {
             // Check if adb is available and get device list
