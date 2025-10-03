@@ -81,14 +81,13 @@ Specify Android hardware/software features as a semicolon-separated list. Append
   <!-- Full backup content (default: false) -->
   <AndroidFullBackupContent>false</AndroidFullBackupContent>
   
-  <!-- Has Java/Kotlin code (default: false for native apps) -->
-  <AndroidHasCode>false</AndroidHasCode>
-  
   <!-- Keep screen on (default: true) -->
   <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
   
   <!-- Fullscreen mode - hide system UI (status bar, navigation bar) (default: false) -->
   <AndroidFullscreen>false</AndroidFullscreen>
+  
+  <!-- Note: AndroidHasCode is automatically set to true (includes SokolNativeActivity.java) -->
   
   <!-- Screen orientation (default: unspecified) -->
   <!-- Values: portrait, landscape, reverseLandscape, reversePortrait, sensorLandscape, -->
@@ -148,6 +147,7 @@ Control how your app handles device orientation changes:
 For truly immersive fullscreen experience (games, video players, VR apps), set `AndroidFullscreen` to `true`:
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidFullscreen>true</AndroidFullscreen>
 </PropertyGroup>
@@ -156,8 +156,16 @@ For truly immersive fullscreen experience (games, video players, VR apps), set `
 When enabled, this will:
 - Hide the status bar (top bar with clock, battery, notifications)
 - Hide the navigation bar (bottom/side bar with back/home buttons)
-- Create an edge-to-edge immersive experience
+- Create an edge-to-edge immersive experience using sticky immersive mode
 - Uses `View.SYSTEM_UI_FLAG_FULLSCREEN`, `View.SYSTEM_UI_FLAG_HIDE_NAVIGATION`, and `View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY` flags
+- Automatically sets `android:hasCode="true"` because it uses a custom `SokolNativeActivity` to enable immersive mode
+
+**Technical Implementation**:
+- Uses a custom Java activity (`com.sokol.app.SokolNativeActivity`) that extends `android.app.NativeActivity`
+- For Android 11+ (API 30+): Uses modern `WindowInsetsController` API
+- For Android 4.4-10 (API 19-29): Uses legacy `setSystemUiVisibility()` with deprecation suppressed
+- Applies Android's immersive sticky mode for optimal fullscreen experience
+- Automatically re-applies immersive mode when the app regains focus
 
 **Note**: Users can temporarily reveal system UI by swiping from the edge of the screen. The UI will auto-hide after a few seconds (sticky immersive mode).
 
@@ -204,8 +212,8 @@ Here's a complete example `Directory.Build.props` with Android configuration in 
       <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
       <AndroidAllowBackup>false</AndroidAllowBackup>
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
-      <AndroidHasCode>false</AndroidHasCode>
    </PropertyGroup>
+   <!-- Note: AndroidHasCode is automatically set to true (includes SokolNativeActivity.java) -->
 
    <!-- Include source files -->
    <ItemGroup>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme for normal mode -->
+    <style name="AppTheme" parent="@android:style/Theme.NoTitleBar">
+    </style>
+
+    <!-- Immersive fullscreen theme that hides both status bar and navigation bar -->
+    <style name="AppTheme.Fullscreen" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

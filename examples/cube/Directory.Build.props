@@ -41,7 +41,6 @@
       <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
       <AndroidAllowBackup>false</AndroidAllowBackup>
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
-      <AndroidHasCode>false</AndroidHasCode>
    </PropertyGroup>
 
    <ItemGroup>

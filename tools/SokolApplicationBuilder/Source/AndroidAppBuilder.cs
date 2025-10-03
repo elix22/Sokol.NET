@@ -600,10 +600,14 @@ namespace SokolApplicationBuilder
                 File.WriteAllText(cmakePath, content);
             }
 
-            // Update Java/Kotlin files
+            // Update Java/Kotlin files (but exclude SokolNativeActivity.java which should not be modified)
             foreach (string file in Directory.GetFiles(androidPath, "*.java", SearchOption.AllDirectories)
                 .Concat(Directory.GetFiles(androidPath, "*.kt", SearchOption.AllDirectories)))
             {
+                // Skip SokolNativeActivity.java - it must not be modified
+                if (Path.GetFileName(file) == "SokolNativeActivity.java")
+                    continue;
+                    
                 string content = File.ReadAllText(file);
                 content = content.Replace("NativeActivity", appName);
                 File.WriteAllText(file, content);
@@ -1080,9 +1084,12 @@ namespace SokolApplicationBuilder
             // Application section
             bool allowBackup = bool.Parse(androidProperties.GetValueOrDefault("AndroidAllowBackup", "false"));
             bool fullBackupContent = bool.Parse(androidProperties.GetValueOrDefault("AndroidFullBackupContent", "false"));
-            bool hasCode = bool.Parse(androidProperties.GetValueOrDefault("AndroidHasCode", "false"));
             bool keepScreenOn = bool.Parse(androidProperties.GetValueOrDefault("AndroidKeepScreenOn", "true"));
             bool fullscreen = bool.Parse(androidProperties.GetValueOrDefault("AndroidFullscreen", "false"));
+
+            // Always set hasCode to true since we include SokolNativeActivity.java in the template
+            // (even if fullscreen is disabled, the Java file is present)
+            bool hasCode = true;
 
             manifest.AppendLine("  <application");
             manifest.AppendLine($"      android:allowBackup=\"{allowBackup.ToString().ToLower()}\"");
@@ -1091,14 +1098,14 @@ namespace SokolApplicationBuilder
             manifest.AppendLine($"      android:label=\"{appName}\"");
             manifest.AppendLine($"      android:hasCode=\"{hasCode.ToString().ToLower()}\"");
             
-            // Add fullscreen theme if enabled
+            // Add fullscreen theme if enabled - use custom immersive theme
             if (fullscreen)
             {
-                manifest.AppendLine($"      android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">");
+                manifest.AppendLine($"      android:theme=\"@style/AppTheme.Fullscreen\">");
             }
             else
             {
-                manifest.AppendLine(">");
+                manifest.AppendLine($"      android:theme=\"@style/AppTheme\">");
             }
             manifest.AppendLine();
 
@@ -1147,7 +1154,10 @@ namespace SokolApplicationBuilder
                 androidOrientation = "unspecified";
             }
 
-            manifest.AppendLine("    <activity android:name=\"android.app.NativeActivity\"");
+            // Use custom SokolNativeActivity for fullscreen to enable immersive mode
+            string activityName = fullscreen ? "com.sokol.app.SokolNativeActivity" : "android.app.NativeActivity";
+            
+            manifest.AppendLine($"    <activity android:name=\"{activityName}\"");
             manifest.AppendLine($"              android:label=\"{appName}\"");
             manifest.AppendLine("              android:configChanges=\"orientation|keyboardHidden|screenSize|screenLayout\"");
             manifest.AppendLine($"              android:screenOrientation=\"{androidOrientation}\"");
