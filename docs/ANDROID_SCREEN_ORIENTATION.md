@@ -6,9 +6,10 @@ The `AndroidScreenOrientation` property in `Directory.Build.props` allows you to
 
 ## Usage
 
-Add to your project's `Directory.Build.props`:
+Add to your project's `Directory.Build.props` in the Android Configuration section:
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
 </PropertyGroup>
@@ -45,6 +46,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### 1. Landscape Game
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
 </PropertyGroup>
@@ -53,6 +55,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### 2. Portrait App with Sensor Support
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>sensorPortrait</AndroidScreenOrientation>
 </PropertyGroup>
@@ -61,6 +64,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### 3. Fully Rotating App
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>fullSensor</AndroidScreenOrientation>
 </PropertyGroup>
@@ -69,6 +73,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### 4. Fixed Portrait (No Rotation)
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>portrait</AndroidScreenOrientation>
 </PropertyGroup>
@@ -77,6 +82,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### 5. Landscape with Reverse Support
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>sensorLandscape</AndroidScreenOrientation>
 </PropertyGroup>
@@ -87,6 +93,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### Fullscreen Landscape Game
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
   <AndroidFullscreen>true</AndroidFullscreen>
@@ -97,6 +104,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### Portrait App with Camera
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>portrait</AndroidScreenOrientation>
   <AndroidPermissions>android.permission.CAMERA;android.permission.INTERNET</AndroidPermissions>
@@ -107,6 +115,7 @@ The `--orientation` command-line flag takes precedence over the `AndroidScreenOr
 ### Rotating Video Player
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
   <AndroidScreenOrientation>fullSensor</AndroidScreenOrientation>
   <AndroidFullscreen>true</AndroidFullscreen>

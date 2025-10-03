@@ -163,7 +163,7 @@ When enabled, this will:
 
 ## Complete Example
 
-Here's a complete example `Directory.Build.props` with Android configuration:
+Here's a complete example `Directory.Build.props` with Android configuration in a separate PropertyGroup:
 
 ```xml
 <Project>
@@ -184,26 +184,27 @@ Here's a complete example `Directory.Build.props` with Android configuration:
       <!-- Sokol Shader Compiler Path -->
       <SokolShdcPath>../../tools/bin/$(HostOS)/$(OSArch)/sokol-shdc</SokolShdcPath>
       <SokolShdcPath Condition="'$(IsWindowsHost)'=='true'">$(SokolShdcPath).exe</SokolShdcPath>
+   </PropertyGroup>
 
-      <!-- ===== ANDROID CONFIGURATION ===== -->
-      
+   <!-- Android Configuration -->
+   <PropertyGroup>
       <!-- SDK Versions -->
       <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
       <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
       
-      <!-- Android Permissions (semicolon-separated) -->
+      <!-- Permissions (semicolon-separated) -->
       <AndroidPermissions>android.permission.RECORD_AUDIO;android.permission.WAKE_LOCK;android.permission.INTERNET;android.permission.WRITE_EXTERNAL_STORAGE;android.permission.CAMERA</AndroidPermissions>
       
-      <!-- Android Features (semicolon-separated, append :not-required for optional features) -->
+      <!-- Features (semicolon-separated, append :not-required for optional features) -->
       <AndroidFeatures>android.hardware.microphone:not-required;android.hardware.camera:not-required</AndroidFeatures>
       
       <!-- Application Properties -->
+      <AndroidFullscreen>true</AndroidFullscreen>
+      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
       <AndroidAllowBackup>false</AndroidAllowBackup>
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
       <AndroidHasCode>false</AndroidHasCode>
-      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
-      <AndroidFullscreen>true</AndroidFullscreen>
-      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
    </PropertyGroup>
 
    <!-- Include source files -->
@@ -232,16 +233,19 @@ Here's a complete example `Directory.Build.props` with Android configuration:
 For a game that needs audio recording and camera access:
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
+  <!-- SDK Versions -->
   <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
   <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
   
-  <!-- Required permissions -->
+  <!-- Permissions -->
   <AndroidPermissions>android.permission.INTERNET;android.permission.RECORD_AUDIO;android.permission.CAMERA;android.permission.WAKE_LOCK</AndroidPermissions>
   
-  <!-- Optional features - app works without camera/microphone -->
+  <!-- Features - optional, app works without camera/microphone -->
   <AndroidFeatures>android.hardware.camera:not-required;android.hardware.microphone:not-required</AndroidFeatures>
   
+  <!-- Application Properties -->
   <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
   <AndroidAllowBackup>false</AndroidAllowBackup>
 </PropertyGroup>
@@ -252,21 +256,19 @@ For a game that needs audio recording and camera access:
 For an immersive fullscreen game without system UI:
 
 ```xml
+<!-- Android Configuration -->
 <PropertyGroup>
+  <!-- SDK Versions -->
   <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
   <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
   
-  <!-- Fullscreen immersive mode -->
-  <AndroidFullscreen>true</AndroidFullscreen>
-  
-  <!-- Lock to landscape orientation -->
-  <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
-  
-  <!-- Keep screen on during gameplay -->
-  <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
-  
-  <!-- Basic permissions -->
+  <!-- Permissions -->
   <AndroidPermissions>android.permission.INTERNET;android.permission.WAKE_LOCK</AndroidPermissions>
+  
+  <!-- Application Properties -->
+  <AndroidFullscreen>true</AndroidFullscreen>
+  <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+  <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
 </PropertyGroup>
 ```
 

@@ -21,27 +21,27 @@
       <!-- Sokol Shader Compiler Path -->
       <SokolShdcPath>../../tools/bin/$(HostOS)/$(OSArch)/sokol-shdc</SokolShdcPath>
       <SokolShdcPath Condition="'$(IsWindowsHost)'=='true'">$(SokolShdcPath).exe</SokolShdcPath>
+   </PropertyGroup>
 
-      <!-- Android Configuration -->
+   <!-- Android Configuration -->
+   <PropertyGroup>
       <!-- SDK Versions -->
       <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
       <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
       
-      <!-- Android Permissions (semicolon-separated) -->
+      <!-- Permissions (semicolon-separated) -->
       <AndroidPermissions>android.permission.RECORD_AUDIO;android.permission.WAKE_LOCK;android.permission.INTERNET;android.permission.WRITE_EXTERNAL_STORAGE</AndroidPermissions>
       
-      <!-- Android Features (semicolon-separated, append :not-required for optional features) -->
+      <!-- Features (semicolon-separated, append :not-required for optional features) -->
       <!-- <AndroidFeatures>android.hardware.microphone:not-required</AndroidFeatures> -->
       
       <!-- Application Properties -->
+      <AndroidFullscreen>true</AndroidFullscreen>
+      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
       <AndroidAllowBackup>false</AndroidAllowBackup>
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
       <AndroidHasCode>false</AndroidHasCode>
-      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
-      <!-- Fullscreen immersive mode - no status/nav bars -->
-      <AndroidFullscreen>true</AndroidFullscreen>
-      <!-- Screen orientation - landscape mode for game -->
-      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
    </PropertyGroup>
 
    <ItemGroup>

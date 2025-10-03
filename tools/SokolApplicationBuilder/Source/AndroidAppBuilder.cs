@@ -1005,16 +1005,21 @@ namespace SokolApplicationBuilder
             try
             {
                 XDocument doc = XDocument.Load(directoryBuildPropsPath);
-                var propertyGroup = doc.Root?.Element("PropertyGroup");
+                
+                // Read from ALL PropertyGroup elements, not just the first one
+                var propertyGroups = doc.Root?.Elements("PropertyGroup");
 
-                if (propertyGroup != null)
+                if (propertyGroups != null)
                 {
-                    // Read all properties that start with "Android"
-                    foreach (var element in propertyGroup.Elements())
+                    foreach (var propertyGroup in propertyGroups)
                     {
-                        if (element.Name.LocalName.StartsWith("Android", StringComparison.OrdinalIgnoreCase))
+                        // Read all properties that start with "Android"
+                        foreach (var element in propertyGroup.Elements())
                         {
-                            properties[element.Name.LocalName] = element.Value;
+                            if (element.Name.LocalName.StartsWith("Android", StringComparison.OrdinalIgnoreCase))
+                            {
+                                properties[element.Name.LocalName] = element.Value;
+                            }
                         }
                     }
                 }
