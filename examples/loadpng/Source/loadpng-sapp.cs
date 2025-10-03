@@ -92,10 +92,11 @@ public static unsafe class LoadPngSApp
         // make continguous vertex buffer for the cube vertices
         byte[] byte_buf = new byte[Marshal.SizeOf<vertex_t>() * 24];
         // we need to use MemoryMarshal.Cast to convert the byte array to a Span of vertex_t
-        Span<vertex_t> vertex_buffer = MemoryMarshal.Cast<byte, vertex_t>(byte_buf);
-        // fill the vertex buffer , it needss to be fixed inroder to avoid GC moving the memory
-        fixed (vertex_t* vert = &vertex_buffer[0])
+        ReadOnlySpan<vertex_t> vertex_buffer = MemoryMarshal.Cast<byte, vertex_t>(byte_buf);
+        // fill the vertex buffer , it needs to be fixed in order to avoid GC moving the memory
+        fixed (byte* buf = byte_buf)
         {
+            vertex_t* vert = (vertex_t*)buf;
             vert[0] = new vertex_t { x = -1.0f, y = -1.0f, z = -1.0f, u = 0, v = 0 };
             vert[1] = new vertex_t { x = 1.0f, y = -1.0f, z = -1.0f, u = 32767, v = 0 };
             vert[2] = new vertex_t { x = 1.0f, y = 1.0f, z = -1.0f, u = 32767, v = 32767 };
@@ -132,7 +133,7 @@ public static unsafe class LoadPngSApp
         {
             data = new sg_range()
             {
-                ptr = Unsafe.AsPointer(ref vertex_buffer[0]),
+                ptr = Unsafe.AsPointer(ref MemoryMarshal.GetReference(vertex_buffer)),
                 size = (uint)(vertex_buffer.Length * Marshal.SizeOf<vertex_t>())
             },
             label = "cube-vertices"

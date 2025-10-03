@@ -60,6 +60,23 @@
   </Target>
   
 
+     <!-- Android Configuration -->
+   <PropertyGroup>
+      <!-- SDK Versions -->
+      <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
+      <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
+      
+      <!-- Permissions (semicolon-separated) -->
+      <AndroidPermissions>android.permission.INTERNET;android.permission.WAKE_LOCK</AndroidPermissions>
+      
+      <!-- Application Properties -->
+      <AndroidFullscreen>true</AndroidFullscreen>
+      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
+      <AndroidAllowBackup>false</AndroidAllowBackup>
+      <AndroidFullBackupContent>false</AndroidFullBackupContent>
+   </PropertyGroup>
+   
 <!-- nuget package for loading png files -->
   <ItemGroup>
       <PackageReference Include="StbImageSharp" Version="2.30.15" />

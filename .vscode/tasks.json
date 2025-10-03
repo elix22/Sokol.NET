@@ -654,7 +654,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cube"
             ],
             "group": "build",
@@ -683,7 +682,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/dyntex"
             ],
             "group": "build",
@@ -712,7 +710,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cimgui"
             ],
             "group": "build",
@@ -741,7 +738,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/loadpng"
             ],
             "group": "build",
@@ -770,7 +766,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/instancing"
             ],
             "group": "build",
@@ -799,7 +794,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/plmpeg"
             ],
             "group": "build",
@@ -828,7 +822,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/drawcallperf"
             ],
             "group": "build",
@@ -858,7 +851,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cube"
             ],
             "group": "build",
@@ -888,7 +880,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/dyntex"
             ],
             "group": "build",
@@ -918,7 +909,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cimgui"
             ],
             "group": "build",
@@ -948,7 +938,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/loadpng"
             ],
             "group": "build",
@@ -978,7 +967,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/instancing"
             ],
             "group": "build",
@@ -1008,7 +996,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/plmpeg"
             ],
             "group": "build",
@@ -1038,7 +1025,6 @@
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/drawcallperf"
             ],
             "group": "build",
@@ -1068,7 +1054,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cube"
             ],
             "group": "build",
@@ -1098,7 +1083,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/dyntex"
             ],
             "group": "build",
@@ -1128,7 +1112,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/cimgui"
             ],
             "group": "build",
@@ -1158,7 +1141,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/loadpng"
             ],
             "group": "build",
@@ -1188,7 +1170,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/instancing"
             ],
             "group": "build",
@@ -1218,7 +1199,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/plmpeg"
             ],
             "group": "build",
@@ -1248,7 +1228,6 @@
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--orientation", "landscape",
                 "--path", "${workspaceFolder}/examples/drawcallperf"
             ],
             "group": "build",

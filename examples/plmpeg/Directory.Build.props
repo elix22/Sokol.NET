@@ -61,4 +61,21 @@
     <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
   </Target>
   
+       <!-- Android Configuration -->
+   <PropertyGroup>
+      <!-- SDK Versions -->
+      <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
+      <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
+      
+      <!-- Permissions (semicolon-separated) -->
+      <AndroidPermissions>android.permission.INTERNET;android.permission.WAKE_LOCK</AndroidPermissions>
+      
+      <!-- Application Properties -->
+      <AndroidFullscreen>true</AndroidFullscreen>
+      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
+      <AndroidAllowBackup>false</AndroidAllowBackup>
+      <AndroidFullBackupContent>false</AndroidFullBackupContent>
+   </PropertyGroup>
+   
 </Project>
