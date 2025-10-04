@@ -2,13 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Cube (Desktop)",
+            "name": "Desktop (Dynamic)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "prepare-cube",
-            "program": "${workspaceFolder}/examples/cube/bin/Debug/net10.0/cube.dll",
+            "preLaunchTask": "prepare-${input:exampleName}",
+            "program": "${workspaceFolder}/examples/${input:exampleName}/bin/Debug/net10.0/${input:exampleName}.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/examples/cube/bin/Debug/net10.0",
+            "cwd": "${workspaceFolder}/examples/${input:exampleName}/bin/Debug/net10.0",
             "console": "internalConsole",
             "stopAtEntry": false,
             "env": {
@@ -16,158 +16,46 @@
             }
         },
         {
-            "name": "Dyntex (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-dyntex",
-            "program": "${workspaceFolder}/examples/dyntex/bin/Debug/net10.0/dyntex.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/dyntex/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "CImGui (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-cimgui",
-            "program": "${workspaceFolder}/examples/cimgui/bin/Debug/net10.0/cimgui.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/cimgui/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "LoadPNG (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-loadpng",
-            "program": "${workspaceFolder}/examples/loadpng/bin/Debug/net10.0/loadpng.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/loadpng/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "Instancing (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-instancing",
-            "program": "${workspaceFolder}/examples/instancing/bin/Debug/net10.0/instancing.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/instancing/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "PlMpeg (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-plmpeg",
-            "program": "${workspaceFolder}/examples/plmpeg/bin/Debug/net10.0/plmpeg.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/plmpeg/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "Drawcallperf (Desktop)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "prepare-drawcallperf",
-            "program": "${workspaceFolder}/examples/drawcallperf/bin/Debug/net10.0/drawcallperf.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/examples/drawcallperf/bin/Debug/net10.0",
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            }
-        },
-        {
-            "name": "Cube (Browser)",
+            "name": "Browser (Dynamic)",
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cube/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8080"],
+            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/${input:exampleName}/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "${input:browserPort}"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "preLaunchTask": "prepare-cube-web"
+            "preLaunchTask": "prepare-${input:exampleName}-web"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "exampleName",
+            "type": "pickString",
+            "description": "Select an example to launch",
+            "options": [
+                "cube",
+                "dyntex",
+                "cimgui",
+                "loadpng",
+                "instancing",
+                "plmpeg",
+                "drawcallperf"
+            ],
+            "default": "cube"
         },
         {
-            "name": "Dyntex (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/dyntex/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8081"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-dyntex-web"
-        },
-        {
-            "name": "CImGui (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/cimgui/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8082"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-cimgui-web"
-        },
-        {
-            "name": "LoadPNG (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/loadpng/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8083"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-loadpng-web"
-        },
-        {
-            "name": "Instancing (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/instancing/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8084"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-instancing-web"
-        },
-        {
-            "name": "PlMpeg (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/plmpeg/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8085"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-plmpeg-web"
-        },
-        {
-            "name": "Drawcallperf (Browser)",
-            "type": "coreclr",
-            "request": "launch",
-            "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/drawcallperf/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "8086"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "preLaunchTask": "prepare-drawcallperf-web"
+            "id": "browserPort",
+            "type": "pickString",
+            "description": "Select browser port (to run multiple examples simultaneously)",
+            "options": [
+                "8080",
+                "8081",
+                "8082",
+                "8083",
+                "8084",
+                "8085",
+                "8086"
+            ],
+            "default": "8080"
         }
     ]
 }
