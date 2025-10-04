@@ -44,5 +44,12 @@
     @TEMPLATE_STATUS_BAR_HIDDEN@
     @TEMPLATE_STATUS_BAR_APPEARANCE@
     @TEMPLATE_REQUIRES_FULLSCREEN@
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string></string>
+        <key>UIImageName</key>
+        <string></string>
+    </dict>
 </dict>
 </plist>
