@@ -79,5 +79,23 @@
       <AndroidAllowBackup>false</AndroidAllowBackup>
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
    </PropertyGroup>
-   
+
+   <!-- iOS Configuration -->
+   <PropertyGroup>
+      <!-- Minimum iOS version -->
+      <IOSMinVersion>14.0</IOSMinVersion>
+      
+      <!-- Screen orientation: portrait, landscape, or both -->
+      <IOSScreenOrientation>landscape</IOSScreenOrientation>
+      
+      <!-- Requires full screen (hides home indicator) -->
+      <IOSRequiresFullScreen>false</IOSRequiresFullScreen>
+      
+      <!-- Hide status bar -->
+      <IOSStatusBarHidden>true</IOSStatusBarHidden>
+      
+      <!-- Development Team ID (optional, can be cached) -->
+      <!-- <IOSDevelopmentTeam>YOUR_TEAM_ID</IOSDevelopmentTeam> -->
+   </PropertyGroup>
+
 </Project>

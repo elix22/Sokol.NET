@@ -23,6 +23,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Xml.Linq;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Task = Microsoft.Build.Utilities.Task;
@@ -52,6 +53,13 @@ namespace SokolApplicationBuilder
         private string URHONET_HOME_PATH = string.Empty;
 
         private string DEVELOPMENT_TEAM = string.Empty;
+        
+        // iOS properties from Directory.Build.props
+        private string iOSMinVersion = "14.0";
+        private string iOSScreenOrientation = "both";
+        private bool iOSRequiresFullScreen = false;
+        private bool iOSStatusBarHidden = false;
+        private string iOSDevelopmentTeam = string.Empty;
 
         private string CLANG_CMD = string.Empty;
         private string AR_CMD = string.Empty;
@@ -109,6 +117,9 @@ namespace SokolApplicationBuilder
                 string projectDir = projectPath;
 
                 Log.LogMessage(MessageImportance.High, $"Building iOS app for project: {projectName}");
+
+                // Read iOS properties from Directory.Build.props
+                ReadIOSPropertiesFromDirectoryBuildProps(projectDir);
 
                 // Setup development team (with caching support)
                 if (!SetupDevelopmentTeam(projectName))
@@ -173,9 +184,17 @@ namespace SokolApplicationBuilder
                 string sokolDir = Path.Combine(iosDir, "sokol-ios");
                 Directory.CreateDirectory(sokolDir);
 
+                // Find ext directory (should be at workspace root)
+                string extDir = Path.GetFullPath(Path.Combine(projectDir, "../../ext"));
+                if (!Directory.Exists(extDir))
+                {
+                    Log.LogError($"ext directory not found at: {extDir}");
+                    return false;
+                }
+
                 // Build sokol framework using CMake
                 var cmakeResult = Cli.Wrap("cmake")
-                    .WithArguments($"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_OSX_ARCHITECTURES=\"arm64\" {Path.Combine(projectDir, "../../ext")}")
+                    .WithArguments($"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET={iOSMinVersion} -DCMAKE_OSX_ARCHITECTURES=\"arm64\" \"{extDir}\"")
                     .WithWorkingDirectory(sokolDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -372,10 +391,14 @@ namespace SokolApplicationBuilder
                 string content = File.ReadAllText(cmakeDest);
                 content = content.Replace("TEMPLATE_PROJECT_NAME", projectName);
                 
-                // Set orientation based on user preference
+                // Set orientation based on Directory.Build.props or command line option
+                string orientation = !string.IsNullOrEmpty(opts.Orientation) && opts.Orientation != "both" 
+                    ? opts.ValidatedOrientation 
+                    : iOSScreenOrientation;
+                
                 string iosOrientations, ipadOrientations;
                 string iosOrientationsPlist, ipadOrientationsPlist;
-                switch (opts.ValidatedOrientation)
+                switch (orientation)
                 {
                     case "portrait":
                         iosOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -412,6 +435,26 @@ namespace SokolApplicationBuilder
                     plistContent = plistContent.Replace("TEMPLATE_PROJECT_NAME", projectName);
                     plistContent = plistContent.Replace("@TEMPLATE_IOS_ORIENTATIONS_PLIST@", iosOrientationsPlist);
                     plistContent = plistContent.Replace("@TEMPLATE_IPAD_ORIENTATIONS_PLIST@", ipadOrientationsPlist);
+                    
+                    // Add UIStatusBarHidden if enabled
+                    string statusBarHiddenPlist = iOSStatusBarHidden 
+                        ? "\n    <key>UIStatusBarHidden</key>\n    <true/>"
+                        : "";
+                    plistContent = plistContent.Replace("@TEMPLATE_STATUS_BAR_HIDDEN@", statusBarHiddenPlist);
+                    
+                    // Add UIViewControllerBasedStatusBarAppearance when status bar is hidden
+                    // This tells iOS to use the Info.plist setting instead of view controller override
+                    string statusBarAppearancePlist = iOSStatusBarHidden 
+                        ? "\n    <key>UIViewControllerBasedStatusBarAppearance</key>\n    <false/>"
+                        : "";
+                    plistContent = plistContent.Replace("@TEMPLATE_STATUS_BAR_APPEARANCE@", statusBarAppearancePlist);
+                    
+                    // Add UIRequiresFullScreen if enabled
+                    string requiresFullScreenPlist = iOSRequiresFullScreen 
+                        ? "\n    <key>UIRequiresFullScreen</key>\n    <true/>"
+                        : "";
+                    plistContent = plistContent.Replace("@TEMPLATE_REQUIRES_FULLSCREEN@", requiresFullScreenPlist);
+                    
                     File.WriteAllText(plistDest, plistContent);
                 }
 
@@ -914,6 +957,83 @@ namespace SokolApplicationBuilder
             return fallbackProject;
         }
 
+        private void ReadIOSPropertiesFromDirectoryBuildProps(string projectPath)
+        {
+            try
+            {
+                string directoryBuildPropsPath = Path.Combine(projectPath, "Directory.Build.props");
+                if (!File.Exists(directoryBuildPropsPath))
+                {
+                    Log.LogMessage(MessageImportance.Normal, "No Directory.Build.props found, using default iOS properties");
+                    return;
+                }
+
+                XDocument doc = XDocument.Load(directoryBuildPropsPath);
+                int propertyCount = 0;
+
+                // Read all PropertyGroup elements (not just the first one)
+                foreach (var propertyGroup in doc.Root?.Elements("PropertyGroup") ?? Enumerable.Empty<XElement>())
+                {
+                    // iOS Minimum Version
+                    var minVersionElement = propertyGroup.Element("IOSMinVersion");
+                    if (minVersionElement != null && !string.IsNullOrEmpty(minVersionElement.Value))
+                    {
+                        iOSMinVersion = minVersionElement.Value;
+                        propertyCount++;
+                    }
+
+                    // iOS Screen Orientation
+                    var orientationElement = propertyGroup.Element("IOSScreenOrientation");
+                    if (orientationElement != null && !string.IsNullOrEmpty(orientationElement.Value))
+                    {
+                        iOSScreenOrientation = orientationElement.Value.ToLower();
+                        propertyCount++;
+                    }
+
+                    // iOS Requires Full Screen
+                    var fullscreenElement = propertyGroup.Element("IOSRequiresFullScreen");
+                    if (fullscreenElement != null && !string.IsNullOrEmpty(fullscreenElement.Value))
+                    {
+                        iOSRequiresFullScreen = bool.Parse(fullscreenElement.Value);
+                        propertyCount++;
+                    }
+
+                    // iOS Status Bar Hidden
+                    var statusBarElement = propertyGroup.Element("IOSStatusBarHidden");
+                    if (statusBarElement != null && !string.IsNullOrEmpty(statusBarElement.Value))
+                    {
+                        iOSStatusBarHidden = bool.Parse(statusBarElement.Value);
+                        propertyCount++;
+                    }
+
+                    // iOS Development Team
+                    var devTeamElement = propertyGroup.Element("IOSDevelopmentTeam");
+                    if (devTeamElement != null && !string.IsNullOrEmpty(devTeamElement.Value))
+                    {
+                        iOSDevelopmentTeam = devTeamElement.Value;
+                        propertyCount++;
+                    }
+                }
+
+                if (propertyCount > 0)
+                {
+                    Log.LogMessage(MessageImportance.High, $"📋 Read {propertyCount} iOS properties from Directory.Build.props");
+                    if (!string.IsNullOrEmpty(iOSMinVersion))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSMinVersion: {iOSMinVersion}");
+                    if (!string.IsNullOrEmpty(iOSScreenOrientation))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSScreenOrientation: {iOSScreenOrientation}");
+                    Log.LogMessage(MessageImportance.High, $"   - IOSRequiresFullScreen: {iOSRequiresFullScreen}");
+                    Log.LogMessage(MessageImportance.High, $"   - IOSStatusBarHidden: {iOSStatusBarHidden}");
+                    if (!string.IsNullOrEmpty(iOSDevelopmentTeam))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSDevelopmentTeam: {iOSDevelopmentTeam}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"Failed to read iOS properties from Directory.Build.props: {ex.Message}");
+            }
+        }
+
         private string GetTeamIdCacheFile(string projectName)
         {
             string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -966,6 +1086,15 @@ namespace SokolApplicationBuilder
             {
                 DEVELOPMENT_TEAM = opts.DevelopmentTeam;
                 Log.LogMessage(MessageImportance.High, $"Using development team from command line: {DEVELOPMENT_TEAM}");
+                SaveTeamIdToCache(projectName, DEVELOPMENT_TEAM);
+                return true;
+            }
+
+            // Try to get team ID from Directory.Build.props
+            if (!string.IsNullOrEmpty(iOSDevelopmentTeam))
+            {
+                DEVELOPMENT_TEAM = iOSDevelopmentTeam;
+                Log.LogMessage(MessageImportance.High, $"✅ Using Development Team ID from Directory.Build.props: {DEVELOPMENT_TEAM}");
                 SaveTeamIdToCache(projectName, DEVELOPMENT_TEAM);
                 return true;
             }
