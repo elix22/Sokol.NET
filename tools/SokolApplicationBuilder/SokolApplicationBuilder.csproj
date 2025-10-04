@@ -19,6 +19,7 @@
   <ItemGroup>
   <PackageReference Include="CommandLineParser" Version="2.9.1" />
   <PackageReference Include="CliWrap" Version="3.9.0" />
+  <PackageReference Include="SkiaSharp" Version="3.119.1" />
  </ItemGroup>
 
   <!-- Copy templates folder to output directory -->

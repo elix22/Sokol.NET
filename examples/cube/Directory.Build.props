@@ -80,7 +80,7 @@
       <AndroidFullBackupContent>false</AndroidFullBackupContent>
       
       <!-- App Icon (path relative to project root, or just filename if in Assets folder) -->
-      <AndroidIcon>logo_full_large.png</AndroidIcon>
+      <AndroidIcon>logo_s_small.png</AndroidIcon>
    </PropertyGroup>
 
    <!-- iOS Configuration -->
@@ -101,7 +101,7 @@
       <!-- <IOSDevelopmentTeam>YOUR_TEAM_ID</IOSDevelopmentTeam> -->
       
       <!-- App Icon (path relative to project root, or just filename if in Assets folder) -->
-      <IOSIcon>logo_full_large.png</IOSIcon>
+      <IOSIcon>logo_s_small.png</IOSIcon>
    </PropertyGroup>
 
    <!-- Desktop Configuration (Windows, macOS, Linux) -->
@@ -110,14 +110,14 @@
       <!-- For Windows: generates .ico file -->
       <!-- For macOS: generates .icns file -->
       <!-- For Linux: copies PNG files for desktop entry -->
-      <DesktopIcon>logo_full_large.png</DesktopIcon>
+      <DesktopIcon>logo_s_large.png</DesktopIcon>
    </PropertyGroup>
 
    <!-- Web Configuration -->
    <PropertyGroup>
       <!-- App Icon (path relative to project root, or just filename if in Assets folder) -->
       <!-- Generates favicon.ico, apple-touch-icon.png, and manifest icons -->
-      <WebIcon>logo_full_large.png</WebIcon>
+      <WebIcon>logo_s_large.png</WebIcon>
    </PropertyGroup>
 
 </Project>

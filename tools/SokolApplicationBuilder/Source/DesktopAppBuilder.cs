@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
+using SkiaSharp;
 using Task = Microsoft.Build.Utilities.Task;
 
 namespace SokolApplicationBuilder
@@ -386,9 +387,20 @@ namespace SokolApplicationBuilder
 
         private bool ResizeImageForDesktop(string sourceIcon, string outputPath, int size)
         {
+            // First choice: Use SkiaSharp (pure C# - always available, cross-platform, high quality)
             try
             {
-                // Try ImageMagick 7+ with 'magick' command
+                if (ResizeImageWithSkiaSharp(sourceIcon, outputPath, size))
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"   ⚠️  SkiaSharp resizing failed: {ex.Message}");
+            }
+
+            // Fallback: Try ImageMagick 7+ with 'magick' command
+            try
+            {
                 // Use -resize with ^ to fill, then -gravity center -extent to crop to exact size
                 var magickResult = CliWrap.Cli.Wrap("magick")
                     .WithArguments($"convert \"{sourceIcon}\" -resize {size}x{size}^ -gravity center -extent {size}x{size} \"{outputPath}\"")
@@ -402,9 +414,9 @@ namespace SokolApplicationBuilder
             }
             catch { }
 
+            // Fallback: Try ImageMagick 6 with 'convert' command
             try
             {
-                // Try ImageMagick 6 with 'convert' command
                 var convertResult = CliWrap.Cli.Wrap("convert")
                     .WithArguments($"\"{sourceIcon}\" -resize {size}x{size}^ -gravity center -extent {size}x{size} \"{outputPath}\"")
                     .WithValidation(CliWrap.CommandResultValidation.None)
@@ -417,7 +429,7 @@ namespace SokolApplicationBuilder
             }
             catch { }
 
-            // Try sips (macOS only)
+            // Fallback: Try sips (macOS only)
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 try
@@ -435,9 +447,78 @@ namespace SokolApplicationBuilder
                 catch { }
             }
 
-            // Fallback: Copy original
+            // Final fallback: Copy original
             File.Copy(sourceIcon, outputPath, true);
-            Log.LogMessage(MessageImportance.Low, $"   ⚠️  Image resizing tools not found. Copied original for {Path.GetFileName(outputPath)}");
+            Log.LogWarning($"   ⚠️  All image resizing methods failed. Copied original for {Path.GetFileName(outputPath)}");
+            return true;
+        }
+
+        private bool ResizeImageWithSkiaSharp(string sourceIcon, string outputPath, int size)
+        {
+            // Load the source image
+            using var inputStream = File.OpenRead(sourceIcon);
+            using var original = SKBitmap.Decode(inputStream);
+            
+            if (original == null)
+            {
+                Log.LogWarning($"   ⚠️  Failed to decode image: {sourceIcon}");
+                return false;
+            }
+
+            // Calculate dimensions to maintain aspect ratio and fill the target size
+            int srcWidth = original.Width;
+            int srcHeight = original.Height;
+            float srcAspect = (float)srcWidth / srcHeight;
+            float targetAspect = 1.0f; // Square target
+
+            int cropWidth, cropHeight, cropX, cropY;
+            
+            if (srcAspect > targetAspect)
+            {
+                // Source is wider, crop width
+                cropHeight = srcHeight;
+                cropWidth = (int)(srcHeight * targetAspect);
+                cropX = (srcWidth - cropWidth) / 2;
+                cropY = 0;
+            }
+            else
+            {
+                // Source is taller, crop height
+                cropWidth = srcWidth;
+                cropHeight = (int)(srcWidth / targetAspect);
+                cropX = 0;
+                cropY = (srcHeight - cropHeight) / 2;
+            }
+
+            // Create cropped bitmap
+            using var cropped = new SKBitmap(cropWidth, cropHeight);
+            using var canvas = new SKCanvas(cropped);
+            
+            var srcRect = new SKRect(cropX, cropY, cropX + cropWidth, cropY + cropHeight);
+            var destRect = new SKRect(0, 0, cropWidth, cropHeight);
+            
+            canvas.DrawBitmap(original, srcRect, destRect, new SKPaint
+            {
+                IsAntialias = true
+            });
+
+            // Resize to target size with high-quality sampling
+            var imageInfo = new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul);
+            var samplingOptions = new SKSamplingOptions(SKCubicResampler.CatmullRom);
+            using var resized = cropped.Resize(imageInfo, samplingOptions);
+            
+            if (resized == null)
+            {
+                Log.LogWarning($"   ⚠️  Failed to resize image to {size}x{size}");
+                return false;
+            }
+
+            // Save as PNG
+            using var image = SKImage.FromBitmap(resized);
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var outputStream = File.OpenWrite(outputPath);
+            data.SaveTo(outputStream);
+
             return true;
         }
 
