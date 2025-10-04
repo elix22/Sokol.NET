@@ -184,8 +184,24 @@ namespace SokolApplicationBuilder
                 string sokolDir = Path.Combine(iosDir, "sokol-ios");
                 Directory.CreateDirectory(sokolDir);
 
-                // Find ext directory (should be at workspace root)
-                string extDir = Path.GetFullPath(Path.Combine(projectDir, "../../ext"));
+                // Find ext directory using the same logic as AndroidAppBuilder
+                string extDir;
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (string.IsNullOrEmpty(homeDir) || !Directory.Exists(homeDir))
+                {
+                    homeDir = Environment.GetEnvironmentVariable("HOME") ?? "";
+                }
+                string configFile = Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+                if (File.Exists(configFile))
+                {
+                    string sokolNetHome = File.ReadAllText(configFile).Trim();
+                    extDir = Path.GetFullPath(Path.Combine(sokolNetHome, "ext"));
+                }
+                else
+                {
+                    extDir = Path.GetFullPath(Path.Combine(projectDir, "..", "..", "..", "ext"));
+                }
+                
                 if (!Directory.Exists(extDir))
                 {
                     Log.LogError($"ext directory not found at: {extDir}");
