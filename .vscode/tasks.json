@@ -1702,7 +1702,7 @@
 				"examples/cimgui",
 				"examples/loadpng",
 				"examples/sgl-points",
-				"examples/debugtext",
+				"examples/plmpeg",
 				"examples/drawcallperf"
 			],
 			"default": "examples/cube"

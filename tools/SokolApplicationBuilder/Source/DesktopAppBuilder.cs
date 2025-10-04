@@ -616,12 +616,36 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.Normal, $"   ✅ Moved Assets to Resources");
                 }
 
-                // Copy other asset files to Resources
-                foreach (string assetFile in Directory.GetFiles(outputPath, "*.png"))
+                // Copy other loose asset files to Resources (images, videos, audio, etc.)
+                // This handles root-level files only - Assets folder structure is already preserved above
+                string[] assetExtensions = { "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tga", "*.mpg", "*.mpeg", "*.mp4", "*.mov", "*.avi", "*.wav", "*.mp3", "*.ogg", "*.flac" };
+                foreach (string pattern in assetExtensions)
                 {
-                    string fileName = Path.GetFileName(assetFile);
-                    string destPath = Path.Combine(resourcesPath, fileName);
-                    File.Move(assetFile, destPath, true);
+                    // Only search root level to avoid duplicating files already in Assets folder
+                    foreach (string assetFile in Directory.GetFiles(outputPath, pattern, SearchOption.TopDirectoryOnly))
+                    {
+                        string fileName = Path.GetFileName(assetFile);
+                        string destPath = Path.Combine(resourcesPath, fileName);
+                        File.Move(assetFile, destPath, true);
+                    }
+                }
+                
+                // Clean up any remaining subdirectories in outputPath (except the .app bundle)
+                foreach (string dir in Directory.GetDirectories(outputPath))
+                {
+                    string dirName = Path.GetFileName(dir);
+                    // Skip .app bundle and .dSYM directories
+                    if (!dirName.EndsWith(".app") && !dirName.EndsWith(".dSYM"))
+                    {
+                        try
+                        {
+                            Directory.Delete(dir, true);
+                        }
+                        catch
+                        {
+                            // Ignore cleanup errors
+                        }
+                    }
                 }
 
                 // Create Info.plist
