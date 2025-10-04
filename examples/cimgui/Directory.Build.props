@@ -59,5 +59,46 @@
     <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
   </Target>
 
+<!-- Android Configuration -->
+   <PropertyGroup>
+      <!-- SDK Versions -->
+      <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
+      <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
+      
+      <!-- Permissions (semicolon-separated) -->
+      <AndroidPermissions>android.permission.INTERNET;android.permission.WAKE_LOCK</AndroidPermissions>
+      
+      <!-- Application Properties -->
+      <AndroidFullscreen>true</AndroidFullscreen>
+      <AndroidScreenOrientation>landscape</AndroidScreenOrientation>
+      <AndroidKeepScreenOn>true</AndroidKeepScreenOn>
+      <AndroidAllowBackup>false</AndroidAllowBackup>
+      <AndroidFullBackupContent>false</AndroidFullBackupContent>
+   </PropertyGroup>
 
+   <!-- iOS Configuration -->
+   <PropertyGroup>
+      <!-- Minimum iOS version -->
+      <IOSMinVersion>14.0</IOSMinVersion>
+      
+      <!-- Screen orientation: portrait, landscape, or both -->
+      <IOSScreenOrientation>landscape</IOSScreenOrientation>
+      
+      <!-- Requires full screen (hides home indicator) -->
+      <IOSRequiresFullScreen>true</IOSRequiresFullScreen>
+      
+      <!-- Hide status bar -->
+      <IOSStatusBarHidden>true</IOSStatusBarHidden>
+      
+      <!-- Development Team ID (optional, can be cached) -->
+      <!-- <IOSDevelopmentTeam>YOUR_TEAM_ID</IOSDevelopmentTeam> -->
+   </PropertyGroup>
+
+   <PropertyGroup>
+      <AndroidIcon>logo_s_small.png</AndroidIcon>
+      <IOSIcon>logo_s_small.png</IOSIcon>
+      <DesktopIcon>logo_s_large.png</DesktopIcon>
+      <WebIcon>logo_s_large.png</WebIcon>
+   </PropertyGroup>
+   
 </Project>

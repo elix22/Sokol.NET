@@ -95,4 +95,11 @@
       <!-- <IOSDevelopmentTeam>YOUR_TEAM_ID</IOSDevelopmentTeam> -->
    </PropertyGroup>
 
+   <PropertyGroup>
+      <AndroidIcon>logo_s_small.png</AndroidIcon>
+      <IOSIcon>logo_s_small.png</IOSIcon>
+      <DesktopIcon>logo_s_large.png</DesktopIcon>
+      <WebIcon>logo_s_large.png</WebIcon>
+   </PropertyGroup>
+
 </Project>
