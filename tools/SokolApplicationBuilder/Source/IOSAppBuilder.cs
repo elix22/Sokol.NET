@@ -60,6 +60,7 @@ namespace SokolApplicationBuilder
         private bool iOSRequiresFullScreen = false;
         private bool iOSStatusBarHidden = false;
         private string iOSDevelopmentTeam = string.Empty;
+        private string iOSIcon = string.Empty;
 
         private string CLANG_CMD = string.Empty;
         private string AR_CMD = string.Empty;
@@ -148,6 +149,9 @@ namespace SokolApplicationBuilder
                 // Copy iOS templates
                 if (!CopyIOSTemplates(iosDir, projectName))
                     return false;
+
+                // Process iOS icon if specified
+                ProcessIOSIcon(iosDir, projectDir);
 
                 // Generate Xcode project
                 if (!GenerateXcodeProject(iosDir, projectName))
@@ -1029,6 +1033,14 @@ namespace SokolApplicationBuilder
                         iOSDevelopmentTeam = devTeamElement.Value;
                         propertyCount++;
                     }
+
+                    // iOS Icon
+                    var iconElement = propertyGroup.Element("IOSIcon");
+                    if (iconElement != null && !string.IsNullOrEmpty(iconElement.Value))
+                    {
+                        iOSIcon = iconElement.Value;
+                        propertyCount++;
+                    }
                 }
 
                 if (propertyCount > 0)
@@ -1042,6 +1054,8 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.High, $"   - IOSStatusBarHidden: {iOSStatusBarHidden}");
                     if (!string.IsNullOrEmpty(iOSDevelopmentTeam))
                         Log.LogMessage(MessageImportance.High, $"   - IOSDevelopmentTeam: {iOSDevelopmentTeam}");
+                    if (!string.IsNullOrEmpty(iOSIcon))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSIcon: {iOSIcon}");
                 }
             }
             catch (Exception ex)
@@ -1175,6 +1189,205 @@ namespace SokolApplicationBuilder
             {
                 string destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
                 CopyDirectory(subDir, destSubDir);
+            }
+        }
+
+        private void ProcessIOSIcon(string iosDir, string projectDir)
+        {
+            if (string.IsNullOrWhiteSpace(iOSIcon))
+            {
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No IOSIcon specified in Directory.Build.props, using default icon");
+                return;
+            }
+
+            // Find the icon file
+            string sourceIconPath = FindIconFile(iOSIcon, projectDir);
+            if (string.IsNullOrEmpty(sourceIconPath) || !File.Exists(sourceIconPath))
+            {
+                Log.LogWarning($"⚠️  iOS icon not found: {iOSIcon}");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, $"📱 Processing iOS icon: {Path.GetFileName(sourceIconPath)}");
+
+            try
+            {
+                // Create Assets.xcassets directory structure
+                string assetsDir = Path.Combine(iosDir, "Assets.xcassets");
+                string appIconDir = Path.Combine(assetsDir, "AppIcon.appiconset");
+                Directory.CreateDirectory(appIconDir);
+
+                // iOS icon sizes (iPhone and iPad)
+                var iconSizes = new List<(string name, int size, string idiom, string scale)>
+                {
+                    // iPhone
+                    ("icon-20@2x.png", 40, "iphone", "2x"),
+                    ("icon-20@3x.png", 60, "iphone", "3x"),
+                    ("icon-29@2x.png", 58, "iphone", "2x"),
+                    ("icon-29@3x.png", 87, "iphone", "3x"),
+                    ("icon-40@2x.png", 80, "iphone", "2x"),
+                    ("icon-40@3x.png", 120, "iphone", "3x"),
+                    ("icon-60@2x.png", 120, "iphone", "2x"),
+                    ("icon-60@3x.png", 180, "iphone", "3x"),
+                    
+                    // iPad
+                    ("icon-20.png", 20, "ipad", "1x"),
+                    ("icon-20@2x-ipad.png", 40, "ipad", "2x"),
+                    ("icon-29.png", 29, "ipad", "1x"),
+                    ("icon-29@2x-ipad.png", 58, "ipad", "2x"),
+                    ("icon-40.png", 40, "ipad", "1x"),
+                    ("icon-40@2x-ipad.png", 80, "ipad", "2x"),
+                    ("icon-76.png", 76, "ipad", "1x"),
+                    ("icon-76@2x.png", 152, "ipad", "2x"),
+                    ("icon-83.5@2x.png", 167, "ipad", "2x"),
+                    
+                    // App Store
+                    ("icon-1024.png", 1024, "ios-marketing", "1x")
+                };
+
+                // Generate Contents.json
+                var contentsJson = new StringBuilder();
+                contentsJson.AppendLine("{");
+                contentsJson.AppendLine("  \"images\" : [");
+
+                for (int i = 0; i < iconSizes.Count; i++)
+                {
+                    var icon = iconSizes[i];
+                    string destIcon = Path.Combine(appIconDir, icon.name);
+                    
+                    // Resize and save icon
+                    ResizeImage(sourceIconPath, destIcon, icon.size, icon.size);
+                    
+                    // Extract size from icon size
+                    string sizeStr = icon.size < 100 
+                        ? $"{icon.size}x{icon.size}" 
+                        : icon.size == 1024 
+                            ? "1024x1024" 
+                            : $"{icon.size / (icon.scale == "2x" ? 2 : icon.scale == "3x" ? 3 : 1)}x{icon.size / (icon.scale == "2x" ? 2 : icon.scale == "3x" ? 3 : 1)}";
+                    
+                    contentsJson.AppendLine("    {");
+                    contentsJson.AppendLine($"      \"filename\" : \"{icon.name}\",");
+                    contentsJson.AppendLine($"      \"idiom\" : \"{icon.idiom}\",");
+                    contentsJson.AppendLine($"      \"scale\" : \"{icon.scale}\",");
+                    contentsJson.AppendLine($"      \"size\" : \"{sizeStr}\"");
+                    contentsJson.Append("    }");
+                    contentsJson.AppendLine(i < iconSizes.Count - 1 ? "," : "");
+                    
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created {icon.name} ({icon.size}x{icon.size})");
+                }
+
+                contentsJson.AppendLine("  ],");
+                contentsJson.AppendLine("  \"info\" : {");
+                contentsJson.AppendLine("    \"author\" : \"xcode\",");
+                contentsJson.AppendLine("    \"version\" : 1");
+                contentsJson.AppendLine("  }");
+                contentsJson.AppendLine("}");
+
+                // Write Contents.json
+                string contentsJsonPath = Path.Combine(appIconDir, "Contents.json");
+                File.WriteAllText(contentsJsonPath, contentsJson.ToString());
+
+                Log.LogMessage(MessageImportance.High, "✅ iOS icon processed successfully");
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to process iOS icon: {ex.Message}");
+            }
+        }
+
+        private string FindIconFile(string iconPath, string projectDir)
+        {
+            // If it's already an absolute path and exists, use it
+            if (Path.IsPathRooted(iconPath) && File.Exists(iconPath))
+            {
+                return iconPath;
+            }
+
+            // Check in Assets folder first
+            string assetsPath = Path.Combine(projectDir, "Assets", iconPath);
+            if (File.Exists(assetsPath))
+            {
+                return assetsPath;
+            }
+
+            // Check relative to project path
+            string relativePath = Path.Combine(projectDir, iconPath);
+            if (File.Exists(relativePath))
+            {
+                return relativePath;
+            }
+
+            return null;
+        }
+
+        private void ResizeImage(string sourcePath, string destPath, int width, int height)
+        {
+            // Try using ImageMagick first (convert or magick command)
+            bool resized = false;
+
+            try
+            {
+                // Try 'magick' command (ImageMagick 7+)
+                var magickResult = Cli.Wrap("magick")
+                    .WithArguments($"\"{sourcePath}\" -resize {width}x{height}! \"{destPath}\"")
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (magickResult.ExitCode == 0)
+                {
+                    resized = true;
+                }
+            }
+            catch
+            {
+                // ImageMagick not available, try 'convert' command
+                try
+                {
+                    var convertResult = Cli.Wrap("convert")
+                        .WithArguments($"\"{sourcePath}\" -resize {width}x{height}! \"{destPath}\"")
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (convertResult.ExitCode == 0)
+                    {
+                        resized = true;
+                    }
+                }
+                catch { }
+            }
+
+            // If ImageMagick is not available, try using sips (macOS only)
+            if (!resized && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                try
+                {
+                    // Copy file first
+                    File.Copy(sourcePath, destPath, true);
+                    
+                    var sipsResult = Cli.Wrap("sips")
+                        .WithArguments($"-z {height} {width} \"{destPath}\"")
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (sipsResult.ExitCode == 0)
+                    {
+                        resized = true;
+                    }
+                }
+                catch { }
+            }
+
+            // If no tool is available, just copy the file
+            if (!resized)
+            {
+                Log.LogWarning($"⚠️  Image resizing tools not found (ImageMagick or sips). Copying original icon.");
+                File.Copy(sourcePath, destPath, true);
             }
         }
     }

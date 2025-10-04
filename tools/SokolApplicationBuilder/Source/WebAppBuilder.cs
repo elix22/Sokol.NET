@@ -1,11 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Task = Microsoft.Build.Utilities.Task;
-using System;
 
 
 namespace SokolApplicationBuilder
@@ -150,7 +150,307 @@ namespace SokolApplicationBuilder
                 return false;
             }
 
+            // Process web icon if specified (use parent project path, not Web subfolder)
+            string iconProjectPath = Path.GetDirectoryName(opts.ProjectPath) ?? opts.ProjectPath;
+            ProcessWebIcon(iconProjectPath, opts.OutputPath);
+
             return true;
+        }
+
+        private void ProcessWebIcon(string projectPath, string outputPath)
+        {
+            try
+            {
+                string? webIcon = ReadWebIconFromDirectoryBuildProps(projectPath);
+                
+                if (string.IsNullOrEmpty(webIcon))
+                {
+                    Log.LogMessage(MessageImportance.Normal, "ℹ️  No WebIcon specified in Directory.Build.props");
+                    return;
+                }
+
+                string? sourceIconPath = FindIconFile(projectPath, webIcon);
+                
+                if (sourceIconPath == null)
+                {
+                    Log.LogWarning($"⚠️  Web icon not found: {webIcon}");
+                    return;
+                }
+
+                Log.LogMessage(MessageImportance.High, $"🌐 Processing Web icon: {Path.GetFileName(sourceIconPath)}");
+
+                // Generate all web icon formats
+                GenerateFavicon(sourceIconPath, outputPath);
+                GenerateAppleTouchIcon(sourceIconPath, outputPath);
+                GenerateManifestIcons(sourceIconPath, outputPath);
+                GenerateWebManifest(outputPath, PROJECT_NAME);
+
+                Log.LogMessage(MessageImportance.High, "✅ Web icon processed successfully");
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to process web icon: {ex.Message}");
+            }
+        }
+
+        private void GenerateFavicon(string sourceIconPath, string outputPath)
+        {
+            string faviconPath = Path.Combine(outputPath, "favicon.ico");
+            
+            // Try to create multi-size favicon.ico with ImageMagick
+            bool created = false;
+            
+            // Resize source to 48, 32, 16 for favicon
+            var tempIcons = new List<string>();
+            var sizes = new[] { 48, 32, 16 };
+            
+            foreach (int size in sizes)
+            {
+                string tempIcon = Path.Combine(Path.GetTempPath(), $"favicon_{size}.png");
+                if (ResizeImageForWeb(sourceIconPath, tempIcon, size))
+                {
+                    tempIcons.Add(tempIcon);
+                }
+            }
+
+            if (tempIcons.Count > 0)
+            {
+                string resizedArgs = string.Join(" ", tempIcons.Select(p => $"\"{p}\""));
+                
+                try
+                {
+                    var magickResult = CliWrap.Cli.Wrap("magick")
+                        .WithArguments($"convert {resizedArgs} \"{faviconPath}\"")
+                        .WithValidation(CliWrap.CommandResultValidation.None)
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (magickResult.ExitCode == 0)
+                    {
+                        created = true;
+                        Log.LogMessage(MessageImportance.Normal, $"   ✅ Created favicon.ico");
+                    }
+                }
+                catch { }
+
+                if (!created)
+                {
+                    try
+                    {
+                        var convertResult = CliWrap.Cli.Wrap("convert")
+                            .WithArguments($"{resizedArgs} \"{faviconPath}\"")
+                            .WithValidation(CliWrap.CommandResultValidation.None)
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+
+                        if (convertResult.ExitCode == 0)
+                        {
+                            created = true;
+                            Log.LogMessage(MessageImportance.Normal, $"   ✅ Created favicon.ico");
+                        }
+                    }
+                    catch { }
+                }
+
+                // Clean up temp files
+                foreach (var tempIcon in tempIcons)
+                {
+                    try { File.Delete(tempIcon); } catch { }
+                }
+            }
+
+            if (!created)
+            {
+                // Fallback: Create 32x32 PNG as favicon.png
+                string faviconPngPath = Path.Combine(outputPath, "favicon.png");
+                if (ResizeImageForWeb(sourceIconPath, faviconPngPath, 32))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created favicon.png (32x32) - ICO generation failed");
+                }
+            }
+        }
+
+        private void GenerateAppleTouchIcon(string sourceIconPath, string outputPath)
+        {
+            // Apple touch icon sizes
+            var sizes = new[] 
+            {
+                (180, "apple-touch-icon-180x180.png"),  // iPhone @3x
+                (167, "apple-touch-icon-167x167.png"),  // iPad Pro
+                (152, "apple-touch-icon-152x152.png"),  // iPad @2x
+                (120, "apple-touch-icon-120x120.png")   // iPhone @2x
+            };
+
+            foreach (var (size, filename) in sizes)
+            {
+                string iconPath = Path.Combine(outputPath, filename);
+                if (ResizeImageForWeb(sourceIconPath, iconPath, size))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created {filename} ({size}x{size})");
+                }
+            }
+
+            // Also create default apple-touch-icon.png (180x180)
+            string defaultAppleIcon = Path.Combine(outputPath, "apple-touch-icon.png");
+            if (ResizeImageForWeb(sourceIconPath, defaultAppleIcon, 180))
+            {
+                Log.LogMessage(MessageImportance.Normal, $"   ✅ Created apple-touch-icon.png (180x180)");
+            }
+        }
+
+        private void GenerateManifestIcons(string sourceIconPath, string outputPath)
+        {
+            // PWA manifest icon sizes
+            var sizes = new[] 
+            {
+                (192, "icon-192x192.png"),  // Standard icon
+                (512, "icon-512x512.png")   // Large icon for splash
+            };
+
+            foreach (var (size, filename) in sizes)
+            {
+                string iconPath = Path.Combine(outputPath, filename);
+                if (ResizeImageForWeb(sourceIconPath, iconPath, size))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created {filename} ({size}x{size})");
+                }
+            }
+        }
+
+        private void GenerateWebManifest(string outputPath, string appName)
+        {
+            string manifestPath = Path.Combine(outputPath, "manifest.json");
+            
+            var manifest = new
+            {
+                name = appName,
+                short_name = appName,
+                description = $"{appName} - Powered by Sokol",
+                start_url = "./",
+                display = "standalone",
+                background_color = "#ffffff",
+                theme_color = "#000000",
+                icons = new[]
+                {
+                    new
+                    {
+                        src = "icon-192x192.png",
+                        sizes = "192x192",
+                        type = "image/png",
+                        purpose = "any maskable"
+                    },
+                    new
+                    {
+                        src = "icon-512x512.png",
+                        sizes = "512x512",
+                        type = "image/png",
+                        purpose = "any maskable"
+                    }
+                }
+            };
+
+            string json = System.Text.Json.JsonSerializer.Serialize(manifest, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            
+            File.WriteAllText(manifestPath, json);
+            Log.LogMessage(MessageImportance.Normal, $"   ✅ Created manifest.json");
+        }
+
+        private bool ResizeImageForWeb(string sourceIcon, string outputPath, int size)
+        {
+            try
+            {
+                // Try ImageMagick 7+ with 'magick' command
+                var magickResult = CliWrap.Cli.Wrap("magick")
+                    .WithArguments($"convert \"{sourceIcon}\" -resize {size}x{size} \"{outputPath}\"")
+                    .WithValidation(CliWrap.CommandResultValidation.None)
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (magickResult.ExitCode == 0)
+                    return true;
+            }
+            catch { }
+
+            try
+            {
+                // Try ImageMagick 6 with 'convert' command
+                var convertResult = CliWrap.Cli.Wrap("convert")
+                    .WithArguments($"\"{sourceIcon}\" -resize {size}x{size} \"{outputPath}\"")
+                    .WithValidation(CliWrap.CommandResultValidation.None)
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (convertResult.ExitCode == 0)
+                    return true;
+            }
+            catch { }
+
+            // Try sips (macOS only)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                try
+                {
+                    var sipsResult = CliWrap.Cli.Wrap("sips")
+                        .WithArguments($"-z {size} {size} \"{sourceIcon}\" --out \"{outputPath}\"")
+                        .WithValidation(CliWrap.CommandResultValidation.None)
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (sipsResult.ExitCode == 0)
+                        return true;
+                }
+                catch { }
+            }
+
+            // Fallback: Copy original
+            File.Copy(sourceIcon, outputPath, true);
+            Log.LogMessage(MessageImportance.Low, $"   ⚠️  Image resizing tools not found. Copied original for {Path.GetFileName(outputPath)}");
+            return true;
+        }
+
+        private string? ReadWebIconFromDirectoryBuildProps(string projectPath)
+        {
+            string directoryBuildPropsPath = Path.Combine(projectPath, "Directory.Build.props");
+            if (!File.Exists(directoryBuildPropsPath))
+                return null;
+
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(directoryBuildPropsPath);
+                var webIcon = doc.Descendants("WebIcon").FirstOrDefault()?.Value;
+                return webIcon;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string? FindIconFile(string projectPath, string iconPath)
+        {
+            // Try absolute path
+            if (Path.IsPathRooted(iconPath) && File.Exists(iconPath))
+                return iconPath;
+
+            // Try Assets folder
+            string assetsPath = Path.Combine(projectPath, "Assets", iconPath);
+            if (File.Exists(assetsPath))
+                return assetsPath;
+
+            // Try relative to project
+            string relativePath = Path.Combine(projectPath, iconPath);
+            if (File.Exists(relativePath))
+                return relativePath;
+
+            return null;
         }
 
         private bool ParseEnvironmentVariables()

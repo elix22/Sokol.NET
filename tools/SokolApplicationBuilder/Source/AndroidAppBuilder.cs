@@ -612,6 +612,159 @@ namespace SokolApplicationBuilder
                 content = content.Replace("NativeActivity", appName);
                 File.WriteAllText(file, content);
             }
+
+            // Process Android icon if specified
+            ProcessAndroidIcon(androidPath, androidProperties);
+        }
+
+        void ProcessAndroidIcon(string androidPath, Dictionary<string, string> androidProperties)
+        {
+            if (!androidProperties.TryGetValue("AndroidIcon", out string? iconPath) || string.IsNullOrWhiteSpace(iconPath))
+            {
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No AndroidIcon specified in Directory.Build.props, using default icon");
+                return;
+            }
+
+            // Find the icon file
+            string sourceIconPath = FindIconFile(iconPath);
+            if (string.IsNullOrEmpty(sourceIconPath) || !File.Exists(sourceIconPath))
+            {
+                Log.LogWarning($"⚠️  Android icon not found: {iconPath}");
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, $"📱 Processing Android icon: {Path.GetFileName(sourceIconPath)}");
+
+            try
+            {
+                // Android icon sizes for different densities
+                var iconSizes = new Dictionary<string, int>
+                {
+                    { "mipmap-mdpi", 48 },
+                    { "mipmap-hdpi", 72 },
+                    { "mipmap-xhdpi", 96 },
+                    { "mipmap-xxhdpi", 144 },
+                    { "mipmap-xxxhdpi", 192 }
+                };
+
+                foreach (var kvp in iconSizes)
+                {
+                    string densityFolder = kvp.Key;
+                    int size = kvp.Value;
+                    
+                    string destFolder = Path.Combine(androidPath, "app", "src", "main", "res", densityFolder);
+                    Directory.CreateDirectory(destFolder);
+                    
+                    string destIcon = Path.Combine(destFolder, "ic_launcher.png");
+                    
+                    // Use ImageMagick or copy if same size
+                    ResizeImage(sourceIconPath, destIcon, size, size);
+                    
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created {densityFolder}/ic_launcher.png ({size}x{size})");
+                }
+
+                Log.LogMessage(MessageImportance.High, "✅ Android icon processed successfully");
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to process Android icon: {ex.Message}");
+            }
+        }
+
+        string FindIconFile(string iconPath)
+        {
+            // If it's already an absolute path and exists, use it
+            if (Path.IsPathRooted(iconPath) && File.Exists(iconPath))
+            {
+                return iconPath;
+            }
+
+            // Check in Assets folder first
+            string assetsPath = Path.Combine(opts.ProjectPath, "Assets", iconPath);
+            if (File.Exists(assetsPath))
+            {
+                return assetsPath;
+            }
+
+            // Check relative to project path
+            string relativePath = Path.Combine(opts.ProjectPath, iconPath);
+            if (File.Exists(relativePath))
+            {
+                return relativePath;
+            }
+
+            return null;
+        }
+
+        void ResizeImage(string sourcePath, string destPath, int width, int height)
+        {
+            // Try using ImageMagick first (convert or magick command)
+            bool resized = false;
+
+            try
+            {
+                // Try 'magick' command (ImageMagick 7+)
+                var magickResult = Cli.Wrap("magick")
+                    .WithArguments($"\"{sourcePath}\" -resize {width}x{height}! \"{destPath}\"")
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteBufferedAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (magickResult.ExitCode == 0)
+                {
+                    resized = true;
+                }
+            }
+            catch
+            {
+                // ImageMagick not available, try 'convert' command
+                try
+                {
+                    var convertResult = Cli.Wrap("convert")
+                        .WithArguments($"\"{sourcePath}\" -resize {width}x{height}! \"{destPath}\"")
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (convertResult.ExitCode == 0)
+                    {
+                        resized = true;
+                    }
+                }
+                catch { }
+            }
+
+            // If ImageMagick is not available, try using sips (macOS only)
+            if (!resized && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                try
+                {
+                    // Copy file first
+                    File.Copy(sourcePath, destPath, true);
+                    
+                    var sipsResult = Cli.Wrap("sips")
+                        .WithArguments($"-z {height} {width} \"{destPath}\"")
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (sipsResult.ExitCode == 0)
+                    {
+                        resized = true;
+                    }
+                }
+                catch { }
+            }
+
+            // If no tool is available, just copy the file
+            if (!resized)
+            {
+                Log.LogWarning($"⚠️  Image resizing tools not found (ImageMagick or sips). Copying original icon.");
+                File.Copy(sourcePath, destPath, true);
+            }
         }
 
         void CompileShaders()

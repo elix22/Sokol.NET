@@ -43,6 +43,39 @@
             "problemMatcher": []
         },
         {
+            "label": "macOS: Build App Bundle",
+            "type": "shell",
+            "osx": {
+                "command": "dotnet",
+                "args": [
+                    "run",
+                    "--project",
+                    "${workspaceFolder}/tools/SokolApplicationBuilder",
+                    "--",
+                    "--task",
+                    "build",
+                    "--type",
+                    "release",
+                    "--architecture",
+                    "desktop",
+                    "--rid",
+                    "${input:macOSArchitecture}",
+                    "--path",
+                    "${input:examplePath}"
+                ]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "compile-cube-shaders",
             "command": "dotnet",
             "type": "process",
@@ -1657,5 +1690,32 @@
             },
             "problemMatcher": "$msCompile"
         }
+	],
+	"inputs": [
+		{
+			"id": "examplePath",
+			"type": "pickString",
+			"description": "Select an example to build",
+			"options": [
+				"examples/cube",
+				"examples/dyntex",
+				"examples/cimgui",
+				"examples/loadpng",
+				"examples/sgl-points",
+				"examples/debugtext",
+				"examples/drawcallperf"
+			],
+			"default": "examples/cube"
+		},
+		{
+			"id": "macOSArchitecture",
+			"type": "pickString",
+			"description": "Select macOS architecture",
+			"options": [
+				"osx-arm64",
+				"osx-x64"
+			],
+			"default": "osx-arm64"
+		}
 	]
 }

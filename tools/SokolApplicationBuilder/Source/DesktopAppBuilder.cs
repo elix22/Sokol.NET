@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
@@ -10,20 +11,7 @@ namespace SokolApplicationBuilder
 {
     public class DesktopBuildTask : Task
     {
-        Options opts;
-        Dictionary<string, string> envVars = new();
-
-        string PROJECT_UUID = string.Empty;
-        string PROJECT_NAME = string.Empty;
-        string JAVA_PACKAGE_PATH = string.Empty;
-        string VERSION_CODE = string.Empty;
-        string VERSION_NAME = string.Empty;
-
-        string URHONET_HOME_PATH = string.Empty;
-
-        string DEVELOPMENT_TEAM = string.Empty;
-
-        Dictionary<string, string> envVarsDict = new();
+        private readonly Options opts;
 
         public DesktopBuildTask(Options opts)
         {
@@ -31,143 +19,574 @@ namespace SokolApplicationBuilder
             Utils.opts = opts;
         }
 
-
-        public override bool Equals(object? obj)
-        {
-            return base.Equals(obj);
-        }
-
         public override bool Execute()
         {
-
-            URHONET_HOME_PATH = Utils.GetUrhoNetHomePath();
-            if (!ParseEnvironmentVariables())
+            try
             {
-                Log.LogError("Failed to parse environment variables");
-                return false;
-            }
+                Log.LogMessage(MessageImportance.High, "🖥️  Building Desktop Application...");
 
-            string buildType = "Debug";
-
-            if (opts.Type == "release")
-            {
-                buildType = "Release";
-            }
-            string targetFramework = (opts.Framework != "") ? opts.Framework : "net10.0";
-
-            if (opts.OutputPath != "")
-            {
-                opts.OutputPath = Path.Combine(opts.OutputPath, opts.RID);
-            }
-
-            string projectPath = Path.Combine(opts.ProjectPath, PROJECT_NAME+".csproj");
-            if (!File.Exists(projectPath))
-            {
-                Log.LogError($"Project file {PROJECT_NAME+".csproj"} not found , searching for a default project file");
-                if(!Utils.FindProjectInPath(opts.ProjectPath, ref projectPath))
-                {
-                    Log.LogError("Default Project file not found");
-                    return false;
-                }
-                else
-                {
-                    Log.LogMessage($"Project file {projectPath} found");
-                }
-            }
-
-            string dotnet_build_command = $"dotnet publish -f {targetFramework} {projectPath} -r  {opts.RID} -c {buildType}   -p:PublishAot=true -p:TrimmerRemoveSymbols=false -p:TrimMode=partial -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:StripSymbols=true   -p:DefineConstants=\"_DESKTOP_PUBLISHED_BINARY_\" -o {opts.OutputPath}";
-
-            (int exitCode, string output) = Utils.RunShellCommand(Log,
-                dotnet_build_command,
-                envVars,
-                workingDir: opts.ProjectPath,
-                logStdErrAsMessage: true,
-                debugMessageImportance: MessageImportance.High,
-                label: "dotnet-build");
-
-            if (exitCode != 0)
-            {
-                Log.LogError("dotnet publish error");
-                return false;
-            }
-
-            Path.Combine(opts.ProjectPath, "Assets").CopyDirectoryIfDifferent(Path.Combine(opts.OutputPath, ""), true);
-
-            return true;
-        }
-
-        private bool ParseEnvironmentVariables()
-        {
-
-            string project_vars_path = Path.Combine(opts.ProjectPath, "script", "project_vars.sh");
-
-            if (!File.Exists(project_vars_path))
-            {
-                Log.LogError($"project_vars.sh not found");
-                return false;
-            }
-
-            project_vars_path.ParseEnvironmentVariables(out envVarsDict);
-
-            PROJECT_UUID = envVarsDict.GetEnvValue("PROJECT_UUID");
-            PROJECT_NAME = envVarsDict.GetEnvValue("PROJECT_NAME");
-            JAVA_PACKAGE_PATH = envVarsDict.GetEnvValue("JAVA_PACKAGE_PATH");
-            VERSION_CODE = envVarsDict.GetEnvValue("VERSION_CODE");
-            VERSION_NAME = envVarsDict.GetEnvValue("VERSION_NAME");
-
-            // Override PROJECT_NAME if specified via command line option
-            if (!string.IsNullOrEmpty(opts.ProjectName))
-            {
-                PROJECT_NAME = opts.ProjectName;
-                Log.LogMessage(MessageImportance.Normal, $"Using project name from command line: {PROJECT_NAME}");
-            }
-
-            // If PROJECT_NAME is still empty, use smart project selection
-            if (string.IsNullOrEmpty(PROJECT_NAME))
-            {
-                string dummyPath = "";
-                if (Utils.FindProjectInPath(opts.ProjectPath, ref dummyPath))
-                {
-                    PROJECT_NAME = Path.GetFileNameWithoutExtension(dummyPath);
-                    Log.LogMessage(MessageImportance.Normal, $"Using auto-detected project name: {PROJECT_NAME}");
-                }
-                else
+                // Determine project name
+                string projectName = GetProjectName(opts.ProjectPath);
+                if (string.IsNullOrEmpty(projectName))
                 {
                     Log.LogError("Could not determine project name");
                     return false;
                 }
-            }
 
-            if (VERSION_CODE == string.Empty)
+                Log.LogMessage(MessageImportance.Normal, $"Project name: {projectName}");
+
+                // Find project file
+                string projectFile = Path.Combine(opts.ProjectPath, $"{projectName}.csproj");
+                if (!File.Exists(projectFile))
+                {
+                    Log.LogError($"Project file not found: {projectFile}");
+                    if (!Utils.FindProjectInPath(opts.ProjectPath, ref projectFile))
+                    {
+                        Log.LogError("No .csproj file found in project directory");
+                        return false;
+                    }
+                    Log.LogMessage(MessageImportance.Normal, $"Using project file: {projectFile}");
+                }
+
+                // Determine build configuration
+                string buildType = opts.Type == "release" ? "Release" : "Debug";
+                string targetFramework = string.IsNullOrEmpty(opts.Framework) ? "net10.0" : opts.Framework;
+
+                // Determine output path
+                string outputPath = opts.OutputPath;
+                if (string.IsNullOrEmpty(outputPath))
+                {
+                    outputPath = Path.Combine(opts.ProjectPath, "bin", buildType, opts.RID);
+                }
+                else
+                {
+                    outputPath = Path.Combine(outputPath, opts.RID);
+                }
+
+                Log.LogMessage(MessageImportance.Normal, $"Build type: {buildType}");
+                Log.LogMessage(MessageImportance.Normal, $"Target framework: {targetFramework}");
+                Log.LogMessage(MessageImportance.Normal, $"Runtime ID: {opts.RID}");
+                Log.LogMessage(MessageImportance.Normal, $"Output path: {outputPath}");
+
+                // Ensure paths are absolute
+                string absoluteProjectFile = Path.GetFullPath(projectFile);
+                string absoluteOutputPath = Path.GetFullPath(outputPath);
+
+                // Build project with dotnet publish
+                string dotnetCommand = $"dotnet publish -f {targetFramework} \"{absoluteProjectFile}\" -r {opts.RID} -c {buildType} " +
+                                     $"-p:PublishAot=true -p:TrimmerRemoveSymbols=false -p:TrimMode=partial " +
+                                     $"-p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true " +
+                                     $"-p:StripSymbols=true -p:DefineConstants=\"_DESKTOP_PUBLISHED_BINARY_\" " +
+                                     $"-o \"{absoluteOutputPath}\"";
+
+                Log.LogMessage(MessageImportance.High, "📦 Publishing .NET project...");
+                (int exitCode, string output) = Utils.RunShellCommand(
+                    Log,
+                    dotnetCommand,
+                    new Dictionary<string, string>(),
+                    workingDir: opts.ProjectPath,
+                    logStdErrAsMessage: true,
+                    debugMessageImportance: MessageImportance.High,
+                    label: "dotnet-publish");
+
+                if (exitCode != 0)
+                {
+                    Log.LogError("dotnet publish failed");
+                    return false;
+                }
+
+                Log.LogMessage(MessageImportance.High, "✅ .NET project published successfully");
+
+                // Copy Assets folder if it exists
+                string assetsPath = Path.Combine(opts.ProjectPath, "Assets");
+                if (Directory.Exists(assetsPath))
+                {
+                    Log.LogMessage(MessageImportance.Normal, "📁 Copying Assets folder...");
+                    assetsPath.CopyDirectoryIfDifferent(outputPath, true);
+                }
+
+                // Process desktop icon if specified
+                string? iconPath = ProcessDesktopIcon(opts.ProjectPath, outputPath);
+
+                // Create macOS app bundle if on macOS
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && opts.RID.Contains("osx"))
+                {
+                    CreateMacOSAppBundle(projectName, outputPath, iconPath);
+                }
+
+                Log.LogMessage(MessageImportance.High, "✅ Desktop build completed successfully");
+                Log.LogMessage(MessageImportance.High, $"📂 Output: {outputPath}");
+
+                return true;
+            }
+            catch (Exception ex)
             {
-                VERSION_CODE = "1";
+                Log.LogError($"Desktop build failed: {ex.Message}");
+                return false;
             }
+        }
 
-            if (VERSION_NAME == string.Empty)
+        private string GetProjectName(string projectPath)
+        {
+            // If project name is explicitly provided via options, use it
+            if (!string.IsNullOrEmpty(opts.ProjectName))
             {
-                VERSION_NAME = "1.0.0";
+                Log.LogMessage(MessageImportance.Normal, $"Using explicitly specified project name: {opts.ProjectName}");
+                return opts.ProjectName;
             }
 
+            // Find all .csproj files in the project directory
+            string[] csprojFiles = Directory.GetFiles(projectPath, "*.csproj");
 
-            Console.WriteLine("UrhoNetHomePath = " + URHONET_HOME_PATH);
-            Console.WriteLine("opts.OutputPath = " + opts.OutputPath);
-            Console.WriteLine("OutputPath  = " + opts.OutputPath);
-            Console.WriteLine("PROJECT_UUID" + "=" + PROJECT_UUID);
-            Console.WriteLine("PROJECT_NAME" + "=" + PROJECT_NAME);
-            Console.WriteLine("JAVA_PACKAGE_PATH" + "=" + JAVA_PACKAGE_PATH);
+            if (csprojFiles.Length == 0)
+            {
+                Log.LogError($"No .csproj files found in directory: {projectPath}");
+                return string.Empty;
+            }
 
+            if (csprojFiles.Length == 1)
+            {
+                // Only one project found, use it
+                string projectName = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+                Log.LogMessage(MessageImportance.Normal, $"Found single project: {projectName}");
+                return projectName;
+            }
 
+            // Multiple projects found, try to match with parent folder name
+            string parentFolderName = Path.GetFileName(projectPath);
+            Log.LogMessage(MessageImportance.Normal, $"Found {csprojFiles.Length} projects, looking for match with parent folder: {parentFolderName}");
+
+            foreach (string csprojFile in csprojFiles)
+            {
+                string projectName = Path.GetFileNameWithoutExtension(csprojFile);
+                if (string.Equals(projectName, parentFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Using project matching folder name: {projectName}");
+                    return projectName;
+                }
+            }
+
+            // No match found, list available projects and use the first one as fallback
+            Log.LogMessage(MessageImportance.Normal, $"No project matched parent folder name '{parentFolderName}'. Available projects:");
+            foreach (string csprojFile in csprojFiles)
+            {
+                Log.LogMessage(MessageImportance.Normal, $"  - {Path.GetFileNameWithoutExtension(csprojFile)}");
+            }
+
+            string fallbackProject = Path.GetFileNameWithoutExtension(csprojFiles[0]);
+            Log.LogMessage(MessageImportance.Normal, $"Using first project as fallback: {fallbackProject}");
+            return fallbackProject;
+        }
+
+        private string? ProcessDesktopIcon(string projectPath, string outputPath)
+        {
+            try
+            {
+                string? desktopIcon = ReadDesktopIconFromDirectoryBuildProps(projectPath);
+                
+                if (string.IsNullOrEmpty(desktopIcon))
+                {
+                    Log.LogMessage(MessageImportance.Normal, "ℹ️  No DesktopIcon specified in Directory.Build.props");
+                    return null;
+                }
+
+                string? sourceIconPath = FindIconFile(projectPath, desktopIcon);
+                
+                if (sourceIconPath == null)
+                {
+                    Log.LogWarning($"⚠️  Desktop icon not found: {desktopIcon}");
+                    return null;
+                }
+
+                Log.LogMessage(MessageImportance.High, $"🖥️  Processing Desktop icon: {Path.GetFileName(sourceIconPath)}");
+
+                // Determine platform from RID
+                string platform = "unknown";
+                if (opts.RID.Contains("win"))
+                    platform = "windows";
+                else if (opts.RID.Contains("osx") || opts.RID.Contains("mac"))
+                    platform = "macos";
+                else if (opts.RID.Contains("linux"))
+                    platform = "linux";
+
+                string? generatedIconPath = null;
+                switch (platform)
+                {
+                    case "windows":
+                        generatedIconPath = GenerateWindowsIcon(sourceIconPath, outputPath);
+                        break;
+                    case "macos":
+                        generatedIconPath = GenerateMacOSIcon(sourceIconPath, outputPath);
+                        break;
+                    case "linux":
+                        GenerateLinuxIcon(sourceIconPath, outputPath);
+                        break;
+                    default:
+                        Log.LogMessage(MessageImportance.Normal, $"ℹ️  Unknown platform for RID: {opts.RID}, skipping icon generation");
+                        break;
+                }
+
+                Log.LogMessage(MessageImportance.High, "✅ Desktop icon processed successfully");
+                return generatedIconPath;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to process desktop icon: {ex.Message}");
+                return null;
+            }
+        }
+
+        private string? GenerateWindowsIcon(string sourceIconPath, string outputPath)
+        {
+            string icoPath = Path.Combine(outputPath, "app.ico");
+            
+            // Try to generate multi-size ICO using ImageMagick
+            var sizes = new[] { 256, 128, 64, 48, 32, 16 };
+            bool created = false;
+
+            // Try ImageMagick 7+ with 'magick' command
+            try
+            {
+                var sizeArgs = string.Join(" ", sizes.Select(s => $"-define icon:auto-resize={s}"));
+                var magickResult = CliWrap.Cli.Wrap("magick")
+                    .WithArguments($"convert \"{sourceIconPath}\" {sizeArgs} \"{icoPath}\"")
+                    .WithValidation(CliWrap.CommandResultValidation.None)
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (magickResult.ExitCode == 0)
+                {
+                    created = true;
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created app.ico");
+                }
+            }
+            catch { }
+
+            if (!created)
+            {
+                // Fallback: Try 'convert' command
+                try
+                {
+                    var convertResult = CliWrap.Cli.Wrap("convert")
+                        .WithArguments($"\"{sourceIconPath}\" -define icon:auto-resize=256,128,64,48,32,16 \"{icoPath}\"")
+                        .WithValidation(CliWrap.CommandResultValidation.None)
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (convertResult.ExitCode == 0)
+                    {
+                        created = true;
+                        Log.LogMessage(MessageImportance.Normal, $"   ✅ Created app.ico");
+                    }
+                }
+                catch { }
+            }
+
+            if (!created)
+            {
+                // Final fallback: Copy source file as .ico (won't be proper multi-size)
+                File.Copy(sourceIconPath, icoPath, true);
+                Log.LogWarning($"   ⚠️  ImageMagick not found. Copied source as app.ico (not multi-size)");
+            }
+            
+            return File.Exists(icoPath) ? icoPath : null;
+        }
+
+        private string? GenerateMacOSIcon(string sourceIconPath, string outputPath)
+        {
+            string icnsPath = Path.Combine(outputPath, "app.icns");
+            string iconsetPath = Path.Combine(outputPath, "app.iconset");
+            
+            try
+            {
+                Directory.CreateDirectory(iconsetPath);
+
+                // Generate all required icon sizes for macOS
+                var sizes = new[] 
+                {
+                    (16, "icon_16x16.png"),
+                    (32, "icon_16x16@2x.png"),
+                    (32, "icon_32x32.png"),
+                    (64, "icon_32x32@2x.png"),
+                    (128, "icon_128x128.png"),
+                    (256, "icon_128x128@2x.png"),
+                    (256, "icon_256x256.png"),
+                    (512, "icon_256x256@2x.png"),
+                    (512, "icon_512x512.png"),
+                    (1024, "icon_512x512@2x.png")
+                };
+
+                foreach (var (size, filename) in sizes)
+                {
+                    string iconPath = Path.Combine(iconsetPath, filename);
+                    if (ResizeImageForDesktop(sourceIconPath, iconPath, size))
+                    {
+                        Log.LogMessage(MessageImportance.Normal, $"   ✅ Created {filename} ({size}x{size})");
+                    }
+                }
+
+                // Convert iconset to icns using iconutil (macOS only)
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    try
+                    {
+                        var iconutilResult = CliWrap.Cli.Wrap("iconutil")
+                            .WithArguments($"-c icns \"{iconsetPath}\" -o \"{icnsPath}\"")
+                            .WithValidation(CliWrap.CommandResultValidation.None)
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+
+                        if (iconutilResult.ExitCode == 0)
+                        {
+                            Log.LogMessage(MessageImportance.Normal, $"   ✅ Created app.icns");
+                            // Clean up iconset directory
+                            Directory.Delete(iconsetPath, true);
+                        }
+                        else
+                        {
+                            Log.LogWarning($"   ⚠️  Failed to create .icns file. Individual icon files available in {iconsetPath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.LogWarning($"   ⚠️  iconutil failed: {ex.Message}. Individual icon files available in {iconsetPath}");
+                    }
+                }
+                else
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   ℹ️  iconutil not available (macOS only). Individual icon files created in {iconsetPath}");
+                }
+                
+                return File.Exists(icnsPath) ? icnsPath : null;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"   ⚠️  Failed to generate macOS icon: {ex.Message}");
+                return null;
+            }
+        }
+
+        private void GenerateLinuxIcon(string sourceIconPath, string outputPath)
+        {
+            // Generate standard Linux icon sizes
+            var sizes = new[] { 16, 22, 24, 32, 48, 64, 128, 256, 512 };
+
+            foreach (int size in sizes)
+            {
+                string iconPath = Path.Combine(outputPath, $"icon_{size}.png");
+                if (ResizeImageForDesktop(sourceIconPath, iconPath, size))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Created icon_{size}.png ({size}x{size})");
+                }
+            }
+        }
+
+        private bool ResizeImageForDesktop(string sourceIcon, string outputPath, int size)
+        {
+            try
+            {
+                // Try ImageMagick 7+ with 'magick' command
+                // Use -resize with ^ to fill, then -gravity center -extent to crop to exact size
+                var magickResult = CliWrap.Cli.Wrap("magick")
+                    .WithArguments($"convert \"{sourceIcon}\" -resize {size}x{size}^ -gravity center -extent {size}x{size} \"{outputPath}\"")
+                    .WithValidation(CliWrap.CommandResultValidation.None)
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (magickResult.ExitCode == 0)
+                    return true;
+            }
+            catch { }
+
+            try
+            {
+                // Try ImageMagick 6 with 'convert' command
+                var convertResult = CliWrap.Cli.Wrap("convert")
+                    .WithArguments($"\"{sourceIcon}\" -resize {size}x{size}^ -gravity center -extent {size}x{size} \"{outputPath}\"")
+                    .WithValidation(CliWrap.CommandResultValidation.None)
+                    .ExecuteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (convertResult.ExitCode == 0)
+                    return true;
+            }
+            catch { }
+
+            // Try sips (macOS only)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                try
+                {
+                    var sipsResult = CliWrap.Cli.Wrap("sips")
+                        .WithArguments($"-z {size} {size} \"{sourceIcon}\" --out \"{outputPath}\"")
+                        .WithValidation(CliWrap.CommandResultValidation.None)
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (sipsResult.ExitCode == 0)
+                        return true;
+                }
+                catch { }
+            }
+
+            // Fallback: Copy original
+            File.Copy(sourceIcon, outputPath, true);
+            Log.LogMessage(MessageImportance.Low, $"   ⚠️  Image resizing tools not found. Copied original for {Path.GetFileName(outputPath)}");
             return true;
         }
 
-        public override int GetHashCode()
+        private string? ReadDesktopIconFromDirectoryBuildProps(string projectPath)
         {
-            return base.GetHashCode();
+            string directoryBuildPropsPath = Path.Combine(projectPath, "Directory.Build.props");
+            if (!File.Exists(directoryBuildPropsPath))
+                return null;
+
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(directoryBuildPropsPath);
+                var desktopIcon = doc.Descendants("DesktopIcon").FirstOrDefault()?.Value;
+                return desktopIcon;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
-        public override string? ToString()
+        private string? FindIconFile(string projectPath, string iconPath)
         {
-            return base.ToString();
+            // Try absolute path
+            if (Path.IsPathRooted(iconPath) && File.Exists(iconPath))
+                return iconPath;
+
+            // Try Assets folder
+            string assetsPath = Path.Combine(projectPath, "Assets", iconPath);
+            if (File.Exists(assetsPath))
+                return assetsPath;
+
+            // Try relative to project
+            string relativePath = Path.Combine(projectPath, iconPath);
+            if (File.Exists(relativePath))
+                return relativePath;
+
+            return null;
+        }
+
+        private void CreateMacOSAppBundle(string projectName, string outputPath, string? iconPath)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.High, "📦 Creating macOS .app bundle...");
+
+                // Create .app bundle structure
+                string appBundlePath = Path.Combine(outputPath, $"{projectName}.app");
+                string contentsPath = Path.Combine(appBundlePath, "Contents");
+                string macOSPath = Path.Combine(contentsPath, "MacOS");
+                string resourcesPath = Path.Combine(contentsPath, "Resources");
+
+                Directory.CreateDirectory(macOSPath);
+                Directory.CreateDirectory(resourcesPath);
+
+                // Move executable to MacOS folder
+                string executablePath = Path.Combine(outputPath, projectName);
+                string newExecutablePath = Path.Combine(macOSPath, projectName);
+                
+                if (File.Exists(executablePath))
+                {
+                    File.Move(executablePath, newExecutablePath, true);
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Moved executable to bundle");
+                }
+
+                // Move dylib files to MacOS folder
+                foreach (string dylibFile in Directory.GetFiles(outputPath, "*.dylib"))
+                {
+                    string fileName = Path.GetFileName(dylibFile);
+                    string destPath = Path.Combine(macOSPath, fileName);
+                    File.Move(dylibFile, destPath, true);
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Moved {fileName} to bundle");
+                }
+
+                // Copy icon to Resources folder if available
+                string? bundleIconFileName = null;
+                if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
+                {
+                    bundleIconFileName = Path.GetFileName(iconPath);
+                    string resourceIconPath = Path.Combine(resourcesPath, bundleIconFileName);
+                    File.Copy(iconPath, resourceIconPath, true);
+                    
+                    // Clean up original icon file
+                    File.Delete(iconPath);
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Added icon to Resources");
+                }
+
+                // Copy Assets folder to Resources if it exists in output
+                string assetsInOutput = Path.Combine(outputPath, "Assets");
+                if (Directory.Exists(assetsInOutput))
+                {
+                    string resourceAssetsPath = Path.Combine(resourcesPath, "Assets");
+                    assetsInOutput.CopyDirectoryIfDifferent(resourceAssetsPath, true);
+                    Directory.Delete(assetsInOutput, true);
+                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Moved Assets to Resources");
+                }
+
+                // Copy other asset files to Resources
+                foreach (string assetFile in Directory.GetFiles(outputPath, "*.png"))
+                {
+                    string fileName = Path.GetFileName(assetFile);
+                    string destPath = Path.Combine(resourcesPath, fileName);
+                    File.Move(assetFile, destPath, true);
+                }
+
+                // Create Info.plist
+                string infoPlistPath = Path.Combine(contentsPath, "Info.plist");
+                
+                string infoPlist = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>{projectName}</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.sokol.{projectName.ToLower()}</string>
+    <key>CFBundleName</key>
+    <string>{projectName}</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>";
+
+                if (!string.IsNullOrEmpty(bundleIconFileName))
+                {
+                    infoPlist += $@"
+    <key>CFBundleIconFile</key>
+    <string>{bundleIconFileName}</string>";
+                }
+
+                infoPlist += @"
+    <key>LSMinimumSystemVersion</key>
+    <string>10.13</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>";
+
+                File.WriteAllText(infoPlistPath, infoPlist);
+                Log.LogMessage(MessageImportance.Normal, $"   ✅ Created Info.plist");
+
+                Log.LogMessage(MessageImportance.High, $"✅ macOS app bundle created: {projectName}.app");
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"⚠️  Failed to create macOS app bundle: {ex.Message}");
+            }
         }
     }
 

@@ -63,9 +63,21 @@ set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES
     XCODE_ATTRIBUTE_UISupportedInterfaceOrientations~ipad "TEMPLATE_IPAD_ORIENTATIONS"
     # Launch screen
     XCODE_ATTRIBUTE_UILaunchScreen~ipad "{}"
+    # App icon from asset catalog
+    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
     # Info.plist entries for orientation
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
 )
+
+# Include app icon assets if they exist - must be added AFTER target creation
+set(ASSETS_XCASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets")
+if(EXISTS ${ASSETS_XCASSETS_DIR})
+    # Add the asset catalog to the target's resources
+    target_sources(TEMPLATE_PROJECT_NAME-ios-app PRIVATE "${ASSETS_XCASSETS_DIR}")
+    set_source_files_properties("${ASSETS_XCASSETS_DIR}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+endif()
 
 # Set development team if provided
 if(DEFINED DEVELOPMENT_TEAM)
