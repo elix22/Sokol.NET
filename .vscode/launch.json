@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Desktop (Dynamic)",
+            "name": "Desktop",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-${input:exampleName}",
@@ -16,7 +16,7 @@
             }
         },
         {
-            "name": "Browser (Dynamic)",
+            "name": "Browser",
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
