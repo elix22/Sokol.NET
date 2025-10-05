@@ -161,6 +161,12 @@ namespace SokolApplicationBuilder
                 if (!CompileXcodeProject(iosDir, projectName))
                     return false;
 
+                // Determine build type from opts
+                string buildType = opts.Type == "debug" ? "debug" : "release";
+
+                // Always copy to output folder (project's output folder or custom path)
+                CopyToOutputPath(iosDir, projectName, buildType);
+
                 // Install on device if requested
                 if (opts.Install)
                 {
@@ -1388,6 +1394,72 @@ namespace SokolApplicationBuilder
             {
                 Log.LogWarning($"⚠️  Image resizing tools not found (ImageMagick or sips). Copying original icon.");
                 File.Copy(sourcePath, destPath, true);
+            }
+        }
+
+        private void CopyToOutputPath(string iosDir, string projectName, string buildType)
+        {
+            try
+            {
+                string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+                
+                // Note: iOS currently always builds Release configuration
+                // But we still organize output by requested build type for consistency
+                string xcodeBuildConfig = "Release-iphoneos";
+                string appBundlePath = Path.Combine(buildDir, xcodeBuildConfig, $"{projectName}-ios-app.app");
+
+                // Check alternate locations
+                if (!Directory.Exists(appBundlePath))
+                {
+                    string altPath = Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app");
+                    if (Directory.Exists(altPath))
+                    {
+                        appBundlePath = altPath;
+                    }
+                }
+
+                // Also check Debug configuration in case it's supported in the future
+                if (!Directory.Exists(appBundlePath))
+                {
+                    string debugPath = Path.Combine(buildDir, "Debug-iphoneos", $"{projectName}-ios-app.app");
+                    if (Directory.Exists(debugPath))
+                    {
+                        appBundlePath = debugPath;
+                    }
+                }
+
+                if (!Directory.Exists(appBundlePath))
+                {
+                    Log.LogWarning($"App bundle not found, skipping output copy.");
+                    return;
+                }
+
+                // Determine output base path: use custom path if specified, otherwise use project's output folder
+                string outputBasePath = string.IsNullOrEmpty(opts.OutputPath) 
+                    ? Path.Combine(opts.ProjectPath, "output") 
+                    : opts.OutputPath;
+
+                // Create output directory: {basePath}/iOS/{buildType}/
+                string outputDir = Path.Combine(outputBasePath, "iOS", buildType);
+                Directory.CreateDirectory(outputDir);
+
+                // Copy .app bundle with descriptive name
+                string outputAppBundle = Path.Combine(outputDir, $"{projectName}-{buildType}.app");
+                
+                // Remove existing bundle if present
+                if (Directory.Exists(outputAppBundle))
+                {
+                    Directory.Delete(outputAppBundle, true);
+                }
+
+                // Copy the entire .app bundle directory
+                CopyDirectory(appBundlePath, outputAppBundle);
+
+                Log.LogMessage(MessageImportance.High, $"✅ iOS app bundle copied to: {outputAppBundle}");
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"Failed to copy iOS app bundle to output path: {ex.Message}");
             }
         }
     }

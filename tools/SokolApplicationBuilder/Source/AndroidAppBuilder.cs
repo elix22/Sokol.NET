@@ -402,6 +402,9 @@ namespace SokolApplicationBuilder
                         SignReleaseApp();
                 }
 
+                // Always copy to output folder (project's output folder or custom path)
+                CopyToOutputPath(appName, buildType, buildAAB);
+
                 // Install if requested
                 if (installApp)
                 {
@@ -2053,6 +2056,48 @@ namespace SokolApplicationBuilder
             AndroidManifest.AppendTextLine($"</manifest>");
 
 
+        }
+
+        void CopyToOutputPath(string appName, string buildType, bool isAAB)
+        {
+            string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
+            string sourceFile;
+            string fileName;
+
+            if (isAAB)
+            {
+                // AAB file
+                string aabSubPath = buildType == "release" ? "release" : "debug";
+                sourceFile = Path.Combine(androidPath, "app", "build", "outputs", "bundle", aabSubPath, $"app-{aabSubPath}.aab");
+                fileName = $"{appName}-{buildType}.aab";
+            }
+            else
+            {
+                // APK file
+                string apkSubPath = buildType == "release" ? "release" : "debug";
+                sourceFile = Path.Combine(androidPath, "app", "build", "outputs", "apk", apkSubPath, $"app-{apkSubPath}.apk");
+                fileName = $"{appName}-{buildType}.apk";
+            }
+
+            if (!File.Exists(sourceFile))
+            {
+                Log.LogWarning($"Build output file not found: {sourceFile}");
+                return;
+            }
+
+            // Determine output base path: use custom path if specified, otherwise use project's output folder
+            string outputBasePath = string.IsNullOrEmpty(opts.OutputPath) 
+                ? Path.Combine(opts.ProjectPath, "output") 
+                : opts.OutputPath;
+
+            // Create output directory structure: {basePath}/Android/buildType/
+            string outputDir = Path.Combine(outputBasePath, "Android", buildType);
+            Directory.CreateDirectory(outputDir);
+
+            string destFile = Path.Combine(outputDir, fileName);
+            File.Copy(sourceFile, destFile, true);
+
+            Log.LogMessage(MessageImportance.High, $"✅ Copied {(isAAB ? "AAB" : "APK")} to: {destFile}");
         }
 
 

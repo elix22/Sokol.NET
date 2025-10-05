@@ -53,16 +53,9 @@ namespace SokolApplicationBuilder
                 string buildType = opts.Type == "release" ? "Release" : "Debug";
                 string targetFramework = string.IsNullOrEmpty(opts.Framework) ? "net10.0" : opts.Framework;
 
-                // Determine output path
-                string outputPath = opts.OutputPath;
-                if (string.IsNullOrEmpty(outputPath))
-                {
-                    outputPath = Path.Combine(opts.ProjectPath, "bin", buildType, opts.RID);
-                }
-                else
-                {
-                    outputPath = Path.Combine(outputPath, opts.RID);
-                }
+                // Determine build output path (always build to project bin folder)
+                string buildOutputPath = Path.Combine(opts.ProjectPath, "bin", buildType, opts.RID);
+                string outputPath = buildOutputPath;
 
                 Log.LogMessage(MessageImportance.Normal, $"Build type: {buildType}");
                 Log.LogMessage(MessageImportance.Normal, $"Target framework: {targetFramework}");
@@ -110,10 +103,14 @@ namespace SokolApplicationBuilder
                 string? iconPath = ProcessDesktopIcon(opts.ProjectPath, outputPath);
 
                 // Create macOS app bundle if on macOS
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && opts.RID.Contains("osx"))
+                bool isMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && opts.RID.Contains("osx");
+                if (isMacOS)
                 {
                     CreateMacOSAppBundle(projectName, outputPath, iconPath);
                 }
+
+                // Always copy to output folder (project's output folder or custom path)
+                CopyToOutputPath(projectName, outputPath, buildType, isMacOS);
 
                 Log.LogMessage(MessageImportance.High, "✅ Desktop build completed successfully");
                 Log.LogMessage(MessageImportance.High, $"📂 Output: {outputPath}");
@@ -691,6 +688,121 @@ namespace SokolApplicationBuilder
             catch (Exception ex)
             {
                 Log.LogWarning($"⚠️  Failed to create macOS app bundle: {ex.Message}");
+            }
+        }
+
+        private void CopyToOutputPath(string projectName, string buildOutputPath, string buildType, bool isMacOS)
+        {
+            try
+            {
+                // Determine platform name from RID
+                string platformName = "Desktop";
+                if (opts.RID.Contains("osx"))
+                    platformName = "macOS";
+                else if (opts.RID.Contains("win"))
+                    platformName = "Windows";
+                else if (opts.RID.Contains("linux"))
+                    platformName = "Linux";
+
+                // Determine output base path: use custom path if specified, otherwise use project's output folder
+                string outputBasePath = string.IsNullOrEmpty(opts.OutputPath) 
+                    ? Path.Combine(opts.ProjectPath, "output") 
+                    : opts.OutputPath;
+
+                // Create output directory: {basePath}/Desktop/{Platform}/{buildType}/
+                string outputDir = Path.Combine(outputBasePath, "Desktop", platformName, buildType.ToLower());
+                Directory.CreateDirectory(outputDir);
+
+                if (isMacOS)
+                {
+                    // Copy .app bundle for macOS
+                    string appBundlePath = Path.Combine(buildOutputPath, $"{projectName}.app");
+                    if (Directory.Exists(appBundlePath))
+                    {
+                        string outputAppBundle = Path.Combine(outputDir, $"{projectName}.app");
+                        
+                        // Remove existing bundle if present
+                        if (Directory.Exists(outputAppBundle))
+                        {
+                            Directory.Delete(outputAppBundle, true);
+                        }
+
+                        // Copy the entire .app bundle directory
+                        CopyDirectory(appBundlePath, outputAppBundle);
+                        Log.LogMessage(MessageImportance.High, $"✅ Desktop app bundle copied to: {outputAppBundle}");
+                    }
+                    else
+                    {
+                        Log.LogWarning($"App bundle not found at {appBundlePath}, skipping output copy.");
+                    }
+                }
+                else
+                {
+                    // Copy executable and dependencies for Windows/Linux
+                    string executableName = projectName;
+                    if (opts.RID.Contains("win"))
+                        executableName += ".exe";
+
+                    string executablePath = Path.Combine(buildOutputPath, executableName);
+                    if (File.Exists(executablePath))
+                    {
+                        // Copy executable
+                        string outputExecutable = Path.Combine(outputDir, executableName);
+                        File.Copy(executablePath, outputExecutable, true);
+
+                        // Copy all .dll files
+                        foreach (string dllFile in Directory.GetFiles(buildOutputPath, "*.dll"))
+                        {
+                            string fileName = Path.GetFileName(dllFile);
+                            File.Copy(dllFile, Path.Combine(outputDir, fileName), true);
+                        }
+
+                        // Copy all .so files (Linux)
+                        foreach (string soFile in Directory.GetFiles(buildOutputPath, "*.so"))
+                        {
+                            string fileName = Path.GetFileName(soFile);
+                            File.Copy(soFile, Path.Combine(outputDir, fileName), true);
+                        }
+
+                        // Copy Assets folder if it exists
+                        string assetsPath = Path.Combine(buildOutputPath, "Assets");
+                        if (Directory.Exists(assetsPath))
+                        {
+                            string outputAssetsPath = Path.Combine(outputDir, "Assets");
+                            CopyDirectory(assetsPath, outputAssetsPath);
+                        }
+
+                        Log.LogMessage(MessageImportance.High, $"✅ Desktop executable copied to: {outputExecutable}");
+                    }
+                    else
+                    {
+                        Log.LogWarning($"Executable not found at {executablePath}, skipping output copy.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"Failed to copy desktop build to output path: {ex.Message}");
+            }
+        }
+
+        private void CopyDirectory(string sourceDir, string destDir)
+        {
+            // Create destination directory
+            Directory.CreateDirectory(destDir);
+
+            // Copy all files
+            foreach (string file in Directory.GetFiles(sourceDir))
+            {
+                string destFile = Path.Combine(destDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
+            }
+
+            // Copy all subdirectories
+            foreach (string subdir in Directory.GetDirectories(sourceDir))
+            {
+                string destSubDir = Path.Combine(destDir, Path.GetFileName(subdir));
+                CopyDirectory(subdir, destSubDir);
             }
         }
     }
