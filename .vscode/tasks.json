@@ -676,7 +676,7 @@
             "problemMatcher": []
         },
         {
-            "label": "Android: Install (Cube)",
+            "label": "Android: Install APK",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -684,10 +684,11 @@
                 "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
                 "--",
                 "--task", "build",
+                "--type", "${input:androidBuildType}",
                 "--architecture", "android",
                 "--install",
                 "--interactive",
-                "--path", "${workspaceFolder}/examples/cube"
+                "--path", "${workspaceFolder}/${input:examplePath}"
             ],
             "group": "build",
             "presentation": {
@@ -704,7 +705,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android: Install (Dyntex)",
+            "label": "Android: Install AAB",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -712,382 +713,12 @@
                 "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
                 "--",
                 "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/dyntex"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/cimgui"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/loadpng"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/instancing"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/plmpeg"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install (Drawcallperf)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/drawcallperf"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (Cube)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/cube"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (Dyntex)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/dyntex"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/cimgui"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/loadpng"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/instancing"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/plmpeg"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install Debug (Drawcallperf)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/drawcallperf"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android AAB: Install (Cube)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
+                "--type", "${input:androidBuildType}",
                 "--architecture", "android",
                 "--subtask", "aab",
                 "--install",
                 "--interactive",
-                "--path", "${workspaceFolder}/examples/cube"
+                "--path", "${workspaceFolder}/${input:examplePath}"
             ],
             "group": "build",
             "presentation": {
@@ -1104,7 +735,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android AAB: Install (Dyntex)",
+            "label": "Android: Build APK",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -1112,11 +743,37 @@
                 "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
                 "--",
                 "--task", "build",
+                "--type", "${input:androidBuildType}",
+                "--architecture", "android",
+                "--path", "${workspaceFolder}/${input:examplePath}"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Android: Build AAB",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
+                "--",
+                "--task", "build",
+                "--type", "${input:androidBuildType}",
                 "--architecture", "android",
                 "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/dyntex"
+                "--path", "${workspaceFolder}/${input:examplePath}"
             ],
             "group": "build",
             "presentation": {
@@ -1133,7 +790,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "Android AAB: Install (CImGui)",
+            "label": "iOS: Install",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -1141,156 +798,12 @@
                 "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
                 "--",
                 "--task", "build",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/cimgui"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android AAB: Install (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/loadpng"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android AAB: Install (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/instancing"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android AAB: Install (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/plmpeg"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android AAB: Install (Drawcallperf)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/examples/drawcallperf"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (Cube)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
+                "--type", "${input:iOSBuildType}",
                 "--architecture", "ios",
                 "--install",
                 "--interactive",
                 "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/cube"
+                "--path", "${workspaceFolder}/${input:examplePath}"
             ],
             "group": "build",
             "presentation": {
@@ -1307,7 +820,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "iOS: Install (Dyntex)",
+            "label": "iOS: Build",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -1315,366 +828,10 @@
                 "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
                 "--",
                 "--task", "build",
+                "--type", "${input:iOSBuildType}",
                 "--architecture", "ios",
-                "--install",
-                "--interactive",
                 "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/dyntex"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/cimgui"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/loadpng"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/instancing"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/plmpeg"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install (Drawcallperf)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/drawcallperf"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (Cube)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/cube"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (Dyntex)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/dyntex"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (CImGui)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/cimgui"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (LoadPNG)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/loadpng"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (Instancing)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/instancing"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (PlMpeg)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/plmpeg"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install Debug (Drawcallperf)",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "debug",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/examples/drawcallperf"
+                "--path", "${workspaceFolder}/${input:examplePath}"
             ],
             "group": "build",
             "presentation": {
@@ -1704,18 +861,36 @@
 				"examples/sgl-points",
 				"examples/plmpeg",
 				"examples/drawcallperf"
-			],
-			"default": "examples/cube"
+			]
 		},
 		{
 			"id": "macOSArchitecture",
 			"type": "pickString",
-			"description": "Select macOS architecture",
+			"description": "Select an architecture to build",
 			"options": [
 				"osx-arm64",
 				"osx-x64"
+			]
+		},
+		{
+			"id": "androidBuildType",
+			"type": "pickString",
+			"description": "Select build type",
+			"options": [
+				"release",
+				"debug"
 			],
-			"default": "osx-arm64"
+			"default": "release"
+		},
+		{
+			"id": "iOSBuildType",
+			"type": "pickString",
+			"description": "Select build type",
+			"options": [
+				"release",
+				"debug"
+			],
+			"default": "release"
 		}
 	]
 }
