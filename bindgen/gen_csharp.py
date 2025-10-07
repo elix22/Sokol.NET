@@ -68,6 +68,7 @@ name_overrides = {
     'sgl_deg':      'sgl_as_degrees',
     'sgl_rad':      'sgl_as_radians',
     'sapp_isvalid': 'sapp_is_valid',
+    'slog_func':    'slog_func_native',
     'lock':         'dolock',
     'params':       'parameters',
     'sshape_element_range': 'sshape_make_element_range',
@@ -168,7 +169,9 @@ web_wrapper_functions = {
     'sg_make_image',
     'sg_alloc_image',
     'sg_make_sampler',
-    'sg_alloc_sampler'
+    'sg_alloc_sampler',
+    'sgp_make_pipeline',
+    'sgl_make_pipeline',
 }
 
 # Functions which need special handling for WebAssembly (Emscripten) platform

@@ -331,7 +331,16 @@ public static string sgp_get_error_message(sgp_error error)
 #else
 [DllImport("sokol", EntryPoint = "sgp_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sgp_make_pipeline_internal(in sgp_pipeline_desc desc);
+public static sg_pipeline sgp_make_pipeline(in sgp_pipeline_desc desc)
+{
+    uint _id = sgp_make_pipeline_internal(desc);
+    return new sg_pipeline { id = _id };
+}
+#else
 public static extern sg_pipeline sgp_make_pipeline(in sgp_pipeline_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgp_begin", CallingConvention = CallingConvention.Cdecl)]

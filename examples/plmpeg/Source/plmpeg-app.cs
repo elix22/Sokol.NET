@@ -20,6 +20,7 @@ using static Sokol.SG.sg_wrap;
 using static Sokol.SG.sg_load_action;
 using static plmpeg_sapp_shader_cs.Shaders;
 using System.Diagnostics;
+using static Sokol.SLog;
 public static unsafe partial class PlMpegApp
 {
     // application state
@@ -67,7 +68,9 @@ public static unsafe partial class PlMpegApp
             max_requests = 1,
             num_channels = 1,
             num_lanes = 1,
-            // logger = new sfetch_logger_t()
+            logger = {
+                func = &slog_func,
+            }
         });
 
         sfetch_request_t request = default;
@@ -82,7 +85,9 @@ public static unsafe partial class PlMpegApp
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
-            logger = new sg_logger()
+            logger = {
+                func = &slog_func,
+            }
         });
 
         Span<vertex_t> vertex_buffer = Utils.CreateSpan<vertex_t>(16);
@@ -198,7 +203,9 @@ public static unsafe partial class PlMpegApp
                     buffer_frames = 4096,
                     num_packets = 256,
                     num_channels = 2,
-                    // logger.func = slog_func,
+                    logger = {
+                        func = &slog_func,
+                    }
                 });
             }
         }
@@ -399,6 +406,9 @@ public static unsafe partial class PlMpegApp
             sample_count = 1,
             window_title = "pl_mpeg demo",
             icon = { sokol_default = true },
+            logger = {
+                func = &slog_func,
+            }
         };
     }
 

@@ -236,7 +236,16 @@ public static extern void sgl_context_draw_layer(sgl_context ctx, int layer_id);
 #else
 [DllImport("sokol", EntryPoint = "sgl_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sgl_make_pipeline_internal(in sg_pipeline_desc desc);
+public static sgl_pipeline sgl_make_pipeline(in sg_pipeline_desc desc)
+{
+    uint _id = sgl_make_pipeline_internal(desc);
+    return new sgl_pipeline { id = _id };
+}
+#else
 public static extern sgl_pipeline sgl_make_pipeline(in sg_pipeline_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_context_make_pipeline", CallingConvention = CallingConvention.Cdecl)]

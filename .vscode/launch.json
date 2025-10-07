@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Desktop",
+            "name": "Desktop (Sokol)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "prepare-${input:exampleName}",
@@ -16,7 +16,7 @@
             }
         },
         {
-            "name": "Browser",
+            "name": "Browser (Sokol)",
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
@@ -38,7 +38,8 @@
                 "loadpng",
                 "instancing",
                 "plmpeg",
-                "drawcallperf"
+                "drawcallperf",
+                "sgl"
             ],
             "default": "cube"
         },

@@ -1639,20 +1639,22 @@ static sg_shader _sgp_make_common_shader(void) {
     sg_backend backend = sg_query_backend();
     sg_shader_desc desc;
     memset(&desc, 0, sizeof(desc));
-    desc.images[0].stage = SG_SHADERSTAGE_FRAGMENT;
-    desc.images[0].multisampled = false;
-    desc.images[0].image_type = SG_IMAGETYPE_2D;
-    desc.images[0].sample_type = SG_IMAGESAMPLETYPE_FLOAT;
+    desc.attrs[0].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+    desc.attrs[1].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+    desc.views[0].texture.stage = SG_SHADERSTAGE_FRAGMENT;
+    desc.views[0].texture.multisampled = false;
+    desc.views[0].texture.image_type = SG_IMAGETYPE_2D;
+    desc.views[0].texture.sample_type = SG_IMAGESAMPLETYPE_FLOAT;
     desc.samplers[0].stage = SG_SHADERSTAGE_FRAGMENT;
     desc.samplers[0].sampler_type = SG_SAMPLERTYPE_FILTERING;
-    desc.image_sampler_pairs[0].stage = SG_SHADERSTAGE_FRAGMENT;
-    desc.image_sampler_pairs[0].image_slot = 0;
-    desc.image_sampler_pairs[0].sampler_slot = 0;
+    desc.texture_sampler_pairs[0].stage = SG_SHADERSTAGE_FRAGMENT;
+    desc.texture_sampler_pairs[0].view_slot = 0;
+    desc.texture_sampler_pairs[0].sampler_slot = 0;
 
     // GLCORE / GLES3 only
     desc.attrs[SGP_VS_ATTR_COORD].glsl_name = "coord";
     desc.attrs[SGP_VS_ATTR_COLOR].glsl_name = "color";
-    desc.image_sampler_pairs[0].glsl_name = "iTexChannel0_iSmpChannel0";
+    desc.texture_sampler_pairs[0].glsl_name = "iTexChannel0_iSmpChannel0";
 
     // D3D11 only
     desc.attrs[SGP_VS_ATTR_COORD].hlsl_sem_name = "TEXCOORD";
@@ -1758,8 +1760,8 @@ void sgp_setup(const sgp_desc* desc) {
     sg_buffer_desc vertex_buf_desc;
     memset(&vertex_buf_desc, 0, sizeof(sg_buffer_desc));
     vertex_buf_desc.size = (size_t)(_sgp.num_vertices * sizeof(sgp_vertex));
-    vertex_buf_desc.type = SG_BUFFERTYPE_VERTEXBUFFER;
-    vertex_buf_desc.usage = SG_USAGE_STREAM;
+    vertex_buf_desc.usage.vertex_buffer = true;
+    vertex_buf_desc.usage.stream_update = true;
 
     _sgp.vertex_buf = sg_make_buffer(&vertex_buf_desc);
     if (sg_query_buffer_state(_sgp.vertex_buf) != SG_RESOURCESTATE_VALID) {
@@ -1777,8 +1779,8 @@ void sgp_setup(const sgp_desc* desc) {
     white_img_desc.width = 2;
     white_img_desc.height = 2;
     white_img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    white_img_desc.data.subimage[0][0].ptr = pixels;
-    white_img_desc.data.subimage[0][0].size = sizeof(pixels);
+    white_img_desc.data.mip_levels[0].ptr = pixels;
+    white_img_desc.data.mip_levels[0].size = sizeof(pixels);
     white_img_desc.label = "sgp-white-texture";
     _sgp.white_img = sg_make_image(&white_img_desc);
     if (sg_query_image_state(_sgp.white_img) != SG_RESOURCESTATE_VALID) {
@@ -2056,7 +2058,7 @@ void sgp_flush(void) {
                     if (cur_imgs_id[j] != img_id) {
                         // when an image binding change we need to re-apply bindings
                         cur_imgs_id[j] = img_id;
-                        bind.images[j].id = img_id;
+                        bind.views[j].id = img_id;
                         bind.samplers[j].id = smp_id;
                         apply_bindings = true;
                     }
@@ -2917,7 +2919,7 @@ void sgp_draw_filled_rect(float x, float y, float w, float h) {
 }
 
 static sgp_isize _sgp_query_image_size(sg_image img_id) {
-    const _sg_image_t* img = _sg_lookup_image(&_sg.pools, img_id.id);
+    const _sg_image_t* img = _sg_lookup_image(img_id.id);
     SOKOL_ASSERT(img);
     sgp_isize size = {img ? img->cmn.width : 0, img ? img->cmn.height : 0};
     return size;

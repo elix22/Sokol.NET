@@ -163,6 +163,17 @@
             ],
             "problemMatcher": "$msCompile"
         },
+        {
+            "label": "compile-sgl-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sgl/sglWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
 		{
             "label": "compile-dyntex-shaders",
             "command": "dotnet",
@@ -225,6 +236,17 @@
             "args": [
                 "msbuild",
 				"examples/drawcallperf/drawcallperf.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-sgl-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sgl/sgl.csproj",
                 "-t:CompileShaders"
             ],
             "problemMatcher": "$msCompile"
@@ -307,6 +329,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-sgl",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sgl/sgl.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube-web",
             "command": "dotnet",
             "type": "process",
@@ -384,6 +417,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-sgl-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sgl/sglWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -440,6 +484,14 @@
             ]
         },
         {
+            "label": "prepare-sgl",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sgl-shaders",
+                "build-sgl"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -493,6 +545,14 @@
             "dependsOn": [
                 "compile-drawcallperf-web-shaders",
                 "build-drawcallperf-web"
+            ]
+        },
+        {
+            "label": "prepare-sgl-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sgl-web-shaders",
+                "build-sgl-web"
             ]
         },
         {
@@ -659,6 +719,36 @@
             "osx": {
                 "command": "${workspaceFolder}/scripts/serve-web-example.py",
                 "args": ["examples/plmpeg"]
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Serve Web: SGL",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/sgl"]
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/sgl"]
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/serve-web-example.py",
+                "args": ["examples/sgl"]
             },
             "group": "build",
             "presentation": {
@@ -859,6 +949,7 @@
 				"examples/cimgui",
 				"examples/loadpng",
 				"examples/sgl-points",
+				"examples/sgl",
 				"examples/plmpeg",
 				"examples/drawcallperf"
 			]

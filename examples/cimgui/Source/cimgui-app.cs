@@ -14,18 +14,10 @@ using System.Diagnostics;
 using static Sokol.SImgui;
 using static Imgui.ImguiNative;
 using Imgui;
+using static Sokol.SLog;
 
 public static unsafe class CImguiApp
 {
-
-
-    static sg_logger logger = new sg_logger();
-
-    [UnmanagedCallersOnly]
-    static void slog_func_wrapper(byte* tag, uint log_level, uint log_item, byte* message, uint line_nr, byte* filename, void* user_data)
-    {
-        logger.func(tag, log_level, log_item, message, line_nr, filename, user_data);
-    }
 
     struct _state
     {
@@ -50,7 +42,7 @@ public static unsafe class CImguiApp
         simgui_setup(new simgui_desc_t
         {
             logger = {
-                func = &slog_func_wrapper,
+                func = &slog_func,
             }
         });
 

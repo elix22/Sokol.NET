@@ -13,7 +13,7 @@ public static unsafe partial class SLog
 #else
 [DllImport("sokol", EntryPoint = "slog_func", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void slog_func([M(U.LPUTF8Str)] string tag, uint log_level, uint log_item, [M(U.LPUTF8Str)] string message, uint line_nr, [M(U.LPUTF8Str)] string filename, void* user_data);
+public static extern void slog_func_native([M(U.LPUTF8Str)] string tag, uint log_level, uint log_item, [M(U.LPUTF8Str)] string message, uint line_nr, [M(U.LPUTF8Str)] string filename, void* user_data);
 
 }
 }
