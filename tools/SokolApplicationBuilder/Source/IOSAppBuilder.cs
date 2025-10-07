@@ -234,8 +234,13 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(opts.Type) || opts.Type.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
+
                 var buildResult = Cli.Wrap("cmake")
-                    .WithArguments("--build . --config Release")
+                    .WithArguments($"--build . --config {configuration}")
                     .WithWorkingDirectory(sokolDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -253,7 +258,7 @@ namespace SokolApplicationBuilder
                 string frameworksDir = Path.Combine(iosDir, "frameworks");
                 Directory.CreateDirectory(frameworksDir);
 
-                string sourceFramework = Path.Combine(sokolDir, "Release-iphoneos", "sokol.framework");
+                string sourceFramework = Path.Combine(sokolDir, $"{configuration}-iphoneos", "sokol.framework");
                 string destFramework = Path.Combine(frameworksDir, "sokol.framework");
 
                 if (Directory.Exists(sourceFramework))
@@ -312,8 +317,13 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.High, "Publishing .NET project for iOS...");
 
                 string projectFile = Path.Combine(projectDir, projectName + ".csproj");
+                
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(opts.Type) || opts.Type.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
 
-                string publishArgs = $"publish \"{projectFile}\" -r ios-arm64 -c Release -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"";
+                string publishArgs = $"publish \"{projectFile}\" -r ios-arm64 -c {configuration} -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"";
                 if (!string.IsNullOrEmpty(opts.LinkerFlags))
                 {
                     publishArgs += $" -p:LinkerFlags=\"{opts.LinkerFlags}\"";
@@ -354,7 +364,12 @@ namespace SokolApplicationBuilder
                 string frameworkDir = Path.Combine(frameworksDir, $"{projectName}.framework");
                 Directory.CreateDirectory(frameworkDir);
 
-                string libPath = Path.Combine(projectDir, "bin", "Release", "net10.0", "ios-arm64", "publish", $"lib{projectName}.dylib");
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(opts.Type) || opts.Type.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
+
+                string libPath = Path.Combine(projectDir, "bin", configuration, "net10.0", "ios-arm64", "publish", $"lib{projectName}.dylib");
 
                 if (!File.Exists(libPath))
                 {
@@ -546,9 +561,14 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.High, "Compiling Xcode project...");
 
                 string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+                
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(opts.Type) || opts.Type.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
 
                 var result = Cli.Wrap("xcodebuild")
-                    .WithArguments($"-target {projectName}-ios-app -configuration Release -sdk iphoneos -arch arm64")
+                    .WithArguments($"-target {projectName}-ios-app -configuration {configuration} -sdk iphoneos -arch arm64")
                     .WithWorkingDirectory(buildDir)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -562,12 +582,12 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
-                string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
+                string appBundlePath = Path.Combine(buildDir, $"{configuration}-iphoneos", $"{projectName}-ios-app.app");
                 
-                // Check if the app bundle exists at the expected location, otherwise look in bin/Release
+                // Check if the app bundle exists at the expected location, otherwise look in bin/{configuration}
                 if (!Directory.Exists(appBundlePath))
                 {
-                    string altPath = Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app");
+                    string altPath = Path.Combine(buildDir, "bin", configuration, $"{projectName}-ios-app.app");
                     if (Directory.Exists(altPath))
                     {
                         appBundlePath = altPath;
@@ -593,16 +613,22 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.High, "Installing on iOS device...");
 
                 string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
-                string appBundlePath = Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app.app");
+                
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(opts.Type) || opts.Type.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
+                
+                string appBundlePath = Path.Combine(buildDir, $"{configuration}-iphoneos", $"{projectName}-ios-app.app");
 
                 // Check multiple possible locations for the app bundle
                 string[] possiblePaths = new[]
                 {
                     appBundlePath,
-                    Path.Combine(buildDir, "Release-iphoneos", $"{projectName}-ios-app", $"{projectName}-ios-app.app"),
-                    Path.Combine(buildDir, "Release", $"{projectName}-ios-app.app"),
+                    Path.Combine(buildDir, $"{configuration}-iphoneos", $"{projectName}-ios-app", $"{projectName}-ios-app.app"),
+                    Path.Combine(buildDir, configuration, $"{projectName}-ios-app.app"),
                     Path.Combine(buildDir, $"{projectName}-ios-app.app"),
-                    Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app")
+                    Path.Combine(buildDir, "bin", configuration, $"{projectName}-ios-app.app")
                 };
 
                 string? foundPath = null;
@@ -1403,28 +1429,32 @@ namespace SokolApplicationBuilder
             {
                 string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
                 
-                // Note: iOS currently always builds Release configuration
-                // But we still organize output by requested build type for consistency
-                string xcodeBuildConfig = "Release-iphoneos";
+                // Determine configuration based on build type
+                string configuration = string.IsNullOrEmpty(buildType) || buildType.Equals("release", StringComparison.OrdinalIgnoreCase) 
+                    ? "Release" 
+                    : "Debug";
+                
+                string xcodeBuildConfig = $"{configuration}-iphoneos";
                 string appBundlePath = Path.Combine(buildDir, xcodeBuildConfig, $"{projectName}-ios-app.app");
 
                 // Check alternate locations
                 if (!Directory.Exists(appBundlePath))
                 {
-                    string altPath = Path.Combine(buildDir, "bin", "Release", $"{projectName}-ios-app.app");
+                    string altPath = Path.Combine(buildDir, "bin", configuration, $"{projectName}-ios-app.app");
                     if (Directory.Exists(altPath))
                     {
                         appBundlePath = altPath;
                     }
                 }
 
-                // Also check Debug configuration in case it's supported in the future
+                // Also check the other configuration as fallback
                 if (!Directory.Exists(appBundlePath))
                 {
-                    string debugPath = Path.Combine(buildDir, "Debug-iphoneos", $"{projectName}-ios-app.app");
-                    if (Directory.Exists(debugPath))
+                    string fallbackConfig = configuration == "Release" ? "Debug" : "Release";
+                    string fallbackPath = Path.Combine(buildDir, $"{fallbackConfig}-iphoneos", $"{projectName}-ios-app.app");
+                    if (Directory.Exists(fallbackPath))
                     {
-                        appBundlePath = debugPath;
+                        appBundlePath = fallbackPath;
                     }
                 }
 
