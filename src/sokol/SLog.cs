@@ -11,7 +11,6 @@ public static unsafe partial class SLog
     [UnmanagedCallersOnly]
     public static void slog_func(byte* tag, uint log_level, uint log_item, byte* message, uint line_nr, byte* filename, void* user_data)
     {
-        // logger.func(tag, log_level, log_item, message, line_nr, filename, user_data);
         SLog.slog_func_native(
             Marshal.PtrToStringAnsi((IntPtr)tag) ?? string.Empty, 
             log_level, 

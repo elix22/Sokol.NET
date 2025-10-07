@@ -75,42 +75,45 @@
   </ItemGroup>
 
 
-  <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
+<Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
-        <libSokol>$(SokolLibsPath)windows/$(OSArch)/sokol.dll</libSokol>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
   <Target Name="CopyCustomContentPublishWindows" AfterTargets="Publish" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
-        <libSokol>$(SokolLibsPath)windows/$(OSArch)/sokol.dll</libSokol>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found. Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
   <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
       <PropertyGroup>
-        <libSokol>$(SokolLibsPath)macos/$(OSArch)/libsokol.dylib</libSokol>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found are you sure URHONET_HOME_ROOT is pointing to the right place ?" /> 
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
        <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
   <Target Name="CopyCustomContentPublishMacOS" AfterTargets="Publish" Condition="'$(IsOSX)'=='true'">
       <PropertyGroup>
-        <libSokol>$(SokolLibsPath)macos/$(OSArch)/libsokol.dylib</libSokol>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found" /> 
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
-
 
   <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
       <PropertyGroup>

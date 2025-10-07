@@ -160,6 +160,29 @@ elseif (APPLE)
             "-framework AVFoundation"
             "-framework Foundation")
         set_target_properties(sokol PROPERTIES LINK_FLAGS "-Wl,-F/Library/Frameworks")
+        
+        # Post-build commands for macOS
+        add_custom_command(TARGET sokol POST_BUILD
+            # Log source file info
+            COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
+            COMMAND ls -l $<TARGET_FILE:sokol>
+            
+            # Ad-hoc code sign the library (required for macOS to load it)
+            COMMAND codesign --force --sign - $<TARGET_FILE:sokol>
+            
+            # Create directory and copy based on build configuration
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/macos/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/macos/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/
+            
+            # Verify destination file
+            COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
+            COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/macos/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/libsokol.dylib
+            
+            # Verify files are identical
+            COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/macos/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/libsokol.dylib
+            
+            COMMENT "Installing and verifying library for macOS ($<CONFIG>)"
+        )
     endif()
 elseif (ANDROID)
     target_compile_options(sokol PRIVATE -x c)
@@ -189,15 +212,15 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
         COMMAND ls -l $<TARGET_FILE:sokol>
         
-        # Create directory and copy
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}/sokol.a
+        # Create directory and copy based on build configuration
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/sokol.a
         
         # Verify destination file
         COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
-        COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}/sokol.a
+        COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/emscripten/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/sokol.a
         
-        COMMENT "Installing and verifying static library for Emscripten"
+        COMMENT "Installing and verifying static library for Emscripten ($<CONFIG>)"
     )
 elseif (LINUX)
             # Add Linux-specific compile options
@@ -225,17 +248,17 @@ elseif (LINUX)
                 COMMAND ${CMAKE_COMMAND} -E echo "Source file info:"
                 COMMAND ls -l $<TARGET_FILE:sokol>
                 
-                # Create directory and copy
-                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}
-                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/
+                # Create directory and copy based on build configuration
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>
+                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/
                 
                 # Verify destination file
                 COMMAND ${CMAKE_COMMAND} -E echo "Destination file info:"
-                COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                COMMAND ls -l ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/libsokol.so
                 
                 # Verify files are identical
-                COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/libsokol.so
+                COMMAND ${CMAKE_COMMAND} -E compare_files $<TARGET_FILE:sokol> ${CMAKE_SOURCE_DIR}/../libs/linux/${CMAKE_SYSTEM_PROCESSOR}/$<LOWER_CASE:$<CONFIG>>/libsokol.so
                 
-                COMMENT "Installing and verifying library for Linux"
+                COMMENT "Installing and verifying library for Linux ($<CONFIG>)"
             )
 endif()

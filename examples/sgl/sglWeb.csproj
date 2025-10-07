@@ -34,12 +34,16 @@
 
     <Import Project="$(SokolNetHome)/Directory.Build.props" />
 
+    <PropertyGroup>
+      <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+      <SokolLibPath>$(SokolLibsPath)emscripten/x86/$(BuildConfigLower)/sokol.a</SokolLibPath>
+    </PropertyGroup>
+
     <ItemGroup>
-      <NativeFileReference Include="$(SokolLibsPath)emscripten/x86/sokol.a">
+      <NativeFileReference Include="$(SokolLibPath)">
         <Link>libs\sokol.a</Link>
       </NativeFileReference>
     </ItemGroup>
-
 
     <PropertyGroup>
       <HostShaderFolder>web</HostShaderFolder>

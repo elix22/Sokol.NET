@@ -34,12 +34,20 @@
 
     <Import Project="$(SokolNetHome)/Directory.Build.props" />
 
+    <PropertyGroup>
+      <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+      <SokolLibPath>$(SokolLibsPath)emscripten/x86/$(BuildConfigLower)/sokol.a</SokolLibPath>
+    </PropertyGroup>
+
     <ItemGroup>
-      <NativeFileReference Include="$(SokolLibsPath)emscripten/x86/sokol.a">
+      <NativeFileReference Include="$(SokolLibPath)">
         <Link>libs\sokol.a</Link>
       </NativeFileReference>
     </ItemGroup>
 
+    <Target Name="ValidateSokolLib" BeforeTargets="Build">
+      <Error Condition="!Exists('$(SokolLibPath)')" Text="sokol.a not found at $(SokolLibPath). Please build the library using ./scripts/build-web-library.sh" />
+    </Target>
 
     <PropertyGroup>
       <HostShaderFolder>web</HostShaderFolder>

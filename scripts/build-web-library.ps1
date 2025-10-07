@@ -35,24 +35,50 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Remove and create build directory
-Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build-emscripten
-New-Item -ItemType Directory -Force build-emscripten | Out-Null
+# Clean up any existing build directories
+Write-Host "Cleaning up build directories..." -ForegroundColor Cyan
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build-emscripten-debug
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build-emscripten-release
 
-# Configure with emcmake
-Write-Host "Configuring with emcmake..."
-emcmake cmake -B build-emscripten -S ext/
+# Build Debug configuration
+Write-Host "=========================================" -ForegroundColor Yellow
+Write-Host "Building Debug configuration..." -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Yellow
+New-Item -ItemType Directory -Force build-emscripten-debug | Out-Null
+emcmake cmake -B build-emscripten-debug -S ext/ -DCMAKE_BUILD_TYPE=Debug
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "CMake configuration failed."
+    Write-Error "CMake configuration failed for Debug."
+    exit 1
+}
+cmake --build build-emscripten-debug
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Debug build failed."
     exit 1
 }
 
-# Build
-Write-Host "Building..."
-cmake --build build-emscripten
+# Build Release configuration
+Write-Host "=========================================" -ForegroundColor Yellow
+Write-Host "Building Release configuration..." -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Yellow
+New-Item -ItemType Directory -Force build-emscripten-release | Out-Null
+emcmake cmake -B build-emscripten-release -S ext/ -DCMAKE_BUILD_TYPE=Release
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Build failed."
+    Write-Error "CMake configuration failed for Release."
+    exit 1
+}
+cmake --build build-emscripten-release
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Release build failed."
     exit 1
 }
 
-Write-Host "Build completed successfully!"
+# Clean up build directories
+Write-Host "Cleaning up build directories..." -ForegroundColor Cyan
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build-emscripten-debug
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build-emscripten-release
+
+Write-Host "=========================================" -ForegroundColor Yellow
+Write-Host "Build completed successfully!" -ForegroundColor Green
+Write-Host "Debug build: libs/emscripten/wasm32/debug/sokol.a" -ForegroundColor Green
+Write-Host "Release build: libs/emscripten/wasm32/release/sokol.a" -ForegroundColor Green
+Write-Host "=========================================" -ForegroundColor Yellow

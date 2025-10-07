@@ -12,6 +12,7 @@ using static Sokol.SG.sg_cull_mode;
 using static Sokol.SG.sg_compare_func;
 using static Sokol.Utils;
 using System.Diagnostics;
+using static Sokol.SLog;
 
 public static unsafe class CubeSapp
 {
@@ -33,7 +34,10 @@ public static unsafe class CubeSapp
 
         sg_setup(new sg_desc()
         {
-            environment = sglue_environment()
+            environment = sglue_environment(),
+            logger = {
+                func = &slog_func,
+            }
         });
 
         /* cube vertex buffer */
@@ -212,6 +216,9 @@ public static unsafe class CubeSapp
             sample_count = 4,
             window_title = "Cube (sokol-app)",
             icon = { sokol_default = true },
+            logger = {
+                func = &slog_func,
+            }
         };
     }
 

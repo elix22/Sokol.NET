@@ -31,17 +31,32 @@ echo "Activating Emscripten SDK version $EMSCRIPTEN_VERSION..."
 echo "Setting up Emscripten environment..."
 source "./tools/emsdk/emsdk_env.sh"
 
-# Remove and create build directory
-echo "Preparing build directory..."
-rm -rf build-emscripten
-mkdir -p build-emscripten
+# Clean up any existing build directories
+echo "Cleaning up build directories..."
+rm -rf build-emscripten-debug build-emscripten-release
 
-# Configure with emcmake
-echo "Configuring with emcmake..."
-emcmake cmake -B build-emscripten -S ext/ -DCMAKE_BUILD_TYPE=Release
+# Build Debug configuration
+echo "========================================="
+echo "Building Debug configuration..."
+echo "========================================="
+mkdir -p build-emscripten-debug
+emcmake cmake -B build-emscripten-debug -S ext/ -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-emscripten-debug
 
-# Build
-echo "Building..."
-cmake --build build-emscripten
+# Build Release configuration
+echo "========================================="
+echo "Building Release configuration..."
+echo "========================================="
+mkdir -p build-emscripten-release
+emcmake cmake -B build-emscripten-release -S ext/ -DCMAKE_BUILD_TYPE=Release
+cmake --build build-emscripten-release
 
+# Clean up build directories
+echo "Cleaning up build directories..."
+rm -rf build-emscripten-debug build-emscripten-release
+
+echo "========================================="
 echo "Build completed successfully!"
+echo "Debug build: libs/emscripten/wasm32/debug/sokol.a"
+echo "Release build: libs/emscripten/wasm32/release/sokol.a"
+echo "========================================="
