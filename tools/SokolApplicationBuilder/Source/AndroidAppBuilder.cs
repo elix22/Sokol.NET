@@ -215,6 +215,34 @@ namespace SokolApplicationBuilder
             return 0;
         }
 
+        private string GetAndroidSdkPath()
+        {
+            // Try to find Android SDK location from environment variables
+            string androidSdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT") 
+                ?? Environment.GetEnvironmentVariable("ANDROID_HOME")
+                ?? Environment.GetEnvironmentVariable("ANDROID_SDK");
+
+            // If not found in environment, try common locations
+            if (string.IsNullOrEmpty(androidSdk) || !Directory.Exists(androidSdk))
+            {
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    androidSdk = Path.Combine(homeDir, "AppData", "Local", "Android", "Sdk");
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    androidSdk = Path.Combine(homeDir, "Library", "Android", "sdk");
+                }
+                else // Linux
+                {
+                    androidSdk = Path.Combine(homeDir, "Android", "Sdk");
+                }
+            }
+
+            return androidSdk;
+        }
+
         private string FindBestAndroidNDK(string currentNdkHome = null, string currentNdkRoot = null)
         {
             // First, check if environment variables point to a suitable NDK (≥25)
@@ -254,28 +282,8 @@ namespace SokolApplicationBuilder
             // Environment NDK not suitable, search for best available NDK
             Log.LogMessage(MessageImportance.Normal, "Searching Android SDK for suitable NDK (≥25)...");
             
-            // Try to find Android SDK location
-            string androidSdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT") 
-                ?? Environment.GetEnvironmentVariable("ANDROID_HOME")
-                ?? Environment.GetEnvironmentVariable("ANDROID_SDK");
-
-            // If not found in environment, try common locations
-            if (string.IsNullOrEmpty(androidSdk) || !Directory.Exists(androidSdk))
-            {
-                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    androidSdk = Path.Combine(homeDir, "AppData", "Local", "Android", "Sdk");
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    androidSdk = Path.Combine(homeDir, "Library", "Android", "sdk");
-                }
-                else // Linux
-                {
-                    androidSdk = Path.Combine(homeDir, "Android", "Sdk");
-                }
-            }
+            // Use the helper method to get Android SDK path
+            string androidSdk = GetAndroidSdkPath();
 
             if (!Directory.Exists(androidSdk))
             {
@@ -385,7 +393,7 @@ namespace SokolApplicationBuilder
                 CompileShaders();
 
                 // Publish .NET assemblies for different architectures
-                PublishAssemblies();
+                PublishAssemblies(buildType);
 
                 // Build Android app (APK or AAB)
                 if (buildAAB)
@@ -788,9 +796,12 @@ namespace SokolApplicationBuilder
             Log.LogMessage(MessageImportance.High, $"Shaders compilation completed with exit code: {result.ExitCode}");
         }
 
-        void PublishAssemblies()
+        void PublishAssemblies(string buildType)
         {
             string[] architectures = { "linux-bionic-arm64", "linux-bionic-arm", "linux-bionic-x64" };
+
+            // Determine configuration
+            string configuration = buildType == "release" ? "Release" : "Debug";
 
             // Add scripts directory to PATH for android_fake_clang.cmd access on Windows
             string sokolNetHome = GetSokolNetHome();
@@ -829,7 +840,7 @@ namespace SokolApplicationBuilder
                     string projectFile = Path.Combine(opts.ProjectPath, $"{PROJECT_NAME}.csproj");
 
                     var result = Cli.Wrap("dotnet")
-                        .WithArguments($"publish \"{projectFile}\" -r {arch} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
+                        .WithArguments($"publish \"{projectFile}\" -r {arch} -c {configuration} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
                         .WithWorkingDirectory(opts.ProjectPath)
                         .WithEnvironmentVariables(env => 
                         {
@@ -848,7 +859,7 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"Publishing for {arch} completed successfully");
                         
                         // Copy the published library to the Android libs directory
-                        string publishDir = Path.Combine(opts.ProjectPath, "bin", "Release", "net10.0", arch, "publish");
+                        string publishDir = Path.Combine(opts.ProjectPath, "bin", configuration, "net10.0", arch, "publish");
                         string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "libs");
                         string abiName = arch switch
                         {
@@ -1047,32 +1058,36 @@ namespace SokolApplicationBuilder
             try
             {
                 // Find apksigner in Android SDK
-                var stringBuilder = new System.Text.StringBuilder();
-                var findApksignerResult = Cli.Wrap("find")
-                    .WithArguments(new[] { "/Users/elialoni/Library/Android/sdk", "-name", "apksigner", "-type", "f" })
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(stringBuilder))
-                    .WithValidation(CommandResultValidation.None) // Don't fail on exit code
-                    .ExecuteAsync()
-                    .GetAwaiter()
-                    .GetResult();
-                
-                string apksignerPath = stringBuilder.ToString().Trim();
-                if (!string.IsNullOrEmpty(apksignerPath))
+                string androidSdkPath = GetAndroidSdkPath();
+                if (!string.IsNullOrEmpty(androidSdkPath) && Directory.Exists(androidSdkPath))
                 {
-                    Log.LogMessage(MessageImportance.High, $"Using apksigner: {apksignerPath}");
-                    
-                    var apksignerResult = Cli.Wrap(apksignerPath.Split('\n')[0]) // Use first line if multiple
-                        .WithArguments($"sign --ks \"{debugKeystore}\" --ks-pass pass:android --key-pass pass:android --out \"{signedApkPath}\" \"{unsignedApkPath}\"")
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                    var stringBuilder = new System.Text.StringBuilder();
+                    var findApksignerResult = Cli.Wrap("find")
+                        .WithArguments(new[] { androidSdkPath, "-name", "apksigner", "-type", "f" })
+                        .WithStandardOutputPipe(PipeTarget.ToStringBuilder(stringBuilder))
+                        .WithValidation(CommandResultValidation.None) // Don't fail on exit code
                         .ExecuteAsync()
                         .GetAwaiter()
                         .GetResult();
                     
-                    if (apksignerResult.ExitCode == 0)
+                    string apksignerPath = stringBuilder.ToString().Trim();
+                    if (!string.IsNullOrEmpty(apksignerPath))
                     {
-                        signingSuccess = true;
-                        Log.LogMessage(MessageImportance.High, "APK signed successfully with apksigner!");
+                        Log.LogMessage(MessageImportance.High, $"Using apksigner: {apksignerPath}");
+                        
+                        var apksignerResult = Cli.Wrap(apksignerPath.Split('\n')[0]) // Use first line if multiple
+                            .WithArguments($"sign --ks \"{debugKeystore}\" --ks-pass pass:android --key-pass pass:android --out \"{signedApkPath}\" \"{unsignedApkPath}\"")
+                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                            .ExecuteAsync()
+                            .GetAwaiter()
+                            .GetResult();
+                        
+                        if (apksignerResult.ExitCode == 0)
+                        {
+                            signingSuccess = true;
+                            Log.LogMessage(MessageImportance.High, "APK signed successfully with apksigner!");
+                        }
                     }
                 }
             }
