@@ -252,23 +252,23 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "compile-sgl-lines-shaders",
+            "label": "compile-sgl_lines-shaders",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "msbuild",
-				"examples/sgl-lines/sgl_lines.csproj",
+				"examples/sgl_lines/sgl_lines.csproj",
                 "-t:CompileShaders"
             ],
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "compile-sgl-lines-web-shaders",
+            "label": "compile-sgl_lines-web-shaders",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "msbuild",
-				"examples/sgl-lines/sgl_linesWeb.csproj",
+				"examples/sgl_lines/sgl_linesWeb.csproj",
                 "-t:CompileShaders"
             ],
             "problemMatcher": "$msCompile"
@@ -384,12 +384,12 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "build-sgl-lines",
+            "label": "build-sgl_lines",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "build",
-				"examples/sgl-lines/sgl_lines.csproj"
+				"examples/sgl_lines/sgl_lines.csproj"
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
@@ -494,12 +494,12 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "build-sgl-lines-web",
+            "label": "build-sgl_lines-web",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "build",
-				"examples/sgl-lines/sgl_linesWeb.csproj"
+				"examples/sgl_lines/sgl_linesWeb.csproj"
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
@@ -580,11 +580,11 @@
             ]
         },
         {
-            "label": "prepare-sgl-lines",
+            "label": "prepare-sgl_lines",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-sgl-lines-shaders",
-                "build-sgl-lines"
+                "compile-sgl_lines-shaders",
+                "build-sgl_lines"
             ]
         },
         {
@@ -660,11 +660,11 @@
             ]
         },
         {
-            "label": "prepare-sgl-lines-web",
+            "label": "prepare-sgl_lines-web",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "compile-sgl-lines-web-shaders",
-                "build-sgl-lines-web"
+                "compile-sgl_lines-web-shaders",
+                "build-sgl_lines-web"
             ]
         },
         {
@@ -1068,10 +1068,12 @@
 				"examples/dyntex",
 				"examples/cimgui",
 				"examples/loadpng",
-				"examples/sgl-points",
-				"examples/sgl",
+				"examples/instancing",
 				"examples/plmpeg",
-				"examples/drawcallperf"
+				"examples/drawcallperf",
+				"examples/sgl",
+				"examples/sgl_lines",
+				"examples/debugtext"
 			]
 		},
 		{

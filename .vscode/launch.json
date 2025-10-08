@@ -57,7 +57,7 @@
                 "plmpeg",
                 "drawcallperf",
                 "sgl",
-                "sgl-lines",
+                "sgl_lines",
                 "debugtext"
             ],
             "default": "cube"
