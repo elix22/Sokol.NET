@@ -58,7 +58,8 @@
                 "drawcallperf",
                 "sgl",
                 "sgl_lines",
-                "debugtext"
+                "debugtext",
+                "imgui_usercallback"
             ],
             "default": "cube"
         },

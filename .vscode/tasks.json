@@ -296,6 +296,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-imgui_usercallback-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/imgui_usercallback/imgui_usercallback.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-imgui_usercallback-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/imgui_usercallback/imgui_usercallbackWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -401,6 +423,17 @@
             "args": [
                 "build",
 				"examples/debugtext/debugtext.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-imgui_usercallback",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/imgui_usercallback/imgui_usercallback.csproj"
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
@@ -516,6 +549,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-imgui_usercallback-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/imgui_usercallback/imgui_usercallbackWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -596,6 +640,14 @@
             ]
         },
         {
+            "label": "prepare-imgui_usercallback",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-imgui_usercallback-shaders",
+                "build-imgui_usercallback"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -673,6 +725,14 @@
             "dependsOn": [
                 "compile-debugtext-web-shaders",
                 "build-debugtext-web"
+            ]
+        },
+        {
+            "label": "prepare-imgui_usercallback-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-imgui_usercallback-web-shaders",
+                "build-imgui_usercallback-web"
             ]
         },
         {
@@ -1073,7 +1133,8 @@
 				"examples/drawcallperf",
 				"examples/sgl",
 				"examples/sgl_lines",
-				"examples/debugtext"
+				"examples/debugtext",
+				"examples/imgui_usercallback"
 			]
 		},
 		{
