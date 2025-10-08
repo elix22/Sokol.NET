@@ -47,14 +47,14 @@ public static extern sg_swapchain sglue_swapchain();
 #else
 [DllImport("sokol", EntryPoint = "sglue_environment_internal", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void sglue_environment_internal(ref sg_environment env);
+public static extern void sglue_environment_internal(ref sg_environment result);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sglue_swapchain_internal", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void sglue_swapchain_internal(ref sg_swapchain swapchain);
+public static extern void sglue_swapchain_internal(ref sg_swapchain result);
 
 }
 }

@@ -71,19 +71,27 @@
 <canvas class="emscripten" id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()">
 Your browser does not support HTML5 canvas.
 </canvas>
-<script>
-// Ensure WebGL context has depth buffer enabled
-var canvas = document.getElementById('canvas');
-var gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-if (gl) {
-    // Check if depth buffer is available
-    var depthBits = gl.getParameter(gl.DEPTH_BITS);
-    console.log('WebGL depth bits:', depthBits);
-    if (depthBits === 0) {
-        console.warn('No depth buffer available in WebGL context!');
-    }
-}
-</script>
 <script type="module" src="./main.js"></script>
+<script>
+// Check WebGL context after sokol initializes it (run after a delay to ensure sokol has created the context)
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        var canvas = document.getElementById('canvas');
+        // Get the existing WebGL context that sokol created (don't create a new one!)
+        var gl = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: false }) || 
+                 canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false });
+        if (gl) {
+            var depthBits = gl.getParameter(gl.DEPTH_BITS);
+            var alphaBits = gl.getParameter(gl.ALPHA_BITS);
+            console.log('WebGL depth bits:', depthBits);
+            console.log('WebGL alpha bits:', alphaBits);
+            console.log('WebGL premultiplied alpha:', gl.getContextAttributes().premultipliedAlpha);
+            if (depthBits === 0) {
+                console.warn('No depth buffer available in WebGL context!');
+            }
+        }
+    }, 1000); // Wait 1 second for sokol to initialize
+});
+</script>
 </body>
 </html>

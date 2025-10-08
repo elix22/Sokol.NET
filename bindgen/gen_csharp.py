@@ -172,6 +172,7 @@ web_wrapper_functions = {
     'sg_alloc_sampler',
     'sgp_make_pipeline',
     'sgl_make_pipeline',
+    'sdtx_get_context',
 }
 
 # Functions which need special handling for WebAssembly (Emscripten) platform
@@ -179,7 +180,13 @@ web_wrapper_functions = {
 # You have to make sure to implement the function on the native side, see examples in sokol_glue.h
 web_wrapper_struct_return_functions = {
     'sglue_swapchain': 'sg_swapchain',
-    'sglue_environment': 'sg_environment'
+    'sglue_environment': 'sg_environment',
+    'sdtx_font_kc853': 'sdtx_font_desc_t',
+    'sdtx_font_kc854': 'sdtx_font_desc_t',
+    'sdtx_font_z1013': 'sdtx_font_desc_t',
+    'sdtx_font_cpc': 'sdtx_font_desc_t',
+    'sdtx_font_c64': 'sdtx_font_desc_t',
+    'sdtx_font_oric': 'sdtx_font_desc_t'
     # Add other query functions that return structs
 }
 
@@ -759,6 +766,26 @@ def gen_imports(inp, dep_prefixes):
         l(f'using static Sokol.{dep_module_name};')
         l('')
 
+def gen_internal_functions(inp, prefix):
+    """Generate _internal function declarations for web wrapper struct return functions."""
+    for decl in inp['decls']:
+        if not decl['is_dep'] and decl['kind'] == 'func':
+            c_func_name = decl['name']
+            if c_func_name in web_wrapper_struct_return_functions:
+                csharp_func_name = as_pascal_case(check_name_override(decl['name']), prefix)
+                csharp_res_type = funcdecl_result_csharp(decl, prefix)
+                
+                l("#if __IOS__")
+                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                l("#else")
+                l(f"[DllImport(\"sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                l("#endif")
+                if decl['params']:
+                    l(f"public static extern void {csharp_func_name}_internal(ref {csharp_res_type} result, {funcdecl_args_csharp(decl, prefix)});")
+                else:
+                    l(f"public static extern void {csharp_func_name}_internal(ref {csharp_res_type} result);")
+                l("")
+
 def gen_module(inp, dep_prefixes):
     l('// machine generated, do not edit')
     l('using System;')
@@ -786,6 +813,8 @@ def gen_module(inp, dep_prefixes):
                 elif kind == 'func':
                     gen_func_c(decl, prefix)
                     gen_func_csharp(decl, prefix)
+    # Generate _internal function declarations for WebAssembly
+    gen_internal_functions(inp, prefix)
     l("}")
     l("}")
 

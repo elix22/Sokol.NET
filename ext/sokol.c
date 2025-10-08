@@ -85,6 +85,50 @@ extern "C"
 #define SOKOL_GFX_IMGUI_IMPL
 #include "sokol_gfx_imgui.h"
 
+/*=== C# BINDING HELPERS (elix22) ============================================
+    WebAssembly/Emscripten cannot marshal structs returned by value through P/Invoke.
+    These _internal helper functions work around this limitation by taking an output
+    pointer parameter instead. The C# binding generator automatically creates wrappers
+    that call these functions on WebAssembly builds while using the regular functions
+    on other platforms.
+    
+    All C# binding-specific code is kept in this file (sokol.c) which is not part
+    of the upstream sokol repository, keeping the upstream headers clean.
+============================================================================*/
+
+// sokol_glue.h helpers
+SOKOL_API_IMPL void sglue_environment_internal(sg_environment* env) {
+    *env = sglue_environment();
+}
+
+SOKOL_API_IMPL void sglue_swapchain_internal(sg_swapchain* swapchain) {
+    *swapchain = sglue_swapchain();
+}
+
+// sokol_debugtext.h helpers
+SOKOL_API_IMPL void sdtx_font_kc853_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_kc853();
+}
+
+SOKOL_API_IMPL void sdtx_font_kc854_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_kc854();
+}
+
+SOKOL_API_IMPL void sdtx_font_z1013_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_z1013();
+}
+
+SOKOL_API_IMPL void sdtx_font_cpc_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_cpc();
+}
+
+SOKOL_API_IMPL void sdtx_font_c64_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_c64();
+}
+
+SOKOL_API_IMPL void sdtx_font_oric_internal(sdtx_font_desc_t* desc) {
+    *desc = sdtx_font_oric();
+}
 
 int sdtx_print_wrapper(const char* str)
 {

@@ -100,47 +100,101 @@ public static extern void sdtx_setup(in sdtx_desc_t desc);
 #endif
 public static extern void sdtx_shutdown();
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_kc853()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_kc853_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_kc853", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_kc853", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_kc853();
+#endif
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_kc854()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_kc854_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_kc854", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_kc854", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_kc854();
+#endif
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_z1013()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_z1013_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_z1013", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_z1013", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_z1013();
+#endif
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_cpc()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_cpc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_cpc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_cpc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_cpc();
+#endif
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_c64()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_c64_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_c64", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_c64", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_c64();
+#endif
 
+#if WEB
+public static sdtx_font_desc_t sdtx_font_oric()
+{
+    sdtx_font_desc_t result = default;
+    sdtx_font_oric_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_oric", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_font_oric", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_font_desc_t sdtx_font_oric();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_make_context", CallingConvention = CallingConvention.Cdecl)]
@@ -168,7 +222,16 @@ public static extern void sdtx_set_context(sdtx_context ctx);
 #else
 [DllImport("sokol", EntryPoint = "sdtx_get_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sdtx_get_context_internal();
+public static sdtx_context sdtx_get_context()
+{
+    uint _id = sdtx_get_context_internal();
+    return new sdtx_context { id = _id };
+}
+#else
 public static extern sdtx_context sdtx_get_context();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_default_context", CallingConvention = CallingConvention.Cdecl)]
@@ -351,6 +414,48 @@ public static extern void sdtx_putr([M(U.LPUTF8Str)] string str, int len);
 [DllImport("sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_range sdtx_get_cleared_fmt_buffer();
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_kc853_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_kc853_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_kc853_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_kc854_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_kc854_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_kc854_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_z1013_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_z1013_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_z1013_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_cpc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_cpc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_cpc_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_c64_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_c64_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_c64_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_oric_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_font_oric_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_font_oric_internal(ref sdtx_font_desc_t result);
 
 }
 }

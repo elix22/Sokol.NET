@@ -153,7 +153,7 @@ public struct sgimgui_shader_t
     #pragma warning disable 169
     public struct glsl_texture_sampler_nameCollection
     {
-        public ref sgimgui_str_t this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 16)[index];
+        public ref sgimgui_str_t this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 32)[index];
         private sgimgui_str_t _item0;
         private sgimgui_str_t _item1;
         private sgimgui_str_t _item2;
@@ -170,6 +170,22 @@ public struct sgimgui_shader_t
         private sgimgui_str_t _item13;
         private sgimgui_str_t _item14;
         private sgimgui_str_t _item15;
+        private sgimgui_str_t _item16;
+        private sgimgui_str_t _item17;
+        private sgimgui_str_t _item18;
+        private sgimgui_str_t _item19;
+        private sgimgui_str_t _item20;
+        private sgimgui_str_t _item21;
+        private sgimgui_str_t _item22;
+        private sgimgui_str_t _item23;
+        private sgimgui_str_t _item24;
+        private sgimgui_str_t _item25;
+        private sgimgui_str_t _item26;
+        private sgimgui_str_t _item27;
+        private sgimgui_str_t _item28;
+        private sgimgui_str_t _item29;
+        private sgimgui_str_t _item30;
+        private sgimgui_str_t _item31;
     }
     #pragma warning restore 169
     public glsl_texture_sampler_nameCollection glsl_texture_sampler_name;
@@ -475,6 +491,7 @@ public enum sgimgui_cmd_t
     SGIMGUI_CMD_APPLY_BINDINGS,
     SGIMGUI_CMD_APPLY_UNIFORMS,
     SGIMGUI_CMD_DRAW,
+    SGIMGUI_CMD_DRAW_EX,
     SGIMGUI_CMD_DISPATCH,
     SGIMGUI_CMD_END_PASS,
     SGIMGUI_CMD_COMMIT,
@@ -646,6 +663,15 @@ public struct sgimgui_args_draw_t
     public int base_element;
     public int num_elements;
     public int num_instances;
+}
+[StructLayout(LayoutKind.Sequential)]
+public struct sgimgui_args_draw_ex_t
+{
+    public int base_element;
+    public int num_elements;
+    public int num_instances;
+    public int base_vertex;
+    public int base_instance;
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct sgimgui_args_dispatch_t
@@ -834,6 +860,7 @@ public struct sgimgui_args_t
     public sgimgui_args_apply_bindings_t apply_bindings;
     public sgimgui_args_apply_uniforms_t apply_uniforms;
     public sgimgui_args_draw_t draw;
+    public sgimgui_args_draw_ex_t draw_ex;
     public sgimgui_args_dispatch_t dispatch;
     public sgimgui_args_alloc_buffer_t alloc_buffer;
     public sgimgui_args_alloc_image_t alloc_image;

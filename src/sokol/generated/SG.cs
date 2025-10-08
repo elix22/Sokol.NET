@@ -46,15 +46,19 @@ public struct sg_range
 }
 public const int SG_INVALID_ID = 0;
 public const int SG_NUM_INFLIGHT_FRAMES = 2;
-public const int SG_MAX_COLOR_ATTACHMENTS = 4;
+public const int SG_MAX_COLOR_ATTACHMENTS = 8;
 public const int SG_MAX_UNIFORMBLOCK_MEMBERS = 16;
 public const int SG_MAX_VERTEX_ATTRIBUTES = 16;
 public const int SG_MAX_MIPMAPS = 16;
 public const int SG_MAX_VERTEXBUFFER_BINDSLOTS = 8;
 public const int SG_MAX_UNIFORMBLOCK_BINDSLOTS = 8;
-public const int SG_MAX_VIEW_BINDSLOTS = 28;
-public const int SG_MAX_SAMPLER_BINDSLOTS = 16;
-public const int SG_MAX_TEXTURE_SAMPLER_PAIRS = 16;
+public const int SG_MAX_VIEW_BINDSLOTS = 32;
+public const int SG_MAX_SAMPLER_BINDSLOTS = 12;
+public const int SG_MAX_TEXTURE_SAMPLER_PAIRS = 32;
+public const int SG_MAX_PORTABLE_COLOR_ATTACHMENTS = 4;
+public const int SG_MAX_PORTABLE_TEXTURE_BINDINGS_PER_STAGE = 16;
+public const int SG_MAX_PORTABLE_STORAGEBUFFER_BINDINGS_PER_STAGE = 8;
+public const int SG_MAX_PORTABLE_STORAGEIMAGE_BINDINGS_PER_STAGE = 4;
 public enum sg_backend
 {
     SG_BACKEND_GLCORE,
@@ -244,6 +248,18 @@ public struct sg_features
     [M(U.I1)] public bool separate_buffer_types;
 #endif
 #if WEB
+    private byte _draw_base_vertex;
+    public bool draw_base_vertex { get => _draw_base_vertex != 0; set => _draw_base_vertex = value ? (byte)1 : (byte)0; }
+#else
+    [M(U.I1)] public bool draw_base_vertex;
+#endif
+#if WEB
+    private byte _draw_base_instance;
+    public bool draw_base_instance { get => _draw_base_instance != 0; set => _draw_base_instance = value ? (byte)1 : (byte)0; }
+#else
+    [M(U.I1)] public bool draw_base_instance;
+#endif
+#if WEB
     private byte _gl_texture_views;
     public bool gl_texture_views { get => _gl_texture_views != 0; set => _gl_texture_views = value ? (byte)1 : (byte)0; }
 #else
@@ -259,8 +275,13 @@ public struct sg_limits
     public int max_image_size_array;
     public int max_image_array_layers;
     public int max_vertex_attrs;
+    public int max_color_attachments;
+    public int max_texture_bindings_per_stage;
+    public int max_storage_buffer_bindings_per_stage;
+    public int max_storage_image_bindings_per_stage;
     public int gl_max_vertex_uniform_components;
     public int gl_max_combined_texture_image_units;
+    public int d3d11_max_unordered_access_views;
 }
 public enum sg_resource_state
 {
@@ -552,11 +573,15 @@ public struct sg_pass_action
     #pragma warning disable 169
     public struct colorsCollection
     {
-        public ref sg_color_attachment_action this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+        public ref sg_color_attachment_action this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 8)[index];
         private sg_color_attachment_action _item0;
         private sg_color_attachment_action _item1;
         private sg_color_attachment_action _item2;
         private sg_color_attachment_action _item3;
+        private sg_color_attachment_action _item4;
+        private sg_color_attachment_action _item5;
+        private sg_color_attachment_action _item6;
+        private sg_color_attachment_action _item7;
     }
     #pragma warning restore 169
     public colorsCollection colors;
@@ -608,22 +633,30 @@ public struct sg_attachments
     #pragma warning disable 169
     public struct colorsCollection
     {
-        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 8)[index];
         private sg_view _item0;
         private sg_view _item1;
         private sg_view _item2;
         private sg_view _item3;
+        private sg_view _item4;
+        private sg_view _item5;
+        private sg_view _item6;
+        private sg_view _item7;
     }
     #pragma warning restore 169
     public colorsCollection colors;
     #pragma warning disable 169
     public struct resolvesCollection
     {
-        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 8)[index];
         private sg_view _item0;
         private sg_view _item1;
         private sg_view _item2;
         private sg_view _item3;
+        private sg_view _item4;
+        private sg_view _item5;
+        private sg_view _item6;
+        private sg_view _item7;
     }
     #pragma warning restore 169
     public resolvesCollection resolves;
@@ -689,7 +722,7 @@ public struct sg_bindings
     #pragma warning disable 169
     public struct viewsCollection
     {
-        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 28)[index];
+        public ref sg_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 32)[index];
         private sg_view _item0;
         private sg_view _item1;
         private sg_view _item2;
@@ -718,13 +751,17 @@ public struct sg_bindings
         private sg_view _item25;
         private sg_view _item26;
         private sg_view _item27;
+        private sg_view _item28;
+        private sg_view _item29;
+        private sg_view _item30;
+        private sg_view _item31;
     }
     #pragma warning restore 169
     public viewsCollection views;
     #pragma warning disable 169
     public struct samplersCollection
     {
-        public ref sg_sampler this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 16)[index];
+        public ref sg_sampler this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 12)[index];
         private sg_sampler _item0;
         private sg_sampler _item1;
         private sg_sampler _item2;
@@ -737,10 +774,6 @@ public struct sg_bindings
         private sg_sampler _item9;
         private sg_sampler _item10;
         private sg_sampler _item11;
-        private sg_sampler _item12;
-        private sg_sampler _item13;
-        private sg_sampler _item14;
-        private sg_sampler _item15;
     }
     #pragma warning restore 169
     public samplersCollection samplers;
@@ -1215,7 +1248,7 @@ public struct sg_shader_desc
     #pragma warning disable 169
     public struct viewsCollection
     {
-        public ref sg_shader_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 28)[index];
+        public ref sg_shader_view this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 32)[index];
         private sg_shader_view _item0;
         private sg_shader_view _item1;
         private sg_shader_view _item2;
@@ -1244,13 +1277,17 @@ public struct sg_shader_desc
         private sg_shader_view _item25;
         private sg_shader_view _item26;
         private sg_shader_view _item27;
+        private sg_shader_view _item28;
+        private sg_shader_view _item29;
+        private sg_shader_view _item30;
+        private sg_shader_view _item31;
     }
     #pragma warning restore 169
     public viewsCollection views;
     #pragma warning disable 169
     public struct samplersCollection
     {
-        public ref sg_shader_sampler this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 16)[index];
+        public ref sg_shader_sampler this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 12)[index];
         private sg_shader_sampler _item0;
         private sg_shader_sampler _item1;
         private sg_shader_sampler _item2;
@@ -1263,17 +1300,13 @@ public struct sg_shader_desc
         private sg_shader_sampler _item9;
         private sg_shader_sampler _item10;
         private sg_shader_sampler _item11;
-        private sg_shader_sampler _item12;
-        private sg_shader_sampler _item13;
-        private sg_shader_sampler _item14;
-        private sg_shader_sampler _item15;
     }
     #pragma warning restore 169
     public samplersCollection samplers;
     #pragma warning disable 169
     public struct texture_sampler_pairsCollection
     {
-        public ref sg_shader_texture_sampler_pair this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 16)[index];
+        public ref sg_shader_texture_sampler_pair this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 32)[index];
         private sg_shader_texture_sampler_pair _item0;
         private sg_shader_texture_sampler_pair _item1;
         private sg_shader_texture_sampler_pair _item2;
@@ -1290,6 +1323,22 @@ public struct sg_shader_desc
         private sg_shader_texture_sampler_pair _item13;
         private sg_shader_texture_sampler_pair _item14;
         private sg_shader_texture_sampler_pair _item15;
+        private sg_shader_texture_sampler_pair _item16;
+        private sg_shader_texture_sampler_pair _item17;
+        private sg_shader_texture_sampler_pair _item18;
+        private sg_shader_texture_sampler_pair _item19;
+        private sg_shader_texture_sampler_pair _item20;
+        private sg_shader_texture_sampler_pair _item21;
+        private sg_shader_texture_sampler_pair _item22;
+        private sg_shader_texture_sampler_pair _item23;
+        private sg_shader_texture_sampler_pair _item24;
+        private sg_shader_texture_sampler_pair _item25;
+        private sg_shader_texture_sampler_pair _item26;
+        private sg_shader_texture_sampler_pair _item27;
+        private sg_shader_texture_sampler_pair _item28;
+        private sg_shader_texture_sampler_pair _item29;
+        private sg_shader_texture_sampler_pair _item30;
+        private sg_shader_texture_sampler_pair _item31;
     }
     #pragma warning restore 169
     public texture_sampler_pairsCollection texture_sampler_pairs;
@@ -1437,11 +1486,15 @@ public struct sg_pipeline_desc
     #pragma warning disable 169
     public struct colorsCollection
     {
-        public ref sg_color_target_state this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+        public ref sg_color_target_state this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 8)[index];
         private sg_color_target_state _item0;
         private sg_color_target_state _item1;
         private sg_color_target_state _item2;
         private sg_color_target_state _item3;
+        private sg_color_target_state _item4;
+        private sg_color_target_state _item5;
+        private sg_color_target_state _item6;
+        private sg_color_target_state _item7;
     }
     #pragma warning restore 169
     public colorsCollection colors;
@@ -1745,6 +1798,7 @@ public struct sg_frame_stats
     public uint num_apply_bindings;
     public uint num_apply_uniforms;
     public uint num_draw;
+    public uint num_draw_ex;
     public uint num_dispatch;
     public uint num_update_buffer;
     public uint num_append_buffer;
@@ -1784,6 +1838,7 @@ public enum sg_log_item
     SG_LOGITEM_GL_FRAMEBUFFER_STATUS_UNSUPPORTED,
     SG_LOGITEM_GL_FRAMEBUFFER_STATUS_INCOMPLETE_MULTISAMPLE,
     SG_LOGITEM_GL_FRAMEBUFFER_STATUS_UNKNOWN,
+    SG_LOGITEM_D3D11_FEATURE_LEVEL_0_DETECTED,
     SG_LOGITEM_D3D11_CREATE_BUFFER_FAILED,
     SG_LOGITEM_D3D11_CREATE_BUFFER_SRV_FAILED,
     SG_LOGITEM_D3D11_CREATE_BUFFER_UAV_FAILED,
@@ -1886,8 +1941,22 @@ public enum sg_log_item
     SG_LOGITEM_SHADER_POOL_EXHAUSTED,
     SG_LOGITEM_PIPELINE_POOL_EXHAUSTED,
     SG_LOGITEM_VIEW_POOL_EXHAUSTED,
+    SG_LOGITEM_BEGINPASS_TOO_MANY_COLOR_ATTACHMENTS,
+    SG_LOGITEM_BEGINPASS_TOO_MANY_RESOLVE_ATTACHMENTS,
     SG_LOGITEM_BEGINPASS_ATTACHMENTS_ALIVE,
     SG_LOGITEM_DRAW_WITHOUT_BINDINGS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_VERTEXSTAGE_TEXTURES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_FRAGMENTSTAGE_TEXTURES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_COMPUTESTAGE_TEXTURES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_VERTEXSTAGE_STORAGEBUFFERS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_FRAGMENTSTAGE_STORAGEBUFFERS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_COMPUTESTAGE_STORAGEBUFFERS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_VERTEXSTAGE_STORAGEIMAGES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_FRAGMENTSTAGE_STORAGEIMAGES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_COMPUTESTAGE_STORAGEIMAGES,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_VERTEXSTAGE_TEXTURESAMPLERPAIRS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_FRAGMENTSTAGE_TEXTURESAMPLERPAIRS,
+    SG_LOGITEM_SHADERDESC_TOO_MANY_COMPUTESTAGE_TEXTURESAMPLERPAIRS,
     SG_LOGITEM_VALIDATE_BUFFERDESC_CANARY,
     SG_LOGITEM_VALIDATE_BUFFERDESC_IMMUTABLE_DYNAMIC_STREAM,
     SG_LOGITEM_VALIDATE_BUFFERDESC_SEPARATE_BUFFER_TYPES,
@@ -1941,47 +2010,29 @@ public enum sg_log_item
     SG_LOGITEM_VALIDATE_SHADERDESC_METAL_THREADS_PER_THREADGROUP_MULTIPLE_32,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_NO_CONT_MEMBERS,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_SIZE_IS_ZERO,
-    SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_METAL_BUFFER_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_METAL_BUFFER_SLOT_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_HLSL_REGISTER_B_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_HLSL_REGISTER_B_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_WGSL_GROUP0_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_WGSL_GROUP0_BINDING_COLLISION,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_NO_MEMBERS,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_UNIFORM_GLSL_NAME,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_SIZE_MISMATCH,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_ARRAY_COUNT,
     SG_LOGITEM_VALIDATE_SHADERDESC_UNIFORMBLOCK_STD140_ARRAY_TYPE,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_METAL_BUFFER_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_METAL_BUFFER_SLOT_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_HLSL_REGISTER_T_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_HLSL_REGISTER_T_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_HLSL_REGISTER_U_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_HLSL_REGISTER_U_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_GLSL_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_GLSL_BINDING_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_WGSL_GROUP1_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEBUFFER_WGSL_GROUP1_BINDING_COLLISION,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_EXPECT_COMPUTE_STAGE,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_METAL_TEXTURE_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_METAL_TEXTURE_SLOT_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_HLSL_REGISTER_U_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_HLSL_REGISTER_U_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_GLSL_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_GLSL_BINDING_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_WGSL_GROUP1_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_STORAGEIMAGE_WGSL_GROUP1_BINDING_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_METAL_TEXTURE_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_METAL_TEXTURE_SLOT_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_HLSL_REGISTER_T_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_HLSL_REGISTER_T_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_WGSL_GROUP1_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_VIEW_TEXTURE_WGSL_GROUP1_BINDING_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_METAL_SAMPLER_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_METAL_SAMPLER_SLOT_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_HLSL_REGISTER_S_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_HLSL_REGISTER_S_COLLISION,
-    SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_WGSL_GROUP1_BINDING_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_SAMPLER_WGSL_GROUP1_BINDING_COLLISION,
     SG_LOGITEM_VALIDATE_SHADERDESC_TEXTURE_SAMPLER_PAIR_VIEW_SLOT_OUT_OF_RANGE,
     SG_LOGITEM_VALIDATE_SHADERDESC_TEXTURE_SAMPLER_PAIR_SAMPLER_SLOT_OUT_OF_RANGE,
@@ -2159,9 +2210,18 @@ public enum sg_log_item
     SG_LOGITEM_VALIDATE_AU_NO_UNIFORMBLOCK_AT_SLOT,
     SG_LOGITEM_VALIDATE_AU_SIZE,
     SG_LOGITEM_VALIDATE_DRAW_RENDERPASS_EXPECTED,
-    SG_LOGITEM_VALIDATE_DRAW_BASEELEMENT,
-    SG_LOGITEM_VALIDATE_DRAW_NUMELEMENTS,
-    SG_LOGITEM_VALIDATE_DRAW_NUMINSTANCES,
+    SG_LOGITEM_VALIDATE_DRAW_BASEELEMENT_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_NUMELEMENTS_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_NUMINSTANCES_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_EX_RENDERPASS_EXPECTED,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEELEMENT_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_EX_NUMELEMENTS_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_EX_NUMINSTANCES_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEINSTANCE_GE_ZERO,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEVERTEX_VS_INDEXED,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEINSTANCE_VS_INSTANCED,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEVERTEX_NOT_SUPPORTED,
+    SG_LOGITEM_VALIDATE_DRAW_EX_BASEINSTANCE_NOT_SUPPORTED,
     SG_LOGITEM_VALIDATE_DRAW_REQUIRED_BINDINGS_OR_UNIFORMS_MISSING,
     SG_LOGITEM_VALIDATE_DISPATCH_COMPUTEPASS_EXPECTED,
     SG_LOGITEM_VALIDATE_DISPATCH_NUMGROUPSX,
@@ -2246,6 +2306,12 @@ public struct sg_desc
     public bool disable_validation { get => _disable_validation != 0; set => _disable_validation = value ? (byte)1 : (byte)0; }
 #else
     [M(U.I1)] public bool disable_validation;
+#endif
+#if WEB
+    private byte _enforce_portable_limits;
+    public bool enforce_portable_limits { get => _enforce_portable_limits != 0; set => _enforce_portable_limits = value ? (byte)1 : (byte)0; }
+#else
+    [M(U.I1)] public bool enforce_portable_limits;
 #endif
 #if WEB
     private byte _d3d11_shader_debugging;
@@ -2568,6 +2634,13 @@ public static extern void sg_apply_uniforms(int ub_slot, in sg_range data);
 [DllImport("sokol", EntryPoint = "sg_draw", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sg_draw(uint base_element, uint num_elements, uint num_instances);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_draw_ex", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_draw_ex", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_draw_ex(int base_element, int num_elements, int num_instances, int base_vertex, int base_instance);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_dispatch", CallingConvention = CallingConvention.Cdecl)]

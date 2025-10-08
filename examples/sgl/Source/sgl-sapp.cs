@@ -25,9 +25,6 @@ public static unsafe class SglApp
 
     static bool PauseUpdate = false;
 
-    private static IntPtr _descPtr = IntPtr.Zero;
-
-
     struct _state
     {
         public sg_pass_action pass_action;
@@ -160,11 +157,6 @@ public static unsafe class SglApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
         sgl_shutdown();
         sg_shutdown();
 

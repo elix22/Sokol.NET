@@ -57,6 +57,6 @@ rm -rf build-emscripten-debug build-emscripten-release
 
 echo "========================================="
 echo "Build completed successfully!"
-echo "Debug build: libs/emscripten/wasm32/debug/sokol.a"
-echo "Release build: libs/emscripten/wasm32/release/sokol.a"
+echo "Debug build: libs/emscripten/x86/debug/sokol.a"
+echo "Release build: libs/emscripten/x86/release/sokol.a"
 echo "========================================="
