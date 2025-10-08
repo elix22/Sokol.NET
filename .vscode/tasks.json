@@ -252,6 +252,50 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-sgl-lines-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sgl-lines/sgl_lines.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-sgl-lines-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sgl-lines/sgl_linesWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-debugtext-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/debugtext/debugtext.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-debugtext-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/debugtext/debugtextWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -335,6 +379,28 @@
             "args": [
                 "build",
 				"examples/sgl/sgl.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-sgl-lines",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sgl-lines/sgl_lines.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-debugtext",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/debugtext/debugtext.csproj"
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
@@ -428,6 +494,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-sgl-lines-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sgl-lines/sgl_linesWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-debugtext-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/debugtext/debugtextWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -492,6 +580,22 @@
             ]
         },
         {
+            "label": "prepare-sgl-lines",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sgl-lines-shaders",
+                "build-sgl-lines"
+            ]
+        },
+        {
+            "label": "prepare-debugtext",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-debugtext-shaders",
+                "build-debugtext"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -553,6 +657,22 @@
             "dependsOn": [
                 "compile-sgl-web-shaders",
                 "build-sgl-web"
+            ]
+        },
+        {
+            "label": "prepare-sgl-lines-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sgl-lines-web-shaders",
+                "build-sgl-lines-web"
+            ]
+        },
+        {
+            "label": "prepare-debugtext-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-debugtext-web-shaders",
+                "build-debugtext-web"
             ]
         },
         {

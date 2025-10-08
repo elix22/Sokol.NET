@@ -20,7 +20,24 @@
             "type": "coreclr",
             "request": "launch",
             "program": "dotnet",
-            "args": ["run", "--project", "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", "--", "-d", "${workspaceFolder}/examples/${input:exampleName}/bin/Debug/net8.0/browser-wasm/AppBundle", "-p", "${input:browserPort}"],
+            "args": [
+                "run", 
+                "--project", 
+                "${workspaceFolder}/tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj", 
+                "--", 
+                "-d", 
+                "${workspaceFolder}/examples/${input:exampleName}/bin/Debug/net8.0/browser-wasm/AppBundle", 
+                "-p", 
+                "${input:browserPort}",
+                "-h",
+                "Cross-Origin-Opener-Policy: same-origin",
+                "-h",
+                "Cross-Origin-Embedder-Policy: require-corp",
+                "-h",
+                "Cache-Control: no-store, no-cache, must-revalidate, max-age=0",
+                "-h",
+                "Pragma: no-cache"
+            ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "preLaunchTask": "prepare-${input:exampleName}-web"
@@ -39,7 +56,9 @@
                 "instancing",
                 "plmpeg",
                 "drawcallperf",
-                "sgl"
+                "sgl",
+                "sgl-lines",
+                "debugtext"
             ],
             "default": "cube"
         },
