@@ -13,6 +13,7 @@ using static Sokol.SG.sg_compare_func;
 using static Sokol.Utils;
 using System.Diagnostics;
 using static Sokol.SLog;
+using static Sokol.SDebugUI;
 
 public static unsafe class CubeSapp
 {
@@ -39,6 +40,7 @@ public static unsafe class CubeSapp
                 func = &slog_func,
             }
         });
+        __dbgui_setup(sapp_sample_count());
 
         /* cube vertex buffer */
         float[] vertices =  {
@@ -176,6 +178,7 @@ public static unsafe class CubeSapp
         uniforms.size = (uint)Marshal.SizeOf<vs_params_t>();
         sg_apply_uniforms(UB_vs_params, uniforms);
         sg_draw(0, 36, 1);
+        __dbgui_draw();
         sg_end_pass();
         sg_commit();
     }
@@ -188,12 +191,14 @@ public static unsafe class CubeSapp
         {
             state.PauseUpdate = !state.PauseUpdate;
         }
+
+        __dbgui_event(e);
     }
 
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-
+        __dbgui_shutdown();
         sg_shutdown();
         
         // Force a complete shutdown if debugging

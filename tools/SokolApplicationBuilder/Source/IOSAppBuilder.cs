@@ -323,7 +323,10 @@ namespace SokolApplicationBuilder
                     ? "Release" 
                     : "Debug";
 
-                string publishArgs = $"publish \"{projectFile}\" -r ios-arm64 -c {configuration} -p:BuildAsLibrary=true -p:DefineConstants=\"__IOS__\"";
+                // Include DEBUG symbol for Debug builds (semicolon must be URL-encoded for MSBuild)
+                string defineConstants = configuration == "Debug" ? "__IOS__%3BDEBUG" : "__IOS__";
+
+                string publishArgs = $"publish \"{projectFile}\" -r ios-arm64 -c {configuration} -p:BuildAsLibrary=true -p:DefineConstants=\"{defineConstants}\"";
                 if (!string.IsNullOrEmpty(opts.LinkerFlags))
                 {
                     publishArgs += $" -p:LinkerFlags=\"{opts.LinkerFlags}\"";

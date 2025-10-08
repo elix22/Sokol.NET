@@ -839,8 +839,11 @@ namespace SokolApplicationBuilder
                 {
                     string projectFile = Path.Combine(opts.ProjectPath, $"{PROJECT_NAME}.csproj");
 
+                    // Include DEBUG symbol for Debug builds (semicolon must be URL-encoded for MSBuild)
+                    string defineConstants = configuration == "Debug" ? "__ANDROID__%3BDEBUG" : "__ANDROID__";
+
                     var result = Cli.Wrap("dotnet")
-                        .WithArguments($"publish \"{projectFile}\" -r {arch} -c {configuration} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"__ANDROID__\" --verbosity quiet")
+                        .WithArguments($"publish \"{projectFile}\" -r {arch} -c {configuration} -p:BuildAsLibrary=true -p:DisableUnsupportedError=true -p:PublishAotUsingRuntimePack=true -p:RemoveSections=true -p:DefineConstants=\"{defineConstants}\" --verbosity quiet")
                         .WithWorkingDirectory(opts.ProjectPath)
                         .WithEnvironmentVariables(env => 
                         {
