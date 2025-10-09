@@ -318,6 +318,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-offscreen-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/offscreen/offscreen.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-offscreen-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/offscreen/offscreenWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -434,6 +456,17 @@
             "args": [
                 "build",
 				"examples/imgui_usercallback/imgui_usercallback.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-offscreen",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/offscreen/offscreen.csproj"
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
@@ -560,6 +593,17 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-offscreen-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/offscreen/offscreenWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -648,6 +692,14 @@
             ]
         },
         {
+            "label": "prepare-offscreen",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-offscreen-shaders",
+                "build-offscreen"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -733,6 +785,14 @@
             "dependsOn": [
                 "compile-imgui_usercallback-web-shaders",
                 "build-imgui_usercallback-web"
+            ]
+        },
+        {
+            "label": "prepare-offscreen-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-offscreen-web-shaders",
+                "build-offscreen-web"
             ]
         },
         {
@@ -1134,7 +1194,8 @@
 				"examples/sgl",
 				"examples/sgl_lines",
 				"examples/debugtext",
-				"examples/imgui_usercallback"
+				"examples/imgui_usercallback",
+				"examples/offscreen"
 			]
 		},
 		{

@@ -59,7 +59,8 @@
                 "sgl",
                 "sgl_lines",
                 "debugtext",
-                "imgui_usercallback"
+                "imgui_usercallback",
+                "offscreen"
             ],
             "default": "cube"
         },

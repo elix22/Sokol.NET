@@ -22,6 +22,16 @@ tasks = [
 
 #C Raw
 gen_csharp.prepare()
+all_irs = []
 for task in tasks:
     [c_header_path, main_prefix, dep_prefixes] = task
-    gen_csharp.gen(c_header_path, main_prefix, dep_prefixes)
+    ir = gen_csharp.gen(c_header_path, main_prefix, dep_prefixes)
+    all_irs.append(ir)
+
+# Generate C header file with internal wrapper implementations
+print('Generating C internal wrappers header...')
+header_content = gen_csharp.gen_c_internal_wrappers_header(all_irs)
+header_output_path = '../ext/sokol_csharp_internal_wrappers.h'
+with open(header_output_path, 'w', newline='\n') as f_header:
+    f_header.write(header_content)
+print(f'  Generated: {header_output_path}')
