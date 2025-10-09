@@ -426,12 +426,21 @@ public static extern void sdtx_puts([M(U.LPUTF8Str)] string str);
 #endif
 public static extern void sdtx_putr([M(U.LPUTF8Str)] string str, int len);
 
+#if WEB
+public static sdtx_range sdtx_get_cleared_fmt_buffer()
+{
+    sdtx_range result = default;
+    sdtx_get_cleared_fmt_buffer_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sdtx_range sdtx_get_cleared_fmt_buffer();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_font_kc853_internal", CallingConvention = CallingConvention.Cdecl)]
@@ -474,6 +483,13 @@ public static extern void sdtx_font_c64_internal(ref sdtx_font_desc_t result);
 [DllImport("sokol", EntryPoint = "sdtx_font_oric_internal", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sdtx_font_oric_internal(ref sdtx_font_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sdtx_get_cleared_fmt_buffer_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sdtx_get_cleared_fmt_buffer_internal(ref sdtx_range result);
 
 }
 }

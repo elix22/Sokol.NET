@@ -786,12 +786,21 @@ public static extern void sapp_unbind_mouse_cursor_image(sapp_mouse_cursor curso
 #endif
 public static extern void* sapp_userdata();
 
+#if WEB
+public static sapp_desc sapp_query_desc()
+{
+    sapp_desc result = default;
+    sapp_query_desc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sapp_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sapp_desc sapp_query_desc();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_request_quit", CallingConvention = CallingConvention.Cdecl)]
@@ -1122,6 +1131,13 @@ public static extern void* sapp_x11_get_display();
 [DllImport("sokol", EntryPoint = "sapp_android_get_native_activity", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void* sapp_android_get_native_activity();
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sapp_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sapp_query_desc_internal(ref sapp_desc result);
 
 }
 }

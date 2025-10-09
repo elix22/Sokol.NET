@@ -563,12 +563,21 @@ public static extern void sspine_setup(in sspine_desc desc);
 #endif
 public static extern void sspine_shutdown();
 
+#if WEB
+public static sspine_context sspine_make_context(in sspine_context_desc desc)
+{
+    sspine_context result = default;
+    sspine_make_context_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_context sspine_make_context(in sspine_context_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_context", CallingConvention = CallingConvention.Cdecl)]
@@ -584,54 +593,117 @@ public static extern void sspine_destroy_context(sspine_context ctx);
 #endif
 public static extern void sspine_set_context(sspine_context ctx);
 
+#if WEB
+public static sspine_context sspine_get_context()
+{
+    sspine_context result = default;
+    sspine_get_context_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_context sspine_get_context();
+#endif
 
+#if WEB
+public static sspine_context sspine_default_context()
+{
+    sspine_context result = default;
+    sspine_default_context_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_context sspine_default_context();
+#endif
 
+#if WEB
+public static sspine_context_info sspine_get_context_info(sspine_context ctx)
+{
+    sspine_context_info result = default;
+    sspine_get_context_info_internal(ref result, ctx);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_context_info sspine_get_context_info(sspine_context ctx);
+#endif
 
+#if WEB
+public static sspine_atlas sspine_make_atlas(in sspine_atlas_desc desc)
+{
+    sspine_atlas result = default;
+    sspine_make_atlas_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_atlas sspine_make_atlas(in sspine_atlas_desc desc);
+#endif
 
+#if WEB
+public static sspine_skeleton sspine_make_skeleton(in sspine_skeleton_desc desc)
+{
+    sspine_skeleton result = default;
+    sspine_make_skeleton_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skeleton sspine_make_skeleton(in sspine_skeleton_desc desc);
+#endif
 
+#if WEB
+public static sspine_skinset sspine_make_skinset(in sspine_skinset_desc desc)
+{
+    sspine_skinset result = default;
+    sspine_make_skinset_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skinset sspine_make_skinset(in sspine_skinset_desc desc);
+#endif
 
+#if WEB
+public static sspine_instance sspine_make_instance(in sspine_instance_desc desc)
+{
+    sspine_instance result = default;
+    sspine_make_instance_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_instance sspine_make_instance(in sspine_instance_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_atlas", CallingConvention = CallingConvention.Cdecl)]
@@ -682,12 +754,21 @@ public static extern void sspine_update_instance(sspine_instance instance, float
 #endif
 public static extern int sspine_num_triggered_events(sspine_instance instance);
 
+#if WEB
+public static sspine_triggered_event_info sspine_get_triggered_event_info(sspine_instance instance, int triggered_event_index)
+{
+    sspine_triggered_event_info result = default;
+    sspine_get_triggered_event_info_internal(ref result, instance, triggered_event_index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_triggered_event_info sspine_get_triggered_event_info(sspine_instance instance, int triggered_event_index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
@@ -703,12 +784,21 @@ public static extern void sspine_draw_instance_in_layer(sspine_instance instance
 #endif
 public static extern void sspine_context_draw_instance_in_layer(sspine_context ctx, sspine_instance instance, int layer);
 
+#if WEB
+public static sspine_mat4 sspine_layer_transform_to_mat4(in sspine_layer_transform tform)
+{
+    sspine_mat4 result = default;
+    sspine_layer_transform_to_mat4_internal(ref result, tform);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_mat4 sspine_layer_transform_to_mat4(in sspine_layer_transform tform);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_draw_layer", CallingConvention = CallingConvention.Cdecl)]
@@ -794,19 +884,37 @@ public static extern bool sspine_instance_valid(sspine_instance instance);
 #endif
 public static extern bool sspine_skinset_valid(sspine_skinset skinset);
 
+#if WEB
+public static sspine_atlas sspine_get_skeleton_atlas(sspine_skeleton skeleton)
+{
+    sspine_atlas result = default;
+    sspine_get_skeleton_atlas_internal(ref result, skeleton);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_atlas sspine_get_skeleton_atlas(sspine_skeleton skeleton);
+#endif
 
+#if WEB
+public static sspine_skeleton sspine_get_instance_skeleton(sspine_instance instance)
+{
+    sspine_skeleton result = default;
+    sspine_get_instance_skeleton_internal(ref result, instance);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skeleton sspine_get_instance_skeleton(sspine_instance instance);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_images", CallingConvention = CallingConvention.Cdecl)]
@@ -815,12 +923,21 @@ public static extern sspine_skeleton sspine_get_instance_skeleton(sspine_instanc
 #endif
 public static extern int sspine_num_images(sspine_atlas atlas);
 
+#if WEB
+public static sspine_image sspine_image_by_index(sspine_atlas atlas, int index)
+{
+    sspine_image result = default;
+    sspine_image_by_index_internal(ref result, atlas, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_image sspine_image_by_index(sspine_atlas atlas, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -836,12 +953,21 @@ public static extern bool sspine_image_valid(sspine_image image);
 #endif
 public static extern bool sspine_image_equal(sspine_image first, sspine_image second);
 
+#if WEB
+public static sspine_image_info sspine_get_image_info(sspine_image image)
+{
+    sspine_image_info result = default;
+    sspine_get_image_info_internal(ref result, image);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_image_info sspine_get_image_info(sspine_image image);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_atlas_pages", CallingConvention = CallingConvention.Cdecl)]
@@ -850,12 +976,21 @@ public static extern sspine_image_info sspine_get_image_info(sspine_image image)
 #endif
 public static extern int sspine_num_atlas_pages(sspine_atlas atlas);
 
+#if WEB
+public static sspine_atlas_page sspine_atlas_page_by_index(sspine_atlas atlas, int index)
+{
+    sspine_atlas_page result = default;
+    sspine_atlas_page_by_index_internal(ref result, atlas, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_atlas_page sspine_atlas_page_by_index(sspine_atlas atlas, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -871,12 +1006,21 @@ public static extern bool sspine_atlas_page_valid(sspine_atlas_page page);
 #endif
 public static extern bool sspine_atlas_page_equal(sspine_atlas_page first, sspine_atlas_page second);
 
+#if WEB
+public static sspine_atlas_page_info sspine_get_atlas_page_info(sspine_atlas_page page)
+{
+    sspine_atlas_page_info result = default;
+    sspine_get_atlas_page_info_internal(ref result, page);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_atlas_page_info sspine_get_atlas_page_info(sspine_atlas_page page);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_position", CallingConvention = CallingConvention.Cdecl)]
@@ -899,19 +1043,37 @@ public static extern void sspine_set_scale(sspine_instance instance, sspine_vec2
 #endif
 public static extern void sspine_set_color(sspine_instance instance, sg_color color);
 
+#if WEB
+public static sspine_vec2 sspine_get_position(sspine_instance instance)
+{
+    sspine_vec2 result = default;
+    sspine_get_position_internal(ref result, instance);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_position(sspine_instance instance);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_get_scale(sspine_instance instance)
+{
+    sspine_vec2 result = default;
+    sspine_get_scale_internal(ref result, instance);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_scale(sspine_instance instance);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_color", CallingConvention = CallingConvention.Cdecl)]
@@ -927,19 +1089,37 @@ public static extern sg_color sspine_get_color(sspine_instance instance);
 #endif
 public static extern int sspine_num_anims(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_anim sspine_anim_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_anim result = default;
+    sspine_anim_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_anim sspine_anim_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_anim sspine_anim_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_anim result = default;
+    sspine_anim_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_anim sspine_anim_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -955,12 +1135,21 @@ public static extern bool sspine_anim_valid(sspine_anim anim);
 #endif
 public static extern bool sspine_anim_equal(sspine_anim first, sspine_anim second);
 
+#if WEB
+public static sspine_anim_info sspine_get_anim_info(sspine_anim anim)
+{
+    sspine_anim_info result = default;
+    sspine_get_anim_info_internal(ref result, anim);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_anim_info sspine_get_anim_info(sspine_anim anim);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_clear_animation_tracks", CallingConvention = CallingConvention.Cdecl)]
@@ -1011,19 +1200,37 @@ public static extern void sspine_add_empty_animation(sspine_instance instance, i
 #endif
 public static extern int sspine_num_bones(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_bone sspine_bone_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_bone result = default;
+    sspine_bone_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_bone sspine_bone_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_bone sspine_bone_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_bone result = default;
+    sspine_bone_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_bone sspine_bone_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -1039,12 +1246,21 @@ public static extern bool sspine_bone_valid(sspine_bone bone);
 #endif
 public static extern bool sspine_bone_equal(sspine_bone first, sspine_bone second);
 
+#if WEB
+public static sspine_bone_info sspine_get_bone_info(sspine_bone bone)
+{
+    sspine_bone_info result = default;
+    sspine_get_bone_info_internal(ref result, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_bone_info sspine_get_bone_info(sspine_bone bone);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_transform", CallingConvention = CallingConvention.Cdecl)]
@@ -1081,19 +1297,37 @@ public static extern void sspine_set_bone_scale(sspine_instance instance, sspine
 #endif
 public static extern void sspine_set_bone_shear(sspine_instance instance, sspine_bone bone, sspine_vec2 shear);
 
+#if WEB
+public static sspine_bone_transform sspine_get_bone_transform(sspine_instance instance, sspine_bone bone)
+{
+    sspine_bone_transform result = default;
+    sspine_get_bone_transform_internal(ref result, instance, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_bone_transform sspine_get_bone_transform(sspine_instance instance, sspine_bone bone);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_get_bone_position(sspine_instance instance, sspine_bone bone)
+{
+    sspine_vec2 result = default;
+    sspine_get_bone_position_internal(ref result, instance, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_bone_position(sspine_instance instance, sspine_bone bone);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
@@ -1102,40 +1336,85 @@ public static extern sspine_vec2 sspine_get_bone_position(sspine_instance instan
 #endif
 public static extern float sspine_get_bone_rotation(sspine_instance instance, sspine_bone bone);
 
+#if WEB
+public static sspine_vec2 sspine_get_bone_scale(sspine_instance instance, sspine_bone bone)
+{
+    sspine_vec2 result = default;
+    sspine_get_bone_scale_internal(ref result, instance, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_bone_scale(sspine_instance instance, sspine_bone bone);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_get_bone_shear(sspine_instance instance, sspine_bone bone)
+{
+    sspine_vec2 result = default;
+    sspine_get_bone_shear_internal(ref result, instance, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_bone_shear(sspine_instance instance, sspine_bone bone);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_get_bone_world_position(sspine_instance instance, sspine_bone bone)
+{
+    sspine_vec2 result = default;
+    sspine_get_bone_world_position_internal(ref result, instance, bone);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_get_bone_world_position(sspine_instance instance, sspine_bone bone);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_bone_local_to_world(sspine_instance instance, sspine_bone bone, sspine_vec2 local_pos)
+{
+    sspine_vec2 result = default;
+    sspine_bone_local_to_world_internal(ref result, instance, bone, local_pos);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_bone_local_to_world(sspine_instance instance, sspine_bone bone, sspine_vec2 local_pos);
+#endif
 
+#if WEB
+public static sspine_vec2 sspine_bone_world_to_local(sspine_instance instance, sspine_bone bone, sspine_vec2 world_pos)
+{
+    sspine_vec2 result = default;
+    sspine_bone_world_to_local_internal(ref result, instance, bone, world_pos);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_vec2 sspine_bone_world_to_local(sspine_instance instance, sspine_bone bone, sspine_vec2 world_pos);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_slots", CallingConvention = CallingConvention.Cdecl)]
@@ -1144,19 +1423,37 @@ public static extern sspine_vec2 sspine_bone_world_to_local(sspine_instance inst
 #endif
 public static extern int sspine_num_slots(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_slot sspine_slot_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_slot result = default;
+    sspine_slot_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_slot sspine_slot_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_slot sspine_slot_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_slot result = default;
+    sspine_slot_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_slot sspine_slot_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -1172,12 +1469,21 @@ public static extern bool sspine_slot_valid(sspine_slot slot);
 #endif
 public static extern bool sspine_slot_equal(sspine_slot first, sspine_slot second);
 
+#if WEB
+public static sspine_slot_info sspine_get_slot_info(sspine_slot slot)
+{
+    sspine_slot_info result = default;
+    sspine_get_slot_info_internal(ref result, slot);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_slot_info sspine_get_slot_info(sspine_slot slot);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_slot_color", CallingConvention = CallingConvention.Cdecl)]
@@ -1200,19 +1506,37 @@ public static extern sg_color sspine_get_slot_color(sspine_instance instance, ss
 #endif
 public static extern int sspine_num_events(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_event sspine_event_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_event result = default;
+    sspine_event_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_event sspine_event_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_event sspine_event_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_event result = default;
+    sspine_event_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_event sspine_event_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -1228,12 +1552,21 @@ public static extern bool sspine_event_valid(sspine_event _event);
 #endif
 public static extern bool sspine_event_equal(sspine_event first, sspine_event second);
 
+#if WEB
+public static sspine_event_info sspine_get_event_info(sspine_event _event)
+{
+    sspine_event_info result = default;
+    sspine_get_event_info_internal(ref result, _event);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_event_info sspine_get_event_info(sspine_event _event);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_iktargets", CallingConvention = CallingConvention.Cdecl)]
@@ -1242,19 +1575,37 @@ public static extern sspine_event_info sspine_get_event_info(sspine_event _event
 #endif
 public static extern int sspine_num_iktargets(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_iktarget sspine_iktarget_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_iktarget result = default;
+    sspine_iktarget_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_iktarget sspine_iktarget_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_iktarget sspine_iktarget_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_iktarget result = default;
+    sspine_iktarget_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_iktarget sspine_iktarget_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -1270,12 +1621,21 @@ public static extern bool sspine_iktarget_valid(sspine_iktarget iktarget);
 #endif
 public static extern bool sspine_iktarget_equal(sspine_iktarget first, sspine_iktarget second);
 
+#if WEB
+public static sspine_iktarget_info sspine_get_iktarget_info(sspine_iktarget iktarget)
+{
+    sspine_iktarget_info result = default;
+    sspine_get_iktarget_info_internal(ref result, iktarget);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_iktarget_info sspine_get_iktarget_info(sspine_iktarget iktarget);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_iktarget_world_pos", CallingConvention = CallingConvention.Cdecl)]
@@ -1291,19 +1651,37 @@ public static extern void sspine_set_iktarget_world_pos(sspine_instance instance
 #endif
 public static extern int sspine_num_skins(sspine_skeleton skeleton);
 
+#if WEB
+public static sspine_skin sspine_skin_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name)
+{
+    sspine_skin result = default;
+    sspine_skin_by_name_internal(ref result, skeleton, name);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skin sspine_skin_by_name(sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+#endif
 
+#if WEB
+public static sspine_skin sspine_skin_by_index(sspine_skeleton skeleton, int index)
+{
+    sspine_skin result = default;
+    sspine_skin_by_index_internal(ref result, skeleton, index);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skin sspine_skin_by_index(sspine_skeleton skeleton, int index);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -1319,12 +1697,21 @@ public static extern bool sspine_skin_valid(sspine_skin skin);
 #endif
 public static extern bool sspine_skin_equal(sspine_skin first, sspine_skin second);
 
+#if WEB
+public static sspine_skin_info sspine_get_skin_info(sspine_skin skin)
+{
+    sspine_skin_info result = default;
+    sspine_get_skin_info_internal(ref result, skin);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_skin_info sspine_get_skin_info(sspine_skin skin);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
@@ -1332,6 +1719,307 @@ public static extern sspine_skin_info sspine_get_skin_info(sspine_skin skin);
 [DllImport("sokol", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_skin(sspine_instance instance, sspine_skin skin);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_make_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_make_context_internal(ref sspine_context result, in sspine_context_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_context_internal(ref sspine_context result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_default_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_default_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_default_context_internal(ref sspine_context result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_context_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_context_info_internal(ref sspine_context_info result, sspine_context ctx);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_atlas_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_make_atlas_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_make_atlas_internal(ref sspine_atlas result, in sspine_atlas_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skeleton_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_make_skeleton_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_make_skeleton_internal(ref sspine_skeleton result, in sspine_skeleton_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skinset_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_make_skinset_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_make_skinset_internal(ref sspine_skinset result, in sspine_skinset_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_instance_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_make_instance_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_make_instance_internal(ref sspine_instance result, in sspine_instance_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_triggered_event_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_triggered_event_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_triggered_event_info_internal(ref sspine_triggered_event_info result, sspine_instance instance, int triggered_event_index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_layer_transform_to_mat4_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_layer_transform_to_mat4_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_layer_transform_to_mat4_internal(ref sspine_mat4 result, in sspine_layer_transform tform);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skeleton_atlas_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_skeleton_atlas_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_skeleton_atlas_internal(ref sspine_atlas result, sspine_skeleton skeleton);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_instance_skeleton_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_instance_skeleton_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_instance_skeleton_internal(ref sspine_skeleton result, sspine_instance instance);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_image_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_image_by_index_internal(ref sspine_image result, sspine_atlas atlas, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_image_info_internal(ref sspine_image_info result, sspine_image image);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_atlas_page_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_atlas_page_by_index_internal(ref sspine_atlas_page result, sspine_atlas atlas, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_atlas_page_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_atlas_page_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_atlas_page_info_internal(ref sspine_atlas_page_info result, sspine_atlas_page page);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_position_internal(ref sspine_vec2 result, sspine_instance instance);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_scale_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_scale_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_scale_internal(ref sspine_vec2 result, sspine_instance instance);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_anim_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_anim_by_name_internal(ref sspine_anim result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_anim_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_anim_by_index_internal(ref sspine_anim result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_anim_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_anim_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_anim_info_internal(ref sspine_anim_info result, sspine_anim anim);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_bone_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_bone_by_name_internal(ref sspine_bone result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_bone_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_bone_by_index_internal(ref sspine_bone result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_info_internal(ref sspine_bone_info result, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_transform_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_transform_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_transform_internal(ref sspine_bone_transform result, sspine_instance instance, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_position_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_scale_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_scale_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_scale_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_shear_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_shear_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_shear_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_world_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_bone_world_position_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_bone_world_position_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_local_to_world_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_bone_local_to_world_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_bone_local_to_world_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone, sspine_vec2 local_pos);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_world_to_local_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_bone_world_to_local_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_bone_world_to_local_internal(ref sspine_vec2 result, sspine_instance instance, sspine_bone bone, sspine_vec2 world_pos);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_slot_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_slot_by_name_internal(ref sspine_slot result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_slot_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_slot_by_index_internal(ref sspine_slot result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_slot_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_slot_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_slot_info_internal(ref sspine_slot_info result, sspine_slot slot);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_event_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_event_by_name_internal(ref sspine_event result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_event_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_event_by_index_internal(ref sspine_event result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_event_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_event_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_event_info_internal(ref sspine_event_info result, sspine_event _event);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_iktarget_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_iktarget_by_name_internal(ref sspine_iktarget result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_iktarget_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_iktarget_by_index_internal(ref sspine_iktarget result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_iktarget_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_iktarget_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_iktarget_info_internal(ref sspine_iktarget_info result, sspine_iktarget iktarget);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_skin_by_name_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_skin_by_name_internal(ref sspine_skin result, sspine_skeleton skeleton, [M(U.LPUTF8Str)] string name);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_skin_by_index_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_skin_by_index_internal(ref sspine_skin result, sspine_skeleton skeleton, int index);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skin_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sspine_get_skin_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sspine_get_skin_info_internal(ref sspine_skin_info result, sspine_skin skin);
 
 }
 }

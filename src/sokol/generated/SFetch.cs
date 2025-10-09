@@ -154,12 +154,21 @@ public static extern void sfetch_shutdown();
 #endif
 public static extern bool sfetch_valid();
 
+#if WEB
+public static sfetch_desc_t sfetch_desc()
+{
+    sfetch_desc_t result = default;
+    sfetch_desc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sfetch_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sfetch_desc_t sfetch_desc();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_max_userdata_bytes", CallingConvention = CallingConvention.Cdecl)]
@@ -175,12 +184,21 @@ public static extern int sfetch_max_userdata_bytes();
 #endif
 public static extern int sfetch_max_path();
 
+#if WEB
+public static sfetch_handle_t sfetch_send(in sfetch_request_t request)
+{
+    sfetch_handle_t result = default;
+    sfetch_send_internal(ref result, request);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_send", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sfetch_send", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sfetch_handle_t sfetch_send(in sfetch_request_t request);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_handle_valid", CallingConvention = CallingConvention.Cdecl)]
@@ -230,6 +248,20 @@ public static extern void sfetch_pause(sfetch_handle_t h);
 [DllImport("sokol", EntryPoint = "sfetch_continue", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sfetch_continue(sfetch_handle_t h);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sfetch_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sfetch_desc_internal(ref sfetch_desc_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sfetch_send_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sfetch_send_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sfetch_send_internal(ref sfetch_handle_t result, in sfetch_request_t request);
 
 }
 }

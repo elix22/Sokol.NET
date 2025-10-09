@@ -140,26 +140,53 @@ public static extern float sgl_as_radians(float deg);
 #endif
 public static extern float sgl_as_degrees(float rad);
 
+#if WEB
+public static sgl_error_t sgl_get_error()
+{
+    sgl_error_t result = default;
+    sgl_get_error_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_error", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_error", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_error_t sgl_get_error();
+#endif
 
+#if WEB
+public static sgl_error_t sgl_context_error(sgl_context ctx)
+{
+    sgl_error_t result = default;
+    sgl_context_error_internal(ref result, ctx);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_context_error", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_context_error", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_error_t sgl_context_error(sgl_context ctx);
+#endif
 
+#if WEB
+public static sgl_context sgl_make_context(in sgl_context_desc_t desc)
+{
+    sgl_context result = default;
+    sgl_make_context_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_make_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_make_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_context sgl_make_context(in sgl_context_desc_t desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_destroy_context", CallingConvention = CallingConvention.Cdecl)]
@@ -175,19 +202,37 @@ public static extern void sgl_destroy_context(sgl_context ctx);
 #endif
 public static extern void sgl_set_context(sgl_context ctx);
 
+#if WEB
+public static sgl_context sgl_get_context()
+{
+    sgl_context result = default;
+    sgl_get_context_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_get_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_get_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_context sgl_get_context();
+#endif
 
+#if WEB
+public static sgl_context sgl_default_context()
+{
+    sgl_context result = default;
+    sgl_default_context_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_default_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_default_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_context sgl_default_context();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_num_vertices", CallingConvention = CallingConvention.Cdecl)]
@@ -247,12 +292,21 @@ public static sgl_pipeline sgl_make_pipeline(in sg_pipeline_desc desc)
 public static extern sgl_pipeline sgl_make_pipeline(in sg_pipeline_desc desc);
 #endif
 
+#if WEB
+public static sgl_pipeline sgl_context_make_pipeline(sgl_context ctx, in sg_pipeline_desc desc)
+{
+    sgl_pipeline result = default;
+    sgl_context_make_pipeline_internal(ref result, ctx, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_context_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgl_context_make_pipeline", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgl_pipeline sgl_context_make_pipeline(sgl_context ctx, in sg_pipeline_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_destroy_pipeline", CallingConvention = CallingConvention.Cdecl)]
@@ -736,6 +790,48 @@ public static extern void sgl_v3f_t2f_c1i(float x, float y, float z, float u, fl
 [DllImport("sokol", EntryPoint = "sgl_end", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sgl_end();
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_error_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_error_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_get_error_internal(ref sgl_error_t result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_context_error_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_context_error_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_context_error_internal(ref sgl_error_t result, sgl_context ctx);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_make_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_make_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_make_context_internal(ref sgl_context result, in sgl_context_desc_t desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_get_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_get_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_get_context_internal(ref sgl_context result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_default_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_default_context_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_default_context_internal(ref sgl_context result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgl_context_make_pipeline_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgl_context_make_pipeline_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgl_context_make_pipeline_internal(ref sgl_pipeline result, sgl_context ctx, in sg_pipeline_desc desc);
 
 }
 }

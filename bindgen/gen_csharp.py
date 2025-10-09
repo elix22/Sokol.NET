@@ -22,8 +22,8 @@ module_names = {
     'sglue_':   'SGlue',
     'sfetch_':  'SFetch',
     'simgui_':  'SImgui',
-    'sgp_':     'SGP',
-    'sspine_':  'SSpine',
+    # 'sgp_':     'SGP',
+    # 'sspine_':  'SSpine',
     'cgltf_':   'CGltf',
     'sbasisu_': 'SBasisu',
     'simgui_':  'SImgui',
@@ -157,6 +157,7 @@ prim_defaults = {
 }
 
 # Functions which need special handling for WebAssembly (Emscripten) platform
+# These functions return structs with an 'id' field that need special wrapper treatment
 web_wrapper_functions = {
     'sg_make_shader',
     'sg_alloc_shader',
@@ -177,40 +178,10 @@ web_wrapper_functions = {
     'sdtx_default_context',
 }
 
-# Functions which need special handling for WebAssembly (Emscripten) platform
-# For every additional query function that returns a struct, add it here 
-# You have to make sure to implement the function on the native side, see examples in sokol_glue.h
-web_wrapper_struct_return_functions = {
-    'sglue_swapchain': 'sg_swapchain',
-    'sglue_environment': 'sg_environment',
-    'sdtx_font_kc853': 'sdtx_font_desc_t',
-    'sdtx_font_kc854': 'sdtx_font_desc_t',
-    'sdtx_font_z1013': 'sdtx_font_desc_t',
-    'sdtx_font_cpc': 'sdtx_font_desc_t',
-    'sdtx_font_c64': 'sdtx_font_desc_t',
-    'sdtx_font_oric': 'sdtx_font_desc_t',
-    # sokol_shape.h functions
-    'sshape_build_plane': 'sshape_buffer_t',
-    'sshape_build_box': 'sshape_buffer_t',
-    'sshape_build_sphere': 'sshape_buffer_t',
-    'sshape_build_cylinder': 'sshape_buffer_t',
-    'sshape_build_torus': 'sshape_buffer_t',
-    'sshape_plane_sizes': 'sshape_sizes_t',
-    'sshape_box_sizes': 'sshape_sizes_t',
-    'sshape_sphere_sizes': 'sshape_sizes_t',
-    'sshape_cylinder_sizes': 'sshape_sizes_t',
-    'sshape_torus_sizes': 'sshape_sizes_t',
-    'sshape_element_range': 'sshape_element_range_t',
-    'sshape_vertex_buffer_desc': 'sg_buffer_desc',
-    'sshape_index_buffer_desc': 'sg_buffer_desc',
-    'sshape_vertex_buffer_layout_state': 'sg_vertex_buffer_layout_state',
-    'sshape_position_vertex_attr_state': 'sg_vertex_attr_state',
-    'sshape_normal_vertex_attr_state': 'sg_vertex_attr_state',
-    'sshape_texcoord_vertex_attr_state': 'sg_vertex_attr_state',
-    'sshape_color_vertex_attr_state': 'sg_vertex_attr_state',
-    'sshape_mat4': 'sshape_mat4_t',
-    'sshape_mat4_transpose': 'sshape_mat4_t'
-}
+# AUTO-DETECTED: Functions that return structs by value (detected automatically during binding generation)
+# This dictionary is populated by detect_struct_return_functions() during pre_parse()
+# Format: {'function_name': 'return_type'}
+web_wrapper_struct_return_functions = {}
 
 struct_types = []
 enum_types = []
@@ -222,10 +193,13 @@ def reset_globals():
     global enum_types
     global enum_items
     global out_lines
+    global web_wrapper_struct_return_functions
     struct_types = []
     enum_types = []
     enum_items = {}
     out_lines = ''
+    # Note: web_wrapper_struct_return_functions is NOT reset here
+    # It accumulates across all modules for the C header generation
 
 def l(s):
     global out_lines
@@ -768,6 +742,40 @@ def gen_func_csharp(decl, prefix):
         l(f"public static extern {csharp_res_type} {csharp_func_name}({funcdecl_args_csharp(decl, prefix)});")
     l("")
 
+def detect_struct_return_functions(inp):
+    """
+    Automatically detect functions that return structs by value.
+    These need special handling for WebAssembly marshalling.
+    """
+    global web_wrapper_struct_return_functions
+    
+    for decl in inp['decls']:
+        if not decl['is_dep'] and decl['kind'] == 'func':
+            func_name = decl['name']
+            
+            # Skip if already in web_wrapper_functions (those have special id-based handling)
+            if func_name in web_wrapper_functions:
+                continue
+            
+            # Skip if function is in ignore list
+            if check_name_ignore(func_name):
+                continue
+            
+            # Extract return type from function signature
+            decl_type = decl['type']
+            return_type = check_type_override(func_name, 'RESULT', 
+                                              decl_type[:decl_type.index('(')].strip())
+            
+            # Check if return type is a struct (not pointer, not primitive, not void)
+            if (is_struct_type(return_type) and 
+                not is_struct_ptr(return_type) and 
+                not is_const_struct_ptr(return_type) and
+                return_type != 'void'):
+                
+                # Add to the dictionary for WebAssembly wrapper generation
+                web_wrapper_struct_return_functions[func_name] = return_type
+                print(f"  [AUTO-DETECTED] {func_name} returns struct {return_type}")
+
 def pre_parse(inp):
     global struct_types
     global enum_types
@@ -781,6 +789,9 @@ def pre_parse(inp):
             enum_items[enum_name] = []
             for item in decl['items']:
                 enum_items[enum_name].append(as_enum_item_name(item['name']))
+    
+    # After parsing types, detect struct-returning functions for WebAssembly
+    detect_struct_return_functions(inp)
 
 def gen_imports(inp, dep_prefixes):
     for dep_prefix in dep_prefixes:
@@ -838,13 +849,25 @@ def gen_c_internal_wrappers_header(all_inputs):
                 if c_func_name in web_wrapper_struct_return_functions:
                     module_functions[prefix]['functions'].append(decl)
     
+    # Define optional modules that may not be included in all builds
+    optional_modules = {
+        'SGP': 'SOKOL_GP_INCLUDED',
+        'SBasisu': 'SOKOL_BASISU_INCLUDED'
+    }
+    
     # Generate functions grouped by module
     for prefix, data in module_functions.items():
         if not data['functions']:
             continue
             
         module_name = data['module']
-        header_lines.append(f"// ========== {module_name} ({prefix}) ==========")
+        
+        # Check if this is an optional module and add conditional compilation
+        if module_name in optional_modules:
+            header_lines.append(f"#if defined({optional_modules[module_name]})")
+            header_lines.append(f"// ========== {module_name} ({prefix}) ==========")
+        else:
+            header_lines.append(f"// ========== {module_name} ({prefix}) ==========")
         header_lines.append("")
         
         for decl in data['functions']:
@@ -876,6 +899,11 @@ def gen_c_internal_wrappers_header(all_inputs):
             header_lines.append(f"SOKOL_API_IMPL void {c_func_name}_internal({return_type}* result{params_str}) {{")
             header_lines.append(f"    *result = {c_func_name}({args_str});")
             header_lines.append("}")
+            header_lines.append("")
+        
+        # Close conditional compilation for optional modules
+        if module_name in optional_modules:
+            header_lines.append(f"#endif // {optional_modules[module_name]}")
             header_lines.append("")
     
     header_lines.append("#endif // SOKOL_CSHARP_INTERNAL_WRAPPERS_H")

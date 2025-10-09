@@ -125,19 +125,37 @@ public static extern ulong simgui_imtextureid(sg_view tex_view);
 #endif
 public static extern ulong simgui_imtextureid_with_sampler(sg_view tex_view, sg_sampler smp);
 
+#if WEB
+public static sg_view simgui_texture_view_from_imtextureid(ulong imtex_id)
+{
+    sg_view result = default;
+    simgui_texture_view_from_imtextureid_internal(ref result, imtex_id);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_texture_view_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "simgui_texture_view_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_view simgui_texture_view_from_imtextureid(ulong imtex_id);
+#endif
 
+#if WEB
+public static sg_sampler simgui_sampler_from_imtextureid(ulong imtex_id)
+{
+    sg_sampler result = default;
+    simgui_sampler_from_imtextureid_internal(ref result, imtex_id);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_sampler_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "simgui_sampler_from_imtextureid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_sampler simgui_sampler_from_imtextureid(ulong imtex_id);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_add_focus_event", CallingConvention = CallingConvention.Cdecl)]
@@ -222,6 +240,20 @@ public static extern int simgui_map_keycode(sapp_keycode keycode);
 [DllImport("sokol", EntryPoint = "simgui_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void simgui_shutdown();
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_texture_view_from_imtextureid_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "simgui_texture_view_from_imtextureid_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void simgui_texture_view_from_imtextureid_internal(ref sg_view result, ulong imtex_id);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "simgui_sampler_from_imtextureid_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "simgui_sampler_from_imtextureid_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void simgui_sampler_from_imtextureid_internal(ref sg_sampler result, ulong imtex_id);
 
 }
 }

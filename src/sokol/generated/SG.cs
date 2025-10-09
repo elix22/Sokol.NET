@@ -2663,12 +2663,21 @@ public static extern void sg_end_pass();
 #endif
 public static extern void sg_commit();
 
+#if WEB
+public static sg_desc sg_query_desc()
+{
+    sg_desc result = default;
+    sg_query_desc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_desc sg_query_desc();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_backend", CallingConvention = CallingConvention.Cdecl)]
@@ -2677,26 +2686,53 @@ public static extern sg_desc sg_query_desc();
 #endif
 public static extern sg_backend sg_query_backend();
 
+#if WEB
+public static sg_features sg_query_features()
+{
+    sg_features result = default;
+    sg_query_features_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_features", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_features", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_features sg_query_features();
+#endif
 
+#if WEB
+public static sg_limits sg_query_limits()
+{
+    sg_limits result = default;
+    sg_query_limits_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_limits", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_limits", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_limits sg_query_limits();
+#endif
 
+#if WEB
+public static sg_pixelformat_info sg_query_pixelformat(sg_pixel_format fmt)
+{
+    sg_pixelformat_info result = default;
+    sg_query_pixelformat_internal(ref result, fmt);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pixelformat", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_pixelformat", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_pixelformat_info sg_query_pixelformat(sg_pixel_format fmt);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_row_pitch", CallingConvention = CallingConvention.Cdecl)]
@@ -2754,131 +2790,293 @@ public static extern sg_resource_state sg_query_pipeline_state(sg_pipeline pip);
 #endif
 public static extern sg_resource_state sg_query_view_state(sg_view view);
 
+#if WEB
+public static sg_buffer_info sg_query_buffer_info(sg_buffer buf)
+{
+    sg_buffer_info result = default;
+    sg_query_buffer_info_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_info sg_query_buffer_info(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_image_info sg_query_image_info(sg_image img)
+{
+    sg_image_info result = default;
+    sg_query_image_info_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_image_info sg_query_image_info(sg_image img);
+#endif
 
+#if WEB
+public static sg_sampler_info sg_query_sampler_info(sg_sampler smp)
+{
+    sg_sampler_info result = default;
+    sg_query_sampler_info_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_sampler_info sg_query_sampler_info(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_shader_info sg_query_shader_info(sg_shader shd)
+{
+    sg_shader_info result = default;
+    sg_query_shader_info_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_shader_info sg_query_shader_info(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_pipeline_info sg_query_pipeline_info(sg_pipeline pip)
+{
+    sg_pipeline_info result = default;
+    sg_query_pipeline_info_internal(ref result, pip);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_pipeline_info sg_query_pipeline_info(sg_pipeline pip);
+#endif
 
+#if WEB
+public static sg_view_info sg_query_view_info(sg_view view)
+{
+    sg_view_info result = default;
+    sg_query_view_info_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_view_info sg_query_view_info(sg_view view);
+#endif
 
+#if WEB
+public static sg_buffer_desc sg_query_buffer_desc(sg_buffer buf)
+{
+    sg_buffer_desc result = default;
+    sg_query_buffer_desc_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_desc sg_query_buffer_desc(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_image_desc sg_query_image_desc(sg_image img)
+{
+    sg_image_desc result = default;
+    sg_query_image_desc_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_image_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_image_desc sg_query_image_desc(sg_image img);
+#endif
 
+#if WEB
+public static sg_sampler_desc sg_query_sampler_desc(sg_sampler smp)
+{
+    sg_sampler_desc result = default;
+    sg_query_sampler_desc_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_sampler_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_sampler_desc sg_query_sampler_desc(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_shader_desc sg_query_shader_desc(sg_shader shd)
+{
+    sg_shader_desc result = default;
+    sg_query_shader_desc_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_shader_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_shader_desc sg_query_shader_desc(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_pipeline_desc sg_query_pipeline_desc(sg_pipeline pip)
+{
+    sg_pipeline_desc result = default;
+    sg_query_pipeline_desc_internal(ref result, pip);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_pipeline_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_pipeline_desc sg_query_pipeline_desc(sg_pipeline pip);
+#endif
 
+#if WEB
+public static sg_view_desc sg_query_view_desc(sg_view view)
+{
+    sg_view_desc result = default;
+    sg_query_view_desc_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_view_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_view_desc sg_query_view_desc(sg_view view);
+#endif
 
+#if WEB
+public static sg_buffer_desc sg_query_buffer_defaults(in sg_buffer_desc desc)
+{
+    sg_buffer_desc result = default;
+    sg_query_buffer_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_buffer_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_desc sg_query_buffer_defaults(in sg_buffer_desc desc);
+#endif
 
+#if WEB
+public static sg_image_desc sg_query_image_defaults(in sg_image_desc desc)
+{
+    sg_image_desc result = default;
+    sg_query_image_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_image_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_image_desc sg_query_image_defaults(in sg_image_desc desc);
+#endif
 
+#if WEB
+public static sg_sampler_desc sg_query_sampler_defaults(in sg_sampler_desc desc)
+{
+    sg_sampler_desc result = default;
+    sg_query_sampler_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_sampler_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_sampler_desc sg_query_sampler_defaults(in sg_sampler_desc desc);
+#endif
 
+#if WEB
+public static sg_shader_desc sg_query_shader_defaults(in sg_shader_desc desc)
+{
+    sg_shader_desc result = default;
+    sg_query_shader_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_shader_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_shader_desc sg_query_shader_defaults(in sg_shader_desc desc);
+#endif
 
+#if WEB
+public static sg_pipeline_desc sg_query_pipeline_defaults(in sg_pipeline_desc desc)
+{
+    sg_pipeline_desc result = default;
+    sg_query_pipeline_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_pipeline_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_pipeline_desc sg_query_pipeline_defaults(in sg_pipeline_desc desc);
+#endif
 
+#if WEB
+public static sg_view_desc sg_query_view_defaults(in sg_view_desc desc)
+{
+    sg_view_desc result = default;
+    sg_query_view_defaults_internal(ref result, desc);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_defaults", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_view_defaults", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_view_desc sg_query_view_defaults(in sg_view_desc desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_size", CallingConvention = CallingConvention.Cdecl)]
@@ -2887,12 +3085,21 @@ public static extern sg_view_desc sg_query_view_defaults(in sg_view_desc desc);
 #endif
 public static extern nuint sg_query_buffer_size(sg_buffer buf);
 
+#if WEB
+public static sg_buffer_usage sg_query_buffer_usage(sg_buffer buf)
+{
+    sg_buffer_usage result = default;
+    sg_query_buffer_usage_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_usage", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_buffer_usage", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_usage sg_query_buffer_usage(sg_buffer buf);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_type", CallingConvention = CallingConvention.Cdecl)]
@@ -2936,12 +3143,21 @@ public static extern int sg_query_image_num_mipmaps(sg_image img);
 #endif
 public static extern sg_pixel_format sg_query_image_pixelformat(sg_image img);
 
+#if WEB
+public static sg_image_usage sg_query_image_usage(sg_image img)
+{
+    sg_image_usage result = default;
+    sg_query_image_usage_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_usage", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_image_usage", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_image_usage sg_query_image_usage(sg_image img);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_sample_count", CallingConvention = CallingConvention.Cdecl)]
@@ -2957,19 +3173,37 @@ public static extern int sg_query_image_sample_count(sg_image img);
 #endif
 public static extern sg_view_type sg_query_view_type(sg_view view);
 
+#if WEB
+public static sg_image sg_query_view_image(sg_view view)
+{
+    sg_image result = default;
+    sg_query_view_image_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_image", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_view_image", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_image sg_query_view_image(sg_view view);
+#endif
 
+#if WEB
+public static sg_buffer sg_query_view_buffer(sg_view view)
+{
+    sg_buffer result = default;
+    sg_query_view_buffer_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_buffer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_view_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer sg_query_view_buffer(sg_view view);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_alloc_buffer", CallingConvention = CallingConvention.Cdecl)]
@@ -3256,12 +3490,21 @@ public static extern void sg_disable_frame_stats();
 #endif
 public static extern bool sg_frame_stats_enabled();
 
+#if WEB
+public static sg_frame_stats sg_query_frame_stats()
+{
+    sg_frame_stats result = default;
+    sg_query_frame_stats_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_frame_stats", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_query_frame_stats", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_frame_stats sg_query_frame_stats();
+#endif
 
 [StructLayout(LayoutKind.Sequential)]
 public struct sg_d3d11_buffer_info
@@ -3465,47 +3708,101 @@ public static extern void* sg_d3d11_device();
 #endif
 public static extern void* sg_d3d11_device_context();
 
+#if WEB
+public static sg_d3d11_buffer_info sg_d3d11_query_buffer_info(sg_buffer buf)
+{
+    sg_d3d11_buffer_info result = default;
+    sg_d3d11_query_buffer_info_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_buffer_info sg_d3d11_query_buffer_info(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_d3d11_image_info sg_d3d11_query_image_info(sg_image img)
+{
+    sg_d3d11_image_info result = default;
+    sg_d3d11_query_image_info_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_image_info sg_d3d11_query_image_info(sg_image img);
+#endif
 
+#if WEB
+public static sg_d3d11_sampler_info sg_d3d11_query_sampler_info(sg_sampler smp)
+{
+    sg_d3d11_sampler_info result = default;
+    sg_d3d11_query_sampler_info_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_sampler_info sg_d3d11_query_sampler_info(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_d3d11_shader_info sg_d3d11_query_shader_info(sg_shader shd)
+{
+    sg_d3d11_shader_info result = default;
+    sg_d3d11_query_shader_info_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_shader_info sg_d3d11_query_shader_info(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_d3d11_pipeline_info sg_d3d11_query_pipeline_info(sg_pipeline pip)
+{
+    sg_d3d11_pipeline_info result = default;
+    sg_d3d11_query_pipeline_info_internal(ref result, pip);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_pipeline_info sg_d3d11_query_pipeline_info(sg_pipeline pip);
+#endif
 
+#if WEB
+public static sg_d3d11_view_info sg_d3d11_query_view_info(sg_view view)
+{
+    sg_d3d11_view_info result = default;
+    sg_d3d11_query_view_info_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_d3d11_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_d3d11_view_info sg_d3d11_query_view_info(sg_view view);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_device", CallingConvention = CallingConvention.Cdecl)]
@@ -3528,40 +3825,85 @@ public static extern void* sg_mtl_render_command_encoder();
 #endif
 public static extern void* sg_mtl_compute_command_encoder();
 
+#if WEB
+public static sg_mtl_buffer_info sg_mtl_query_buffer_info(sg_buffer buf)
+{
+    sg_mtl_buffer_info result = default;
+    sg_mtl_query_buffer_info_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_mtl_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_mtl_buffer_info sg_mtl_query_buffer_info(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_mtl_image_info sg_mtl_query_image_info(sg_image img)
+{
+    sg_mtl_image_info result = default;
+    sg_mtl_query_image_info_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_mtl_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_mtl_image_info sg_mtl_query_image_info(sg_image img);
+#endif
 
+#if WEB
+public static sg_mtl_sampler_info sg_mtl_query_sampler_info(sg_sampler smp)
+{
+    sg_mtl_sampler_info result = default;
+    sg_mtl_query_sampler_info_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_mtl_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_mtl_sampler_info sg_mtl_query_sampler_info(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_mtl_shader_info sg_mtl_query_shader_info(sg_shader shd)
+{
+    sg_mtl_shader_info result = default;
+    sg_mtl_query_shader_info_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_mtl_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_mtl_shader_info sg_mtl_query_shader_info(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_mtl_pipeline_info sg_mtl_query_pipeline_info(sg_pipeline pip)
+{
+    sg_mtl_pipeline_info result = default;
+    sg_mtl_query_pipeline_info_internal(ref result, pip);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_mtl_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_mtl_pipeline_info sg_mtl_query_pipeline_info(sg_pipeline pip);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_device", CallingConvention = CallingConvention.Cdecl)]
@@ -3598,82 +3940,524 @@ public static extern void* sg_wgpu_render_pass_encoder();
 #endif
 public static extern void* sg_wgpu_compute_pass_encoder();
 
+#if WEB
+public static sg_wgpu_buffer_info sg_wgpu_query_buffer_info(sg_buffer buf)
+{
+    sg_wgpu_buffer_info result = default;
+    sg_wgpu_query_buffer_info_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_buffer_info sg_wgpu_query_buffer_info(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_wgpu_image_info sg_wgpu_query_image_info(sg_image img)
+{
+    sg_wgpu_image_info result = default;
+    sg_wgpu_query_image_info_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_image_info sg_wgpu_query_image_info(sg_image img);
+#endif
 
+#if WEB
+public static sg_wgpu_sampler_info sg_wgpu_query_sampler_info(sg_sampler smp)
+{
+    sg_wgpu_sampler_info result = default;
+    sg_wgpu_query_sampler_info_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_sampler_info sg_wgpu_query_sampler_info(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_wgpu_shader_info sg_wgpu_query_shader_info(sg_shader shd)
+{
+    sg_wgpu_shader_info result = default;
+    sg_wgpu_query_shader_info_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_shader_info sg_wgpu_query_shader_info(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_wgpu_pipeline_info sg_wgpu_query_pipeline_info(sg_pipeline pip)
+{
+    sg_wgpu_pipeline_info result = default;
+    sg_wgpu_query_pipeline_info_internal(ref result, pip);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_pipeline_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_pipeline_info sg_wgpu_query_pipeline_info(sg_pipeline pip);
+#endif
 
+#if WEB
+public static sg_wgpu_view_info sg_wgpu_query_view_info(sg_view view)
+{
+    sg_wgpu_view_info result = default;
+    sg_wgpu_query_view_info_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_wgpu_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_wgpu_view_info sg_wgpu_query_view_info(sg_view view);
+#endif
 
+#if WEB
+public static sg_gl_buffer_info sg_gl_query_buffer_info(sg_buffer buf)
+{
+    sg_gl_buffer_info result = default;
+    sg_gl_query_buffer_info_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_gl_query_buffer_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_gl_buffer_info sg_gl_query_buffer_info(sg_buffer buf);
+#endif
 
+#if WEB
+public static sg_gl_image_info sg_gl_query_image_info(sg_image img)
+{
+    sg_gl_image_info result = default;
+    sg_gl_query_image_info_internal(ref result, img);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_gl_query_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_gl_image_info sg_gl_query_image_info(sg_image img);
+#endif
 
+#if WEB
+public static sg_gl_sampler_info sg_gl_query_sampler_info(sg_sampler smp)
+{
+    sg_gl_sampler_info result = default;
+    sg_gl_query_sampler_info_internal(ref result, smp);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_gl_query_sampler_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_gl_sampler_info sg_gl_query_sampler_info(sg_sampler smp);
+#endif
 
+#if WEB
+public static sg_gl_shader_info sg_gl_query_shader_info(sg_shader shd)
+{
+    sg_gl_shader_info result = default;
+    sg_gl_query_shader_info_internal(ref result, shd);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_gl_query_shader_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_gl_shader_info sg_gl_query_shader_info(sg_shader shd);
+#endif
 
+#if WEB
+public static sg_gl_view_info sg_gl_query_view_info(sg_view view)
+{
+    sg_gl_view_info result = default;
+    sg_gl_query_view_info_internal(ref result, view);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sg_gl_query_view_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_gl_view_info sg_gl_query_view_info(sg_view view);
+#endif
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_desc_internal(ref sg_desc result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_features_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_features_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_features_internal(ref sg_features result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_limits_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_limits_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_limits_internal(ref sg_limits result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pixelformat_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_pixelformat_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_pixelformat_internal(ref sg_pixelformat_info result, sg_pixel_format fmt);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_buffer_info_internal(ref sg_buffer_info result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_image_info_internal(ref sg_image_info result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_sampler_info_internal(ref sg_sampler_info result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_shader_info_internal(ref sg_shader_info result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_pipeline_info_internal(ref sg_pipeline_info result, sg_pipeline pip);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_view_info_internal(ref sg_view_info result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_buffer_desc_internal(ref sg_buffer_desc result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_image_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_image_desc_internal(ref sg_image_desc result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_sampler_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_sampler_desc_internal(ref sg_sampler_desc result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_shader_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_shader_desc_internal(ref sg_shader_desc result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_pipeline_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_pipeline_desc_internal(ref sg_pipeline_desc result, sg_pipeline pip);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_view_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_view_desc_internal(ref sg_view_desc result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_buffer_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_buffer_defaults_internal(ref sg_buffer_desc result, in sg_buffer_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_image_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_image_defaults_internal(ref sg_image_desc result, in sg_image_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_sampler_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_sampler_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_sampler_defaults_internal(ref sg_sampler_desc result, in sg_sampler_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_shader_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_shader_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_shader_defaults_internal(ref sg_shader_desc result, in sg_shader_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_pipeline_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_pipeline_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_pipeline_defaults_internal(ref sg_pipeline_desc result, in sg_pipeline_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_view_defaults_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_view_defaults_internal(ref sg_view_desc result, in sg_view_desc desc);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_buffer_usage_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_buffer_usage_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_buffer_usage_internal(ref sg_buffer_usage result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_image_usage_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_image_usage_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_image_usage_internal(ref sg_image_usage result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_image_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_view_image_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_view_image_internal(ref sg_image result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_view_buffer_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_view_buffer_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_view_buffer_internal(ref sg_buffer result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_query_frame_stats_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_query_frame_stats_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_query_frame_stats_internal(ref sg_frame_stats result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_buffer_info_internal(ref sg_d3d11_buffer_info result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_image_info_internal(ref sg_d3d11_image_info result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_sampler_info_internal(ref sg_d3d11_sampler_info result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_shader_info_internal(ref sg_d3d11_shader_info result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_pipeline_info_internal(ref sg_d3d11_pipeline_info result, sg_pipeline pip);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_d3d11_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_d3d11_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_d3d11_query_view_info_internal(ref sg_d3d11_view_info result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_mtl_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_mtl_query_buffer_info_internal(ref sg_mtl_buffer_info result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_mtl_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_mtl_query_image_info_internal(ref sg_mtl_image_info result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_mtl_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_mtl_query_sampler_info_internal(ref sg_mtl_sampler_info result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_mtl_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_mtl_query_shader_info_internal(ref sg_mtl_shader_info result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_mtl_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_mtl_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_mtl_query_pipeline_info_internal(ref sg_mtl_pipeline_info result, sg_pipeline pip);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_buffer_info_internal(ref sg_wgpu_buffer_info result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_image_info_internal(ref sg_wgpu_image_info result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_sampler_info_internal(ref sg_wgpu_sampler_info result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_shader_info_internal(ref sg_wgpu_shader_info result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_pipeline_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_pipeline_info_internal(ref sg_wgpu_pipeline_info result, sg_pipeline pip);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_wgpu_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_wgpu_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_wgpu_query_view_info_internal(ref sg_wgpu_view_info result, sg_view view);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_gl_query_buffer_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_gl_query_buffer_info_internal(ref sg_gl_buffer_info result, sg_buffer buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_gl_query_image_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_gl_query_image_info_internal(ref sg_gl_image_info result, sg_image img);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_gl_query_sampler_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_gl_query_sampler_info_internal(ref sg_gl_sampler_info result, sg_sampler smp);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_gl_query_shader_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_gl_query_shader_info_internal(ref sg_gl_shader_info result, sg_shader shd);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sg_gl_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sg_gl_query_view_info_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sg_gl_query_view_info_internal(ref sg_gl_view_info result, sg_view view);
 
 }
 }

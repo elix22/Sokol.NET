@@ -664,12 +664,28 @@ public static extern void sgp_draw_textured_rect(int channel, sgp_rect dest_rect
 #endif
 public static extern ref sgp_state sgp_query_state();
 
+#if WEB
+public static sgp_desc sgp_query_desc()
+{
+    sgp_desc result = default;
+    sgp_query_desc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgp_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sgp_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sgp_desc sgp_query_desc();
+#endif
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sgp_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sgp_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sgp_query_desc_internal(ref sgp_desc result);
 
 }
 }

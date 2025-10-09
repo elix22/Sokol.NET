@@ -93,12 +93,21 @@ public static extern bool saudio_isvalid();
 #endif
 public static extern void* saudio_userdata();
 
+#if WEB
+public static saudio_desc saudio_query_desc()
+{
+    saudio_desc result = default;
+    saudio_query_desc_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "saudio_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "saudio_query_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern saudio_desc saudio_query_desc();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "saudio_sample_rate", CallingConvention = CallingConvention.Cdecl)]
@@ -141,6 +150,13 @@ public static extern int saudio_expect();
 [DllImport("sokol", EntryPoint = "saudio_push", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern int saudio_push(in float frames, int num_frames);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "saudio_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "saudio_query_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void saudio_query_desc_internal(ref saudio_desc result);
 
 }
 }

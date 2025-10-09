@@ -11,6 +11,210 @@
 #ifndef SOKOL_CSHARP_INTERNAL_WRAPPERS_H
 #define SOKOL_CSHARP_INTERNAL_WRAPPERS_H
 
+// ========== SG (sg_) ==========
+
+SOKOL_API_IMPL void sg_query_desc_internal(sg_desc* result) {
+    *result = sg_query_desc();
+}
+
+SOKOL_API_IMPL void sg_query_features_internal(sg_features* result) {
+    *result = sg_query_features();
+}
+
+SOKOL_API_IMPL void sg_query_limits_internal(sg_limits* result) {
+    *result = sg_query_limits();
+}
+
+SOKOL_API_IMPL void sg_query_pixelformat_internal(sg_pixelformat_info* result, sg_pixel_format fmt) {
+    *result = sg_query_pixelformat(fmt);
+}
+
+SOKOL_API_IMPL void sg_query_buffer_info_internal(sg_buffer_info* result, sg_buffer buf) {
+    *result = sg_query_buffer_info(buf);
+}
+
+SOKOL_API_IMPL void sg_query_image_info_internal(sg_image_info* result, sg_image img) {
+    *result = sg_query_image_info(img);
+}
+
+SOKOL_API_IMPL void sg_query_sampler_info_internal(sg_sampler_info* result, sg_sampler smp) {
+    *result = sg_query_sampler_info(smp);
+}
+
+SOKOL_API_IMPL void sg_query_shader_info_internal(sg_shader_info* result, sg_shader shd) {
+    *result = sg_query_shader_info(shd);
+}
+
+SOKOL_API_IMPL void sg_query_pipeline_info_internal(sg_pipeline_info* result, sg_pipeline pip) {
+    *result = sg_query_pipeline_info(pip);
+}
+
+SOKOL_API_IMPL void sg_query_view_info_internal(sg_view_info* result, sg_view view) {
+    *result = sg_query_view_info(view);
+}
+
+SOKOL_API_IMPL void sg_query_buffer_desc_internal(sg_buffer_desc* result, sg_buffer buf) {
+    *result = sg_query_buffer_desc(buf);
+}
+
+SOKOL_API_IMPL void sg_query_image_desc_internal(sg_image_desc* result, sg_image img) {
+    *result = sg_query_image_desc(img);
+}
+
+SOKOL_API_IMPL void sg_query_sampler_desc_internal(sg_sampler_desc* result, sg_sampler smp) {
+    *result = sg_query_sampler_desc(smp);
+}
+
+SOKOL_API_IMPL void sg_query_shader_desc_internal(sg_shader_desc* result, sg_shader shd) {
+    *result = sg_query_shader_desc(shd);
+}
+
+SOKOL_API_IMPL void sg_query_pipeline_desc_internal(sg_pipeline_desc* result, sg_pipeline pip) {
+    *result = sg_query_pipeline_desc(pip);
+}
+
+SOKOL_API_IMPL void sg_query_view_desc_internal(sg_view_desc* result, sg_view view) {
+    *result = sg_query_view_desc(view);
+}
+
+SOKOL_API_IMPL void sg_query_buffer_defaults_internal(sg_buffer_desc* result, const sg_buffer_desc * desc) {
+    *result = sg_query_buffer_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_image_defaults_internal(sg_image_desc* result, const sg_image_desc * desc) {
+    *result = sg_query_image_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_sampler_defaults_internal(sg_sampler_desc* result, const sg_sampler_desc * desc) {
+    *result = sg_query_sampler_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_shader_defaults_internal(sg_shader_desc* result, const sg_shader_desc * desc) {
+    *result = sg_query_shader_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_pipeline_defaults_internal(sg_pipeline_desc* result, const sg_pipeline_desc * desc) {
+    *result = sg_query_pipeline_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_view_defaults_internal(sg_view_desc* result, const sg_view_desc * desc) {
+    *result = sg_query_view_defaults(desc);
+}
+
+SOKOL_API_IMPL void sg_query_buffer_usage_internal(sg_buffer_usage* result, sg_buffer buf) {
+    *result = sg_query_buffer_usage(buf);
+}
+
+SOKOL_API_IMPL void sg_query_image_usage_internal(sg_image_usage* result, sg_image img) {
+    *result = sg_query_image_usage(img);
+}
+
+SOKOL_API_IMPL void sg_query_view_image_internal(sg_image* result, sg_view view) {
+    *result = sg_query_view_image(view);
+}
+
+SOKOL_API_IMPL void sg_query_view_buffer_internal(sg_buffer* result, sg_view view) {
+    *result = sg_query_view_buffer(view);
+}
+
+SOKOL_API_IMPL void sg_query_frame_stats_internal(sg_frame_stats* result) {
+    *result = sg_query_frame_stats();
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_buffer_info_internal(sg_d3d11_buffer_info* result, sg_buffer buf) {
+    *result = sg_d3d11_query_buffer_info(buf);
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_image_info_internal(sg_d3d11_image_info* result, sg_image img) {
+    *result = sg_d3d11_query_image_info(img);
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_sampler_info_internal(sg_d3d11_sampler_info* result, sg_sampler smp) {
+    *result = sg_d3d11_query_sampler_info(smp);
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_shader_info_internal(sg_d3d11_shader_info* result, sg_shader shd) {
+    *result = sg_d3d11_query_shader_info(shd);
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_pipeline_info_internal(sg_d3d11_pipeline_info* result, sg_pipeline pip) {
+    *result = sg_d3d11_query_pipeline_info(pip);
+}
+
+SOKOL_API_IMPL void sg_d3d11_query_view_info_internal(sg_d3d11_view_info* result, sg_view view) {
+    *result = sg_d3d11_query_view_info(view);
+}
+
+SOKOL_API_IMPL void sg_mtl_query_buffer_info_internal(sg_mtl_buffer_info* result, sg_buffer buf) {
+    *result = sg_mtl_query_buffer_info(buf);
+}
+
+SOKOL_API_IMPL void sg_mtl_query_image_info_internal(sg_mtl_image_info* result, sg_image img) {
+    *result = sg_mtl_query_image_info(img);
+}
+
+SOKOL_API_IMPL void sg_mtl_query_sampler_info_internal(sg_mtl_sampler_info* result, sg_sampler smp) {
+    *result = sg_mtl_query_sampler_info(smp);
+}
+
+SOKOL_API_IMPL void sg_mtl_query_shader_info_internal(sg_mtl_shader_info* result, sg_shader shd) {
+    *result = sg_mtl_query_shader_info(shd);
+}
+
+SOKOL_API_IMPL void sg_mtl_query_pipeline_info_internal(sg_mtl_pipeline_info* result, sg_pipeline pip) {
+    *result = sg_mtl_query_pipeline_info(pip);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_buffer_info_internal(sg_wgpu_buffer_info* result, sg_buffer buf) {
+    *result = sg_wgpu_query_buffer_info(buf);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_image_info_internal(sg_wgpu_image_info* result, sg_image img) {
+    *result = sg_wgpu_query_image_info(img);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_sampler_info_internal(sg_wgpu_sampler_info* result, sg_sampler smp) {
+    *result = sg_wgpu_query_sampler_info(smp);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_shader_info_internal(sg_wgpu_shader_info* result, sg_shader shd) {
+    *result = sg_wgpu_query_shader_info(shd);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_pipeline_info_internal(sg_wgpu_pipeline_info* result, sg_pipeline pip) {
+    *result = sg_wgpu_query_pipeline_info(pip);
+}
+
+SOKOL_API_IMPL void sg_wgpu_query_view_info_internal(sg_wgpu_view_info* result, sg_view view) {
+    *result = sg_wgpu_query_view_info(view);
+}
+
+SOKOL_API_IMPL void sg_gl_query_buffer_info_internal(sg_gl_buffer_info* result, sg_buffer buf) {
+    *result = sg_gl_query_buffer_info(buf);
+}
+
+SOKOL_API_IMPL void sg_gl_query_image_info_internal(sg_gl_image_info* result, sg_image img) {
+    *result = sg_gl_query_image_info(img);
+}
+
+SOKOL_API_IMPL void sg_gl_query_sampler_info_internal(sg_gl_sampler_info* result, sg_sampler smp) {
+    *result = sg_gl_query_sampler_info(smp);
+}
+
+SOKOL_API_IMPL void sg_gl_query_shader_info_internal(sg_gl_shader_info* result, sg_shader shd) {
+    *result = sg_gl_query_shader_info(shd);
+}
+
+SOKOL_API_IMPL void sg_gl_query_view_info_internal(sg_gl_view_info* result, sg_view view) {
+    *result = sg_gl_query_view_info(view);
+}
+
+// ========== SApp (sapp_) ==========
+
+SOKOL_API_IMPL void sapp_query_desc_internal(sapp_desc* result) {
+    *result = sapp_query_desc();
+}
+
 // ========== SGlue (sglue_) ==========
 
 SOKOL_API_IMPL void sglue_environment_internal(sg_environment* result) {
@@ -19,6 +223,48 @@ SOKOL_API_IMPL void sglue_environment_internal(sg_environment* result) {
 
 SOKOL_API_IMPL void sglue_swapchain_internal(sg_swapchain* result) {
     *result = sglue_swapchain();
+}
+
+// ========== SAudio (saudio_) ==========
+
+SOKOL_API_IMPL void saudio_query_desc_internal(saudio_desc* result) {
+    *result = saudio_query_desc();
+}
+
+// ========== SFetch (sfetch_) ==========
+
+SOKOL_API_IMPL void sfetch_desc_internal(sfetch_desc_t* result) {
+    *result = sfetch_desc();
+}
+
+SOKOL_API_IMPL void sfetch_send_internal(sfetch_handle_t* result, const sfetch_request_t * request) {
+    *result = sfetch_send(request);
+}
+
+// ========== SGL (sgl_) ==========
+
+SOKOL_API_IMPL void sgl_error_internal(sgl_error_t* result) {
+    *result = sgl_error();
+}
+
+SOKOL_API_IMPL void sgl_context_error_internal(sgl_error_t* result, sgl_context ctx) {
+    *result = sgl_context_error(ctx);
+}
+
+SOKOL_API_IMPL void sgl_make_context_internal(sgl_context* result, const sgl_context_desc_t * desc) {
+    *result = sgl_make_context(desc);
+}
+
+SOKOL_API_IMPL void sgl_get_context_internal(sgl_context* result) {
+    *result = sgl_get_context();
+}
+
+SOKOL_API_IMPL void sgl_default_context_internal(sgl_context* result) {
+    *result = sgl_default_context();
+}
+
+SOKOL_API_IMPL void sgl_context_make_pipeline_internal(sgl_pipeline* result, sgl_context ctx, const sg_pipeline_desc * desc) {
+    *result = sgl_context_make_pipeline(ctx, desc);
 }
 
 // ========== SDebugText (sdtx_) ==========
@@ -45,6 +291,10 @@ SOKOL_API_IMPL void sdtx_font_c64_internal(sdtx_font_desc_t* result) {
 
 SOKOL_API_IMPL void sdtx_font_oric_internal(sdtx_font_desc_t* result) {
     *result = sdtx_font_oric();
+}
+
+SOKOL_API_IMPL void sdtx_get_cleared_fmt_buffer_internal(sdtx_range* result) {
+    *result = sdtx_get_cleared_fmt_buffer();
 }
 
 // ========== SShape (sshape_) ==========
@@ -127,6 +377,29 @@ SOKOL_API_IMPL void sshape_mat4_internal(sshape_mat4_t* result, const float * m)
 
 SOKOL_API_IMPL void sshape_mat4_transpose_internal(sshape_mat4_t* result, const float * m) {
     *result = sshape_mat4_transpose(m);
+}
+
+#if defined(SOKOL_BASISU_INCLUDED)
+// ========== SBasisu (sbasisu_) ==========
+
+SOKOL_API_IMPL void sbasisu_make_image_internal(sg_image* result, sg_range basisu_data) {
+    *result = sbasisu_make_image(basisu_data);
+}
+
+SOKOL_API_IMPL void sbasisu_transcode_internal(sg_image_desc* result, sg_range basisu_data) {
+    *result = sbasisu_transcode(basisu_data);
+}
+
+#endif // SOKOL_BASISU_INCLUDED
+
+// ========== SImgui (simgui_) ==========
+
+SOKOL_API_IMPL void simgui_texture_view_from_imtextureid_internal(sg_view* result, uint64_t imtex_id) {
+    *result = simgui_texture_view_from_imtextureid(imtex_id);
+}
+
+SOKOL_API_IMPL void simgui_sampler_from_imtextureid_internal(sg_sampler* result, uint64_t imtex_id) {
+    *result = simgui_sampler_from_imtextureid(imtex_id);
 }
 
 #endif // SOKOL_CSHARP_INTERNAL_WRAPPERS_H
