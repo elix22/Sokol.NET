@@ -130,6 +130,87 @@ SOKOL_API_IMPL void sdtx_font_oric_internal(sdtx_font_desc_t* desc) {
     *desc = sdtx_font_oric();
 }
 
+// sokol_shape.h helpers
+SOKOL_API_IMPL void sshape_build_plane_internal(sshape_buffer_t* result, const sshape_buffer_t* buf, const sshape_plane_t* params) {
+    *result = sshape_build_plane(buf, params);
+}
+
+SOKOL_API_IMPL void sshape_build_box_internal(sshape_buffer_t* result, const sshape_buffer_t* buf, const sshape_box_t* params) {
+    *result = sshape_build_box(buf, params);
+}
+
+SOKOL_API_IMPL void sshape_build_sphere_internal(sshape_buffer_t* result, const sshape_buffer_t* buf, const sshape_sphere_t* params) {
+    *result = sshape_build_sphere(buf, params);
+}
+
+SOKOL_API_IMPL void sshape_build_cylinder_internal(sshape_buffer_t* result, const sshape_buffer_t* buf, const sshape_cylinder_t* params) {
+    *result = sshape_build_cylinder(buf, params);
+}
+
+SOKOL_API_IMPL void sshape_build_torus_internal(sshape_buffer_t* result, const sshape_buffer_t* buf, const sshape_torus_t* params) {
+    *result = sshape_build_torus(buf, params);
+}
+
+SOKOL_API_IMPL void sshape_plane_sizes_internal(sshape_sizes_t* result, uint32_t tiles) {
+    *result = sshape_plane_sizes(tiles);
+}
+
+SOKOL_API_IMPL void sshape_box_sizes_internal(sshape_sizes_t* result, uint32_t tiles) {
+    *result = sshape_box_sizes(tiles);
+}
+
+SOKOL_API_IMPL void sshape_sphere_sizes_internal(sshape_sizes_t* result, uint32_t slices, uint32_t stacks) {
+    *result = sshape_sphere_sizes(slices, stacks);
+}
+
+SOKOL_API_IMPL void sshape_cylinder_sizes_internal(sshape_sizes_t* result, uint32_t slices, uint32_t stacks) {
+    *result = sshape_cylinder_sizes(slices, stacks);
+}
+
+SOKOL_API_IMPL void sshape_torus_sizes_internal(sshape_sizes_t* result, uint32_t sides, uint32_t rings) {
+    *result = sshape_torus_sizes(sides, rings);
+}
+
+SOKOL_API_IMPL void sshape_element_range_internal(sshape_element_range_t* result, const sshape_buffer_t* buf) {
+    *result = sshape_element_range(buf);
+}
+
+SOKOL_API_IMPL void sshape_vertex_buffer_desc_internal(sg_buffer_desc* result, const sshape_buffer_t* buf) {
+    *result = sshape_vertex_buffer_desc(buf);
+}
+
+SOKOL_API_IMPL void sshape_index_buffer_desc_internal(sg_buffer_desc* result, const sshape_buffer_t* buf) {
+    *result = sshape_index_buffer_desc(buf);
+}
+
+SOKOL_API_IMPL void sshape_vertex_buffer_layout_state_internal(sg_vertex_buffer_layout_state* result) {
+    *result = sshape_vertex_buffer_layout_state();
+}
+
+SOKOL_API_IMPL void sshape_position_vertex_attr_state_internal(sg_vertex_attr_state* result) {
+    *result = sshape_position_vertex_attr_state();
+}
+
+SOKOL_API_IMPL void sshape_normal_vertex_attr_state_internal(sg_vertex_attr_state* result) {
+    *result = sshape_normal_vertex_attr_state();
+}
+
+SOKOL_API_IMPL void sshape_texcoord_vertex_attr_state_internal(sg_vertex_attr_state* result) {
+    *result = sshape_texcoord_vertex_attr_state();
+}
+
+SOKOL_API_IMPL void sshape_color_vertex_attr_state_internal(sg_vertex_attr_state* result) {
+    *result = sshape_color_vertex_attr_state();
+}
+
+SOKOL_API_IMPL void sshape_mat4_internal(sshape_mat4_t* result, const float m[16]) {
+    *result = sshape_mat4(m);
+}
+
+SOKOL_API_IMPL void sshape_mat4_transpose_internal(sshape_mat4_t* result, const float m[16]) {
+    *result = sshape_mat4_transpose(m);
+}
+
 int sdtx_print_wrapper(const char* str)
 {
     return sdtx_printf("%s", str);

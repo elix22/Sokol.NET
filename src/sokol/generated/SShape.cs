@@ -199,131 +199,293 @@ public struct sshape_torus_t
 #endif
     public sshape_mat4_t transform;
 }
+#if WEB
+public static sshape_buffer_t sshape_build_plane(in sshape_buffer_t buf, in sshape_plane_t parameters)
+{
+    sshape_buffer_t result = default;
+    sshape_build_plane_internal(ref result, buf, parameters);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_plane", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_build_plane", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_buffer_t sshape_build_plane(in sshape_buffer_t buf, in sshape_plane_t parameters);
+#endif
 
+#if WEB
+public static sshape_buffer_t sshape_build_box(in sshape_buffer_t buf, in sshape_box_t parameters)
+{
+    sshape_buffer_t result = default;
+    sshape_build_box_internal(ref result, buf, parameters);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_box", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_build_box", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_buffer_t sshape_build_box(in sshape_buffer_t buf, in sshape_box_t parameters);
+#endif
 
+#if WEB
+public static sshape_buffer_t sshape_build_sphere(in sshape_buffer_t buf, in sshape_sphere_t parameters)
+{
+    sshape_buffer_t result = default;
+    sshape_build_sphere_internal(ref result, buf, parameters);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_sphere", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_build_sphere", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_buffer_t sshape_build_sphere(in sshape_buffer_t buf, in sshape_sphere_t parameters);
+#endif
 
+#if WEB
+public static sshape_buffer_t sshape_build_cylinder(in sshape_buffer_t buf, in sshape_cylinder_t parameters)
+{
+    sshape_buffer_t result = default;
+    sshape_build_cylinder_internal(ref result, buf, parameters);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_cylinder", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_build_cylinder", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_buffer_t sshape_build_cylinder(in sshape_buffer_t buf, in sshape_cylinder_t parameters);
+#endif
 
+#if WEB
+public static sshape_buffer_t sshape_build_torus(in sshape_buffer_t buf, in sshape_torus_t parameters)
+{
+    sshape_buffer_t result = default;
+    sshape_build_torus_internal(ref result, buf, parameters);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_torus", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_build_torus", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_buffer_t sshape_build_torus(in sshape_buffer_t buf, in sshape_torus_t parameters);
+#endif
 
+#if WEB
+public static sshape_sizes_t sshape_plane_sizes(uint tiles)
+{
+    sshape_sizes_t result = default;
+    sshape_plane_sizes_internal(ref result, tiles);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_plane_sizes", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_plane_sizes", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_sizes_t sshape_plane_sizes(uint tiles);
+#endif
 
+#if WEB
+public static sshape_sizes_t sshape_box_sizes(uint tiles)
+{
+    sshape_sizes_t result = default;
+    sshape_box_sizes_internal(ref result, tiles);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_box_sizes", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_box_sizes", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_sizes_t sshape_box_sizes(uint tiles);
+#endif
 
+#if WEB
+public static sshape_sizes_t sshape_sphere_sizes(uint slices, uint stacks)
+{
+    sshape_sizes_t result = default;
+    sshape_sphere_sizes_internal(ref result, slices, stacks);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_sphere_sizes", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_sphere_sizes", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_sizes_t sshape_sphere_sizes(uint slices, uint stacks);
+#endif
 
+#if WEB
+public static sshape_sizes_t sshape_cylinder_sizes(uint slices, uint stacks)
+{
+    sshape_sizes_t result = default;
+    sshape_cylinder_sizes_internal(ref result, slices, stacks);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_cylinder_sizes", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_cylinder_sizes", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_sizes_t sshape_cylinder_sizes(uint slices, uint stacks);
+#endif
 
+#if WEB
+public static sshape_sizes_t sshape_torus_sizes(uint sides, uint rings)
+{
+    sshape_sizes_t result = default;
+    sshape_torus_sizes_internal(ref result, sides, rings);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_torus_sizes", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_torus_sizes", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_sizes_t sshape_torus_sizes(uint sides, uint rings);
+#endif
 
+#if WEB
+public static sshape_element_range_t sshape_make_element_range(in sshape_buffer_t buf)
+{
+    sshape_element_range_t result = default;
+    sshape_make_element_range_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_element_range", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_element_range", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_element_range_t sshape_make_element_range(in sshape_buffer_t buf);
+#endif
 
+#if WEB
+public static sg_buffer_desc sshape_vertex_buffer_desc(in sshape_buffer_t buf)
+{
+    sg_buffer_desc result = default;
+    sshape_vertex_buffer_desc_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_vertex_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_vertex_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_desc sshape_vertex_buffer_desc(in sshape_buffer_t buf);
+#endif
 
+#if WEB
+public static sg_buffer_desc sshape_index_buffer_desc(in sshape_buffer_t buf)
+{
+    sg_buffer_desc result = default;
+    sshape_index_buffer_desc_internal(ref result, buf);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_index_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_index_buffer_desc", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_buffer_desc sshape_index_buffer_desc(in sshape_buffer_t buf);
+#endif
 
+#if WEB
+public static sg_vertex_buffer_layout_state sshape_vertex_buffer_layout_state()
+{
+    sg_vertex_buffer_layout_state result = default;
+    sshape_vertex_buffer_layout_state_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_vertex_buffer_layout_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_vertex_buffer_layout_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_vertex_buffer_layout_state sshape_vertex_buffer_layout_state();
+#endif
 
+#if WEB
+public static sg_vertex_attr_state sshape_position_vertex_attr_state()
+{
+    sg_vertex_attr_state result = default;
+    sshape_position_vertex_attr_state_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_position_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_position_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_vertex_attr_state sshape_position_vertex_attr_state();
+#endif
 
+#if WEB
+public static sg_vertex_attr_state sshape_normal_vertex_attr_state()
+{
+    sg_vertex_attr_state result = default;
+    sshape_normal_vertex_attr_state_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_normal_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_normal_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_vertex_attr_state sshape_normal_vertex_attr_state();
+#endif
 
+#if WEB
+public static sg_vertex_attr_state sshape_texcoord_vertex_attr_state()
+{
+    sg_vertex_attr_state result = default;
+    sshape_texcoord_vertex_attr_state_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_texcoord_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_texcoord_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_vertex_attr_state sshape_texcoord_vertex_attr_state();
+#endif
 
+#if WEB
+public static sg_vertex_attr_state sshape_color_vertex_attr_state()
+{
+    sg_vertex_attr_state result = default;
+    sshape_color_vertex_attr_state_internal(ref result);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_color_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_color_vertex_attr_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_vertex_attr_state sshape_color_vertex_attr_state();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_color_4f", CallingConvention = CallingConvention.Cdecl)]
@@ -353,19 +515,177 @@ public static extern uint sshape_color_4b(byte r, byte g, byte b, byte a);
 #endif
 public static extern uint sshape_color_3b(byte r, byte g, byte b);
 
+#if WEB
+public static sshape_mat4_t sshape_make_mat4(in float m)
+{
+    sshape_mat4_t result = default;
+    sshape_make_mat4_internal(ref result, m);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_mat4", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_mat4", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_mat4_t sshape_make_mat4(in float m);
+#endif
 
+#if WEB
+public static sshape_mat4_t sshape_mat4_transpose(in float m)
+{
+    sshape_mat4_t result = default;
+    sshape_mat4_transpose_internal(ref result, m);
+    return result;
+}
+#else
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_mat4_transpose", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "sshape_mat4_transpose", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sshape_mat4_t sshape_mat4_transpose(in float m);
+#endif
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_plane_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_build_plane_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_build_plane_internal(ref sshape_buffer_t result, in sshape_buffer_t buf, in sshape_plane_t parameters);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_box_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_build_box_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_build_box_internal(ref sshape_buffer_t result, in sshape_buffer_t buf, in sshape_box_t parameters);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_sphere_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_build_sphere_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_build_sphere_internal(ref sshape_buffer_t result, in sshape_buffer_t buf, in sshape_sphere_t parameters);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_cylinder_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_build_cylinder_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_build_cylinder_internal(ref sshape_buffer_t result, in sshape_buffer_t buf, in sshape_cylinder_t parameters);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_build_torus_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_build_torus_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_build_torus_internal(ref sshape_buffer_t result, in sshape_buffer_t buf, in sshape_torus_t parameters);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_plane_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_plane_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_plane_sizes_internal(ref sshape_sizes_t result, uint tiles);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_box_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_box_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_box_sizes_internal(ref sshape_sizes_t result, uint tiles);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_sphere_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_sphere_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_sphere_sizes_internal(ref sshape_sizes_t result, uint slices, uint stacks);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_cylinder_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_cylinder_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_cylinder_sizes_internal(ref sshape_sizes_t result, uint slices, uint stacks);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_torus_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_torus_sizes_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_torus_sizes_internal(ref sshape_sizes_t result, uint sides, uint rings);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_element_range_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_element_range_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_make_element_range_internal(ref sshape_element_range_t result, in sshape_buffer_t buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_vertex_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_vertex_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_vertex_buffer_desc_internal(ref sg_buffer_desc result, in sshape_buffer_t buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_index_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_index_buffer_desc_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_index_buffer_desc_internal(ref sg_buffer_desc result, in sshape_buffer_t buf);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_vertex_buffer_layout_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_vertex_buffer_layout_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_vertex_buffer_layout_state_internal(ref sg_vertex_buffer_layout_state result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_position_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_position_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_position_vertex_attr_state_internal(ref sg_vertex_attr_state result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_normal_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_normal_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_normal_vertex_attr_state_internal(ref sg_vertex_attr_state result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_texcoord_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_texcoord_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_texcoord_vertex_attr_state_internal(ref sg_vertex_attr_state result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_color_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_color_vertex_attr_state_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_color_vertex_attr_state_internal(ref sg_vertex_attr_state result);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_mat4_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_mat4_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_make_mat4_internal(ref sshape_mat4_t result, in float m);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sshape_mat4_transpose_internal", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sshape_mat4_transpose_internal", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void sshape_mat4_transpose_internal(ref sshape_mat4_t result, in float m);
 
 }
 }

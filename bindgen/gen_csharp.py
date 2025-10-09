@@ -186,8 +186,28 @@ web_wrapper_struct_return_functions = {
     'sdtx_font_z1013': 'sdtx_font_desc_t',
     'sdtx_font_cpc': 'sdtx_font_desc_t',
     'sdtx_font_c64': 'sdtx_font_desc_t',
-    'sdtx_font_oric': 'sdtx_font_desc_t'
-    # Add other query functions that return structs
+    'sdtx_font_oric': 'sdtx_font_desc_t',
+    # sokol_shape.h functions
+    'sshape_build_plane': 'sshape_buffer_t',
+    'sshape_build_box': 'sshape_buffer_t',
+    'sshape_build_sphere': 'sshape_buffer_t',
+    'sshape_build_cylinder': 'sshape_buffer_t',
+    'sshape_build_torus': 'sshape_buffer_t',
+    'sshape_plane_sizes': 'sshape_sizes_t',
+    'sshape_box_sizes': 'sshape_sizes_t',
+    'sshape_sphere_sizes': 'sshape_sizes_t',
+    'sshape_cylinder_sizes': 'sshape_sizes_t',
+    'sshape_torus_sizes': 'sshape_sizes_t',
+    'sshape_element_range': 'sshape_element_range_t',
+    'sshape_vertex_buffer_desc': 'sg_buffer_desc',
+    'sshape_index_buffer_desc': 'sg_buffer_desc',
+    'sshape_vertex_buffer_layout_state': 'sg_vertex_buffer_layout_state',
+    'sshape_position_vertex_attr_state': 'sg_vertex_attr_state',
+    'sshape_normal_vertex_attr_state': 'sg_vertex_attr_state',
+    'sshape_texcoord_vertex_attr_state': 'sg_vertex_attr_state',
+    'sshape_color_vertex_attr_state': 'sg_vertex_attr_state',
+    'sshape_mat4': 'sshape_mat4_t',
+    'sshape_mat4_transpose': 'sshape_mat4_t'
 }
 
 struct_types = []
