@@ -116,11 +116,7 @@ public static unsafe partial class PlMpegApp
 
         state.bind.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
         {
-            data = new sg_range()
-            {
-                ptr = Unsafe.AsPointer(ref vertex_buffer[0]),
-                size = (uint)(vertex_buffer.Length * Marshal.SizeOf<vertex_t>())
-            },
+            data = SG_RANGE<vertex_t>(vertex_buffer),
             label = "vertices"
         });
 
@@ -224,11 +220,6 @@ public static unsafe partial class PlMpegApp
         {
             sg_apply_pipeline(state.pip);
             sg_apply_bindings(state.bind);
-            // sg_apply_uniforms(UB_vs_params, new sg_range()
-            // {
-            //     ptr = Unsafe.AsPointer(ref vs_params),
-            //     size = (uint)Marshal.SizeOf<vs_params_t>()
-            // });
             sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
             sg_draw(0, 24, 1);
         }

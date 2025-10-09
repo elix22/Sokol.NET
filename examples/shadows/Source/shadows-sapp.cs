@@ -362,11 +362,7 @@ public static unsafe class ShadowsApp
         sg_begin_pass(state.shadow.pass);
         sg_apply_pipeline(state.shadow.pip);
         sg_apply_bindings(state.shadow.bind);
-        sg_apply_uniforms(UB_vs_shadow_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref cube_vs_shadow_params),
-            size = (uint)Marshal.SizeOf<vs_shadow_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_shadow_params, SG_RANGE<vs_shadow_params_t>(ref cube_vs_shadow_params));
         sg_draw(0, 36, 1);
         sg_end_pass();
 
@@ -374,22 +370,10 @@ public static unsafe class ShadowsApp
         sg_begin_pass(new sg_pass(){ action = state.display.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.display.pip);
         sg_apply_bindings(state.display.bind);
-        sg_apply_uniforms(UB_fs_display_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref fs_display_params),
-            size = (uint)Marshal.SizeOf<fs_display_params_t>()
-        });
-        sg_apply_uniforms(UB_vs_display_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref plane_vs_display_params),
-            size = (uint)Marshal.SizeOf<vs_display_params_t>()
-        });
+        sg_apply_uniforms(UB_fs_display_params, SG_RANGE<fs_display_params_t>(ref fs_display_params));
+        sg_apply_uniforms(UB_vs_display_params, SG_RANGE<vs_display_params_t>(ref plane_vs_display_params));
         sg_draw(36, 6, 1);
-        sg_apply_uniforms(UB_vs_display_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref cube_vs_display_params),
-            size = (uint)Marshal.SizeOf<vs_display_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_display_params, SG_RANGE<vs_display_params_t>(ref cube_vs_display_params));
         sg_draw(0, 36, 1);
 
         // render debug visualization of shadow-map

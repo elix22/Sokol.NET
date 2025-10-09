@@ -204,12 +204,7 @@ public static unsafe class DynTextApp
         sg_begin_pass(new sg_pass() { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);
         sg_apply_bindings(state.bind);
-        var uniforms = new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref vs_params),
-            size = (uint)Marshal.SizeOf<vs_params_t>()
-        };
-        sg_apply_uniforms(UB_vs_params, uniforms);
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(0, 36, 1);
 
         sg_end_pass();

@@ -204,7 +204,7 @@ public static unsafe class ImguiUserCallbackApp
         */
         sg_apply_pipeline(state.scene1.pip);
         sg_apply_bindings(state.scene1.bind);
-        sg_apply_uniforms(UB_vs_params, new sg_range() { ptr = &vs_params, size = (uint)Marshal.SizeOf<vs_params_t>() });
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(0, 36, 1);
 
     }

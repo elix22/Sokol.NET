@@ -131,11 +131,7 @@ public static unsafe class LoadPngSApp
 
         state.bind.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
         {
-            data = new sg_range()
-            {
-                ptr = Unsafe.AsPointer(ref MemoryMarshal.GetReference(vertex_buffer)),
-                size = (uint)(vertex_buffer.Length * Marshal.SizeOf<vertex_t>())
-            },
+            data = SG_RANGE<vertex_t>(vertex_buffer),
             label = "cube-vertices"
         });
 
@@ -211,8 +207,7 @@ public static unsafe class LoadPngSApp
             image_desc.width = png_width;
             image_desc.height = png_height;
             image_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-            image_desc.data.mip_levels[0] = new sg_range() { ptr = Unsafe.AsPointer(ref image.Data[0]), size = (uint)(png_width * png_height * 4) };
-
+            image_desc.data.mip_levels[0] = SG_RANGE(image.Data);
             sg_image img = sg_make_image(image_desc);
 
                   // ...and initialize the pre-allocated texture view handle with that image
@@ -253,11 +248,7 @@ public static unsafe class LoadPngSApp
         sg_begin_pass(new sg_pass() { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);
         sg_apply_bindings(state.bind);
-        sg_apply_uniforms(UB_vs_params, new sg_range()
-        {
-            ptr = Unsafe.AsPointer(ref vs_params),
-            size = (uint)Marshal.SizeOf<vs_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(0, 36, 1);
         sg_end_pass();
         sg_commit();

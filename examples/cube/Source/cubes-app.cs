@@ -173,10 +173,7 @@ public static unsafe class CubeSapp
 
         sg_apply_pipeline(state.pip);
         sg_apply_bindings(state.bind);
-        var uniforms = default(sg_range);
-        uniforms.ptr = Unsafe.AsPointer(ref vs_params);
-        uniforms.size = (uint)Marshal.SizeOf<vs_params_t>();
-        sg_apply_uniforms(UB_vs_params, uniforms);
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(0, 36, 1);
         __dbgui_draw();
         sg_end_pass();

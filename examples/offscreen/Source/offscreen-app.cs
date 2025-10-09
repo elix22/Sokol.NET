@@ -283,10 +283,7 @@ public static unsafe class OffscreenApp
         sg_begin_pass(state.offscreen.pass);
         sg_apply_pipeline(state.offscreen.pip);
         sg_apply_bindings(state.offscreen.bind);
-         sg_apply_uniforms(UB_vs_params, new sg_range(){
-            ptr = Unsafe.AsPointer(ref vs_params),
-            size = (uint)Marshal.SizeOf<vs_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_params,SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(state.donut.base_element, state.donut.num_elements, 1);
         sg_end_pass();
 
@@ -304,10 +301,7 @@ public static unsafe class OffscreenApp
         });
         sg_apply_pipeline(state.display.pip);
         sg_apply_bindings(state.display.bind);
-        sg_apply_uniforms(UB_vs_params, new sg_range(){
-            ptr = Unsafe.AsPointer(ref vs_params),
-            size = (uint)Marshal.SizeOf<vs_params_t>()
-        });
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
         sg_draw(state.sphere.base_element, state.sphere.num_elements, 1);
         __dbgui_draw();
         sg_end_pass();

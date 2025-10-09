@@ -184,11 +184,7 @@ public static unsafe class InstancingSApp
             });
             sg_apply_pipeline(state.pip);
             sg_apply_bindings(state.bind);
-            sg_apply_uniforms(UB_vs_params, new sg_range()
-            {
-                ptr = Unsafe.AsPointer(ref vs_params),
-                size = (uint)Marshal.SizeOf<vs_params_t>()
-            });
+            sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
             sg_draw(0, 24, (uint)state.cur_num_particles);
 
             sg_end_pass();

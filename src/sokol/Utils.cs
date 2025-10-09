@@ -47,6 +47,15 @@ namespace Sokol
                 size = (uint)(span.Length * Marshal.SizeOf<T>())
             };
         }
+       
+        public static sg_range SG_RANGE<T>(ReadOnlySpan<T> span) where T : unmanaged
+        {
+            return new sg_range()
+            {
+                ptr = Unsafe.AsPointer(ref MemoryMarshal.GetReference(span)),
+                size = (uint)(span.Length * Marshal.SizeOf<T>())
+            };
+        }
 
         public static sg_range SG_RANGE<T>(ref T value) where T : unmanaged
         {
