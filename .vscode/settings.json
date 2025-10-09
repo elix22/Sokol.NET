@@ -91,7 +91,8 @@
         "sokol_audio.h": "c",
         "sokol_defines.h": "c",
         "*.inc": "c",
-        "sokol_debugtext.h": "c"
+        "sokol_debugtext.h": "c",
+        "sokol_basisu.h": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5502

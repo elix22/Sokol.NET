@@ -70,7 +70,8 @@ extern "C"
 #define PL_MPEG_IMPLEMENTATION
 #include "pl_mpeg/pl_mpeg.h"
 
-// #include "basisu/sokol_basisu.h"
+#define SOKOL_BASISU_INCLUDED
+#include "basisu/sokol_basisu.h"
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
