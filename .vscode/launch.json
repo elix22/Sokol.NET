@@ -60,7 +60,9 @@
                 "sgl_lines",
                 "debugtext",
                 "imgui_usercallback",
-                "offscreen"
+                "offscreen",
+                "sdf",
+                "shadows"
             ],
             "default": "cube"
         },

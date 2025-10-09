@@ -340,6 +340,50 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-sdf-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sdf/sdf.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-sdf-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/sdf/sdfWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-shadows-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/shadows/shadows.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-shadows-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/shadows/shadowsWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -604,6 +648,50 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-sdf",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sdf/sdf.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-sdf-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/sdf/sdfWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-shadows",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/shadows/shadows.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-shadows-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/shadows/shadowsWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -700,6 +788,22 @@
             ]
         },
         {
+            "label": "prepare-sdf",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sdf-shaders",
+                "build-sdf"
+            ]
+        },
+        {
+            "label": "prepare-shadows",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-shadows-shaders",
+                "build-shadows"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -793,6 +897,22 @@
             "dependsOn": [
                 "compile-offscreen-web-shaders",
                 "build-offscreen-web"
+            ]
+        },
+        {
+            "label": "prepare-sdf-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-sdf-web-shaders",
+                "build-sdf-web"
+            ]
+        },
+        {
+            "label": "prepare-shadows-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-shadows-web-shaders",
+                "build-shadows-web"
             ]
         },
         {
@@ -1195,7 +1315,9 @@
 				"examples/sgl_lines",
 				"examples/debugtext",
 				"examples/imgui_usercallback",
-				"examples/offscreen"
+				"examples/offscreen",
+				"examples/sdf",
+				"examples/shadows"
 			]
 		},
 		{
