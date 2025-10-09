@@ -172,7 +172,9 @@ web_wrapper_functions = {
     'sg_alloc_sampler',
     'sgp_make_pipeline',
     'sgl_make_pipeline',
+    'sdtx_make_context',
     'sdtx_get_context',
+    'sdtx_default_context',
 }
 
 # Functions which need special handling for WebAssembly (Emscripten) platform

@@ -201,7 +201,16 @@ public static extern sdtx_font_desc_t sdtx_font_oric();
 #else
 [DllImport("sokol", EntryPoint = "sdtx_make_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sdtx_make_context_internal(in sdtx_context_desc_t desc);
+public static sdtx_context sdtx_make_context(in sdtx_context_desc_t desc)
+{
+    uint _id = sdtx_make_context_internal(desc);
+    return new sdtx_context { id = _id };
+}
+#else
 public static extern sdtx_context sdtx_make_context(in sdtx_context_desc_t desc);
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_destroy_context", CallingConvention = CallingConvention.Cdecl)]
@@ -238,7 +247,16 @@ public static extern sdtx_context sdtx_get_context();
 #else
 [DllImport("sokol", EntryPoint = "sdtx_default_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
+#if WEB
+static extern uint sdtx_default_context_internal();
+public static sdtx_context sdtx_default_context()
+{
+    uint _id = sdtx_default_context_internal();
+    return new sdtx_context { id = _id };
+}
+#else
 public static extern sdtx_context sdtx_default_context();
+#endif
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sdtx_draw", CallingConvention = CallingConvention.Cdecl)]
