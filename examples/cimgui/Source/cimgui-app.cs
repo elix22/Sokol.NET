@@ -15,6 +15,7 @@ using static Sokol.SImgui;
 using static Imgui.ImguiNative;
 using Imgui;
 using static Sokol.SLog;
+using static Imgui.ImGuiHelpers;
 
 public static unsafe class CImguiApp
 {
@@ -60,7 +61,43 @@ public static unsafe class CImguiApp
 
 
     static float flt = 0.0f;
-
+    static byte[] inputBuffer = new byte[256]; // Buffer for text input
+    
+    [UnmanagedCallersOnly]
+    static unsafe int TextInputCallbackImpl(ImGuiInputTextCallbackData* data)
+    {
+        // Log the callback event
+        // Console.WriteLine($"Callback Event: {data->EventFlag}, Char: {(char)data->EventChar}, CursorPos: {data->CursorPos}");
+        
+        // CallbackCharFilter: Filter and modify character input
+        if ((data->EventFlag & ImGuiInputTextFlags.CallbackCharFilter) != 0)
+        {
+            char c = (char)data->EventChar;
+            
+            // Convert lowercase to uppercase
+            if (c >= 'a' && c <= 'z')
+            {
+                data->EventChar = (ushort)(c - 32);
+                Console.WriteLine($"Converted '{c}' to '{(char)data->EventChar}'");
+            }
+            
+            // Filter out digits
+            if (c >= '0' && c <= '9')
+            {
+                Console.WriteLine($"Filtered out digit: '{c}'");
+                return 1; // Return non-zero to filter out this character
+            }
+        }
+        
+        // CallbackAlways: Called on every change
+        // if ((data->EventFlag & ImGuiInputTextFlags.CallbackAlways) != 0)
+        // {
+        //     Console.WriteLine($"Text length: {data->BufTextLen}");
+        // }
+        
+        return 0; // Return 0 to accept the character
+    }
+    
     [UnmanagedCallersOnly]
     private static unsafe void Frame()
     {
@@ -79,7 +116,12 @@ public static unsafe class CImguiApp
         igText("Hello, world from Eli !");
         igSliderFloat("float value", ref flt, 0.0f, 1.0f, "%.3f", 0);
         igColorEdit3("clear color", ref state.pass_action.colors[0].clear_value.AsVector3, 0);
-
+       
+        // Input text with callback - converts to uppercase, filters digits
+        // Using ImGuiHelpers for simplified callback usage (just like &Init, &Frame, etc.)
+        InputText("(uppercase only)", ref inputBuffer[0], (uint)inputBuffer.Length, 
+            ImGuiInputTextFlags.CallbackCharFilter | ImGuiInputTextFlags.CallbackAlways, 
+            &TextInputCallbackImpl);
         if (igButton("Test Window", Vector2.Zero)) state.show_test_window ^= 1;
         if (igButton("Another Window", Vector2.Zero)) state.show_another_window ^= 1;
 
