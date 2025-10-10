@@ -23,6 +23,11 @@ extern void* findCanvasEventTarget(const char* target);
 #define SOKOL_FETCH_API_DECL
 
 #ifdef __ANDROID__
+// Enable Android soft keyboard extension for sokol-csharp
+// This provides enhanced keyboard support using JNI and hidden EditText
+// See: docs/ANDROID_KEYBOARD_IMPLEMENTATION.md
+#define SOKOL_ANDROID_KEYBOARD_EXT
+
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
