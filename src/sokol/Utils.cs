@@ -210,11 +210,114 @@ namespace Sokol
 
         /// <summary>
         /// Returns a reference to the first float field (M11) of the Matrix4x4.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in matrix.M11' instead.
         /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in matrix.M11' instead. Example: sshape_make_mat4(in matrix.M11)", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in matrix.M11'. Example: sshape_make_mat4(in matrix.M11)", error: true)]
+#endif
         public static ref float AsFloat(this Matrix4x4 matrix)
         {
             // This reinterprets the Matrix4x4 as a float.
             return ref Unsafe.As<Matrix4x4, float>(ref matrix);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (M11) of the Matrix3x2.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in matrix.M11' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in matrix.M11' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in matrix.M11'.", error: true)]
+#endif
+        public static ref float AsFloat(this Matrix3x2 matrix)
+        {
+            // This reinterprets the Matrix3x2 as a float.
+            return ref Unsafe.As<Matrix3x2, float>(ref matrix);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (X) of the Vector2.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in vector.X' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in vector.X' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in vector.X'.", error: true)]
+#endif
+        public static ref float AsFloat(this Vector2 vector)
+        {
+            // This reinterprets the Vector2 as a float.
+            return ref Unsafe.As<Vector2, float>(ref vector);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (X) of the Vector3.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in vector.X' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in vector.X' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in vector.X'.", error: true)]
+#endif
+        public static ref float AsFloat(this Vector3 vector)
+        {
+            // This reinterprets the Vector3 as a float.
+            return ref Unsafe.As<Vector3, float>(ref vector);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (X) of the Vector4.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in vector.X' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in vector.X' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in vector.X'.", error: true)]
+#endif
+        public static ref float AsFloat(this Vector4 vector)
+        {
+            // This reinterprets the Vector4 as a float.
+            return ref Unsafe.As<Vector4, float>(ref vector);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (X) of the Quaternion.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in quaternion.X' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in quaternion.X' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in quaternion.X'.", error: true)]
+#endif
+        public static ref float AsFloat(this Quaternion quaternion)
+        {
+            // This reinterprets the Quaternion as a float.
+            return ref Unsafe.As<Quaternion, float>(ref quaternion);
+        }
+
+        /// <summary>
+        /// Returns a reference to the first float field (Normal.X) of the Plane.
+        /// WARNING: This method does not work correctly on Web (.NET 8) builds.
+        /// For cross-platform compatibility, use 'in plane.Normal.X' instead.
+        /// </summary>
+#if NET8_0 && WEB
+        [Obsolete("AsFloat() does not work correctly on Web (.NET 8). Use 'in plane.Normal.X' instead.", error: true)]
+#else
+        [Obsolete("AsFloat() may not work on all platforms. For cross-platform compatibility, prefer 'in plane.Normal.X'.", error: true)]
+#endif
+        public static ref float AsFloat(this Plane plane)
+        {
+            // This reinterprets the Plane as a float.
+            return ref Unsafe.As<Plane, float>(ref plane);
         }
     }
 

@@ -94,26 +94,26 @@ public static unsafe class ShapesTransformApp
         Matrix4x4 torus_transform = Matrix4x4.CreateTranslation(new Vector3(+1.0f, 0.0f, -1.0f));
 
         // // build the shapes...
-        buf = sshape_build_box(ref buf, new sshape_box_t()
+        buf = sshape_build_box(in buf, new sshape_box_t()
         {
             width = 1.0f,
             height = 1.0f,
             depth = 1.0f,
             tiles = 10,
             random_colors = true,
-            transform = sshape_make_mat4(box_transform.AsFloat())
+            transform = sshape_make_mat4(in box_transform.M11) // using box_transform.AsFloat() won't work on Web
         });
 
-        buf = sshape_build_sphere(ref buf, new sshape_sphere_t
+        buf = sshape_build_sphere(in buf, new sshape_sphere_t
         {
             merge = true,
             radius = 0.75f,
             slices = 36,
             stacks = 20,
             random_colors = true,
-            transform = sshape_make_mat4(sphere_transform.AsFloat())
+            transform = sshape_make_mat4(in sphere_transform.M11)
         });
-        buf = sshape_build_cylinder(ref buf, new sshape_cylinder_t
+        buf = sshape_build_cylinder(in buf, new sshape_cylinder_t
         {
             merge = true,
             radius = 0.5f,
@@ -121,9 +121,9 @@ public static unsafe class ShapesTransformApp
             slices = 36,
             stacks = 10,
             random_colors = true,
-            transform = sshape_make_mat4(cylinder_transform.AsFloat())
+            transform = sshape_make_mat4(in cylinder_transform.M11)
         });
-        buf = sshape_build_torus(ref buf, new sshape_torus_t
+        buf = sshape_build_torus(in buf, new sshape_torus_t
         {
             merge = true,
             radius = 0.5f,
@@ -131,7 +131,7 @@ public static unsafe class ShapesTransformApp
             rings = 36,
             sides = 18,
             random_colors = true,
-            transform = sshape_make_mat4(torus_transform.AsFloat())
+            transform = sshape_make_mat4(in torus_transform.M11)
         });
 
         state.elms = sshape_make_element_range(buf);
@@ -272,8 +272,8 @@ public static unsafe class ShapesTransformApp
             frame_cb = &Frame,
             event_cb = &Event,
             cleanup_cb = &Cleanup,
-            width = 800,
-            height = 600,
+            width = 0,
+            height = 0,
             sample_count = 1,
             window_title = "shapes-transform (sokol-app)",
             icon = { sokol_default = true },
