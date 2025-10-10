@@ -688,7 +688,7 @@ public static unsafe class CGltfApp
             gltf_parse_materials(out_data);
             gltf_parse_meshes(out_data);
             gltf_parse_nodes(out_data);
-            cgltf_free(ref *out_data);
+            cgltf_free(out_data);
         }
     }
 
@@ -762,9 +762,7 @@ public static unsafe class CGltfApp
         }
         if (node->has_matrix != 0)
         {
-            // needs testing, not sure if the element order is correct
-            Matrix4x4 tform = FromGltfMatrix(node->matrix);// Identity;// *(Matrix4x4*)node->matrix;
-            return tform;
+            return  FromGltfMatrix(node->matrix);
         }
         else
         {

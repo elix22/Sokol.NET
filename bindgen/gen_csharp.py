@@ -373,10 +373,8 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
         # not a bug, pass const structs by value
         return f"in {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
     elif is_struct_ptr(arg_type):
-        if arg_prefix is None:  # This is a return type
-            return f"ref {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
-        else:  # This is a parameter
-            return f"ref {as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}" + pre
+        # For struct pointers, use pointer syntax (cgltf_data*) not ref
+        return f"{as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}*" + pre
     elif is_prim_ptr(arg_type):
         return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     elif is_const_prim_ptr(arg_type):

@@ -923,7 +923,7 @@ public static extern cgltf_result cgltf_parse_file(in cgltf_options options, [M(
 #else
 [DllImport("sokol", EntryPoint = "cgltf_load_buffers", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern cgltf_result cgltf_load_buffers(in cgltf_options options, ref cgltf_data data, [M(U.LPUTF8Str)] string gltf_path);
+public static extern cgltf_result cgltf_load_buffers(in cgltf_options options, cgltf_data* data, [M(U.LPUTF8Str)] string gltf_path);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "cgltf_load_buffer_base64", CallingConvention = CallingConvention.Cdecl)]
@@ -951,14 +951,14 @@ public static extern nuint cgltf_decode_uri(IntPtr uri);
 #else
 [DllImport("sokol", EntryPoint = "cgltf_validate", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern cgltf_result cgltf_validate(ref cgltf_data data);
+public static extern cgltf_result cgltf_validate(cgltf_data* data);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "cgltf_free", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "cgltf_free", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern void cgltf_free(ref cgltf_data data);
+public static extern void cgltf_free(cgltf_data* data);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "cgltf_node_transform_local", CallingConvention = CallingConvention.Cdecl)]
@@ -986,7 +986,7 @@ public static extern byte* cgltf_buffer_view_data(in cgltf_buffer_view view);
 #else
 [DllImport("sokol", EntryPoint = "cgltf_find_accessor", CallingConvention = CallingConvention.Cdecl)]
 #endif
-public static extern ref cgltf_accessor cgltf_find_accessor(in cgltf_primitive prim, cgltf_attribute_type type, int index);
+public static extern cgltf_accessor* cgltf_find_accessor(in cgltf_primitive prim, cgltf_attribute_type type, int index);
 
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "cgltf_accessor_read_float", CallingConvention = CallingConvention.Cdecl)]
