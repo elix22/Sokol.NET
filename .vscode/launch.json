@@ -62,7 +62,8 @@
                 "imgui_usercallback",
                 "offscreen",
                 "sdf",
-                "shadows"
+                "shadows",
+                "shapes_transform"
             ],
             "default": "cube"
         },

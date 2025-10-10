@@ -384,6 +384,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-shapes_transform-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/shapes_transform/shapes_transform.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-shapes_transform-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/shapes_transform/shapes_transformWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -692,6 +714,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-shapes_transform",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/shapes_transform/shapes_transform.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-shapes_transform-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/shapes_transform/shapes_transformWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -804,6 +848,14 @@
             ]
         },
         {
+            "label": "prepare-shapes_transform",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-shapes_transform-shaders",
+                "build-shapes_transform"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -913,6 +965,14 @@
             "dependsOn": [
                 "compile-shadows-web-shaders",
                 "build-shadows-web"
+            ]
+        },
+        {
+            "label": "prepare-shapes_transform-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-shapes_transform-web-shaders",
+                "build-shapes_transform-web"
             ]
         },
         {
@@ -1317,7 +1377,8 @@
 				"examples/imgui_usercallback",
 				"examples/offscreen",
 				"examples/sdf",
-				"examples/shadows"
+				"examples/shadows",
+				"examples/shapes_transform"
 			]
 		},
 		{

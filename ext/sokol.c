@@ -61,6 +61,7 @@ extern "C"
 #include "sokol_audio.h"
 #include "sokol_time.h"
 #include "sokol_log.h"
+#define SOKOL_SHAPE_IMPL
 #include "sokol_shape.h"
 #include "sokol_gl.h"
 #include "sokol_fetch.h"
