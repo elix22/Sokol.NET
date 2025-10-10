@@ -89,11 +89,7 @@ public static unsafe class CImguiApp
             }
         }
         
-        // CallbackAlways: Called on every change
-        // if ((data->EventFlag & ImGuiInputTextFlags.CallbackAlways) != 0)
-        // {
-        //     Console.WriteLine($"Text length: {data->BufTextLen}");
-        // }
+
         
         return 0; // Return 0 to accept the character
     }
@@ -119,9 +115,10 @@ public static unsafe class CImguiApp
        
         // Input text with callback - converts to uppercase, filters digits
         // Using ImGuiHelpers for simplified callback usage (just like &Init, &Frame, etc.)
+        // Pass &TextInputCallbackImpl to use callback, or null for no callback (safe - won't crash)
         InputText("(uppercase only)", ref inputBuffer[0], (uint)inputBuffer.Length, 
             ImGuiInputTextFlags.CallbackCharFilter | ImGuiInputTextFlags.CallbackAlways, 
-            &TextInputCallbackImpl);
+            &TextInputCallbackImpl);  // Change to null to disable callback
         if (igButton("Test Window", Vector2.Zero)) state.show_test_window ^= 1;
         if (igButton("Another Window", Vector2.Zero)) state.show_another_window ^= 1;
 
