@@ -63,7 +63,8 @@
                 "offscreen",
                 "sdf",
                 "shadows",
-                "shapes_transform"
+                "shapes_transform",
+                "cgltf"
             ],
             "default": "cube"
         },

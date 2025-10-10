@@ -406,6 +406,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-cgltf-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/cgltf/cgltf.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-cgltf-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/cgltf/cgltfWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -736,6 +758,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-cgltf",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/cgltf/cgltf.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-cgltf-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/cgltf/cgltfWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -856,6 +900,14 @@
             ]
         },
         {
+            "label": "prepare-cgltf",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-cgltf-shaders",
+                "build-cgltf"
+            ]
+        },
+        {
             "label": "prepare-cube-web",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -973,6 +1025,14 @@
             "dependsOn": [
                 "compile-shapes_transform-web-shaders",
                 "build-shapes_transform-web"
+            ]
+        },
+        {
+            "label": "prepare-cgltf-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-cgltf-web-shaders",
+                "build-cgltf-web"
             ]
         },
         {
@@ -1378,7 +1438,8 @@
 				"examples/offscreen",
 				"examples/sdf",
 				"examples/shadows",
-				"examples/shapes_transform"
+				"examples/shapes_transform",
+				"examples/cgltf"
 			]
 		},
 		{
