@@ -77,24 +77,43 @@ The project includes automated builds via GitHub Actions defined in `.github/wor
 - Pull requests to `main` or `develop` branches
 - Manual workflow dispatch
 
-### Auto-commit to Repository
+### Automated Jobs
+
+The workflow includes two main automation jobs:
+
+#### 1. C# Binding Generation
+- **Generates C# bindings** from sokol C headers using Python scripts
+- **Output**: `src/sokol/generated/*.cs` and `ext/sokol_csharp_internal_wrappers.h`
+- **Smart detection**: Only commits if bindings actually changed
+- **Triggers**: Runs on every push to `main` branch
+- **Dependencies**: Python 3.x
+
+#### 2. Auto-commit to Repository
 When building from the `main` branch (push event), the workflow will:
-1. Build all platform libraries
-2. Compare new libraries with existing ones using SHA256 checksums
-3. Only commit if binaries have changed (prevents spam commits)
-4. Push to `main` branch with commit message `[skip ci]` to prevent infinite loops
-5. Include build information (commit SHA, workflow run link, library sizes)
+1. **Generate C# bindings** from C headers (separate job)
+2. **Build all platform libraries** in parallel
+3. **Compare** new libraries with existing ones using SHA256 checksums
+4. **Only commit** if binaries or bindings have changed (prevents spam commits)
+5. **Push** to `main` branch with commit message `[skip ci]` to prevent infinite loops
+6. **Include** build information (commit SHA, workflow run link, library sizes)
 
 **Requirements for Private Repositories:**
 The workflow requires `contents: write` permission to push commits back to the repository. This is configured in the workflow file and works automatically for both public and private repositories.
 
 **Smart Change Detection:**
+
+*For Bindings:*
+- Uses `git diff` to detect changes in generated C# files
+- Only commits when C header files change
+- Skips commit for documentation or build system changes
+
+*For Libraries:*
 - On **first run**: Detects no existing libraries and commits everything
 - On **subsequent runs**: Compares SHA256 checksums of each platform's libraries
 - Only commits when **native code changes** affect the binaries
 - Skips commit when only **documentation** or **C# code** changes
 
-This ensures the repository always has the latest pre-built binaries available for users to clone and use immediately, without cluttering the commit history.
+This ensures the repository always has the latest pre-built binaries and up-to-date C# bindings available for users to clone and use immediately, without cluttering the commit history.
 
 ### Build Matrix
 
@@ -121,6 +140,15 @@ This ensures the repository always has the latest pre-built binaries available f
 - Runner: ubuntu-latest
 - Output: Static library (.a) files
 
+#### C# Binding Generation
+- Runner: ubuntu-latest
+- Python: 3.x
+- Input: C header files from `ext/sokol/`
+- Output: 
+  - `src/sokol/generated/*.cs` (C# bindings)
+  - `ext/sokol_csharp_internal_wrappers.h` (C wrapper functions)
+- Runs independently of library builds
+
 ### Artifacts
 
 The workflow produces the following artifacts:
@@ -138,6 +166,40 @@ The workflow produces the following artifacts:
 3. **Release archives** (90-day retention, only on main branch):
    - `sokol-libraries.tar.gz`
    - `sokol-libraries.zip`
+
+### Workflow Execution Order
+
+The GitHub Actions workflow executes jobs in the following order:
+
+```
+Push to main/develop
+       ↓
+   ┌───┴───────────────────────────┐
+   │                               │
+   ↓                               ↓
+Generate Bindings         Build Libraries (Parallel)
+   │                      ├─→ Windows x64
+   │                      ├─→ macOS arm64
+   │                      ├─→ macOS x86_64
+   │                      ├─→ Linux x86_64
+   │                      └─→ Emscripten
+   │                               │
+   │                               ↓
+   │                      Combine Artifacts
+   │                               │
+   ↓                               ↓
+Check bindings changed?    Check libraries changed?
+   │                               │
+   └───────────┬───────────────────┘
+               ↓
+      Commit if changed [skip ci]
+```
+
+**Key Points:**
+- Binding generation and library builds run **independently in parallel**
+- Each can commit separately if changes are detected
+- `[skip ci]` in commit messages prevents infinite loops
+- Failed builds don't affect binding generation (and vice versa)
 
 ### Downloading Built Libraries
 

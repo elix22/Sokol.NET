@@ -202,6 +202,78 @@ jobs:
         path: libs/emscripten/**/*
         retention-days: 30
 
+  # Generate C# bindings from C headers
+  generate-bindings:
+    name: Generate C# Bindings
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        pip install setuptools
+    
+    - name: Generate bindings
+      run: |
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🔄 Generating C# bindings from C headers..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ./scripts/generate-bindings.sh
+        echo "✅ Bindings generated successfully"
+    
+    - name: Check for binding changes and commit
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Check if there are any changes to generated bindings
+        echo "Checking for changes in generated bindings..."
+        
+        if git diff --quiet src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h; then
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ No binding changes detected - skipping commit"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          exit 0
+        fi
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Binding changes detected - committing..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Show what changed
+        echo "Changed files:"
+        git diff --name-only src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h
+        
+        # Stage changes
+        git add src/sokol/generated/
+        git add ext/sokol_csharp_internal_wrappers.h
+        
+        # Commit and push
+        git commit -m "Auto-update C# bindings [skip ci]
+        
+        Generated from commit: ${{ github.sha }}
+        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        
+        Changes:
+        $(git diff --stat HEAD~1 src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h)"
+        
+        git push origin main
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ Bindings committed and pushed successfully"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
   # Combine all artifacts into a single release
   combine-artifacts:
     name: Combine All Libraries
