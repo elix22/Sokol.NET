@@ -20,3 +20,4 @@ This is the main entry point for the Sokol-Charp project. For platform-specific 
 - **VS Code**
 
 See [docs/web-server-setup.md](docs/web-server-setup.md) for installation instructions on Windows, macOS, and Linux.
+
