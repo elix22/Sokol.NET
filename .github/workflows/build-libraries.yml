@@ -12,6 +12,57 @@ permissions:
   contents: write  # Allow workflow to push commits back to repository
 
 jobs:
+  generate-bindings:
+    name: Generate C# Bindings
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install clang
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang
+    
+    - name: Generate bindings
+      run: |
+        cd bindgen
+        python3 gen.py
+        rm -rf *.json
+        rm -rf __pycache__
+    
+    - name: Check for binding changes
+      id: check_changes
+      run: |
+        if git diff --quiet src/; then
+          echo "No binding changes detected"
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "Binding changes detected"
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit binding changes
+      if: steps.check_changes.outputs.changed == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git add src/
+        
+        git commit -m "Auto-update C# bindings [skip ci]
+        
+        Generated from commit: ${{ github.sha }}
+        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        
+        Bindings regenerated from Sokol C headers"
+        
+        git push origin main
+
   build-windows:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
@@ -329,17 +380,62 @@ jobs:
         path: libs/emscripten/**/*
         retention-days: 30
 
-  # Generate C# bindings from C headers
-  # TODO: Fix binding generation in GitHub Actions - currently disabled
-  # Issue: clang cannot find header files when running in CI environment  
-  # Works locally but fails in GitHub Actions due to working directory issues
-  # Need to investigate why clang subprocess doesn't respect working directory
-  # For now, bindings must be generated and committed manually when sokol headers change
+  # Generate C# bindings from C headers (now enabled in CI)
+  generate-bindings:
+    name: Generate C# Bindings
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install clang
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang
+    
+    - name: Generate bindings
+      run: |
+        cd bindgen
+        python3 gen.py
+        rm -rf *.json
+        rm -rf __pycache__
+    
+    - name: Check for binding changes
+      id: check_changes
+      run: |
+        if git diff --quiet src/; then
+          echo "No binding changes detected"
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "Binding changes detected"
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit binding changes
+      if: steps.check_changes.outputs.changed == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git add src/
+        
+        git commit -m "Auto-update C# bindings [skip ci]
+        
+        Generated from commit: ${{ github.sha }}
+        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        
+        Bindings regenerated from Sokol C headers"
+        
+        git push origin main
   
   # Combine all artifacts into a single release
   combine-artifacts:
     name: Combine All Libraries
-    needs: [build-windows, build-macos, build-linux, build-web]
+    needs: [generate-bindings, build-windows, build-macos, build-linux, build-web]
     runs-on: ubuntu-latest
     
     steps:
