@@ -81,6 +81,13 @@ extern "C"
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
+// Fix X11 macro conflicts on Linux
+// X11 headers (included by sokol_app.h on Linux) define a 'Status' macro
+// that conflicts with the 'Status' member in ImTextureData struct
+#if defined(__linux__) && defined(Status)
+    #undef Status
+#endif
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui/cimgui.h"
 #ifndef ImTextureID_Invalid

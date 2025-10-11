@@ -214,6 +214,12 @@ The CMakeLists.txt automatically handles compiler-specific flags:
 - GCC uses its own compatible warning flags
 - This is handled automatically by detecting `CMAKE_C_COMPILER_ID`
 
+#### X11 Macro Conflicts on Linux
+On Linux, X11 headers define a `Status` macro that conflicts with struct members in cimgui:
+- The `ext/sokol.c` file undefines the X11 `Status` macro before including cimgui
+- This is done conditionally only on Linux (`#if defined(__linux__)`)
+- Prevents compilation errors without affecting X11 functionality
+
 #### macOS Universal Binaries
 To create a universal binary (both arm64 and x86_64):
 ```bash
