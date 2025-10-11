@@ -2,4 +2,4 @@
 #define CGLTF_IMPLEMENTATION
 #endif
 #include "sokol_defines.h"
-#include "../ext/cgltf/cgltf.h"
+#include "ext/cgltf/cgltf.h"

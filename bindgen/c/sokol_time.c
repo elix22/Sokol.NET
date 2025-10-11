@@ -2,4 +2,4 @@
 #define SOKOL_TIME_IMPL
 #endif
 #include "sokol_defines.h"
-#include "../ext/sokol/sokol_time.h"
+#include "ext/sokol/sokol_time.h"

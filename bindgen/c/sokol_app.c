@@ -2,4 +2,4 @@
 #define SOKOL_APP_IMPL
 #endif
 #include "sokol_defines.h"
-#include "../ext/sokol/sokol_app.h"
+#include "ext/sokol/sokol_app.h"

@@ -203,89 +203,12 @@ jobs:
         retention-days: 30
 
   # Generate C# bindings from C headers
-  generate-bindings:
-    name: Generate C# Bindings
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-        fetch-depth: 0
-    
-    - name: Initialize submodules
-      run: |
-        git submodule update --init --recursive --force
-    
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    
-    - name: Install dependencies
-      run: |
-        pip install setuptools
-    
-    - name: Verify submodules
-      run: |
-        echo "Checking submodule status..."
-        git submodule status
-        echo "Verifying ext/sokol directory..."
-        ls -la ext/sokol/ | head -20
-    
-    - name: Generate bindings
-      run: |
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "🔄 Generating C# bindings from C headers..."
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        ./scripts/generate-bindings.sh
-        echo "✅ Bindings generated successfully"
-    
-    - name: Check for binding changes and commit
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Check if there are any changes to generated bindings
-        echo "Checking for changes in generated bindings..."
-        
-        if git diff --quiet src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h; then
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ No binding changes detected - skipping commit"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          exit 0
-        fi
-        
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "📝 Binding changes detected - committing..."
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        
-        # Show what changed
-        echo "Changed files:"
-        git diff --name-only src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h
-        
-        # Stage changes
-        git add src/sokol/generated/
-        git add ext/sokol_csharp_internal_wrappers.h
-        
-        # Commit and push
-        git commit -m "Auto-update C# bindings [skip ci]
-        
-        Generated from commit: ${{ github.sha }}
-        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        
-        Changes:
-        $(git diff --stat HEAD~1 src/sokol/generated/ ext/sokol_csharp_internal_wrappers.h)"
-        
-        git push origin main
-        
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ Bindings committed and pushed successfully"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
+  # TODO: Fix binding generation in GitHub Actions - currently disabled
+  # Issue: clang cannot find header files when running in CI environment  
+  # Works locally but fails in GitHub Actions due to working directory issues
+  # Need to investigate why clang subprocess doesn't respect working directory
+  # For now, bindings must be generated and committed manually when sokol headers change
+  
   # Combine all artifacts into a single release
   combine-artifacts:
     name: Combine All Libraries

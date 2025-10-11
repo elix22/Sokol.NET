@@ -8,6 +8,6 @@
 #include CIMGUI_HEADER_PATH
 #endif
 #include "sokol_defines.h"
-#include "../ext/sokol/sokol_app.h"
-#include "../ext/sokol/sokol_gfx.h"
-#include "../ext/sokol/util/sokol_imgui.h"
+#include "ext/sokol/sokol_app.h"
+#include "ext/sokol/sokol_gfx.h"
+#include "ext/sokol/util/sokol_imgui.h"
