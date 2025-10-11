@@ -16,21 +16,8 @@ jobs:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
     strategy:
-      matr        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Check if source files that affect library builds have changed
-        echo "Checking if source files changed..."
-        SOURCE_FILES_CHANGED=false
-        
-        # Get the previous commit
-        PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
-        
-        if [ -z "$PREVIOUS_COMMIT" ]; then
-          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
-          SOURCE_FILES_CHANGED=true
-        elsearch: [x64]  # Can add Win32, ARM64 if needed
+      matrix:
+        arch: [x64]  # Can add Win32, ARM64 if needed
     
     steps:
     - name: Checkout repository
