@@ -445,7 +445,6 @@ jobs:
             CMakeLists.txt
             Directory.Build.props
             *.targets
-            .github/workflows/build-libraries.yml
           "
           
           echo "Files changed in this commit:"
