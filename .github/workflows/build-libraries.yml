@@ -378,10 +378,24 @@ jobs:
         # Create backup of existing libraries for comparison
         echo "Backing up existing libraries for comparison..."
         mkdir -p ../old-libs
-        if [ -d "libs/windows" ]; then cp -r libs/windows ../old-libs/ 2>/dev/null || true; fi
-        if [ -d "libs/macos" ]; then cp -r libs/macos ../old-libs/ 2>/dev/null || true; fi
-        if [ -d "libs/linux" ]; then cp -r libs/linux ../old-libs/ 2>/dev/null || true; fi
-        if [ -d "libs/emscripten" ]; then cp -r libs/emscripten ../old-libs/ 2>/dev/null || true; fi
+        if [ -d "libs/windows" ]; then 
+          echo "  Backing up libs/windows..."
+          cp -r libs/windows ../old-libs/ 2>/dev/null || true
+        fi
+        if [ -d "libs/macos" ]; then 
+          echo "  Backing up libs/macos..."
+          cp -r libs/macos ../old-libs/ 2>/dev/null || true
+        fi
+        if [ -d "libs/linux" ]; then 
+          echo "  Backing up libs/linux..."
+          cp -r libs/linux ../old-libs/ 2>/dev/null || true
+        fi
+        if [ -d "libs/emscripten" ]; then 
+          echo "  Backing up libs/emscripten..."
+          cp -r libs/emscripten ../old-libs/ 2>/dev/null || true
+        fi
+        echo "Backup complete. Contents of ../old-libs:"
+        ls -la ../old-libs/ || echo "No old-libs directory"
         
         # Remove old libraries (if they exist)
         rm -rf libs/windows libs/macos libs/linux libs/emscripten
@@ -409,20 +423,25 @@ jobs:
             echo "Checking $platform..."
             
             if [ ! -d "../old-libs/$platform" ]; then
-              echo "  - $platform: New platform detected"
+              echo "  - $platform: New platform detected (../old-libs/$platform doesn't exist)"
               CHANGES_DETECTED=true
               return
             fi
           
           # Compare using checksums (handles binary files correctly)
+          echo "  - Computing OLD_HASH for ../old-libs/$platform..."
           OLD_HASH=$(find ../old-libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+          echo "  - OLD_HASH: $OLD_HASH"
+          
+          echo "  - Computing NEW_HASH for libs/$platform..."
           NEW_HASH=$(find libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+          echo "  - NEW_HASH: $NEW_HASH"
           
           if [ "$OLD_HASH" != "$NEW_HASH" ]; then
-            echo "  - $platform: Changes detected"
+            echo "  - $platform: Changes detected (hashes differ)"
             CHANGES_DETECTED=true
           else
-            echo "  - $platform: No changes"
+            echo "  - $platform: No changes (hashes match)"
           fi
         }
         

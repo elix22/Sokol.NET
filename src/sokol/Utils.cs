@@ -10,7 +10,6 @@ using static Sokol.SG.sg_vertex_format;
 using static Sokol.SG.sg_index_type;
 using static Sokol.SG.sg_cull_mode;
 using static Sokol.SG.sg_compare_func;
-using static Sokol.SSpine;
 using System.Text;
 using static Sokol.CGltf;
 
@@ -191,16 +190,6 @@ namespace Sokol
             int totalBytes = Marshal.SizeOf<T>() * count;
             byte[] byteBuffer = new byte[totalBytes];
             return MemoryMarshal.Cast<byte, T>(byteBuffer.AsSpan());
-        }
-
-        public static string String(this sspine_string str)
-        {
-            byte[] data = new byte[str.len];
-            for (int i = 0; i < str.len; i++)
-            {
-                data[i] = (byte)str.cstr[i];
-            }
-            return Encoding.UTF8.GetString(data);
         }
 
         public static string String(this nint ptr)

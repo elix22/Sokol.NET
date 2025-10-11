@@ -163,7 +163,8 @@ def clang(csrc_path, with_comments=False):
     cmd = [compiler]
     if std_flag:
         cmd.append(std_flag)
-    cmd += ['-Xclang', '-ast-dump=json', "-c", csrc_path]
+    # Add include path for parent directory (needed to find ../ext/sokol/*.h)
+    cmd += ['-I..', '-Xclang', '-ast-dump=json', "-c", csrc_path]
     if with_comments:
         cmd.append('-fparse-all-comments')
     return subprocess.check_output(cmd)
