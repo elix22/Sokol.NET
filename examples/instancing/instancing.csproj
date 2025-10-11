@@ -116,6 +116,26 @@
   </Target>
 
 
+  <Target Name="CopyCustomContentLinux" AfterTargets="AfterBuild" Condition="'$(IsLinux)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishLinux" AfterTargets="Publish" Condition="'$(IsLinux)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
   <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
       <PropertyGroup>
           <BuiltLibrary>$(PublishDir)/$(LibraryName).so</BuiltLibrary>
