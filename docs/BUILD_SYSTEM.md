@@ -203,9 +203,35 @@ If a build fails locally or in CI:
 ### Architecture-specific Issues
 
 #### Linux ARM64 Cross-compilation
-If cross-compilation fails, install the cross-compiler tools:
+If cross-compilation fails, install the cross-compiler tools and ARM64 libraries:
 ```bash
+# Install cross-compiler
 sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+# Add ARM64 architecture
+sudo dpkg --add-architecture arm64
+sudo apt-get update
+
+# Install ARM64 development libraries
+sudo apt-get install -y \
+  libx11-dev:arm64 \
+  libxcursor-dev:arm64 \
+  libxi-dev:arm64 \
+  libasound2-dev:arm64 \
+  libgl1-mesa-dev:arm64
+```
+
+Then build with CMake cross-compilation flags:
+```bash
+cmake ../ext \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+  -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+  -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+  -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+  -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
 ```
 
 #### GCC vs Clang Compiler Differences

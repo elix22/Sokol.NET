@@ -134,6 +134,21 @@ jobs:
           libgl1-mesa-dev \
           ${{ matrix.packages }}
     
+    - name: Install ARM64 cross-compilation libraries
+      if: matrix.arch == 'aarch64'
+      run: |
+        # Add arm64 architecture for cross-compilation
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        
+        # Install ARM64 development libraries
+        sudo apt-get install -y \
+          libx11-dev:arm64 \
+          libxcursor-dev:arm64 \
+          libxi-dev:arm64 \
+          libasound2-dev:arm64 \
+          libgl1-mesa-dev:arm64
+    
     - name: Configure and Build (x86_64)
       if: matrix.arch == 'x86_64'
       run: |
@@ -164,7 +179,13 @@ jobs:
           -DCMAKE_SYSTEM_NAME=Linux \
           -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
           -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+          -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+          -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+          -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+          -DCMAKE_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu \
+          -DCMAKE_INCLUDE_PATH=/usr/include/aarch64-linux-gnu
         cmake --build . --config Debug
         mkdir -p ../libs/linux/${{ matrix.arch }}/debug
         cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
@@ -176,7 +197,13 @@ jobs:
           -DCMAKE_SYSTEM_NAME=Linux \
           -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
           -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+          -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+          -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+          -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+          -DCMAKE_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu \
+          -DCMAKE_INCLUDE_PATH=/usr/include/aarch64-linux-gnu
         cmake --build . --config Release
         mkdir -p ../libs/linux/${{ matrix.arch }}/release
         cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/

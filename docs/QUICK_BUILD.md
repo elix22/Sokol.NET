@@ -111,11 +111,19 @@ cmake ../ext -DCMAKE_OSX_ARCHITECTURES=arm64  # or x86_64
 
 ### Cross-compile for ARM64 (Linux)
 ```bash
+# First install ARM64 cross-compilation tools and libraries
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+sudo dpkg --add-architecture arm64
+sudo apt-get update
+sudo apt-get install libx11-dev:arm64 libxcursor-dev:arm64 libxi-dev:arm64 libasound2-dev:arm64 libgl1-mesa-dev:arm64
+
+# Then configure and build
 cmake ../ext \
   -DCMAKE_SYSTEM_NAME=Linux \
   -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
   -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+  -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu
 ```
 
 ## 🧹 Clean Build
