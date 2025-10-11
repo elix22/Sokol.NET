@@ -208,6 +208,12 @@ If cross-compilation fails, install the cross-compiler tools:
 sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 ```
 
+#### GCC vs Clang Compiler Differences
+The CMakeLists.txt automatically handles compiler-specific flags:
+- Clang-only flags (like `-Wincompatible-pointer-types-discards-qualifiers`) are only applied when using Clang
+- GCC uses its own compatible warning flags
+- This is handled automatically by detecting `CMAKE_C_COMPILER_ID`
+
 #### macOS Universal Binaries
 To create a universal binary (both arm64 and x86_64):
 ```bash

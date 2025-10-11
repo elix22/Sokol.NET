@@ -73,7 +73,8 @@ endif()
 
 set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
 
-if (NOT MSVC)
+# Add Clang-specific warning flags (not supported by GCC)
+if (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-qualifiers)
 endif()
 
