@@ -1,15 +1,23 @@
 # Sokol Library Build System
 
-This directory contains scripts and GitHub Actions workflows for building the sokol native libraries across multiple platforms.
+This directory contains scripts and G#### Linux
+- Architecture: x86_64
+- Runner: ubuntu-latest
+- Compiler: GCC
+- Dependencies: X11, XCursor, Xi, ALSA, Mesa GL
+- Output: .so files
+- Note: ARM64 builds should be done natively on ARM64 hardwareActions workflows for building the sokol native libraries across multiple platforms.
 
 ## Supported Platforms
 
 - **Windows**: x64 (Debug & Release)
 - **macOS**: arm64, x86_64 (Debug & Release)
-- **Linux**: x86_64, aarch64 (Debug & Release)
+- **Linux**: x86_64 (Debug & Release)
 - **Web (Emscripten)**: x86 (Debug & Release)
 
 > **Note**: Android and iOS libraries are compiled on-the-fly during project build and are not included in the CI/CD pipeline.
+
+> **Note**: Linux ARM64 (aarch64) is not included in CI/CD due to cross-compilation complexity. ARM64 Linux builds should be done natively on ARM64 hardware if needed.
 
 ## Local Build Scripts
 
@@ -84,7 +92,6 @@ The workflow produces the following artifacts:
    - `macos-arm64`
    - `macos-x86_64`
    - `linux-x86_64`
-   - `linux-aarch64`
    - `emscripten-x86`
 
 2. **Combined artifact** (90-day retention):
@@ -123,10 +130,7 @@ libs/
 │       ├── debug/libsokol.dylib
 │       └── release/libsokol.dylib
 ├── linux/
-│   ├── x86_64/
-│   │   ├── debug/libsokol.so
-│   │   └── release/libsokol.so
-│   └── aarch64/
+│   └── x86_64/
 │       ├── debug/libsokol.so
 │       └── release/libsokol.so
 └── emscripten/
@@ -202,37 +206,21 @@ If a build fails locally or in CI:
 
 ### Architecture-specific Issues
 
-#### Linux ARM64 Cross-compilation
-If cross-compilation fails, install the cross-compiler tools and ARM64 libraries:
+#### Linux ARM64 (Not in CI/CD)
+ARM64 Linux builds are **not included in the CI/CD pipeline** due to cross-compilation complexity and repository limitations. 
+
+**For ARM64 Linux builds:**
+- Build natively on ARM64 hardware (e.g., Raspberry Pi, AWS Graviton)
+- Or use QEMU user-mode emulation for cross-compilation locally
+
+**Native ARM64 build (recommended):**
 ```bash
-# Install cross-compiler
-sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-# Add ARM64 architecture
-sudo dpkg --add-architecture arm64
-sudo apt-get update
-
-# Install ARM64 development libraries
-sudo apt-get install -y \
-  libx11-dev:arm64 \
-  libxcursor-dev:arm64 \
-  libxi-dev:arm64 \
-  libasound2-dev:arm64 \
-  libgl1-mesa-dev:arm64
+# On ARM64 Linux machine
+./scripts/build-linux-library.sh
 ```
 
-Then build with CMake cross-compilation flags:
-```bash
-cmake ../ext \
-  -DCMAKE_SYSTEM_NAME=Linux \
-  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
-  -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
-  -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-  -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-  -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-```
+**Cross-compilation (advanced, may have issues):**
+Cross-compiling from x86_64 to ARM64 requires multi-arch setup which is unreliable on GitHub Actions. If you need to cross-compile locally, you can attempt it at your own risk.
 
 #### GCC vs Clang Compiler Differences
 The CMakeLists.txt automatically handles compiler-specific flags:
