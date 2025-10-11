@@ -1,0 +1,307 @@
+name: Build Sokol Libraries
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build-windows:
+    name: Build Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64]  # Can add Win32, ARM64 if needed
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    
+    - name: Configure CMake
+      run: |
+        mkdir build-windows
+        cd build-windows
+        cmake ../ext -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
+    
+    - name: Build Debug
+      run: |
+        cd build-windows
+        cmake --build . --config Debug
+    
+    - name: Build Release
+      run: |
+        cd build-windows
+        cmake --build . --config Release
+    
+    - name: Create output directories
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force "libs/windows/${{ matrix.arch }}/debug" | Out-Null
+        New-Item -ItemType Directory -Force "libs/windows/${{ matrix.arch }}/release" | Out-Null
+    
+    - name: Copy artifacts
+      shell: pwsh
+      run: |
+        Copy-Item -Force build-windows/Debug/sokol.dll "libs/windows/${{ matrix.arch }}/debug/"
+        Copy-Item -Force build-windows/Debug/sokol.lib "libs/windows/${{ matrix.arch }}/debug/"
+        Copy-Item -Force build-windows/Release/sokol.dll "libs/windows/${{ matrix.arch }}/release/"
+        Copy-Item -Force build-windows/Release/sokol.lib "libs/windows/${{ matrix.arch }}/release/"
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-${{ matrix.arch }}
+        path: libs/windows/${{ matrix.arch }}/**/*
+        retention-days: 30
+
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    
+    - name: Configure and Build
+      run: |
+        mkdir build-macos-${{ matrix.arch }}
+        cd build-macos-${{ matrix.arch }}
+        
+        # Configure for specific architecture
+        cmake ../ext -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Debug
+        cmake --build . --config Debug
+        
+        # Create output directories
+        mkdir -p ../libs/macos/${{ matrix.arch }}/debug
+        cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/debug/
+        
+        # Build Release
+        cmake ../ext -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release
+        cmake --build . --config Release
+        
+        mkdir -p ../libs/macos/${{ matrix.arch }}/release
+        cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/release/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-${{ matrix.arch }}
+        path: libs/macos/${{ matrix.arch }}/**/*
+        retention-days: 30
+
+  build-linux:
+    name: Build Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            packages: ""
+          - arch: aarch64
+            packages: "gcc-aarch64-linux-gnu g++-aarch64-linux-gnu"
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libx11-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libasound2-dev \
+          libgl1-mesa-dev \
+          ${{ matrix.packages }}
+    
+    - name: Configure and Build (x86_64)
+      if: matrix.arch == 'x86_64'
+      run: |
+        mkdir build-linux
+        cd build-linux
+        
+        # Build Debug
+        cmake ../ext -DCMAKE_BUILD_TYPE=Debug
+        cmake --build . --config Debug
+        mkdir -p ../libs/linux/${{ matrix.arch }}/debug
+        cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
+        
+        # Build Release
+        cmake ../ext -DCMAKE_BUILD_TYPE=Release
+        cmake --build . --config Release
+        mkdir -p ../libs/linux/${{ matrix.arch }}/release
+        cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/
+    
+    - name: Configure and Build (aarch64)
+      if: matrix.arch == 'aarch64'
+      run: |
+        mkdir build-linux
+        cd build-linux
+        
+        # Build Debug with cross-compilation
+        cmake ../ext \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+        cmake --build . --config Debug
+        mkdir -p ../libs/linux/${{ matrix.arch }}/debug
+        cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
+        
+        # Clean and build Release
+        rm -rf *
+        cmake ../ext \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+        cmake --build . --config Release
+        mkdir -p ../libs/linux/${{ matrix.arch }}/release
+        cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-${{ matrix.arch }}
+        path: libs/linux/${{ matrix.arch }}/**/*
+        retention-days: 30
+
+  build-web:
+    name: Build Web (Emscripten)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: '3.1.34'
+    
+    - name: Build Debug
+      run: |
+        mkdir build-emscripten-debug
+        cd build-emscripten-debug
+        emcmake cmake ../ext -DCMAKE_BUILD_TYPE=Debug
+        cmake --build .
+        mkdir -p ../libs/emscripten/x86/debug
+        cp sokol.a ../libs/emscripten/x86/debug/
+    
+    - name: Build Release
+      run: |
+        mkdir build-emscripten-release
+        cd build-emscripten-release
+        emcmake cmake ../ext -DCMAKE_BUILD_TYPE=Release
+        cmake --build .
+        mkdir -p ../libs/emscripten/x86/release
+        cp sokol.a ../libs/emscripten/x86/release/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: emscripten-x86
+        path: libs/emscripten/**/*
+        retention-days: 30
+
+  # Combine all artifacts into a single release
+  combine-artifacts:
+    name: Combine All Libraries
+    needs: [build-windows, build-macos, build-linux, build-web]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: libs
+    
+    - name: Reorganize artifacts
+      run: |
+        # Reorganize the downloaded artifacts into proper structure
+        mkdir -p combined-libs
+        
+        # Windows
+        if [ -d "libs/windows-x64" ]; then
+          mkdir -p combined-libs/windows/x64
+          cp -r libs/windows-x64/* combined-libs/windows/x64/ || true
+        fi
+        
+        # macOS
+        if [ -d "libs/macos-arm64" ]; then
+          mkdir -p combined-libs/macos/arm64
+          cp -r libs/macos-arm64/* combined-libs/macos/arm64/ || true
+        fi
+        if [ -d "libs/macos-x86_64" ]; then
+          mkdir -p combined-libs/macos/x86_64
+          cp -r libs/macos-x86_64/* combined-libs/macos/x86_64/ || true
+        fi
+        
+        # Linux
+        if [ -d "libs/linux-x86_64" ]; then
+          mkdir -p combined-libs/linux/x86_64
+          cp -r libs/linux-x86_64/* combined-libs/linux/x86_64/ || true
+        fi
+        if [ -d "libs/linux-aarch64" ]; then
+          mkdir -p combined-libs/linux/aarch64
+          cp -r libs/linux-aarch64/* combined-libs/linux/aarch64/ || true
+        fi
+        
+        # Emscripten
+        if [ -d "libs/emscripten-x86" ]; then
+          mkdir -p combined-libs/emscripten
+          cp -r libs/emscripten-x86/* combined-libs/emscripten/ || true
+        fi
+        
+        # Show structure
+        echo "Combined libraries structure:"
+        find combined-libs -type f
+    
+    - name: Upload combined artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sokol-libraries-all-platforms
+        path: combined-libs/**/*
+        retention-days: 90
+    
+    - name: Create release archive
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd combined-libs
+        tar -czf ../sokol-libraries.tar.gz *
+        cd ..
+        zip -r sokol-libraries.zip combined-libs/*
+    
+    - name: Upload release archives
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: actions/upload-artifact@v4
+      with:
+        name: sokol-libraries-archives
+        path: |
+          sokol-libraries.tar.gz
+          sokol-libraries.zip
+        retention-days: 90
