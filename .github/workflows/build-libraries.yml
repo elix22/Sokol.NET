@@ -479,60 +479,6 @@ jobs:
         # Ensure libs directory exists
         mkdir -p libs
         
-        # Copy new libraries
-        cp -r ../combined-libs/* libs/
-        
-        # Check if source files that affect library builds have changed
-        echo "Checking if source files changed..."
-        SOURCE_FILES_CHANGED=false
-        
-        # Get the previous commit
-        PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
-        
-        if [ -z "$PREVIOUS_COMMIT" ]; then
-          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
-          SOURCE_FILES_CHANGED=true
-        else
-          # Check if any files that affect the library build changed
-          CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT HEAD)
-          
-          # Files that affect library builds
-          BUILD_AFFECTING_FILES="
-            ext/
-            src/sokol/
-            bindgen/
-            scripts/build-*.sh
-            CMakeLists.txt
-            Directory.Build.props
-            *.targets
-            .github/workflows/build-libraries.yml
-          "
-          
-          echo "Files changed in this commit:"
-          echo "$CHANGED_FILES"
-          
-          # Check if any changed files affect the build
-          while IFS= read -r changed_file; do
-            for pattern in $BUILD_AFFECTING_FILES; do
-              if [[ "$changed_file" == $pattern* ]] || [[ "$changed_file" == *"$pattern" ]]; then
-                echo "Build-affecting file changed: $changed_file"
-                SOURCE_FILES_CHANGED=true
-                break 2
-              fi
-            done
-          done <<< "$CHANGED_FILES"
-          
-          if [ "$SOURCE_FILES_CHANGED" = false ]; then
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "⏭️  No source files affecting library builds changed - skipping library update"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            exit 0
-          fi
-        else
-          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
-          SOURCE_FILES_CHANGED=true
-        fi
-        
         # Copy new libraries (source files changed, so update libraries)
         cp -r ../combined-libs/* libs/
         
