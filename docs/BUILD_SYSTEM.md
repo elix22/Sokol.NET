@@ -80,11 +80,21 @@ The project includes automated builds via GitHub Actions defined in `.github/wor
 ### Auto-commit to Repository
 When building from the `main` branch (push event), the workflow will:
 1. Build all platform libraries
-2. Automatically commit them back to the `libs/` folder
-3. Push to `main` branch with commit message `[skip ci]` to prevent infinite loops
-4. Include build information (commit SHA, workflow run link, library sizes)
+2. Compare new libraries with existing ones using SHA256 checksums
+3. Only commit if binaries have changed (prevents spam commits)
+4. Push to `main` branch with commit message `[skip ci]` to prevent infinite loops
+5. Include build information (commit SHA, workflow run link, library sizes)
 
-This ensures the repository always has the latest pre-built binaries available for users to clone and use immediately.
+**Requirements for Private Repositories:**
+The workflow requires `contents: write` permission to push commits back to the repository. This is configured in the workflow file and works automatically for both public and private repositories.
+
+**Smart Change Detection:**
+- On **first run**: Detects no existing libraries and commits everything
+- On **subsequent runs**: Compares SHA256 checksums of each platform's libraries
+- Only commits when **native code changes** affect the binaries
+- Skips commit when only **documentation** or **C# code** changes
+
+This ensures the repository always has the latest pre-built binaries available for users to clone and use immediately, without cluttering the commit history.
 
 ### Build Matrix
 
@@ -341,6 +351,21 @@ lipo -create \
   libs/macos/x86_64/release/libsokol.dylib \
   -output libs/macos/universal/libsokol.dylib
 ```
+
+#### GitHub Actions: 403 Error on Private Repositories
+If you see this error when the workflow tries to push:
+```
+remote: Write access to repository not granted.
+fatal: unable to access 'https://github.com/...': The requested URL returned error: 403
+```
+
+**Solution:** Ensure the workflow has the `contents: write` permission. This is already configured in `.github/workflows/build-libraries.yml`:
+```yaml
+permissions:
+  contents: write  # Allow workflow to push commits
+```
+
+This permission is **required for private repositories** and works automatically once added. The workflow uses the built-in `GITHUB_TOKEN` which is automatically provided by GitHub Actions.
 
 ## Contributing
 

@@ -7,6 +7,10 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual triggering
 
+# Required permissions for private repositories
+permissions:
+  contents: write  # Allow workflow to push commits back to repository
+
 jobs:
   build-windows:
     name: Build Windows (${{ matrix.arch }})
