@@ -16,8 +16,21 @@ jobs:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
     strategy:
-      matrix:
-        arch: [x64]  # Can add Win32, ARM64 if needed
+      matr        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Check if source files that affect library builds have changed
+        echo "Checking if source files changed..."
+        SOURCE_FILES_CHANGED=false
+        
+        # Get the previous commit
+        PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        
+        if [ -z "$PREVIOUS_COMMIT" ]; then
+          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
+          SOURCE_FILES_CHANGED=true
+        elsearch: [x64]  # Can add Win32, ARM64 if needed
     
     steps:
     - name: Checkout repository
@@ -418,7 +431,7 @@ jobs:
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
         # Checkout the repository (artifacts download doesn't include repo files)
-        git clone --depth 1 --branch main https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        git clone --depth 2 --branch main https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
         cd repo
         
         # Configure git
@@ -469,7 +482,7 @@ jobs:
             exit 0
           fi
         else
-          echo "No previous commit found (first commit?) - proceeding with library update"
+          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
           SOURCE_FILES_CHANGED=true
         fi
         
@@ -489,7 +502,10 @@ jobs:
         # Get the previous commit
         PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
         
-        if [ -n "$PREVIOUS_COMMIT" ]; then
+        if [ -z "$PREVIOUS_COMMIT" ]; then
+          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
+          SOURCE_FILES_CHANGED=true
+        else
           # Check if any files that affect the library build changed
           CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT HEAD)
           
@@ -526,7 +542,7 @@ jobs:
             exit 0
           fi
         else
-          echo "No previous commit found (first commit?) - proceeding with library update"
+          echo "Cannot determine previous commit (possibly first commit or shallow clone) - proceeding with library update"
           SOURCE_FILES_CHANGED=true
         fi
         
