@@ -53,10 +53,53 @@ jobs:
     - name: Copy artifacts
       shell: pwsh
       run: |
-        Copy-Item -Force build-windows/Debug/sokol.dll "libs/windows/${{ matrix.arch }}/debug/"
-        Copy-Item -Force build-windows/Debug/sokol.lib "libs/windows/${{ matrix.arch }}/debug/"
-        Copy-Item -Force build-windows/Release/sokol.dll "libs/windows/${{ matrix.arch }}/release/"
-        Copy-Item -Force build-windows/Release/sokol.lib "libs/windows/${{ matrix.arch }}/release/"
+        $debugDll = "build-windows/Debug/sokol.dll"
+        $debugLib = "build-windows/Debug/sokol.lib"
+        $releaseDll = "build-windows/Release/sokol.dll"
+        $releaseLib = "build-windows/Release/sokol.lib"
+        
+        $debugDestDir = "libs/windows/${{ matrix.arch }}/debug"
+        $releaseDestDir = "libs/windows/${{ matrix.arch }}/release"
+        
+        # Function to check if file changed
+        function ShouldCopyFile($sourcePath, $destPath) {
+          if (!(Test-Path $sourcePath)) {
+            Write-Host "Source file $sourcePath does not exist"
+            return $false
+          }
+          
+          if (!(Test-Path $destPath)) {
+            Write-Host "Destination file $destPath does not exist - copying"
+            return $true
+          }
+          
+          $sourceHash = Get-FileHash $sourcePath -Algorithm SHA256
+          $destHash = Get-FileHash $destPath -Algorithm SHA256
+          
+          if ($sourceHash.Hash -ne $destHash.Hash) {
+            Write-Host "File $destPath changed (SHA256 differs) - copying"
+            return $true
+          } else {
+            Write-Host "File $destPath unchanged - skipping copy"
+            return $false
+          }
+        }
+        
+        # Copy debug files if changed
+        if (ShouldCopyFile $debugDll "$debugDestDir/sokol.dll") {
+          Copy-Item -Force $debugDll $debugDestDir/
+        }
+        if (ShouldCopyFile $debugLib "$debugDestDir/sokol.lib") {
+          Copy-Item -Force $debugLib $debugDestDir/
+        }
+        
+        # Copy release files if changed
+        if (ShouldCopyFile $releaseDll "$releaseDestDir/sokol.dll") {
+          Copy-Item -Force $releaseDll $releaseDestDir/
+        }
+        if (ShouldCopyFile $releaseLib "$releaseDestDir/sokol.lib") {
+          Copy-Item -Force $releaseLib $releaseDestDir/
+        }
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -92,14 +135,42 @@ jobs:
         
         # Create output directories
         mkdir -p ../libs/macos/${{ matrix.arch }}/debug
-        cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/debug/
+        
+        # Check if debug library changed before copying
+        if [ -f "../libs/macos/${{ matrix.arch }}/debug/libsokol.dylib" ]; then
+          OLD_DEBUG_HASH=$(sha256sum "../libs/macos/${{ matrix.arch }}/debug/libsokol.dylib" | cut -d' ' -f1)
+          NEW_DEBUG_HASH=$(sha256sum "libsokol.dylib" | cut -d' ' -f1)
+          if [ "$OLD_DEBUG_HASH" = "$NEW_DEBUG_HASH" ]; then
+            echo "Debug library unchanged - skipping copy"
+          else
+            echo "Debug library changed - copying"
+            cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/debug/
+          fi
+        else
+          echo "Debug library doesn't exist - copying"
+          cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/debug/
+        fi
         
         # Build Release
         cmake ../ext -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release
         cmake --build . --config Release
         
         mkdir -p ../libs/macos/${{ matrix.arch }}/release
-        cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/release/
+        
+        # Check if release library changed before copying
+        if [ -f "../libs/macos/${{ matrix.arch }}/release/libsokol.dylib" ]; then
+          OLD_RELEASE_HASH=$(sha256sum "../libs/macos/${{ matrix.arch }}/release/libsokol.dylib" | cut -d' ' -f1)
+          NEW_RELEASE_HASH=$(sha256sum "libsokol.dylib" | cut -d' ' -f1)
+          if [ "$OLD_RELEASE_HASH" = "$NEW_RELEASE_HASH" ]; then
+            echo "Release library unchanged - skipping copy"
+          else
+            echo "Release library changed - copying"
+            cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/release/
+          fi
+        else
+          echo "Release library doesn't exist - copying"
+          cp libsokol.dylib ../libs/macos/${{ matrix.arch }}/release/
+        fi
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -147,13 +218,41 @@ jobs:
         cmake ../ext -DCMAKE_BUILD_TYPE=Debug
         cmake --build . --config Debug
         mkdir -p ../libs/linux/${{ matrix.arch }}/debug
-        cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
+        
+        # Check if debug library changed before copying
+        if [ -f "../libs/linux/${{ matrix.arch }}/debug/libsokol.so" ]; then
+          OLD_DEBUG_HASH=$(sha256sum "../libs/linux/${{ matrix.arch }}/debug/libsokol.so" | cut -d' ' -f1)
+          NEW_DEBUG_HASH=$(sha256sum "libsokol.so" | cut -d' ' -f1)
+          if [ "$OLD_DEBUG_HASH" = "$NEW_DEBUG_HASH" ]; then
+            echo "Debug library unchanged - skipping copy"
+          else
+            echo "Debug library changed - copying"
+            cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
+          fi
+        else
+          echo "Debug library doesn't exist - copying"
+          cp libsokol.so ../libs/linux/${{ matrix.arch }}/debug/
+        fi
         
         # Build Release
         cmake ../ext -DCMAKE_BUILD_TYPE=Release
         cmake --build . --config Release
         mkdir -p ../libs/linux/${{ matrix.arch }}/release
-        cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/
+        
+        # Check if release library changed before copying
+        if [ -f "../libs/linux/${{ matrix.arch }}/release/libsokol.so" ]; then
+          OLD_RELEASE_HASH=$(sha256sum "../libs/linux/${{ matrix.arch }}/release/libsokol.so" | cut -d' ' -f1)
+          NEW_RELEASE_HASH=$(sha256sum "libsokol.so" | cut -d' ' -f1)
+          if [ "$OLD_RELEASE_HASH" = "$NEW_RELEASE_HASH" ]; then
+            echo "Release library unchanged - skipping copy"
+          else
+            echo "Release library changed - copying"
+            cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/
+          fi
+        else
+          echo "Release library doesn't exist - copying"
+          cp libsokol.so ../libs/linux/${{ matrix.arch }}/release/
+        fi
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -184,7 +283,21 @@ jobs:
         emcmake cmake ../ext -DCMAKE_BUILD_TYPE=Debug
         cmake --build .
         mkdir -p ../libs/emscripten/x86/debug
-        cp sokol.a ../libs/emscripten/x86/debug/
+        
+        # Check if debug library changed before copying
+        if [ -f "../libs/emscripten/x86/debug/sokol.a" ]; then
+          OLD_DEBUG_HASH=$(sha256sum "../libs/emscripten/x86/debug/sokol.a" | cut -d' ' -f1)
+          NEW_DEBUG_HASH=$(sha256sum "sokol.a" | cut -d' ' -f1)
+          if [ "$OLD_DEBUG_HASH" = "$NEW_DEBUG_HASH" ]; then
+            echo "Debug library unchanged - skipping copy"
+          else
+            echo "Debug library changed - copying"
+            cp sokol.a ../libs/emscripten/x86/debug/
+          fi
+        else
+          echo "Debug library doesn't exist - copying"
+          cp sokol.a ../libs/emscripten/x86/debug/
+        fi
     
     - name: Build Release
       run: |
@@ -193,7 +306,21 @@ jobs:
         emcmake cmake ../ext -DCMAKE_BUILD_TYPE=Release
         cmake --build .
         mkdir -p ../libs/emscripten/x86/release
-        cp sokol.a ../libs/emscripten/x86/release/
+        
+        # Check if release library changed before copying
+        if [ -f "../libs/emscripten/x86/release/sokol.a" ]; then
+          OLD_RELEASE_HASH=$(sha256sum "../libs/emscripten/x86/release/sokol.a" | cut -d' ' -f1)
+          NEW_RELEASE_HASH=$(sha256sum "sokol.a" | cut -d' ' -f1)
+          if [ "$OLD_RELEASE_HASH" = "$NEW_RELEASE_HASH" ]; then
+            echo "Release library unchanged - skipping copy"
+          else
+            echo "Release library changed - copying"
+            cp sokol.a ../libs/emscripten/x86/release/
+          fi
+        else
+          echo "Release library doesn't exist - copying"
+          cp sokol.a ../libs/emscripten/x86/release/
+        fi
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
