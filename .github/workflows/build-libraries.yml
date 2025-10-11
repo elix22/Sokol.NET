@@ -425,27 +425,53 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # Create backup of existing libraries for comparison
-        echo "Backing up existing libraries for comparison..."
-        mkdir -p ../old-libs
-        if [ -d "libs/windows" ]; then 
-          echo "  Backing up libs/windows..."
-          cp -r libs/windows ../old-libs/ 2>/dev/null || true
+                # Check if source files that affect library builds have changed
+        echo "Checking if source files changed..."
+        SOURCE_FILES_CHANGED=false
+        
+        # Get the previous commit
+        PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_COMMIT" ]; then
+          # Check if any files that affect the library build changed
+          CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT HEAD)
+          
+          # Files that affect library builds
+          BUILD_AFFECTING_FILES="
+            ext/
+            src/sokol/
+            bindgen/
+            scripts/build-*.sh
+            CMakeLists.txt
+            Directory.Build.props
+            *.targets
+            .github/workflows/build-libraries.yml
+          "
+          
+          echo "Files changed in this commit:"
+          echo "$CHANGED_FILES"
+          
+          # Check if any changed files affect the build
+          while IFS= read -r changed_file; do
+            for pattern in $BUILD_AFFECTING_FILES; do
+              if [[ "$changed_file" == $pattern* ]] || [[ "$changed_file" == *"$pattern" ]]; then
+                echo "Build-affecting file changed: $changed_file"
+                SOURCE_FILES_CHANGED=true
+                break 2
+              fi
+            done
+          done <<< "$CHANGED_FILES"
+          
+          if [ "$SOURCE_FILES_CHANGED" = false ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "⏭️  No source files affecting library builds changed - skipping library update"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 0
+          fi
+        else
+          echo "No previous commit found (first commit?) - proceeding with library update"
+          SOURCE_FILES_CHANGED=true
         fi
-        if [ -d "libs/macos" ]; then 
-          echo "  Backing up libs/macos..."
-          cp -r libs/macos ../old-libs/ 2>/dev/null || true
-        fi
-        if [ -d "libs/linux" ]; then 
-          echo "  Backing up libs/linux..."
-          cp -r libs/linux ../old-libs/ 2>/dev/null || true
-        fi
-        if [ -d "libs/emscripten" ]; then 
-          echo "  Backing up libs/emscripten..."
-          cp -r libs/emscripten ../old-libs/ 2>/dev/null || true
-        fi
-        echo "Backup complete. Contents of ../old-libs:"
-        ls -la ../old-libs/ || echo "No old-libs directory"
         
         # Remove old libraries (if they exist)
         rm -rf libs/windows libs/macos libs/linux libs/emscripten
@@ -456,78 +482,71 @@ jobs:
         # Copy new libraries
         cp -r ../combined-libs/* libs/
         
-        # Compare old and new libraries
-        echo "Comparing old and new libraries..."
-        CHANGES_DETECTED=false
+        # Check if source files that affect library builds have changed
+        echo "Checking if source files changed..."
+        SOURCE_FILES_CHANGED=false
         
-        # Check if this is the first time (no old libraries exist)
-        if [ ! -d "../old-libs" ] || [ -z "$(ls -A ../old-libs 2>/dev/null)" ]; then
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🆕 First time setup - no existing libraries found"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          CHANGES_DETECTED=true
-        else
-          # Function to compare directories using checksums
-          compare_libs() {
-            local platform=$1
-            echo "Checking $platform..."
-            
-            if [ ! -d "../old-libs/$platform" ]; then
-              echo "  - $platform: New platform detected (../old-libs/$platform doesn't exist)"
-              CHANGES_DETECTED=true
-              return
-            fi
+        # Get the previous commit
+        PREVIOUS_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_COMMIT" ]; then
+          # Check if any files that affect the library build changed
+          CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT HEAD)
           
-          # Compare using checksums (handles binary files correctly)
-          echo "  - Computing OLD_HASH for ../old-libs/$platform..."
-          OLD_HASH=$(find ../old-libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
-          echo "  - OLD_HASH: $OLD_HASH"
+          # Files that affect library builds
+          BUILD_AFFECTING_FILES="
+            ext/
+            src/sokol/
+            bindgen/
+            scripts/build-*.sh
+            CMakeLists.txt
+            Directory.Build.props
+            *.targets
+            .github/workflows/build-libraries.yml
+          "
           
-          echo "  - Computing NEW_HASH for libs/$platform..."
-          NEW_HASH=$(find libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
-          echo "  - NEW_HASH: $NEW_HASH"
+          echo "Files changed in this commit:"
+          echo "$CHANGED_FILES"
           
-          if [ "$OLD_HASH" != "$NEW_HASH" ]; then
-            echo "  - $platform: Changes detected (hashes differ)"
-            CHANGES_DETECTED=true
-          else
-            echo "  - $platform: No changes (hashes match)"
+          # Check if any changed files affect the build
+          while IFS= read -r changed_file; do
+            for pattern in $BUILD_AFFECTING_FILES; do
+              if [[ "$changed_file" == $pattern* ]] || [[ "$changed_file" == *"$pattern" ]]; then
+                echo "Build-affecting file changed: $changed_file"
+                SOURCE_FILES_CHANGED=true
+                break 2
+              fi
+            done
+          done <<< "$CHANGED_FILES"
+          
+          if [ "$SOURCE_FILES_CHANGED" = false ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "⏭️  No source files affecting library builds changed - skipping library update"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 0
           fi
-        }
-        
-          # Check each platform
-          if [ -d "libs/windows" ]; then compare_libs "windows"; fi
-          if [ -d "libs/macos" ]; then compare_libs "macos"; fi
-          if [ -d "libs/linux" ]; then compare_libs "linux"; fi
-          if [ -d "libs/emscripten" ]; then compare_libs "emscripten"; fi
+        else
+          echo "No previous commit found (first commit?) - proceeding with library update"
+          SOURCE_FILES_CHANGED=true
         fi
         
-        # Only commit if changes were detected
-        if [ "$CHANGES_DETECTED" = false ]; then
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ No library changes detected - skipping commit"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          exit 0
-        fi
+        # Copy new libraries (source files changed, so update libraries)
+        cp -r ../combined-libs/* libs/
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "📦 Library changes detected - committing..."
+        echo "📦 Source files changed - updating libraries..."
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
         # Stage changes
         git add libs/
-        
-        # Double-check git detected changes
-        if git diff --cached --quiet; then
-          echo "Git reports no changes to commit (false positive from comparison)"
-          exit 0
-        fi
         
         # Commit and push
         git commit -m "Auto-update built libraries [skip ci]
         
         Built from commit: ${{ github.sha }}
         Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        
+        Source files changed - libraries rebuilt
         
         Platform sizes:
         - Windows x64: $(du -sh libs/windows/x64 | cut -f1)
