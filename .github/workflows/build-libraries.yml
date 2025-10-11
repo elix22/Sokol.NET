@@ -211,7 +211,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Initialize submodules
+      run: |
+        git submodule update --init --recursive --force
     
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -221,6 +226,13 @@ jobs:
     - name: Install dependencies
       run: |
         pip install setuptools
+    
+    - name: Verify submodules
+      run: |
+        echo "Checking submodule status..."
+        git submodule status
+        echo "Verifying ext/sokol directory..."
+        ls -la ext/sokol/ | head -20
     
     - name: Generate bindings
       run: |
