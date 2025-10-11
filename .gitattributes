@@ -1,0 +1,44 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Binary files - treat as binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.lib binary
+*.framework binary
+
+# Archives
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.ogg binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Documents
+*.pdf binary
+
+# Prevent diff on library files (they change frequently)
+libs/**/*.dll -diff
+libs/**/*.so -diff
+libs/**/*.dylib -diff
+libs/**/*.a -diff
+libs/**/*.lib -diff

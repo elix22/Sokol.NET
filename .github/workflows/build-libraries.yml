@@ -275,3 +275,112 @@ jobs:
           sokol-libraries.tar.gz
           sokol-libraries.zip
         retention-days: 90
+    
+    - name: Commit libraries to repository
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        # Checkout the repository (artifacts download doesn't include repo files)
+        git clone --depth 1 --branch main https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create backup of existing libraries for comparison
+        echo "Backing up existing libraries for comparison..."
+        mkdir -p ../old-libs
+        if [ -d "libs/windows" ]; then cp -r libs/windows ../old-libs/ 2>/dev/null || true; fi
+        if [ -d "libs/macos" ]; then cp -r libs/macos ../old-libs/ 2>/dev/null || true; fi
+        if [ -d "libs/linux" ]; then cp -r libs/linux ../old-libs/ 2>/dev/null || true; fi
+        if [ -d "libs/emscripten" ]; then cp -r libs/emscripten ../old-libs/ 2>/dev/null || true; fi
+        
+        # Remove old libraries (if they exist)
+        rm -rf libs/windows libs/macos libs/linux libs/emscripten
+        
+        # Ensure libs directory exists
+        mkdir -p libs
+        
+        # Copy new libraries
+        cp -r ../combined-libs/* libs/
+        
+        # Compare old and new libraries
+        echo "Comparing old and new libraries..."
+        CHANGES_DETECTED=false
+        
+        # Check if this is the first time (no old libraries exist)
+        if [ ! -d "../old-libs" ] || [ -z "$(ls -A ../old-libs 2>/dev/null)" ]; then
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🆕 First time setup - no existing libraries found"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          CHANGES_DETECTED=true
+        else
+          # Function to compare directories using checksums
+          compare_libs() {
+            local platform=$1
+            echo "Checking $platform..."
+            
+            if [ ! -d "../old-libs/$platform" ]; then
+              echo "  - $platform: New platform detected"
+              CHANGES_DETECTED=true
+              return
+            fi
+          
+          # Compare using checksums (handles binary files correctly)
+          OLD_HASH=$(find ../old-libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+          NEW_HASH=$(find libs/$platform -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+          
+          if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+            echo "  - $platform: Changes detected"
+            CHANGES_DETECTED=true
+          else
+            echo "  - $platform: No changes"
+          fi
+        }
+        
+          # Check each platform
+          if [ -d "libs/windows" ]; then compare_libs "windows"; fi
+          if [ -d "libs/macos" ]; then compare_libs "macos"; fi
+          if [ -d "libs/linux" ]; then compare_libs "linux"; fi
+          if [ -d "libs/emscripten" ]; then compare_libs "emscripten"; fi
+        fi
+        
+        # Only commit if changes were detected
+        if [ "$CHANGES_DETECTED" = false ]; then
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ No library changes detected - skipping commit"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          exit 0
+        fi
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📦 Library changes detected - committing..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Stage changes
+        git add libs/
+        
+        # Double-check git detected changes
+        if git diff --cached --quiet; then
+          echo "Git reports no changes to commit (false positive from comparison)"
+          exit 0
+        fi
+        
+        # Commit and push
+        git commit -m "Auto-update built libraries [skip ci]
+        
+        Built from commit: ${{ github.sha }}
+        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        
+        Platform sizes:
+        - Windows x64: $(du -sh libs/windows/x64 | cut -f1)
+        - macOS arm64: $(du -sh libs/macos/arm64 | cut -f1)
+        - macOS x86_64: $(du -sh libs/macos/x86_64 | cut -f1)
+        - Linux x86_64: $(du -sh libs/linux/x86_64 | cut -f1)
+        - Emscripten: $(du -sh libs/emscripten | cut -f1)"
+        
+        git push origin main
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ Libraries committed and pushed successfully"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -4,7 +4,26 @@ This directory contains scripts and G#### Linux
 - Architecture: x86_64
 - Runner: ubuntu-latest
 - Compiler: GCC
-- Dependencies: X11, XCursor, Xi, ALSA, Mesa GL
+- Dependencies: X11, ### Auto-commit Behavior
+
+### When Libraries Are Committed
+The workflow automatically commits built libraries to the repository when:
+- ✅ Building from `main` branch
+- ✅ Triggered by a push event (not PR)
+- ✅ All builds complete successfully
+- ✅ **Libraries have actually changed** (checksum comparison)
+
+### Smart Change Detection
+Before committing, the workflow:
+1. Downloads existing libraries from the repository
+2. Compares checksums (SHA256) of old vs new binaries
+3. Only commits if binaries are different
+4. Skips commit if no changes detected
+
+This prevents unnecessary commits when:
+- Only documentation is updated
+- Only non-library code is changed
+- Builds produce identical binaries, Xi, ALSA, Mesa GL
 - Output: .so files
 - Note: ARM64 builds should be done natively on ARM64 hardwareActions workflows for building the sokol native libraries across multiple platforms.
 
@@ -57,6 +76,15 @@ The project includes automated builds via GitHub Actions defined in `.github/wor
 - Push to `main` or `develop` branches
 - Pull requests to `main` or `develop` branches
 - Manual workflow dispatch
+
+### Auto-commit to Repository
+When building from the `main` branch (push event), the workflow will:
+1. Build all platform libraries
+2. Automatically commit them back to the `libs/` folder
+3. Push to `main` branch with commit message `[skip ci]` to prevent infinite loops
+4. Include build information (commit SHA, workflow run link, library sizes)
+
+This ensures the repository always has the latest pre-built binaries available for users to clone and use immediately.
 
 ### Build Matrix
 
@@ -150,6 +178,77 @@ You can manually trigger the build workflow from GitHub:
 5. Click "Run workflow"
 
 This is useful for testing or building from a feature branch.
+
+## Auto-commit Behavior
+
+### When Libraries Are Committed
+The workflow automatically commits built libraries to the repository when:
+- ✅ Building from `main` branch
+- ✅ Triggered by a push event (not PR)
+- ✅ All builds complete successfully
+
+### Preventing Infinite Loops
+The commit message includes `[skip ci]` which tells GitHub Actions to **not** trigger the workflow again. This prevents:
+- Infinite build loops
+- Wasted CI/CD minutes
+- Unnecessary builds
+
+### Commit Message Format
+```
+Auto-update built libraries [skip ci]
+
+Built from commit: abc123def456
+Workflow run: https://github.com/user/repo/actions/runs/123456
+
+Platform sizes:
+- Windows x64: 7.3M
+- macOS arm64: 6.4M
+- macOS x86_64: 6.5M
+- Linux x86_64: 10.7M
+- Emscripten: 18.9M
+```
+
+### Workflow Output Examples
+
+**When changes are detected:**
+```
+Comparing old and new libraries...
+Checking windows...
+  - windows: Changes detected
+Checking macos...
+  - macos: No changes
+Checking linux...
+  - linux: Changes detected
+Checking emscripten...
+  - emscripten: No changes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Library changes detected - committing...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**When no changes are detected:**
+```
+Comparing old and new libraries...
+Checking windows...
+  - windows: No changes
+Checking macos...
+  - macos: No changes
+Checking linux...
+  - linux: No changes
+Checking emscripten...
+  - emscripten: No changes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ No library changes detected - skipping commit
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Benefits
+- ✅ Users can clone and immediately use pre-built libraries
+- ✅ No need to build locally for supported platforms
+- ✅ Always in sync with source code
+- ✅ Clear traceability (commit SHA and workflow run link)
+- ✅ **No unnecessary commits** - only when binaries change
+- ✅ Cleaner git history - no spam commits
 
 ## Requirements
 
