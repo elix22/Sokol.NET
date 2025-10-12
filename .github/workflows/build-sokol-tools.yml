@@ -363,20 +363,6 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
         fi
     
-    - name: Create custom fips config for ARM64 cross-compile
-      if: steps.check_binary.outputs.exists == 'false'
-      run: |
-        cd tools/sokol-tools
-        mkdir -p fips-configs
-        cat > fips-configs/linux-arm64-ninja-release.yml << 'EOF'
-        ---
-        platform: linux
-        generator: Ninja
-        build_tool: ninja
-        build_type: Release
-        cmake-toolchain: $GITHUB_WORKSPACE/arm64-toolchain.cmake
-        EOF
-    
     - name: Create CMake toolchain file for ARM64
       if: steps.check_binary.outputs.exists == 'false'
       run: |
@@ -393,13 +379,33 @@ jobs:
         set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
         EOF
     
-    - name: Build sokol-shdc for ARM64 (cross-compile with fips)
+    - name: Build sokol-shdc for ARM64 (cross-compile directly with CMake)
       if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
-        # Use fips with our custom ARM64 config
-        python3 fips set config linux-arm64-ninja-release
-        python3 fips build
+        
+        # Build directly with CMake, bypassing fips
+        mkdir -p fips-build/linux-arm64-ninja-release
+        cd fips-build/linux-arm64-ninja-release
+        
+        # Initialize fips first to get dependencies
+        cd ../..
+        python3 fips fetch
+        
+        # Now build with CMake using our toolchain
+        cd fips-build/linux-arm64-ninja-release
+        cmake ../.. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/arm64-toolchain.cmake \
+          -DFIPS_CONFIG=linux-arm64-ninja-release \
+          -DFIPS_PLATFORM=linux
+        
+        ninja sokol-shdc
+        
+        # Create the fips-deploy directory structure
+        mkdir -p ../../fips-deploy/sokol-tools/linux-arm64-ninja-release
+        cp sokol-shdc ../../fips-deploy/sokol-tools/linux-arm64-ninja-release/
     
     - name: Verify and strip binary
       if: steps.check_binary.outputs.exists == 'false'
