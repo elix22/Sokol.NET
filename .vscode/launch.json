@@ -64,7 +64,8 @@
                 "sdf",
                 "shadows",
                 "shapes_transform",
-                "cgltf"
+                "cgltf",
+                "clear"
             ],
             "default": "cube"
         },

@@ -428,6 +428,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "compile-clear-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/clear/clear.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "compile-clear-web-shaders",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "msbuild",
+				"examples/clear/clearWeb.csproj",
+                "-t:CompileShaders"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build-cube",
             "command": "dotnet",
             "type": "process",
@@ -780,6 +802,28 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-clear",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/clear/clear.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-clear-web",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+				"examples/clear/clearWeb.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "prepare-cube",
             "dependsOrder": "sequence",
             "dependsOn": [
@@ -1033,6 +1077,22 @@
             "dependsOn": [
                 "compile-cgltf-web-shaders",
                 "build-cgltf-web"
+            ]
+        },
+        {
+            "label": "prepare-clear",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-clear-shaders",
+                "build-clear"
+            ]
+        },
+        {
+            "label": "prepare-clear-web",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "compile-clear-web-shaders",
+                "build-clear-web"
             ]
         },
         {
@@ -1439,7 +1499,8 @@
 				"examples/sdf",
 				"examples/shadows",
 				"examples/shapes_transform",
-				"examples/cgltf"
+				"examples/cgltf",
+				"examples/clear"
 			]
 		},
 		{
