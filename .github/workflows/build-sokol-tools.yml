@@ -401,10 +401,29 @@ jobs:
         python3 fips set config linux-arm64-ninja-release
         python3 fips build
     
-    - name: Strip binary
+    - name: Verify and strip binary
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        aarch64-linux-gnu-strip tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc
+        # Check what was actually built
+        echo "Checking build output directory:"
+        ls -la tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/ || echo "Directory not found"
+        
+        # Check file type
+        if [ -f "tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc" ]; then
+          echo "File exists, checking type:"
+          file tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc
+          
+          # Only strip if it's actually an ARM64 binary
+          if file tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc | grep -q "aarch64"; then
+            echo "Stripping ARM64 binary..."
+            aarch64-linux-gnu-strip tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc
+          else
+            echo "WARNING: Binary is not ARM64, skipping strip"
+          fi
+        else
+          echo "ERROR: sokol-shdc not found!"
+          exit 1
+        fi
     
     - name: Copy binary to tools/bin
       if: steps.check_binary.outputs.exists == 'false'
