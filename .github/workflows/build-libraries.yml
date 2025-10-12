@@ -15,7 +15,7 @@ jobs:
   generate-bindings:
     name: Generate C# Bindings
     runs-on: ubuntu-latest
-    if: false  # Temporarily disabled for debugging sokol-tools build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
     - name: Checkout repository
