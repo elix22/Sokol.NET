@@ -537,14 +537,33 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Checking git status before staging..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        git status tools/bin/ || echo "tools/bin/ doesn't exist yet"
+        
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📦 Staging binary changes..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        git add -v tools/bin/
+        
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🔍 Checking staged changes..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        git diff --cached --stat
+        
         # Check if there are any changes to commit
-        if git diff --quiet tools/bin/; then
-          echo "No changes to sokol-tools binaries"
+        if git diff --cached --quiet; then
+          echo ""
+          echo "⚠️  No changes to sokol-tools binaries detected"
           exit 0
         fi
         
-        # Stage all binary changes
-        git add tools/bin/
+        echo ""
+        echo "✓ Changes detected, preparing commit..."
+        echo ""
         
         # Create commit message with details
         echo "Auto-update sokol-tools binaries [skip ci]" > commit_msg.txt
