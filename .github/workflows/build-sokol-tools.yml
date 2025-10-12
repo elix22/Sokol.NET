@@ -366,7 +366,7 @@ jobs:
     - name: Create CMake toolchain file for ARM64
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        cat > arm64-toolchain.cmake << 'EOF'
+        cat > $GITHUB_WORKSPACE/arm64-toolchain.cmake << 'EOF'
         set(CMAKE_SYSTEM_NAME Linux)
         set(CMAKE_SYSTEM_PROCESSOR aarch64)
         
@@ -389,7 +389,7 @@ jobs:
         cmake ../.. \
           -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=../../../arm64-toolchain.cmake
+          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/arm64-toolchain.cmake
         
         ninja
         
