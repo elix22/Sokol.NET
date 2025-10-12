@@ -12,9 +12,9 @@ permissions:
   contents: write  # Allow workflow to push commits back to repository
 
 jobs:
-  # Check if sokol-tools source changed
+  # Check if sokol-tools source changed or binaries are missing
   check-changes:
-    name: Check for sokol-tools changes
+    name: Check for sokol-tools changes or missing binaries
     runs-on: ubuntu-latest
     outputs:
       tools_changed: ${{ steps.check_tools.outputs.changed }}
@@ -25,26 +25,63 @@ jobs:
         fetch-depth: 2
         submodules: recursive
     
-    - name: Check for sokol-tools changes
+    - name: Check for sokol-tools changes or missing binaries
       id: check_tools
       run: |
-        # Check if this is the first commit
+        SHOULD_BUILD=false
+        
+        # Check if any binaries are missing
+        MISSING_BINARIES=""
+        
+        if [ ! -f "tools/bin/windows/x64/sokol-shdc.exe" ]; then
+          MISSING_BINARIES="$MISSING_BINARIES windows/x64"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ ! -f "tools/bin/osx/arm64/sokol-shdc" ]; then
+          MISSING_BINARIES="$MISSING_BINARIES osx/arm64"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ ! -f "tools/bin/osx/x86_64/sokol-shdc" ]; then
+          MISSING_BINARIES="$MISSING_BINARIES osx/x86_64"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ ! -f "tools/bin/linux/x86_64/sokol-shdc" ]; then
+          MISSING_BINARIES="$MISSING_BINARIES linux/x86_64"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ ! -f "tools/bin/linux/aarch64/sokol-shdc" ]; then
+          MISSING_BINARIES="$MISSING_BINARIES linux/aarch64"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ -n "$MISSING_BINARIES" ]; then
+          echo "Missing binaries for:$MISSING_BINARIES"
+        fi
+        
+        # Check if sokol-tools source changed
         if git rev-parse HEAD~1 >/dev/null 2>&1; then
-          # Get changed files
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           
-          # Check if sokol-tools source changed
           if echo "$CHANGED_FILES" | grep -q "^tools/sokol-tools/"; then
             echo "sokol-tools source code changed"
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "sokol-tools source code unchanged"
-            echo "changed=false" >> $GITHUB_OUTPUT
+            SHOULD_BUILD=true
           fi
         else
           # First commit, build everything
           echo "First commit - building all tools"
+          SHOULD_BUILD=true
+        fi
+        
+        if [ "$SHOULD_BUILD" = true ]; then
           echo "changed=true" >> $GITHUB_OUTPUT
+          echo "✓ Will build sokol-tools binaries"
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "✓ All binaries exist and source unchanged - skipping build"
         fi
 
   build-windows-x64:
