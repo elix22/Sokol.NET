@@ -327,7 +327,7 @@ jobs:
 
   build-linux-arm64:
     name: Build sokol-shdc (Linux ARM64)
-    runs-on: ubuntu-24.04-arm64  # Native ARM64 runner - much faster!
+    runs-on: ubuntu-latest  # Cross-compile on x86_64 - much faster than QEMU!
     needs: check-changes
     if: needs.check-changes.outputs.tools_changed == 'true'
     
@@ -340,10 +340,17 @@ jobs:
     - name: Setup CMake
       uses: lukka/get-cmake@latest
     
-    - name: Install dependencies
+    - name: Install ARM64 cross-compilation tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git python3 cmake ninja-build
+        sudo apt-get install -y \
+          build-essential \
+          git \
+          python3 \
+          cmake \
+          ninja-build \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu
     
     - name: Check if binary already exists
       id: check_binary
@@ -356,21 +363,49 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
         fi
     
-    - name: Build sokol-shdc
+    - name: Create CMake toolchain file for ARM64
+      if: steps.check_binary.outputs.exists == 'false'
+      run: |
+        cat > arm64-toolchain.cmake << 'EOF'
+        set(CMAKE_SYSTEM_NAME Linux)
+        set(CMAKE_SYSTEM_PROCESSOR aarch64)
+        
+        set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+        set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+        
+        set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+        set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+        EOF
+    
+    - name: Build sokol-shdc for ARM64 (cross-compile)
       if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
-        python3 fips build linux-ninja-release
+        mkdir -p fips-build/linux-arm64-release
+        cd fips-build/linux-arm64-release
+        
+        cmake ../.. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=../../../arm64-toolchain.cmake
+        
+        ninja
+        
+        # Copy to expected fips location
+        mkdir -p ../../fips-deploy/sokol-tools/linux-arm64-release
+        cp sokol-shdc ../../fips-deploy/sokol-tools/linux-arm64-release/
     
     - name: Strip binary
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        strip tools/fips-deploy/sokol-tools/linux-ninja-release/sokol-shdc
+        aarch64-linux-gnu-strip tools/fips-deploy/sokol-tools/linux-arm64-release/sokol-shdc
     
     - name: Copy binary to tools/bin
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-ninja-release"
+        SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-arm64-release"
         DEST_DIR="tools/bin/linux/aarch64"
         
         mkdir -p "$DEST_DIR"
