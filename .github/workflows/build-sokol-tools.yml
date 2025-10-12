@@ -401,11 +401,8 @@ jobs:
           -DFIPS_CONFIG=linux-arm64-ninja-release \
           -DFIPS_PLATFORM=linux
         
+        # Build - ninja will automatically place it in fips-deploy directory
         ninja sokol-shdc
-        
-        # Create the fips-deploy directory structure
-        mkdir -p ../../fips-deploy/sokol-tools/linux-arm64-ninja-release
-        cp sokol-shdc ../../fips-deploy/sokol-tools/linux-arm64-ninja-release/
     
     - name: Verify and strip binary
       if: steps.check_binary.outputs.exists == 'false'
