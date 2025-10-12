@@ -363,6 +363,19 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
         fi
     
+    - name: Create custom fips config for ARM64 cross-compile
+      if: steps.check_binary.outputs.exists == 'false'
+      run: |
+        cd tools/sokol-tools
+        cat > fips-configs/linux-arm64-ninja-release.yml << 'EOF'
+        ---
+        platform: linux
+        generator: Ninja
+        build_tool: ninja
+        build_type: Release
+        cmake-toolchain: $GITHUB_WORKSPACE/arm64-toolchain.cmake
+        EOF
+    
     - name: Create CMake toolchain file for ARM64
       if: steps.check_binary.outputs.exists == 'false'
       run: |
@@ -379,33 +392,23 @@ jobs:
         set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
         EOF
     
-    - name: Build sokol-shdc for ARM64 (cross-compile)
+    - name: Build sokol-shdc for ARM64 (cross-compile with fips)
       if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
-        mkdir -p fips-build/linux-arm64-release
-        cd fips-build/linux-arm64-release
-        
-        cmake ../.. \
-          -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/arm64-toolchain.cmake
-        
-        ninja
-        
-        # Copy to expected fips location
-        mkdir -p ../../fips-deploy/sokol-tools/linux-arm64-release
-        cp sokol-shdc ../../fips-deploy/sokol-tools/linux-arm64-release/
+        # Use fips with our custom ARM64 config
+        python3 fips set config linux-arm64-ninja-release
+        python3 fips build
     
     - name: Strip binary
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        aarch64-linux-gnu-strip tools/fips-deploy/sokol-tools/linux-arm64-release/sokol-shdc
+        aarch64-linux-gnu-strip tools/fips-deploy/sokol-tools/linux-arm64-ninja-release/sokol-shdc
     
     - name: Copy binary to tools/bin
       if: steps.check_binary.outputs.exists == 'false'
       run: |
-        SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-arm64-release"
+        SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-arm64-ninja-release"
         DEST_DIR="tools/bin/linux/aarch64"
         
         mkdir -p "$DEST_DIR"
