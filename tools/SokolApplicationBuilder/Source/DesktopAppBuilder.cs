@@ -603,26 +603,23 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.Normal, $"   ✅ Added icon to Resources");
                 }
 
-                // Copy Assets folder to Resources if it exists in output
-                string assetsInOutput = Path.Combine(outputPath, "Assets");
-                if (Directory.Exists(assetsInOutput))
-                {
-                    string resourceAssetsPath = Path.Combine(resourcesPath, "Assets");
-                    assetsInOutput.CopyDirectoryIfDifferent(resourceAssetsPath, true);
-                    Directory.Delete(assetsInOutput, true);
-                    Log.LogMessage(MessageImportance.Normal, $"   ✅ Moved Assets to Resources");
-                }
-
-                // Copy other loose asset files to Resources (images, videos, audio, etc.)
-                // This handles root-level files only - Assets folder structure is already preserved above
-                string[] assetExtensions = { "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tga", "*.mpg", "*.mpeg", "*.mp4", "*.mov", "*.avi", "*.wav", "*.mp3", "*.ogg", "*.flac" };
+                // Move all asset files to Resources (images, videos, audio, models, etc.)
+                string[] assetExtensions = { "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tga", "*.mpg", "*.mpeg", "*.mp4", "*.mov", "*.avi", "*.wav", "*.mp3", "*.ogg", "*.flac", "*.gltf", "*.glb", "*.bin", "*.basis" };
                 foreach (string pattern in assetExtensions)
                 {
-                    // Only search root level to avoid duplicating files already in Assets folder
-                    foreach (string assetFile in Directory.GetFiles(outputPath, pattern, SearchOption.TopDirectoryOnly))
+                    foreach (string assetFile in Directory.GetFiles(outputPath, pattern, SearchOption.AllDirectories))
                     {
-                        string fileName = Path.GetFileName(assetFile);
-                        string destPath = Path.Combine(resourcesPath, fileName);
+                        // Get relative path from outputPath
+                        string relativePath = Path.GetRelativePath(outputPath, assetFile);
+                        string destPath = Path.Combine(resourcesPath, relativePath);
+                        
+                        // Create directory if needed
+                        string? destDir = Path.GetDirectoryName(destPath);
+                        if (!string.IsNullOrEmpty(destDir))
+                        {
+                            Directory.CreateDirectory(destDir);
+                        }
+                        
                         File.Move(assetFile, destPath, true);
                     }
                 }

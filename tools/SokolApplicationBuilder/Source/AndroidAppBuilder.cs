@@ -1999,8 +1999,9 @@ namespace SokolApplicationBuilder
 
         string FindBundletool()
         {
-            // First check local tools folder
-            string localBundletool = Path.Combine(opts.ProjectPath, "..", "..", "tools", "bundletool.jar");
+            // First check local tools folder using SokolNet home
+            string sokolNetHome = GetSokolNetHome();
+            string localBundletool = Path.Combine(sokolNetHome, "tools", "bundletool.jar");
             if (File.Exists(localBundletool))
                 return Path.GetFullPath(localBundletool);
 
