@@ -28,6 +28,14 @@
         {
             "label": "iOS: List Devices",
             "type": "shell",
+            "windows": {
+                "command": "echo",
+                "args": ["This task is only available on macOS"]
+            },
+            "linux": {
+                "command": "echo",
+                "args": ["This task is only available on macOS"]
+            },
             "osx": {
                 "command": "${workspaceFolder}/scripts/list-ios-devices.sh"
             },
@@ -45,6 +53,14 @@
         {
             "label": "macOS: Build App Bundle",
             "type": "shell",
+            "windows": {
+                "command": "echo",
+                "args": ["This task is only available on macOS"]
+            },
+            "linux": {
+                "command": "echo",
+                "args": ["This task is only available on macOS"]
+            },
             "osx": {
                 "command": "dotnet",
                 "args": [
