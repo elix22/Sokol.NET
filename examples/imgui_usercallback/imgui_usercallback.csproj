@@ -115,10 +115,6 @@
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
-
-        <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
-  </Target>
-
   <Target Name="CopyCustomContentLinux" AfterTargets="AfterBuild" Condition="'$(IsLinux)'=='true'">
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>

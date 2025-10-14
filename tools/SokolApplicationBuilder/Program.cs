@@ -157,6 +157,14 @@ namespace SokolApplicationBuilder
                         }
                         break;
 
+                    case "prepare":
+                        {
+                            var task = new PrepareTask(opts);
+                            task.BuildEngine = buildEngine;
+                            task.Execute();
+                        }
+                        break;
+
                     default:
                         {
                             Console.WriteLine("Unknown task " + opts.Task);

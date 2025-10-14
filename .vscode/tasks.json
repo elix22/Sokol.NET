@@ -1,1500 +1,457 @@
 {
 	"version": "2.0.0",
 	"tasks": [
-        {
-            "label": "Android: List Devices",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/list-android-devices.ps1"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/list-android-devices.sh"
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/list-android-devices.sh"
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "iOS: List Devices",
-            "type": "shell",
-            "windows": {
-                "command": "echo",
-                "args": ["This task is only available on macOS"]
-            },
-            "linux": {
-                "command": "echo",
-                "args": ["This task is only available on macOS"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/list-ios-devices.sh"
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "macOS: Build App Bundle",
-            "type": "shell",
-            "windows": {
-                "command": "echo",
-                "args": ["This task is only available on macOS"]
-            },
-            "linux": {
-                "command": "echo",
-                "args": ["This task is only available on macOS"]
-            },
-            "osx": {
-                "command": "dotnet",
-                "args": [
-                    "run",
-                    "--project",
-                    "${workspaceFolder}/tools/SokolApplicationBuilder",
-                    "--",
-                    "--task",
-                    "build",
-                    "--type",
-                    "release",
-                    "--architecture",
-                    "desktop",
-                    "--rid",
-                    "${input:macOSArchitecture}",
-                    "--path",
-                    "${input:examplePath}"
-                ]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "compile-cube-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cube/cube.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-cube-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cube/cubeweb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-dyntex-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/dyntex/dyntexWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-cimgui-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cimgui/cimguiweb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-loadpng-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/loadpng/loadpngWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-instancing-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/instancing/instancingWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-plmpeg-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/plmpeg/plmpegWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-drawcallperf-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/drawcallperf/drawcallperfWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sgl-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sgl/sglWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
 		{
-            "label": "compile-dyntex-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/dyntex/dyntex.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-cimgui-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cimgui/cimgui.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-loadpng-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/loadpng/loadpng.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-instancing-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/instancing/instancing.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-plmpeg-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/plmpeg/plmpeg.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-drawcallperf-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/drawcallperf/drawcallperf.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sgl-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sgl/sgl.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sgl_lines-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sgl_lines/sgl_lines.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sgl_lines-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sgl_lines/sgl_linesWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-debugtext-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/debugtext/debugtext.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-debugtext-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/debugtext/debugtextWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-imgui_usercallback-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/imgui_usercallback/imgui_usercallback.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-imgui_usercallback-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/imgui_usercallback/imgui_usercallbackWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-offscreen-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/offscreen/offscreen.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-offscreen-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/offscreen/offscreenWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sdf-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sdf/sdf.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-sdf-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/sdf/sdfWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-shadows-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/shadows/shadows.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-shadows-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/shadows/shadowsWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-shapes_transform-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/shapes_transform/shapes_transform.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-shapes_transform-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/shapes_transform/shapes_transformWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-cgltf-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cgltf/cgltf.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-cgltf-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/cgltf/cgltfWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-clear-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/clear/clear.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "compile-clear-web-shaders",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "msbuild",
-				"examples/clear/clearWeb.csproj",
-                "-t:CompileShaders"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cube",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cube/cube.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-dyntex",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/dyntex/dyntex.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cimgui",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cimgui/cimgui.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-loadpng",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/loadpng/loadpng.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-instancing",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/instancing/instancing.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-plmpeg",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/plmpeg/plmpeg.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-drawcallperf",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/drawcallperf/drawcallperf.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sgl",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sgl/sgl.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sgl_lines",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sgl_lines/sgl_lines.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-debugtext",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/debugtext/debugtext.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-imgui_usercallback",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/imgui_usercallback/imgui_usercallback.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-offscreen",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/offscreen/offscreen.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cube-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cube/cubeweb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-dyntex-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/dyntex/dyntexWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cimgui-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cimgui/cimguiweb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-loadpng-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/loadpng/loadpngWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-instancing-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/instancing/instancingWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-plmpeg-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/plmpeg/plmpegWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-drawcallperf-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/drawcallperf/drawcallperfWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sgl-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sgl/sglWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sgl_lines-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sgl_lines/sgl_linesWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-debugtext-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/debugtext/debugtextWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-imgui_usercallback-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/imgui_usercallback/imgui_usercallbackWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-offscreen-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/offscreen/offscreenWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sdf",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sdf/sdf.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-sdf-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/sdf/sdfWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-shadows",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/shadows/shadows.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-shadows-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/shadows/shadowsWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-shapes_transform",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/shapes_transform/shapes_transform.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-shapes_transform-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/shapes_transform/shapes_transformWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cgltf",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cgltf/cgltf.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-cgltf-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/cgltf/cgltfWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-clear",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/clear/clear.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "build-clear-web",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-				"examples/clear/clearWeb.csproj"
-            ],
-            "group": "build",
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "prepare-cube",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cube-shaders",
-                "build-cube"
-            ]
-        },
-        {
-            "label": "prepare-dyntex",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-dyntex-shaders",
-                "build-dyntex"
-            ]
-        },
-        {
-            "label": "prepare-cimgui",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cimgui-shaders",
-                "build-cimgui"
-            ]
-        },
-        {
-            "label": "prepare-loadpng",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-loadpng-shaders",
-                "build-loadpng"
-            ]
-        },
-        {
-            "label": "prepare-instancing",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-instancing-shaders",
-                "build-instancing"
-            ]
-        },
-        {
-            "label": "prepare-plmpeg",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-plmpeg-shaders",
-                "build-plmpeg"
-            ]
-        },
-        {
-            "label": "prepare-drawcallperf",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-drawcallperf-shaders",
-                "build-drawcallperf"
-            ]
-        },
-        {
-            "label": "prepare-sgl",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sgl-shaders",
-                "build-sgl"
-            ]
-        },
-        {
-            "label": "prepare-sgl_lines",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sgl_lines-shaders",
-                "build-sgl_lines"
-            ]
-        },
-        {
-            "label": "prepare-debugtext",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-debugtext-shaders",
-                "build-debugtext"
-            ]
-        },
-        {
-            "label": "prepare-imgui_usercallback",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-imgui_usercallback-shaders",
-                "build-imgui_usercallback"
-            ]
-        },
-        {
-            "label": "prepare-offscreen",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-offscreen-shaders",
-                "build-offscreen"
-            ]
-        },
-        {
-            "label": "prepare-sdf",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sdf-shaders",
-                "build-sdf"
-            ]
-        },
-        {
-            "label": "prepare-shadows",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-shadows-shaders",
-                "build-shadows"
-            ]
-        },
-        {
-            "label": "prepare-shapes_transform",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-shapes_transform-shaders",
-                "build-shapes_transform"
-            ]
-        },
-        {
-            "label": "prepare-cgltf",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cgltf-shaders",
-                "build-cgltf"
-            ]
-        },
-        {
-            "label": "prepare-cube-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cube-web-shaders",
-                "build-cube-web"
-            ]
-        },
-        {
-            "label": "prepare-dyntex-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-dyntex-web-shaders",
-                "build-dyntex-web"
-            ]
-        },
-        {
-            "label": "prepare-cimgui-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cimgui-web-shaders",
-                "build-cimgui-web"
-            ]
-        },
-        {
-            "label": "prepare-loadpng-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-loadpng-web-shaders",
-                "build-loadpng-web"
-            ]
-        },
-        {
-            "label": "prepare-instancing-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-instancing-web-shaders",
-                "build-instancing-web"
-            ]
-        },
-        {
-            "label": "prepare-plmpeg-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-plmpeg-web-shaders",
-                "build-plmpeg-web"
-            ]
-        },
-        {
-            "label": "prepare-drawcallperf-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-drawcallperf-web-shaders",
-                "build-drawcallperf-web"
-            ]
-        },
-        {
-            "label": "prepare-sgl-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sgl-web-shaders",
-                "build-sgl-web"
-            ]
-        },
-        {
-            "label": "prepare-sgl_lines-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sgl_lines-web-shaders",
-                "build-sgl_lines-web"
-            ]
-        },
-        {
-            "label": "prepare-debugtext-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-debugtext-web-shaders",
-                "build-debugtext-web"
-            ]
-        },
-        {
-            "label": "prepare-imgui_usercallback-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-imgui_usercallback-web-shaders",
-                "build-imgui_usercallback-web"
-            ]
-        },
-        {
-            "label": "prepare-offscreen-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-offscreen-web-shaders",
-                "build-offscreen-web"
-            ]
-        },
-        {
-            "label": "prepare-sdf-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-sdf-web-shaders",
-                "build-sdf-web"
-            ]
-        },
-        {
-            "label": "prepare-shadows-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-shadows-web-shaders",
-                "build-shadows-web"
-            ]
-        },
-        {
-            "label": "prepare-shapes_transform-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-shapes_transform-web-shaders",
-                "build-shapes_transform-web"
-            ]
-        },
-        {
-            "label": "prepare-cgltf-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-cgltf-web-shaders",
-                "build-cgltf-web"
-            ]
-        },
-        {
-            "label": "prepare-clear",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-clear-shaders",
-                "build-clear"
-            ]
-        },
-        {
-            "label": "prepare-clear-web",
-            "dependsOrder": "sequence",
-            "dependsOn": [
-                "compile-clear-web-shaders",
-                "build-clear-web"
-            ]
-        },
-        {
-            "label": "Serve Web: Cube",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/cube"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/cube"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/cube"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: Dyntex",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/dyntex"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/dyntex"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/dyntex"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: CImGui",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/cimgui"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/cimgui"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/cimgui"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: LoadPNG",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/loadpng"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/loadpng"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/loadpng"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: Instancing",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/instancing"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/instancing"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/instancing"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: PlMpeg",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/plmpeg"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/plmpeg"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/plmpeg"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Serve Web: SGL",
-            "type": "shell",
-            "windows": {
-                "command": "powershell",
-                "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/serve-web-example.ps1", "examples/sgl"]
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/sgl"]
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/serve-web-example.py",
-                "args": ["examples/sgl"]
-            },
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "isBackground": true,
-            "problemMatcher": []
-        },
-        {
-            "label": "Android: Install APK",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:androidBuildType}",
-                "--architecture", "android",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Install AAB",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:androidBuildType}",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--install",
-                "--interactive",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build APK",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:androidBuildType}",
-                "--architecture", "android",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "Android: Build AAB",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:androidBuildType}",
-                "--architecture", "android",
-                "--subtask", "aab",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Install",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:iOSBuildType}",
-                "--architecture", "ios",
-                "--install",
-                "--interactive",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "iOS: Build",
-            "type": "shell",
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project", "${workspaceFolder}/tools/SokolApplicationBuilder",
-                "--",
-                "--task", "build",
-                "--type", "${input:iOSBuildType}",
-                "--architecture", "ios",
-                "--orientation", "landscape",
-                "--path", "${workspaceFolder}/${input:examplePath}"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        }
+			"label": "prepare-cube",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/cube"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cube-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/cube"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-dyntex",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/dyntex"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-dyntex-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/dyntex"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cimgui",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/cimgui"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cimgui-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/cimgui"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-loadpng",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/loadpng"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-loadpng-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/loadpng"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-instancing",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/instancing"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-instancing-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/instancing"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-plmpeg",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/plmpeg"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-plmpeg-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/plmpeg"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-drawcallperf",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/drawcallperf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-drawcallperf-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/drawcallperf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sgl",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/sgl"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sgl-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/sgl"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sgl_lines",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/sgl_lines"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sgl_lines-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/sgl_lines"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-debugtext",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/debugtext"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-debugtext-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/debugtext"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-imgui_usercallback",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/imgui_usercallback"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-imgui_usercallback-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/imgui_usercallback"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-offscreen",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/offscreen"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-offscreen-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/offscreen"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sdf",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/sdf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sdf-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/sdf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-shadows",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/shadows"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-shadows-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/shadows"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-shapes_transform",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/shapes_transform"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-shapes_transform-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/shapes_transform"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cgltf",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/cgltf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cgltf-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/cgltf"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-clear",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/clear"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-clear-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/clear"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Android: List Devices",
+			"type": "shell",
+			"group": "build",
+			"command": "${workspaceFolder}/scripts/list-android-devices.sh"
+		},
+		{
+			"label": "iOS: List Devices",
+			"type": "shell",
+			"group": "build",
+			"command": "${workspaceFolder}/scripts/list-ios-devices.sh"
+		},
+		{
+			"label": "macOS: Build App Bundle",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"release",
+				"--architecture",
+				"desktop",
+				"--rid",
+				"${input:macOSArchitecture}",
+				"--path",
+				"${input:examplePath}"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Android: Install APK",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:androidBuildType}",
+				"--architecture",
+				"android",
+				"--install",
+				"--interactive",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Android: Install AAB",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:androidBuildType}",
+				"--architecture",
+				"android",
+				"--subtask",
+				"aab",
+				"--install",
+				"--interactive",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Android: Build APK",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:androidBuildType}",
+				"--architecture",
+				"android",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Android: Build AAB",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:androidBuildType}",
+				"--architecture",
+				"android",
+				"--subtask",
+				"aab",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "iOS: Install",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:iOSBuildType}",
+				"--architecture",
+				"ios",
+				"--install",
+				"--interactive",
+				"--orientation",
+				"landscape",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "iOS: Build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"build",
+				"--type",
+				"${input:iOSBuildType}",
+				"--architecture",
+				"ios",
+				"--orientation",
+				"landscape",
+				"--path",
+				"${workspaceFolder}/${input:examplePath}"
+			],
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		}
 	],
 	"inputs": [
+		{
+			"id": "exampleName",
+			"type": "pickString",
+			"description": "Select an example",
+			"options": [
+				"cube",
+				"dyntex",
+				"cimgui",
+				"loadpng",
+				"instancing",
+				"plmpeg",
+				"drawcallperf",
+				"sgl",
+				"sgl_lines",
+				"debugtext",
+				"imgui_usercallback",
+				"offscreen",
+				"sdf",
+				"shadows",
+				"shapes_transform",
+				"cgltf",
+				"clear"
+			],
+			"default": "cube"
+		},
 		{
 			"id": "examplePath",
 			"type": "pickString",
