@@ -76,10 +76,21 @@ Your browser does not support HTML5 canvas.
 // Check WebGL context after sokol initializes it (run after a delay to ensure sokol has created the context)
 window.addEventListener('load', function() {
     setTimeout(function() {
+              // Create WebGL context with no alpha channel and no premultiplied alpha
+        // This matches what dotnet-serve enforces via CORS headers
+        var contextAttributes = {
+            alpha: false,  // No alpha channel - prevents white background blending issues
+            premultipliedAlpha: false,  // Don't premultiply alpha
+            antialias: true,
+            depth: true,
+            stencil: false,
+            preserveDrawingBuffer: false,
+            failIfMajorPerformanceCaveat: false
+        };
         var canvas = document.getElementById('canvas');
         // Get the existing WebGL context that sokol created (don't create a new one!)
-        var gl = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: false }) || 
-                 canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false });
+        var gl = canvas.getContext('webgl2', contextAttributes) || 
+                 canvas.getContext('webgl', contextAttributes);
         if (gl) {
             var depthBits = gl.getParameter(gl.DEPTH_BITS);
             var alphaBits = gl.getParameter(gl.ALPHA_BITS);
