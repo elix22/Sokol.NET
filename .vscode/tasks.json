@@ -254,6 +254,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-texview",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/texview"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-texview-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/texview"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -463,7 +477,8 @@
 				"shapes_transform",
 				"cgltf",
 				"basisu",
-				"clear"
+				"clear",
+				"texview"
 			],
 			"default": "cube"
 		},
@@ -489,7 +504,8 @@
 				"examples/shapes_transform",
 				"examples/cgltf",
 				"examples/basisu",
-				"examples/clear"
+				"examples/clear",
+				"examples/texview"
 			]
 		},
 		{
