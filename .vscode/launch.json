@@ -65,6 +65,7 @@
                 "shadows",
                 "shapes_transform",
                 "cgltf",
+                "basisu",
                 "clear"
             ],
             "default": "cube"

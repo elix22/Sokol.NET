@@ -226,6 +226,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-basisu",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/basisu"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-basisu-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/basisu"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "prepare-clear",
 			"type": "shell",
 			"command": "dotnet",
@@ -448,6 +462,7 @@
 				"shadows",
 				"shapes_transform",
 				"cgltf",
+				"basisu",
 				"clear"
 			],
 			"default": "cube"
@@ -473,6 +488,7 @@
 				"examples/shadows",
 				"examples/shapes_transform",
 				"examples/cgltf",
+				"examples/basisu",
 				"examples/clear"
 			]
 		},
