@@ -333,10 +333,10 @@ public static unsafe class TexViewApp
         sg_uninit_view(state.tex_view);
         sg_init_view(state.tex_view, new sg_view_desc
         {
-            texture = new sg_texture_view_desc
+            texture = 
             {
                 image = state.img,
-                mip_levels = new sg_texture_view_range
+                mip_levels =
                 {
                     _base = state.ui_min_mip,
                     count = (state.ui_max_mip - state.ui_min_mip) + 1
