@@ -434,6 +434,24 @@ namespace SokolApplicationBuilder
             }
         }
 
+        private string? ReadAppVersionFromDirectoryBuildProps(string projectPath)
+        {
+            string directoryBuildPropsPath = Path.Combine(projectPath, "Directory.Build.props");
+            if (!File.Exists(directoryBuildPropsPath))
+                return null;
+
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(directoryBuildPropsPath);
+                var appVersion = doc.Descendants("AppVersion").FirstOrDefault()?.Value;
+                return appVersion;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private string? FindIconFile(string projectPath, string iconPath)
         {
             // Try absolute path
@@ -495,14 +513,26 @@ namespace SokolApplicationBuilder
                 }
             }
 
-            if (VERSION_CODE == string.Empty)
+            // Try to read AppVersion from Directory.Build.props
+            string? appVersionFromProps = ReadAppVersionFromDirectoryBuildProps(opts.ProjectPath);
+            if (!string.IsNullOrEmpty(appVersionFromProps))
             {
-                VERSION_CODE = "1";
+                VERSION_NAME = appVersionFromProps;
+                // Extract version code from version string (e.g., "1.2.3" -> "1")
+                VERSION_CODE = VERSION_NAME.Split('.')[0];
+                Log.LogMessage(MessageImportance.High, $"📋 Using AppVersion from Directory.Build.props: {VERSION_NAME}");
             }
-
-            if (VERSION_NAME == string.Empty)
+            else
             {
-                VERSION_NAME = "1.0.0";
+                if (VERSION_CODE == string.Empty)
+                {
+                    VERSION_CODE = "1";
+                }
+
+                if (VERSION_NAME == string.Empty)
+                {
+                    VERSION_NAME = "1.0";
+                }
             }
 
 

@@ -537,6 +537,24 @@ namespace SokolApplicationBuilder
             }
         }
 
+        private string ReadAppVersionFromDirectoryBuildProps(string projectPath)
+        {
+            string directoryBuildPropsPath = Path.Combine(projectPath, "Directory.Build.props");
+            if (!File.Exists(directoryBuildPropsPath))
+                return "1.0";
+
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(directoryBuildPropsPath);
+                var appVersion = doc.Descendants("AppVersion").FirstOrDefault()?.Value;
+                return !string.IsNullOrEmpty(appVersion) ? appVersion : "1.0";
+            }
+            catch
+            {
+                return "1.0";
+            }
+        }
+
         private string? FindIconFile(string projectPath, string iconPath)
         {
             // Try absolute path
@@ -645,6 +663,10 @@ namespace SokolApplicationBuilder
                 // Create Info.plist
                 string infoPlistPath = Path.Combine(contentsPath, "Info.plist");
                 
+                // Read app version from Directory.Build.props
+                string appVersion = ReadAppVersionFromDirectoryBuildProps(opts.ProjectPath);
+                string versionCode = appVersion.Split('.')[0];
+                
                 string infoPlist = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
 <plist version=""1.0"">
@@ -658,9 +680,9 @@ namespace SokolApplicationBuilder
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>{appVersion}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>";
+    <string>{versionCode}</string>";
 
                 if (!string.IsNullOrEmpty(bundleIconFileName))
                 {

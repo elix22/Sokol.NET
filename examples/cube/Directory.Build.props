@@ -3,6 +3,9 @@
    <PropertyGroup>
       <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)</BaseIntermediateOutputPath>
       
+      <!-- Application Version (used across all platforms) -->
+      <AppVersion>1.0</AppVersion>
+      
       <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
       <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
       <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
@@ -62,6 +65,9 @@
 
    <!-- Android Configuration -->
    <PropertyGroup>
+      <!-- Package Prefix (e.g., com.yourcompany will create com.yourcompany.appname) -->
+      <AndroidPackagePrefix>com.sokol</AndroidPackagePrefix>
+      
       <!-- SDK Versions -->
       <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
       <AndroidTargetSdkVersion>34</AndroidTargetSdkVersion>
@@ -85,6 +91,9 @@
 
    <!-- iOS Configuration -->
    <PropertyGroup>
+      <!-- Bundle Identifier Prefix (e.g., com.yourcompany will create com.yourcompany.appname-ios-app) -->
+      <IOSBundlePrefix>com.sokol</IOSBundlePrefix>
+      
       <!-- Minimum iOS version -->
       <IOSMinVersion>14.0</IOSMinVersion>
       

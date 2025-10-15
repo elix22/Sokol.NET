@@ -530,9 +530,11 @@ namespace SokolApplicationBuilder
             string buildGradlePath = Path.Combine(androidPath, "app", "build.gradle");
             if (File.Exists(buildGradlePath))
             {
+                string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
+                string packageName = $"{packagePrefix}.{appName}";
                 string content = File.ReadAllText(buildGradlePath);
-                content = content.Replace("applicationId = 'com.example.native_activity'", $"applicationId = 'com.elix22.{appName}'");
-                content = content.Replace("namespace 'com.example.native_activity'", $"namespace 'com.elix22.{appName}'");
+                content = content.Replace("applicationId = 'com.example.native_activity'", $"applicationId = '{packageName}'");
+                content = content.Replace("namespace 'com.example.native_activity'", $"namespace '{packageName}'");
                 File.WriteAllText(buildGradlePath, content);
             }
 
@@ -1286,6 +1288,11 @@ namespace SokolApplicationBuilder
                             {
                                 properties[element.Name.LocalName] = element.Value;
                             }
+                            // Also read AppVersion property (used across all platforms)
+                            if (element.Name.LocalName.Equals("AppVersion", StringComparison.OrdinalIgnoreCase))
+                            {
+                                properties[element.Name.LocalName] = element.Value;
+                            }
                         }
                     }
                 }
@@ -1310,8 +1317,14 @@ namespace SokolApplicationBuilder
             manifest.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             manifest.AppendLine("<!-- BEGIN_INCLUDE(manifest) -->");
             manifest.AppendLine("<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"");
-            manifest.AppendLine("    android:versionCode=\"1\"");
-            manifest.AppendLine("          android:versionName=\"1.0\">");
+            
+            // Version from Directory.Build.props (defaults to "1.0")
+            string appVersion = androidProperties.GetValueOrDefault("AppVersion", "1.0");
+            // versionCode is derived from version string (e.g., "1.0" -> 1, "1.2.3" -> 1)
+            string versionCode = appVersion.Split('.')[0];
+            
+            manifest.AppendLine($"    android:versionCode=\"{versionCode}\"");
+            manifest.AppendLine($"          android:versionName=\"{appVersion}\">");
             manifest.AppendLine();
 
             // SDK versions
@@ -1669,6 +1682,10 @@ namespace SokolApplicationBuilder
                 return; // Error already logged by SelectAndroidDevice
             }
 
+            // Read Android properties to get package prefix
+            var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
+            string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
+
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
             // Find APK file
@@ -1702,7 +1719,7 @@ namespace SokolApplicationBuilder
                 }
                 
                 // Uninstall existing app to avoid signature mismatch errors
-                string packageName = $"com.elix22.{appName}";
+                string packageName = $"{packagePrefix}.{appName}";
                 Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
                 try
                 {
@@ -1782,6 +1799,10 @@ namespace SokolApplicationBuilder
             {
                 return; // Error already logged by SelectAndroidDevice
             }
+
+            // Read Android properties to get package prefix
+            var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
+            string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
 
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
@@ -1911,7 +1932,7 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
 
                     // Uninstall existing app to avoid signature mismatch errors
-                    string packageName = $"com.elix22.{appName}";
+                    string packageName = $"{packagePrefix}.{appName}";
                     Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
                     try
                     {

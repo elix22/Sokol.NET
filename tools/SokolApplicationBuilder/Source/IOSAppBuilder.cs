@@ -55,12 +55,14 @@ namespace SokolApplicationBuilder
         private string DEVELOPMENT_TEAM = string.Empty;
         
         // iOS properties from Directory.Build.props
+        private string iOSBundlePrefix = "com.elix22";
         private string iOSMinVersion = "14.0";
         private string iOSScreenOrientation = "both";
         private bool iOSRequiresFullScreen = false;
         private bool iOSStatusBarHidden = false;
         private string iOSDevelopmentTeam = string.Empty;
         private string iOSIcon = string.Empty;
+        private string appVersion = "1.0"; // Application version (common across all platforms)
 
         private string CLANG_CMD = string.Empty;
         private string AR_CMD = string.Empty;
@@ -434,6 +436,8 @@ namespace SokolApplicationBuilder
                 // Replace placeholders
                 string content = File.ReadAllText(cmakeDest);
                 content = content.Replace("TEMPLATE_PROJECT_NAME", projectName);
+                content = content.Replace("TEMPLATE_BUNDLE_PREFIX", iOSBundlePrefix);
+                content = content.Replace("TEMPLATE_APP_VERSION", appVersion);
                 
                 // Set orientation based on Directory.Build.props or command line option
                 string orientation = !string.IsNullOrEmpty(opts.Orientation) && opts.Orientation != "both" 
@@ -831,9 +835,10 @@ namespace SokolApplicationBuilder
                 // Try to uninstall the app first if it exists (helps with installation errors)
                 try
                 {
+                    string bundleId = $"{iOSBundlePrefix}.{projectName}-ios-app";
                     Log.LogMessage(MessageImportance.Normal, $"Attempting to uninstall existing app from device: {deviceName}");
                     var uninstallResult = Cli.Wrap("ios-deploy")
-                        .WithArguments($"--id {deviceId} --uninstall_only --bundle_id com.elix22.cube-ios-app")
+                        .WithArguments($"--id {deviceId} --uninstall_only --bundle_id {bundleId}")
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .ExecuteBufferedAsync()
@@ -1029,6 +1034,14 @@ namespace SokolApplicationBuilder
                 // Read all PropertyGroup elements (not just the first one)
                 foreach (var propertyGroup in doc.Root?.Elements("PropertyGroup") ?? Enumerable.Empty<XElement>())
                 {
+                    // iOS Bundle Prefix
+                    var bundlePrefixElement = propertyGroup.Element("IOSBundlePrefix");
+                    if (bundlePrefixElement != null && !string.IsNullOrEmpty(bundlePrefixElement.Value))
+                    {
+                        iOSBundlePrefix = bundlePrefixElement.Value;
+                        propertyCount++;
+                    }
+
                     // iOS Minimum Version
                     var minVersionElement = propertyGroup.Element("IOSMinVersion");
                     if (minVersionElement != null && !string.IsNullOrEmpty(minVersionElement.Value))
@@ -1076,11 +1089,23 @@ namespace SokolApplicationBuilder
                         iOSIcon = iconElement.Value;
                         propertyCount++;
                     }
+
+                    // App Version (common across all platforms)
+                    var versionElement = propertyGroup.Element("AppVersion");
+                    if (versionElement != null && !string.IsNullOrEmpty(versionElement.Value))
+                    {
+                        appVersion = versionElement.Value;
+                        propertyCount++;
+                    }
                 }
 
                 if (propertyCount > 0)
                 {
                     Log.LogMessage(MessageImportance.High, $"📋 Read {propertyCount} iOS properties from Directory.Build.props");
+                    if (!string.IsNullOrEmpty(appVersion))
+                        Log.LogMessage(MessageImportance.High, $"   - AppVersion: {appVersion}");
+                    if (!string.IsNullOrEmpty(iOSBundlePrefix))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSBundlePrefix: {iOSBundlePrefix}");
                     if (!string.IsNullOrEmpty(iOSMinVersion))
                         Log.LogMessage(MessageImportance.High, $"   - IOSMinVersion: {iOSMinVersion}");
                     if (!string.IsNullOrEmpty(iOSScreenOrientation))
