@@ -92,7 +92,9 @@
         "sokol_defines.h": "c",
         "*.inc": "c",
         "sokol_debugtext.h": "c",
-        "sokol_basisu.h": "c"
+        "sokol_basisu.h": "c",
+        "fontstash.h": "c",
+        "sokol_fontstash.h": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5503

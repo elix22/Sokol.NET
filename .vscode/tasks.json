@@ -268,6 +268,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-fontstash",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/fontstash"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-fontstash-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/fontstash"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -478,7 +492,8 @@
 				"cgltf",
 				"basisu",
 				"clear",
-				"texview"
+				"texview",
+				"fontstash"
 			],
 			"default": "cube"
 		},
@@ -505,7 +520,8 @@
 				"examples/cgltf",
 				"examples/basisu",
 				"examples/clear",
-				"examples/texview"
+				"examples/texview",
+				"examples/fontstash"
 			]
 		},
 		{

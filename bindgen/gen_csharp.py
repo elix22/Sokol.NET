@@ -27,7 +27,9 @@ module_names = {
     'cgltf_':   'CGltf',
     'sbasisu_': 'SBasisu',
     'simgui_':  'SImgui',
-    'sgimgui_': 'SGImgui'
+    'sgimgui_': 'SGImgui',
+    'sfons_':   'SFontstash',
+    'fons':     'Fontstash'
 }
 
 
@@ -48,7 +50,9 @@ c_source_paths = {
     'cgltf_':   'c/cgltf.c',
     'sbasisu_': 'c/sokol_basisu.c',
     'simgui_':  'c/sokol_imgui.c',
-    'sgimgui_': 'c/sokol_gfx_imgui.c'
+    'sgimgui_': 'c/sokol_gfx_imgui.c',
+    'sfons_':   'c/sokol_fontstash.c',
+    'fons':     'c/fontstash.c'
 }
 
 name_ignores = [
@@ -60,6 +64,7 @@ name_ignores = [
     'sg_color', # will be create manually inorder to support additional vonversion to Vector3,Vector4,float[] , Span
     'sgimgui_init',
     'sgimgui_t', # struct
+    'fonsSetErrorCallback', # function pointer callback not supported
 
 ]
 
@@ -133,7 +138,9 @@ prim_types = {
     'void **':      'IntPtr',
     'cgltf_float *' : 'float *',    
     'uint8_t *':   'byte*',
-    'sgimgui_t *': 'IntPtr'
+    'sgimgui_t *': 'IntPtr',
+    'unsigned char': 'byte',
+    'unsigned char *': 'byte*'
 }
 
 
@@ -314,11 +321,10 @@ def extract_array_nums(s):
     return s[s.index('['):].replace('[', ' ').replace(']', ' ').split()
 
 def extract_ptr_type(s):
-    tokens = s.split()
-    if tokens[0] == 'const':
-        return tokens[1]
-    else:
-        return tokens[0]
+    # Remove 'const' and pointer markers to get the base type
+    # e.g., "const unsigned char *" -> "unsigned char"
+    s = s.replace('const', '').replace('*', '').strip()
+    return s
 
 def as_extern_c_arg_type(arg_type, prefix):
     if arg_type == "void":
@@ -376,9 +382,19 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
         # For struct pointers, use pointer syntax (cgltf_data*) not ref
         return f"{as_csharp_struct_type(extract_ptr_type(arg_type), prefix)}*" + pre
     elif is_prim_ptr(arg_type):
-        return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
+        if arg_prefix is None:
+            # Return type: use pointer syntax
+            return f"{as_csharp_prim_type(extract_ptr_type(arg_type))}*" + pre
+        else:
+            # Parameter: use ref
+            return f"ref {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     elif is_const_prim_ptr(arg_type):
-        return f"in {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
+        if arg_prefix is None:
+            # Return type: use pointer syntax
+            return f"{as_csharp_prim_type(extract_ptr_type(arg_type))}*" + pre
+        else:
+            # Parameter: use in
+            return f"in {as_csharp_prim_type(extract_ptr_type(arg_type))}" + pre
     # Explicit handling for specific SGP types:
     elif arg_type.startswith("const sgp_point *"):
         return f"in sgp_vec2{pre}"
@@ -398,9 +414,24 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
         return f"in cgltf_sampler{pre}"
     elif arg_type.startswith("cgltf_accessor *"):
         return f"cgltf_accessor *"
+    elif arg_type.startswith("FONScontext *"):
+        return f"IntPtr{pre}"
+    elif arg_type.startswith("FONSparams *"):
+        return f"IntPtr{pre}"
+    elif arg_type.startswith("FONStextIter *"):
+        return f"IntPtr{pre}"
+    elif arg_type.startswith("struct FONSquad *"):
+        return f"IntPtr{pre}"
+    elif arg_type.startswith("const unsigned char *"):
+        return f"byte *{pre}"
+    elif arg_type.startswith("unsigned char *"):
+        return f"byte *{pre}"
     else:
         print(f"[DEBUG] as_csharp_arg_type not handled for arg_type: '{arg_type}', arg_prefix: '{arg_prefix}', prefix: '{prefix}'", file=sys.stderr, flush=True)
-        return arg_prefix + "??? (as_csharp_arg_type)"
+        if arg_prefix is None:
+            return "IntPtr  /* ??? (as_csharp_arg_type) */"
+        else:
+            return arg_prefix + "IntPtr  /* ??? (as_csharp_arg_type) */"
 
 # get C-style arguments of a function pointer as string
 def funcptr_args_c(field_type, prefix):

@@ -67,7 +67,8 @@
                 "cgltf",
                 "basisu",
                 "clear",
-                "texview"
+                "texview",
+                "fontstash"
             ],
             "default": "cube"
         },

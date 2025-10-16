@@ -17,6 +17,8 @@ tasks = [
     [ '../ext/basisu/sokol_basisu.h',        'sbasisu_',  ['sg_'] ],
     [ '../ext/sokol/util/sokol_imgui.h',     'simgui_',   ['sg_','sapp_'] ],
     [ '../ext/sokol/util/sokol_gfx_imgui.h', 'sgimgui_',   ['sg_','sapp_'] ],
+    [ '../ext/sokol/util/sokol_fontstash.h', 'sfons_',   ['sg_','sapp_'] ],
+    [ '../ext/fontstash/fontstash.h',        'fons',     [] ],
     
 ]
 

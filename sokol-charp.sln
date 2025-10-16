@@ -80,6 +80,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "texview", "examples\texview
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "texviewWeb", "examples\texview\texviewWeb.csproj", "{D4686747-BEF5-48A1-8EF5-867F1AD6DC9D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fontstash", "examples\fontstash\fontstash.csproj", "{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fontstashWeb", "examples\fontstash\fontstashWeb.csproj", "{CDC837E9-304E-4228-93FE-2A4D8AED938A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -238,6 +242,14 @@ Global
 		{D4686747-BEF5-48A1-8EF5-867F1AD6DC9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D4686747-BEF5-48A1-8EF5-867F1AD6DC9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D4686747-BEF5-48A1-8EF5-867F1AD6DC9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDC837E9-304E-4228-93FE-2A4D8AED938A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDC837E9-304E-4228-93FE-2A4D8AED938A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDC837E9-304E-4228-93FE-2A4D8AED938A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDC837E9-304E-4228-93FE-2A4D8AED938A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -281,6 +293,8 @@ Global
 		{CF4E3E94-902C-4318-B7AC-D10C50892FD8} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{3A746B31-EE0B-4F94-88A0-89CAF0D49EE1} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{D4686747-BEF5-48A1-8EF5-867F1AD6DC9D} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{C0CB1F89-9A1A-43E3-B2C7-AB27B89637E9} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{CDC837E9-304E-4228-93FE-2A4D8AED938A} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

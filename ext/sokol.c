@@ -99,6 +99,26 @@ extern "C"
 #define SOKOL_GFX_IMGUI_IMPL
 #include "sokol_gfx_imgui.h"
 
+#if defined(__clang__)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wunused-function"
+#elif defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
+#define FONTSTASH_IMPLEMENTATION
+#include "fontstash/fontstash.h"
+
+#if defined(__clang__)
+    #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+    #pragma GCC diagnostic pop
+#endif
+
+#define SOKOL_FONTSTASH_IMPL
+#include "sokol_fontstash.h"
+
 /*=== C# BINDING HELPERS (elix22) ============================================
     WebAssembly/Emscripten cannot marshal structs returned by value through P/Invoke.
     These _internal helper functions work around this limitation by taking an output
