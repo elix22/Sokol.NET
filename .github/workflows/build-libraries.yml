@@ -52,8 +52,6 @@ jobs:
             ^scripts/build-.*\.sh$
             ^scripts/build-.*\.ps1$
             ^CMakeLists\.txt$
-            ^Directory\.Build\.props$
-            .*\.targets$
           "
           
           # Check if any changed files match build-affecting patterns
