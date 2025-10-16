@@ -68,7 +68,8 @@
                 "basisu",
                 "clear",
                 "texview",
-                "fontstash"
+                "fontstash",
+                "fontstash_layers"
             ],
             "default": "cube"
         },
