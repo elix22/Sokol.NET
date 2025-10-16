@@ -296,6 +296,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-cubemaprt",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/cubemaprt"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-cubemaprt-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/cubemaprt"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -508,7 +522,8 @@
 				"clear",
 				"texview",
 				"fontstash",
-				"fontstash_layers"
+				"fontstash_layers",
+				"cubemaprt"
 			],
 			"default": "cube"
 		},
@@ -537,7 +552,8 @@
 				"examples/clear",
 				"examples/texview",
 				"examples/fontstash",
-				"examples/fontstash_layers"
+				"examples/fontstash_layers",
+				"examples/cubemaprt"
 			]
 		},
 		{

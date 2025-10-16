@@ -69,7 +69,8 @@
                 "clear",
                 "texview",
                 "fontstash",
-                "fontstash_layers"
+                "fontstash_layers",
+                "cubemaprt"
             ],
             "default": "cube"
         },

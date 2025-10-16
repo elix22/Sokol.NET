@@ -56,6 +56,18 @@ namespace Sokol
             };
         }
 
+        public static sg_range SG_RANGE<T>(T[] array) where T : unmanaged
+        {
+            fixed (T* ptr = array)
+            {
+                return new sg_range()
+                {
+                    ptr = ptr,
+                    size = (uint)(array.Length * Marshal.SizeOf<T>())
+                };
+            }
+        }
+
         public static sg_range SG_RANGE<T>(ref T value) where T : unmanaged
         {
             return new sg_range()

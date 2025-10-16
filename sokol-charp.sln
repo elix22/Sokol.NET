@@ -88,6 +88,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fontstash_layers", "example
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fontstash_layersWeb", "examples\fontstash_layers\fontstash_layersWeb.csproj", "{32F4CBBA-5C8C-4419-A6E1-4B2304E30522}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cubemaprt", "examples\cubemaprt\cubemaprt.csproj", "{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cubemaprtWeb", "examples\cubemaprt\cubemaprtWeb.csproj", "{FF4B5DDC-8395-4B62-9D84-87B6687786B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -262,6 +266,14 @@ Global
 		{32F4CBBA-5C8C-4419-A6E1-4B2304E30522}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{32F4CBBA-5C8C-4419-A6E1-4B2304E30522}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{32F4CBBA-5C8C-4419-A6E1-4B2304E30522}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF4B5DDC-8395-4B62-9D84-87B6687786B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF4B5DDC-8395-4B62-9D84-87B6687786B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF4B5DDC-8395-4B62-9D84-87B6687786B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF4B5DDC-8395-4B62-9D84-87B6687786B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -309,6 +321,8 @@ Global
 		{CDC837E9-304E-4228-93FE-2A4D8AED938A} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{4BC74E26-F718-4795-83A2-5D8420033B62} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{32F4CBBA-5C8C-4419-A6E1-4B2304E30522} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{DA9DF78E-1B40-4C32-BB9F-D0EB4A0CFB39} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{FF4B5DDC-8395-4B62-9D84-87B6687786B5} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}
