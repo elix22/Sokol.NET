@@ -188,6 +188,7 @@ public static unsafe class MipRenderApp
         {
             layout =
             {
+                buffers = { [0] = sshape_vertex_buffer_layout_state() },
                 attrs = {
                     [ATTR_offscreen_in_pos] = sshape_position_vertex_attr_state(),
                     [ATTR_offscreen_in_nrm] = sshape_normal_vertex_attr_state()
@@ -205,7 +206,6 @@ public static unsafe class MipRenderApp
             },
             label = "offscreen-pipeline"
         };
-        offscreen_pip_desc.layout.buffers[0] = sshape_vertex_buffer_layout_state();
         offscreen_pip_desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
         state.offscreen_pip = sg_make_pipeline(offscreen_pip_desc);
 
@@ -214,6 +214,7 @@ public static unsafe class MipRenderApp
         {
             layout =
             {
+                buffers = { [0] = sshape_vertex_buffer_layout_state() },
                 attrs = {
                     [ATTR_display_in_pos] = sshape_position_vertex_attr_state(),
                     [ATTR_display_in_uv] = sshape_texcoord_vertex_attr_state()
@@ -229,7 +230,7 @@ public static unsafe class MipRenderApp
             },
             label = "display-pipeline"
         };
-        display_pip_desc.layout.buffers[0] = sshape_vertex_buffer_layout_state();
+
         state.display_pip = sg_make_pipeline(display_pip_desc);
 
         // initialize resource bindings
