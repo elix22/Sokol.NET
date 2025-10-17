@@ -310,6 +310,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-miprender",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/miprender"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-miprender-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/miprender"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -523,7 +537,8 @@
 				"texview",
 				"fontstash",
 				"fontstash_layers",
-				"cubemaprt"
+				"cubemaprt",
+				"miprender"
 			],
 			"default": "cube"
 		},
@@ -553,7 +568,8 @@
 				"examples/texview",
 				"examples/fontstash",
 				"examples/fontstash_layers",
-				"examples/cubemaprt"
+				"examples/cubemaprt",
+				"examples/miprender"
 			]
 		},
 		{

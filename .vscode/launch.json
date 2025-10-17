@@ -70,7 +70,8 @@
                 "texview",
                 "fontstash",
                 "fontstash_layers",
-                "cubemaprt"
+                "cubemaprt",
+                "miprender"
             ],
             "default": "cube"
         },
