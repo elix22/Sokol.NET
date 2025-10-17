@@ -52,7 +52,7 @@ public static unsafe class CubemapJpegApp
                 func = &slog_func,
             }
         });
-        
+
         __dbgui_setup(sapp_sample_count());
 
         sdtx_setup(new sdtx_desc_t()
@@ -221,7 +221,7 @@ public static unsafe class CubemapJpegApp
                 state.load_failed = true;
                 return;
             }
-            
+
             // Decode JPEG using native STB from the fetched data in the buffer
             int width = 0, height = 0, channels = 0;
             byte* pixels = stbi_load_csharp(
@@ -232,7 +232,7 @@ public static unsafe class CubemapJpegApp
                 ref channels,
                 4  // desired_channels: force RGBA
             );
-            
+
             if (pixels == null)
             {
                 state.load_failed = true;
@@ -245,24 +245,43 @@ public static unsafe class CubemapJpegApp
                 state.load_failed = true;
                 return;
             }
-            
+
             // Copy decoded pixels to the appropriate face
             int offset = face_index * FACE_NUM_BYTES;
             fixed (byte* dest = &state.pixels[offset])
             {
                 Buffer.MemoryCopy(pixels, dest, FACE_NUM_BYTES, FACE_NUM_BYTES);
             }
-            
+
             // Free the native STB image data
             stbi_image_free_csharp(pixels);
 
             // Increment load count
             state.load_count++;
-            
+
             // All 6 faces loaded?
             if (state.load_count == NUM_FACES)
             {
-                CreateCubemapImage();
+                sg_image img = sg_make_image(new sg_image_desc()
+                {
+                    type = sg_image_type.SG_IMAGETYPE_CUBE,
+                    width = FACE_WIDTH,
+                    height = FACE_HEIGHT,
+                    pixel_format = SG_PIXELFORMAT_RGBA8,
+                    data = {
+                            mip_levels = {
+                                [0] = SG_RANGE(state.pixels)
+                            }
+                        },
+                    label = "cubemap-image"
+                });
+
+                // Initialize the pre-allocated view
+                sg_init_view(state.bind.views[VIEW_tex], new sg_view_desc()
+                {
+                    texture = { image = img },
+                    label = "cubemap-view"
+                });
             }
         }
         else if (response->failed)
@@ -271,29 +290,6 @@ public static unsafe class CubemapJpegApp
         }
     }
 
-    static void CreateCubemapImage()
-    {
-        // Create a cubemap image
-        sg_image_data imgData = new sg_image_data();
-        imgData.mip_levels[0] = new sg_range { ptr = (void*)Marshal.UnsafeAddrOfPinnedArrayElement(state.pixels, 0), size = (nuint)state.pixels.Length };
-
-        sg_image img = sg_make_image(new sg_image_desc()
-        {
-            type = sg_image_type.SG_IMAGETYPE_CUBE,
-            width = FACE_WIDTH,
-            height = FACE_HEIGHT,
-            pixel_format = SG_PIXELFORMAT_RGBA8,
-            data = imgData,
-            label = "cubemap-image"
-        });
-
-        // Initialize the pre-allocated view
-        sg_init_view(state.bind.views[VIEW_tex], new sg_view_desc()
-        {
-            texture = { image = img },
-            label = "cubemap-view"
-        });
-    }
 
     [UnmanagedCallersOnly]
     private static unsafe void Frame()

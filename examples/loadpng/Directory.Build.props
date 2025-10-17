@@ -101,10 +101,5 @@
       <DesktopIcon>logo_s_large.png</DesktopIcon>
       <WebIcon>logo_s_large.png</WebIcon>
    </PropertyGroup>
-   
-<!-- nuget package for loading png files -->
-  <ItemGroup>
-      <PackageReference Include="StbImageSharp" Version="2.30.15" />
-  </ItemGroup>
 
 </Project>

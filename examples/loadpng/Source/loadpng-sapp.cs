@@ -19,8 +19,8 @@ using static Sokol.SG.sg_wrap;
 using static Sokol.SG.sg_load_action;
 using static Sokol.SG.sg_vertex_step;
 using static loadpng_sapp_shader_cs.Shaders;
+using static Sokol.StbImage;
 
-using StbImageSharp;
 using System.Diagnostics;
 
 public static unsafe class LoadPngSApp
@@ -192,25 +192,43 @@ public static unsafe class LoadPngSApp
             /* the file data has been fetched, since we provided a big-enough
                 buffer we can be sure that all data has been loaded here
             */
-            int png_width, png_height;
-            // actually this one returns the right 4 channels as opposed to the original native which returns 3
-            var image = ImageResult.FromMemory(state.fetch_buffer.Buffer, ColorComponents.RedGreenBlueAlpha);
-            if (image == null)
+            
+            // Decode PNG using native STB from the fetched data in the buffer
+            int png_width = 0, png_height = 0, channels = 0;
+            byte* pixels = stbi_load_csharp(
+                in state.fetch_buffer.Buffer[0],
+                (int)response->data.size,
+                ref png_width,
+                ref png_height,
+                ref channels,
+                4  // desired_channels: force RGBA
+            );
+
+            if (pixels == null)
             {
                 state.pass_action.colors[0].clear_value = new sg_color() { r = 1f, g = 0f, b = 0f, a = 1.0f };
                 return;
             }
-            png_width = image.Width;
-            png_height = image.Height;
 
+            // Create the image descriptor with the decoded pixel data
             sg_image_desc image_desc = new sg_image_desc();
             image_desc.width = png_width;
             image_desc.height = png_height;
             image_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-            image_desc.data.mip_levels[0] = SG_RANGE(image.Data);
+            
+            // Calculate the size of the pixel data
+            int pixel_data_size = png_width * png_height * 4;
+            
+            // Create a span from the native pointer for the image data
+            ReadOnlySpan<byte> pixelSpan = new ReadOnlySpan<byte>(pixels, pixel_data_size);
+            image_desc.data.mip_levels[0] = SG_RANGE(pixelSpan);
+            
             sg_image img = sg_make_image(image_desc);
 
-                  // ...and initialize the pre-allocated texture view handle with that image
+            // Free the native STB image data
+            stbi_image_free_csharp(pixels);
+
+            // ...and initialize the pre-allocated texture view handle with that image
             sg_init_view(state.bind.views[VIEW_tex], new sg_view_desc()
             {
                 texture = new sg_texture_view_desc(){ image = img },
