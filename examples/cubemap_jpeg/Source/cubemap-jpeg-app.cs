@@ -15,12 +15,11 @@ using static Sokol.SG.sg_pixel_format;
 using static Sokol.SG.sg_filter;
 using static Sokol.SG.sg_load_action;
 using static Sokol.Utils;
-using System.Diagnostics;
 using static Sokol.SLog;
 using static Sokol.SDebugUI;
 using static Sokol.SDebugText;
+using static Sokol.StbImage;
 using static cubemap_jpeg_sapp_shader_cs.Shaders;
-using StbImageSharp;
 
 public static unsafe class CubemapJpegApp
 {
@@ -43,32 +42,9 @@ public static unsafe class CubemapJpegApp
 
     static _state state = default;
 
-    static byte[] GetCubefaceRange(int face_index)
-    {
-        if (face_index < 0 || face_index >= NUM_FACES)
-            throw new ArgumentOutOfRangeException(nameof(face_index));
-        
-        byte[] faceData = new byte[FACE_NUM_BYTES];
-        int offset = face_index * FACE_NUM_BYTES;
-        Array.Copy(state.pixels, offset, faceData, 0, FACE_NUM_BYTES);
-        return faceData;
-    }
-
-    static void SetCubefaceRange(int face_index, byte[] data)
-    {
-        if (face_index < 0 || face_index >= NUM_FACES)
-            throw new ArgumentOutOfRangeException(nameof(face_index));
-        if (data.Length != FACE_NUM_BYTES)
-            throw new ArgumentException($"Data must be {FACE_NUM_BYTES} bytes");
-        
-        int offset = face_index * FACE_NUM_BYTES;
-        Array.Copy(data, 0, state.pixels, offset, FACE_NUM_BYTES);
-    }
-
     [UnmanagedCallersOnly]
     private static unsafe void Init()
     {
-        Console.WriteLine("Initialize() Enter");
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
@@ -76,6 +52,7 @@ public static unsafe class CubemapJpegApp
                 func = &slog_func,
             }
         });
+        
         __dbgui_setup(sapp_sample_count());
 
         sdtx_setup(new sdtx_desc_t()
@@ -202,7 +179,7 @@ public static unsafe class CubemapJpegApp
             label = "cubemap-pipeline"
         });
 
-                // start loading JPEG files
+        // start loading JPEG files
         string[] filenames = [
             "nb2_posx.jpg", "nb2_negx.jpg",
             "nb2_posy.jpg", "nb2_negy.jpg",
@@ -245,25 +222,39 @@ public static unsafe class CubemapJpegApp
                 return;
             }
             
-            // Decode JPEG using StbImageSharp from the fetched data in the buffer
-            StbImage.stbi_set_flip_vertically_on_load(0);
-            var image = ImageResult.FromMemory(state.fetch_buffers[face_index].Buffer, ColorComponents.RedGreenBlueAlpha);
+            // Decode JPEG using native STB from the fetched data in the buffer
+            int width = 0, height = 0, channels = 0;
+            byte* pixels = stbi_load_csharp(
+                in state.fetch_buffers[face_index].Buffer[0],
+                (int)response->data.size,
+                ref width,
+                ref height,
+                ref channels,
+                4  // desired_channels: force RGBA
+            );
             
-            if (image == null)
+            if (pixels == null)
             {
                 state.load_failed = true;
                 return;
             }
 
-            if (image.Width != FACE_WIDTH || image.Height != FACE_HEIGHT)
+            if (width != FACE_WIDTH || height != FACE_HEIGHT)
             {
-                // Image dimensions don't match expected size
+                stbi_image_free_csharp(pixels);
                 state.load_failed = true;
                 return;
             }
-
+            
             // Copy decoded pixels to the appropriate face
-            SetCubefaceRange(face_index, image.Data);
+            int offset = face_index * FACE_NUM_BYTES;
+            fixed (byte* dest = &state.pixels[offset])
+            {
+                Buffer.MemoryCopy(pixels, dest, FACE_NUM_BYTES, FACE_NUM_BYTES);
+            }
+            
+            // Free the native STB image data
+            stbi_image_free_csharp(pixels);
 
             // Increment load count
             state.load_count++;
@@ -369,12 +360,6 @@ public static unsafe class CubemapJpegApp
         __dbgui_shutdown();
         sdtx_shutdown();
         sg_shutdown();
-
-        // Force a complete shutdown if debugging
-        if (Debugger.IsAttached)
-        {
-            Environment.Exit(0);
-        }
     }
 
     public static SApp.sapp_desc sokol_main()

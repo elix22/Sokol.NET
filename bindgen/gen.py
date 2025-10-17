@@ -19,6 +19,7 @@ tasks = [
     [ '../ext/sokol/util/sokol_gfx_imgui.h', 'sgimgui_',   ['sg_','sapp_'] ],
     [ '../ext/sokol/util/sokol_fontstash.h', 'sfons_',   ['sg_','sapp_'] ],
     [ '../ext/fontstash/fontstash.h',        'fons',     [] ],
+    [ '../ext/stb/stb_image.h',              'stbi_',    [] ],
     
 ]
 

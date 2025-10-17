@@ -81,6 +81,10 @@ extern "C"
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
+// STB Image - for fast native image loading
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 // Fix X11 macro conflicts on Linux
 // X11 headers (included by sokol_app.h on Linux) define a 'Status' macro
 // that conflicts with the 'Status' member in ImTextureData struct
@@ -118,6 +122,27 @@ extern "C"
 
 #define SOKOL_FONTSTASH_IMPL
 #include "sokol_fontstash.h"
+
+/*=== STB IMAGE C# BINDINGS ==================================================
+    Wrapper functions for stb_image to provide C# bindings for fast native
+    image loading (especially important for WebAssembly performance).
+============================================================================*/
+
+// stbi_load wrapper that returns image data pointer
+// Caller is responsible for freeing with stbi_image_free
+SOKOL_API_IMPL unsigned char* stbi_load_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels) {
+    return stbi_load_from_memory(buffer, len, x, y, channels_in_file, desired_channels);
+}
+
+// stbi_image_free wrapper
+SOKOL_API_IMPL void stbi_image_free_csharp(void* retval_from_stbi_load) {
+    stbi_image_free(retval_from_stbi_load);
+}
+
+// stbi_failure_reason wrapper
+SOKOL_API_IMPL const char* stbi_failure_reason_csharp(void) {
+    return stbi_failure_reason();
+}
 
 /*=== C# BINDING HELPERS (elix22) ============================================
     WebAssembly/Emscripten cannot marshal structs returned by value through P/Invoke.

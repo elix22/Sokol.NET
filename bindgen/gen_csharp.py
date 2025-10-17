@@ -29,7 +29,8 @@ module_names = {
     'simgui_':  'SImgui',
     'sgimgui_': 'SGImgui',
     'sfons_':   'SFontstash',
-    'fons':     'Fontstash'
+    'fons':     'Fontstash',
+    'stbi_':    'StbImage'
 }
 
 
@@ -52,7 +53,8 @@ c_source_paths = {
     'simgui_':  'c/sokol_imgui.c',
     'sgimgui_': 'c/sokol_gfx_imgui.c',
     'sfons_':   'c/sokol_fontstash.c',
-    'fons':     'c/fontstash.c'
+    'fons':     'c/fontstash.c',
+    'stbi_':    'c/stb_image.c'
 }
 
 name_ignores = [
