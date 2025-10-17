@@ -1893,11 +1893,11 @@ namespace SokolApplicationBuilder
 }}";
                     File.WriteAllText(deviceSpecFile, deviceSpec);
 
-                    // Convert AAB to APK using bundletool (universal mode for all architectures)
+                    // Convert AAB to APK using bundletool (device-specific for smaller size)
                     string apksPath = Path.Combine(tempDir, "app.apks");
                     
                     var bundletoolResult = Cli.Wrap("java")
-                        .WithArguments($"-jar \"{bundletoolPath}\" build-apks --bundle=\"{aabPath}\" --output=\"{apksPath}\" --mode=universal")
+                        .WithArguments($"-jar \"{bundletoolPath}\" build-apks --bundle=\"{aabPath}\" --output=\"{apksPath}\" --device-spec=\"{deviceSpecFile}\"")
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                         .ExecuteAsync()
@@ -1911,54 +1911,11 @@ namespace SokolApplicationBuilder
                         continue;
                     }
 
-                    // Extract the universal APK from the .apks file
-                    string apkPath = Path.Combine(tempDir, "universal.apk");
+                    // Install APKs directly from the .apks file using bundletool
+                    Log.LogMessage(MessageImportance.High, "Installing device-specific APKs...");
                     
-                    var unzipResult = Cli.Wrap("unzip")
-                        .WithArguments($"-q \"{apksPath}\" -d \"{tempDir}\"")
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
-                        .ExecuteAsync()
-                        .GetAwaiter()
-                        .GetResult();
-
-                    if (!File.Exists(apkPath))
-                    {
-                        Log.LogError($"❌ Failed to extract universal APK from bundle for {selectedDeviceId}");
-                        failCount++;
-                        continue;
-                    }
-
-                    Log.LogMessage(MessageImportance.High, "✅ AAB converted to APK successfully!");
-
-                    // Uninstall existing app to avoid signature mismatch errors
-                    string packageName = $"{packagePrefix}.{appName}";
-                    Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
-                    try
-                    {
-                        var uninstallResult = Cli.Wrap("adb")
-                            .WithArguments($"-s {selectedDeviceId} uninstall {packageName}")
-                            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                            .ExecuteAsync()
-                            .GetAwaiter()
-                            .GetResult();
-                        
-                        if (uninstallResult.ExitCode == 0)
-                        {
-                            Log.LogMessage(MessageImportance.Normal, "✅ Existing app uninstalled");
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore uninstall errors (app might not be installed)
-                        Log.LogMessage(MessageImportance.Normal, "ℹ️  No existing app to uninstall");
-                    }
-
-                    // Install the converted APK
-                    Log.LogMessage(MessageImportance.High, "Installing APK on device...");
-                    var installResult = Cli.Wrap("adb")
-                        .WithArguments($"-s {selectedDeviceId} install -r \"{apkPath}\"")  
+                    var installResult = Cli.Wrap("java")
+                        .WithArguments($"-jar \"{bundletoolPath}\" install-apks --apks=\"{apksPath}\" --device-id={selectedDeviceId}")
                         .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                         .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                         .ExecuteAsync()
@@ -1971,7 +1928,7 @@ namespace SokolApplicationBuilder
                         successCount++;
 
                         // Try to launch the app
-                        // packageName already declared above for uninstall
+                        string packageName = $"{packagePrefix}.{appName}";
                         Log.LogMessage(MessageImportance.High, $"Launching app (package: {packageName})...");
 
                         try
