@@ -621,25 +621,28 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.Normal, $"   ✅ Added icon to Resources");
                 }
 
-                // Move all asset files to Resources (images, videos, audio, models, etc.)
-                string[] assetExtensions = { "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tga", "*.mpg", "*.mpeg", "*.mp4", "*.mov", "*.avi", "*.wav", "*.mp3", "*.ogg", "*.flac", "*.gltf", "*.glb", "*.bin", "*.basis" };
-                foreach (string pattern in assetExtensions)
+                // Move all files from outputPath to Resources (preserving directory structure)
+                // This ensures all assets are available in the app bundle
+                foreach (string file in Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories))
                 {
-                    foreach (string assetFile in Directory.GetFiles(outputPath, pattern, SearchOption.AllDirectories))
+                    string relativePath = Path.GetRelativePath(outputPath, file);
+                    
+                    // Skip files that are already inside .app or .dSYM bundles
+                    if (relativePath.Contains(".app") || relativePath.Contains(".dSYM"))
                     {
-                        // Get relative path from outputPath
-                        string relativePath = Path.GetRelativePath(outputPath, assetFile);
-                        string destPath = Path.Combine(resourcesPath, relativePath);
-                        
-                        // Create directory if needed
-                        string? destDir = Path.GetDirectoryName(destPath);
-                        if (!string.IsNullOrEmpty(destDir))
-                        {
-                            Directory.CreateDirectory(destDir);
-                        }
-                        
-                        File.Move(assetFile, destPath, true);
+                        continue;
                     }
+                    
+                    string destPath = Path.Combine(resourcesPath, relativePath);
+                    
+                    // Create directory if needed
+                    string? destDir = Path.GetDirectoryName(destPath);
+                    if (!string.IsNullOrEmpty(destDir))
+                    {
+                        Directory.CreateDirectory(destDir);
+                    }
+                    
+                    File.Move(file, destPath, true);
                 }
                 
                 // Clean up any remaining subdirectories in outputPath (except the .app bundle)
@@ -657,6 +660,21 @@ namespace SokolApplicationBuilder
                         {
                             // Ignore cleanup errors
                         }
+                    }
+                }
+                
+                // Clean up any nested .app bundles inside the Resources folder
+                // (sometimes created by dotnet publish)
+                foreach (string dir in Directory.GetDirectories(resourcesPath, "*.app", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                        Log.LogMessage(MessageImportance.Normal, $"   ✅ Removed nested .app bundle from Resources");
+                    }
+                    catch
+                    {
+                        // Ignore cleanup errors
                     }
                 }
 

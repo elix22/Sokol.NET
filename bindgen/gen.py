@@ -11,7 +11,7 @@ tasks = [
     [ '../ext/sokol/util/sokol_gl.h',        'sgl_',      ['sg_'] ],
     [ '../ext/sokol/util/sokol_debugtext.h', 'sdtx_',     ['sg_'] ],
     [ '../ext/sokol/util/sokol_shape.h',     'sshape_',   ['sg_'] ],
-    # [ '../ext/sokol/util/sokol_spine.h',     'sspine_',   ['sg_'] ],
+    [ '../ext/sokol/util/sokol_spine.h',     'sspine_',   ['sg_'] ],
     # [ '../ext/sokol_gp/sokol_gp.h',          'sgp_',      ['sg_'] ],
     [ '../ext/cgltf/cgltf.h',                'cgltf_',    [] ],
     [ '../ext/basisu/sokol_basisu.h',        'sbasisu_',  ['sg_'] ],
@@ -38,8 +38,17 @@ for task in tasks:
 # Generate C header file with internal wrapper implementations
 print('Generating C internal wrappers header...')
 print(f'  Auto-detected {len(gen_csharp.web_wrapper_struct_return_functions)} functions returning structs by value')
-header_content = gen_csharp.gen_c_internal_wrappers_header(all_irs)
-header_output_path = '../ext/sokol_csharp_internal_wrappers.h'
-with open(header_output_path, 'w', newline='\n') as f_header:
-    f_header.write(header_content)
-print(f'  Generated: {header_output_path}')
+
+# Generate sokol wrappers header (excludes spine-c)
+sokol_header_content = gen_csharp.gen_c_internal_wrappers_header(all_irs)
+sokol_header_output_path = '../ext/sokol_csharp_internal_wrappers.h'
+with open(sokol_header_output_path, 'w', newline='\n') as f_header:
+    f_header.write(sokol_header_content)
+print(f'  Generated Sokol wrappers: {sokol_header_output_path}')
+
+# Generate spine-c wrappers header (only spine-c functions)
+spine_header_content = gen_csharp.gen_c_spine_wrappers_header(all_irs)
+spine_header_output_path = '../ext/spine-c/spine_c_csharp_internal_wrappers.h'
+with open(spine_header_output_path, 'w', newline='\n') as f_header:
+    f_header.write(spine_header_content)
+print(f'  Generated Spine-C wrappers: {spine_header_output_path}')

@@ -23,7 +23,7 @@ module_names = {
     'sfetch_':  'SFetch',
     'simgui_':  'SImgui',
     # 'sgp_':     'SGP',
-    # 'sspine_':  'SSpine',
+    'sspine_':  'SSpine',
     'cgltf_':   'CGltf',
     'sbasisu_': 'SBasisu',
     'simgui_':  'SImgui',
@@ -31,6 +31,28 @@ module_names = {
     'sfons_':   'SFontstash',
     'fons':     'Fontstash',
     'stbi_':    'StbImage'
+}
+
+# Library names for DllImport statements
+library_names = {
+    'slog_':    'sokol',
+    'sg_':      'sokol',
+    'sapp_':    'sokol',
+    'stm_':     'sokol',
+    'saudio_':  'sokol',
+    'sgl_':     'sokol',
+    'sdtx_':    'sokol',
+    'sshape_':  'sokol',
+    'sglue_':   'sokol',
+    'sfetch_':  'sokol',
+    'simgui_':  'sokol',
+    'sspine_':  'spine-c',  # spine-c uses separate library
+    'cgltf_':   'sokol',
+    'sbasisu_': 'sokol',
+    'sgimgui_': 'sokol',
+    'sfons_':   'sokol',
+    'fons':     'sokol',
+    'stbi_':    'sokol'
 }
 
 
@@ -196,6 +218,7 @@ struct_types = []
 enum_types = []
 enum_items = {}
 out_lines = ''
+current_library_name = 'sokol'  # Default library name, will be set per module
 
 def reset_globals():
     global struct_types
@@ -203,10 +226,12 @@ def reset_globals():
     global enum_items
     global out_lines
     global web_wrapper_struct_return_functions
+    global current_library_name
     struct_types = []
     enum_types = []
     enum_items = {}
     out_lines = ''
+    current_library_name = 'sokol'  # Reset to default
     # Note: web_wrapper_struct_return_functions is NOT reset here
     # It accumulates across all modules for the C header generation
 
@@ -630,9 +655,12 @@ def gen_func_c(decl, prefix):
     c_func_name = decl['name']
     if c_func_name not in web_wrapper_struct_return_functions:
         l("#if __IOS__")
-        l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        if current_library_name == 'sokol':
+            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        else:
+            l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#else")
-        l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#endif")
 
 def gen_func_csharp(decl, prefix):
@@ -707,9 +735,12 @@ def gen_func_csharp(decl, prefix):
         l("}")
         l("#else")
         l("#if __IOS__")
-        l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        if current_library_name == 'sokol':
+            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        else:
+            l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#else")
-        l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
         l("#endif")
         if csharp_res_type == "string":
             # Manual string marshalling for WebAssembly to avoid corruption
@@ -840,9 +871,12 @@ def gen_internal_functions(inp, prefix):
                 csharp_res_type = funcdecl_result_csharp(decl, prefix)
                 
                 l("#if __IOS__")
-                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                if current_library_name == 'sokol':
+                    l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                else:
+                    l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
                 l("#else")
-                l(f"[DllImport(\"sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
                 l("#endif")
                 if decl['params']:
                     l(f"public static extern void {csharp_func_name}_internal(ref {csharp_res_type} result, {funcdecl_args_csharp(decl, prefix)});")
@@ -851,7 +885,7 @@ def gen_internal_functions(inp, prefix):
                 l("")
 
 def gen_c_internal_wrappers_header(all_inputs):
-    """Generate C header file with _internal wrapper function implementations."""
+    """Generate C header file with _internal wrapper function implementations (excluding spine-c)."""
     header_lines = []
     header_lines.append("/*")
     header_lines.append("    AUTO-GENERATED C INTERNAL WRAPPER FUNCTIONS")
@@ -867,10 +901,13 @@ def gen_c_internal_wrappers_header(all_inputs):
     header_lines.append("#define SOKOL_CSHARP_INTERNAL_WRAPPERS_H")
     header_lines.append("")
     
-    # Group functions by module/prefix
+    # Group functions by module/prefix (excluding spine-c)
     module_functions = {}
     for inp in all_inputs:
         prefix = inp['prefix']
+        if prefix == 'sspine_':  # Skip spine functions - they go in separate header
+            continue
+            
         module_name = inp['module']
         module_functions[prefix] = {'module': module_name, 'functions': []}
         
@@ -942,6 +979,86 @@ def gen_c_internal_wrappers_header(all_inputs):
     
     return "\n".join(header_lines)
 
+def gen_c_spine_wrappers_header(all_inputs):
+    """Generate C header file with spine-c _internal wrapper function implementations."""
+    header_lines = []
+    header_lines.append("/*")
+    header_lines.append("    AUTO-GENERATED SPINE-C INTERNAL WRAPPER FUNCTIONS")
+    header_lines.append("    This file is automatically generated by gen_csharp.py")
+    header_lines.append("    DO NOT EDIT MANUALLY")
+    header_lines.append("")
+    header_lines.append("    WebAssembly/Emscripten cannot marshal structs returned by value through P/Invoke.")
+    header_lines.append("    These _internal helper functions work around this limitation by taking an output")
+    header_lines.append("    pointer parameter instead.")
+    header_lines.append("*/")
+    header_lines.append("")
+    header_lines.append("#ifndef SPINE_C_CSHARP_INTERNAL_WRAPPERS_H")
+    header_lines.append("#define SPINE_C_CSHARP_INTERNAL_WRAPPERS_H")
+    header_lines.append("")
+    header_lines.append("#include <spine/spine.h>")
+    header_lines.append("#include \"../sokol/util/sokol_spine.h\"")
+    header_lines.append("")
+    header_lines.append("// For Emscripten builds, these functions need to be exported")
+    header_lines.append("#ifdef __EMSCRIPTEN__")
+    header_lines.append("    #include <emscripten.h>")
+    header_lines.append("    #define SPINE_EXPORT EMSCRIPTEN_KEEPALIVE")
+    header_lines.append("#else")
+    header_lines.append("    #define SPINE_EXPORT")
+    header_lines.append("#endif")
+    header_lines.append("")
+    
+    # Filter only spine-related functions
+    for inp in all_inputs:
+        prefix = inp['prefix']
+        if prefix != 'sspine_':  # Only process spine functions
+            continue
+            
+        module_name = inp['module']
+        has_functions = False
+        
+        for decl in inp['decls']:
+            if not decl['is_dep'] and decl['kind'] == 'func':
+                c_func_name = decl['name']
+                if c_func_name in web_wrapper_struct_return_functions:
+                    if not has_functions:
+                        header_lines.append(f"// ========== {module_name} ({prefix}) ==========")
+                        header_lines.append("")
+                        has_functions = True
+                    
+                    return_type = web_wrapper_struct_return_functions[c_func_name]
+                    
+                    # Build parameter list for C
+                    params_c = []
+                    for param in decl['params']:
+                        param_type = check_type_override(c_func_name, param['name'], param['type'])
+                        param_name = param['name']
+                        
+                        # Convert type to C syntax
+                        if is_const_struct_ptr(param_type):
+                            params_c.append(f"{param_type} {param_name}")
+                        elif is_prim_type(param_type):
+                            params_c.append(f"{param_type} {param_name}")
+                        else:
+                            params_c.append(f"{param_type} {param_name}")
+                    
+                    params_str = ", ".join(params_c) if params_c else ""
+                    if params_str:
+                        params_str = ", " + params_str
+                    
+                    # Build argument list for function call
+                    args = [param['name'] for param in decl['params']]
+                    args_str = ", ".join(args)
+                    
+                    header_lines.append(f"SPINE_EXPORT void {c_func_name}_internal({return_type}* result{params_str}) {{")
+                    header_lines.append(f"    *result = {c_func_name}({args_str});")
+                    header_lines.append("}")
+                    header_lines.append("")
+    
+    header_lines.append("#endif // SPINE_C_CSHARP_INTERNAL_WRAPPERS_H")
+    header_lines.append("")
+    
+    return "\n".join(header_lines)
+
 def gen_module(inp, dep_prefixes):
     l('// machine generated, do not edit')
     l('using System;')
@@ -978,10 +1095,12 @@ def prepare():
     print('Generating C# bindings:')
 
 def gen(c_header_path, c_prefix, dep_c_prefixes):
+    global current_library_name
     module_name = module_names[c_prefix]
     c_source_path = c_source_paths[c_prefix]
-    print(f'  {c_header_path} => {module_name}')
+    print(f'  {c_header_path} => {module_name} (lib: {library_names.get(c_prefix, "sokol")})')
     reset_globals()
+    current_library_name = library_names.get(c_prefix, 'sokol')  # Set library name AFTER reset_globals
     ir = gen_ir.gen(c_header_path, c_source_path, module_name, c_prefix, dep_c_prefixes)
     gen_module(ir, dep_c_prefixes)
     output_path = f"../src/sokol/generated/{ir['module']}.cs"

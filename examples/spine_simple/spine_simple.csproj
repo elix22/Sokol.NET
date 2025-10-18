@@ -1,0 +1,206 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType Condition="'$(BuildAsLibrary)' != 'true'">Exe</OutputType>
+    <OutputType Condition="'$(BuildAsLibrary)' == 'true'">Library</OutputType>
+    <ImportDirectoryBuildProps Condition="'$(ImportDirectoryBuildProps)' == ''">true</ImportDirectoryBuildProps>
+    <TargetFramework>net10.0</TargetFramework>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+    <TrimMode>partial</TrimMode>
+    <TrimmerRemoveSymbols>false</TrimmerRemoveSymbols>
+    <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
+    <IsAndroid>$(RuntimeIdentifier.ToLower().StartsWith('android'))</IsAndroid>
+		<IsAndroid Condition="'$(IsAndroid)'=='false'">$(RuntimeIdentifier.ToLower().StartsWith('linux-bionic'))</IsAndroid>
+    <IsIOS Condition="$(DefineConstants.Contains('__IOS__'))">true</IsIOS>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <!-- Exclude build artifacts from project view -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
+    <HomeDir>$(UserProfile)</HomeDir>
+    <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
+    <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
+    <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
+  </PropertyGroup>
+
+  <Import Project="$(SokolNetHome)/Directory.Build.props" />
+
+    <!-- Library-specific settings -->
+  <PropertyGroup Condition="'$(BuildAsLibrary)' == 'true'">
+    <LibraryName>lib$(MSBuildProjectName)</LibraryName>
+    <AssemblyName>$(LibraryName)</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+
+
+  <PropertyGroup>
+    <!-- If __ANDROID__ is defined, force Android (and set IsAndroid to true) -->
+    <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__ANDROID__'))">glsl300es</ShaderSlang>
+    <ShaderSlang Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('__IOS__'))">metal_ios</ShaderSlang>
+    <!-- Fallback, if no constant was defined -->
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsAndroid)'=='true'">glsl300es</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsOSX)'=='true'">metal_macos</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsWindows)'=='true'">hlsl5</ShaderSlang>
+    <ShaderSlang Condition="'$(ShaderSlang)' == '' and '$(IsLinux)'=='true'">glsl430</ShaderSlang>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_ios'">ios</HostShaderFolder>
+    <HostShaderFolder Condition="'$(ShaderSlang)'=='metal_macos'">osx</HostShaderFolder>
+    <HostShaderFolder Condition="'$(ShaderSlang)'=='hlsl5'">windows</HostShaderFolder>
+    <HostShaderFolder Condition="'$(ShaderSlang)'=='glsl430'">linux</HostShaderFolder>
+    <HostShaderFolder Condition="'$(ShaderSlang)'=='glsl300es'">android</HostShaderFolder>
+  </PropertyGroup>
+
+    <ItemGroup>
+      <Compile Remove="Android/**/*" />
+      <Compile Remove="ios/**/*" />
+      <Compile Remove="obj/**/*" />
+      <Compile Remove="bin/**/*" />
+    </ItemGroup>
+
+  <!-- Exclude shaders from other platform folders -->
+  <ItemGroup>
+    <Compile Remove="shaders/compiled/web/**/*.cs" />
+    <Compile Remove="shaders/compiled/ios/**/*.cs" Condition="'$(HostShaderFolder)' != 'ios'" />
+    <Compile Remove="shaders/compiled/osx/**/*.cs" Condition="'$(HostShaderFolder)' != 'osx'" />
+    <Compile Remove="shaders/compiled/windows/**/*.cs" Condition="'$(HostShaderFolder)' != 'windows'" />
+    <Compile Remove="shaders/compiled/linux/**/*.cs" Condition="'$(HostShaderFolder)' != 'linux'" />
+    <Compile Remove="shaders/compiled/android/**/*.cs" Condition="'$(HostShaderFolder)' != 'android'" />
+  </ItemGroup>
+
+  <!-- Spine-C Library Paths -->
+  <PropertyGroup>
+    <SpineCLibsPath>$(SokolNetHome)/ext/spine-c/libs/</SpineCLibsPath>
+  </PropertyGroup>
+
+  <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
+        <libSpineC>$(SpineCLibsPath)windows/$(OSArch)/release/spine-c.dll</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Error Condition="! Exists('$(libSpineC)')" Text="spine-c.dll not found at $(libSpineC). Please build the library using .\libs\spine-c\scripts\build-spine-c-windows.bat" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishWindows" AfterTargets="Publish" Condition="'$(IsWindows)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
+        <libSpineC>$(SpineCLibsPath)windows/$(OSArch)/release/spine-c.dll</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Error Condition="! Exists('$(libSpineC)')" Text="spine-c.dll not found at $(libSpineC). Please build the library using .\libs\spine-c\scripts\build-spine-c-windows.bat" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentMacOS" AfterTargets="AfterBuild" Condition="'$(IsOSX)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
+        <libSpineC>$(SpineCLibsPath)macos/$(OSArch)/release/libspine-c.dylib</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
+      <Error Condition="! Exists('$(libSpineC)')" Text="libspine-c.dylib not found at $(libSpineC). Please build the library using ./libs/spine-c/scripts/build-spine-c-macos.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishMacOS" AfterTargets="Publish" Condition="'$(IsOSX)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
+        <libSpineC>$(SpineCLibsPath)macos/$(OSArch)/release/libspine-c.dylib</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
+      <Error Condition="! Exists('$(libSpineC)')" Text="libspine-c.dylib not found at $(libSpineC). Please build the library using ./libs/spine-c/scripts/build-spine-c-macos.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentLinux" AfterTargets="AfterBuild" Condition="'$(IsLinux)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+        <libSpineC>$(SpineCLibsPath)linux/$(OSArch)/release/libspine-c.so</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
+      <Error Condition="! Exists('$(libSpineC)')" Text="libspine-c.so not found at $(libSpineC). Please build the library using ./libs/spine-c/scripts/build-spine-c-linux.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+  <Target Name="CopyCustomContentPublishLinux" AfterTargets="Publish" Condition="'$(IsLinux)'=='true'">
+      <PropertyGroup>
+        <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+        <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+        <libSpineC>$(SpineCLibsPath)linux/$(OSArch)/release/libspine-c.so</libSpineC>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
+      <Error Condition="! Exists('$(libSpineC)')" Text="libspine-c.so not found at $(libSpineC). Please build the library using ./libs/spine-c/scripts/build-spine-c-linux.sh" />
+      <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="$(libSpineC)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
+  </Target>
+
+
+  <Target Name="CopyLibraryToArchitectureFolder" AfterTargets="Publish" Condition="'$(BuildAsLibrary)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+      <PropertyGroup>
+          <BuiltLibrary>$(PublishDir)/$(LibraryName).so</BuiltLibrary>
+      </PropertyGroup>
+      <Error Condition="!Exists('$(BuiltLibrary)')" Text="Built library not found at $(BuiltLibrary)" />
+      <MakeDir Directories="$(ArchitectureOutputPath)" />
+      <Copy SourceFiles="$(BuiltLibrary)" DestinationFolder="$(ArchitectureOutputPath)" SkipUnchangedFiles="true" />
+      <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" Importance="high" />
+  </Target>
+
+  <!-- Copy spine-c native library for Android (called after Publish for each ABI) -->
+  <Target Name="CopySpineCAndroidLibrary" AfterTargets="Publish" Condition="'$(IsAndroid)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+      <PropertyGroup>
+        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm64'))">arm64-v8a</AndroidAbiName>
+        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm'))">armeabi-v7a</AndroidAbiName>
+        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('x64'))">x86_64</AndroidAbiName>
+        <libSpineCAndroid>$(SpineCLibsPath)android/$(AndroidAbiName)/release/libspine-c.so</libSpineCAndroid>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(libSpineCAndroid)')" Text="libspine-c.so not found at $(libSpineCAndroid). Please build the library using ./libs/spine-c/scripts/build-spine-c-android.sh" />
+      <Copy SourceFiles="$(libSpineCAndroid)" DestinationFolder="$(ArchitectureOutputPath)" SkipUnchangedFiles="true" />
+      <Message Text="Copied spine-c Android library ($(AndroidAbiName)) to $(ArchitectureOutputPath)" Importance="high" />
+  </Target>
+
+  <!-- Copy spine-c framework for iOS -->
+  <Target Name="CopySpineCIOSFramework" BeforeTargets="BuildIOS;BuildIOSDebug;BuildIOSInstall;BuildIOSDebugInstall" Condition="'$(IsIOS)' == 'true' Or '$(DefineConstants.Contains(__IOS__))' == 'true'">
+      <PropertyGroup>
+        <SpineCFramework>$(SpineCLibsPath)ios/arm64/release/spine-c.framework</SpineCFramework>
+        <IOSFrameworksDir>$(MSBuildProjectDirectory)/ios/Frameworks</IOSFrameworksDir>
+      </PropertyGroup>
+      <Error Condition="! Exists('$(SpineCFramework)')" Text="spine-c.framework not found at $(SpineCFramework). Please build the library using ./libs/spine-c/scripts/build-spine-c-ios.sh" />
+      <MakeDir Directories="$(IOSFrameworksDir)" />
+      <Message Text="Copying spine-c.framework to $(IOSFrameworksDir)" Importance="high" />
+      <!-- Remove old framework if exists -->
+      <RemoveDir Directories="$(IOSFrameworksDir)/spine-c.framework" Condition="Exists('$(IOSFrameworksDir)/spine-c.framework')" />
+      <!-- Copy the entire framework directory -->
+      <Exec Command="cp -R &quot;$(SpineCFramework)&quot; &quot;$(IOSFrameworksDir)/&quot;" />
+      <Message Text="Copied spine-c.framework to iOS Frameworks directory" Importance="high" />
+  </Target>
+
+  <!-- Import Android build configuration -->
+  <Import Project="$(SokolNetHome)/Android.Build.targets" />
+
+  <!-- Import iOS build configuration -->
+  <Import Project="$(SokolNetHome)/iOS.Build.targets" />
+
+</Project>

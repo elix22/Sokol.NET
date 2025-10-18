@@ -72,7 +72,8 @@
                 "fontstash_layers",
                 "cubemaprt",
                 "miprender",
-                "cubemap_jpeg"
+                "cubemap_jpeg",
+                "spine_simple"
             ],
             "default": "cube"
         },
