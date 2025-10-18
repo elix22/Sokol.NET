@@ -52,6 +52,17 @@ if (APPLE)
 else()
     set(FILEUTIL_SRCS "util/fileutil.c" "util/fileutil.h")
 endif()
+
+# Conditionally include spine-c sources if INCLUDE_SPINE is defined and ON
+set(SPINE_SOURCE_FILES "")
+if(DEFINED INCLUDE_SPINE AND INCLUDE_SPINE)
+    message(STATUS "Including spine-c in sokol library")
+    file(GLOB SPINE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/spine-c/src/spine/*.c)
+    list(APPEND SPINE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/spine-c/sokol_spine_extension.c)
+else()
+    message(STATUS "Building sokol library without spine-c")
+endif()
+
 # Determine library type based on platform
 if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     set(SOKOL_LIBRARY_TYPE STATIC)
@@ -63,6 +74,7 @@ add_library(sokol ${SOKOL_LIBRARY_TYPE}
 "sokol.c" 
 ${IMGUI_SOURCE_FILES} 
 ${FILEUTIL_SRCS}
+${SPINE_SOURCE_FILES}
 "basisu/sokol_basisu.cpp")
 
 
@@ -76,11 +88,13 @@ set_target_properties(sokol PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES
 # Add Clang-specific warning flags (not supported by GCC)
 if (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(sokol PRIVATE -Wincompatible-pointer-types-discards-qualifiers)
+    # Allow implicit int->float conversion warning for external spine-c library
+    target_compile_options(sokol PRIVATE -Wno-error=implicit-const-int-float-conversion)
 endif()
 
 target_link_libraries(sokol)
 
-target_include_directories(sokol PRIVATE sokol )
+target_include_directories(sokol PRIVATE sokol ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/spine-c/include)
 
 # Add public include directory for consumers
 target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol/util ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
