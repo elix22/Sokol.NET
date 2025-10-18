@@ -6,6 +6,9 @@
       <!-- Application Version (used across all platforms) -->
       <AppVersion>1.0</AppVersion>
       
+      <!-- Spine-C Integration: Set to true to include spine-c in sokol library for iOS/Android -->
+      <IncludeSpine>true</IncludeSpine>
+      
       <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
       <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
       <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
@@ -65,6 +68,10 @@
 
    <!-- Android Configuration -->
    <PropertyGroup>
+      <!-- Spine-C Integration for Android: spine-c will be compiled into libsokol.so -->
+      <!-- This is controlled by the global IncludeSpine property set above -->
+      <!-- When IncludeSpine=true, spine-c sources are included in the Android native build -->
+      
       <!-- Package Prefix (e.g., com.yourcompany will create com.yourcompany.appname) -->
       <AndroidPackagePrefix>com.sokol</AndroidPackagePrefix>
       
@@ -91,6 +98,10 @@
 
    <!-- iOS Configuration -->
    <PropertyGroup>
+      <!-- Spine-C Integration for iOS: spine-c will be compiled into sokol.framework -->
+      <!-- This is controlled by the global IncludeSpine property set above -->
+      <!-- When IncludeSpine=true, spine-c sources are included in the iOS framework build -->
+      
       <!-- Bundle Identifier Prefix (e.g., com.yourcompany will create com.yourcompany.appname-ios-app) -->
       <IOSBundlePrefix>com.sokol</IOSBundlePrefix>
       

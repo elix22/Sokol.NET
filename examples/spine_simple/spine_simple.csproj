@@ -169,7 +169,9 @@
   </Target>
 
   <!-- Copy spine-c native library for Android (called after Publish for each ABI) -->
-  <Target Name="CopySpineCAndroidLibrary" AfterTargets="Publish" Condition="'$(IsAndroid)' == 'true' And '$(ArchitectureOutputPath)' != ''">
+  <!-- Note: This is only needed when IncludeSpine is NOT true. -->
+  <!-- When IncludeSpine=true, spine-c is compiled into libsokol.so and doesn't need separate copying -->
+  <Target Name="CopySpineCAndroidLibrary" AfterTargets="Publish" Condition="'$(IsAndroid)' == 'true' And '$(ArchitectureOutputPath)' != '' And '$(IncludeSpine)' != 'true'">
       <PropertyGroup>
         <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm64'))">arm64-v8a</AndroidAbiName>
         <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm'))">armeabi-v7a</AndroidAbiName>
@@ -182,7 +184,9 @@
   </Target>
 
   <!-- Copy spine-c framework for iOS -->
-  <Target Name="CopySpineCIOSFramework" BeforeTargets="BuildIOS;BuildIOSDebug;BuildIOSInstall;BuildIOSDebugInstall" Condition="'$(IsIOS)' == 'true' Or '$(DefineConstants.Contains(__IOS__))' == 'true'">
+  <!-- Note: This is only needed when IncludeSpine is NOT true. -->
+  <!-- When IncludeSpine=true, spine-c is compiled into sokol.framework and doesn't need separate copying -->
+  <Target Name="CopySpineCIOSFramework" BeforeTargets="BuildIOS;BuildIOSDebug;BuildIOSInstall;BuildIOSDebugInstall" Condition="('$(IsIOS)' == 'true' Or '$(DefineConstants.Contains(__IOS__))' == 'true') And '$(IncludeSpine)' != 'true'">
       <PropertyGroup>
         <SpineCFramework>$(SpineCLibsPath)ios/arm64/release/spine-c.framework</SpineCFramework>
         <IOSFrameworksDir>$(MSBuildProjectDirectory)/ios/Frameworks</IOSFrameworksDir>

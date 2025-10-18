@@ -44,6 +44,7 @@ namespace SokolApplicationBuilder
 
         Options opts;
         Dictionary<string, string> envVarsDict = new();
+        Dictionary<string, string> androidProperties = new();
 
         string PROJECT_UUID = string.Empty;
         string PROJECT_NAME = string.Empty;
@@ -514,7 +515,7 @@ namespace SokolApplicationBuilder
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
             // Read Android properties from Directory.Build.props
-            var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
+            androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
 
             // Update AndroidManifest.xml
             string manifestPath = Path.Combine(androidPath, "app", "src", "main", "AndroidManifest.xml");
@@ -1001,8 +1002,19 @@ namespace SokolApplicationBuilder
 
             // Build Gradle arguments with NDK version if available
             string ndkVersionArg = !string.IsNullOrEmpty(DETECTED_NDK_VERSION) 
-                ? $"-PndkVersionOverride=\"{DETECTED_NDK_VERSION}\"" 
+                ? $"-PndkVersionArg=\"{DETECTED_NDK_VERSION}\"" 
                 : "";
+            
+            // Build CMake arguments
+            string cmakeArgs = $"-DAPP_NAME={appName}";
+            
+            // Add INCLUDE_SPINE flag if enabled in Directory.Build.props
+            if (androidProperties.TryGetValue("IncludeSpine", out string includeSpine) && 
+                includeSpine.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                cmakeArgs += " -DINCLUDE_SPINE=ON";
+                Log.LogMessage(MessageImportance.High, "🦴 Including spine-c in sokol library build");
+            }
             
             if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
             {
@@ -1016,7 +1028,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleRelease {ndkVersionArg}")
+                    .WithArguments($"assembleRelease -PcmakeArgs=\"{cmakeArgs}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -1033,7 +1045,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"assembleDebug {ndkVersionArg}")
+                    .WithArguments($"assembleDebug -PcmakeArgs=\"{cmakeArgs}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -1060,6 +1072,17 @@ namespace SokolApplicationBuilder
                 ? $"-PndkVersionOverride=\"{DETECTED_NDK_VERSION}\"" 
                 : "";
             
+            // Build CMake arguments
+            string cmakeArgs = $"-DAPP_NAME={appName}";
+            
+            // Add INCLUDE_SPINE flag if enabled in Directory.Build.props
+            if (androidProperties.TryGetValue("IncludeSpine", out string includeSpine) && 
+                includeSpine.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                cmakeArgs += " -DINCLUDE_SPINE=ON";
+                Log.LogMessage(MessageImportance.High, "🦴 Including spine-c in sokol library build");
+            }
+            
             if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
             {
                 Log.LogMessage(MessageImportance.High, $"📦 Configuring Gradle to use NDK version: {DETECTED_NDK_VERSION}");
@@ -1072,7 +1095,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"bundleRelease -PcmakeArgs=\"-DAPP_NAME={appName}\" {ndkVersionArg}")
+                    .WithArguments($"bundleRelease -PcmakeArgs=\"{cmakeArgs}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -1089,7 +1112,7 @@ namespace SokolApplicationBuilder
                 Log.LogMessage(MessageImportance.Normal, $"Using gradlew path: {gradlewPath}");
 
                 var result = Cli.Wrap(gradlewPath)
-                    .WithArguments($"bundleDebug -PcmakeArgs=\"-DAPP_NAME={appName}\" {ndkVersionArg}")
+                    .WithArguments($"bundleDebug -PcmakeArgs=\"{cmakeArgs}\" {ndkVersionArg}")
                     .WithWorkingDirectory(androidPath)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
@@ -1290,6 +1313,11 @@ namespace SokolApplicationBuilder
                             }
                             // Also read AppVersion property (used across all platforms)
                             if (element.Name.LocalName.Equals("AppVersion", StringComparison.OrdinalIgnoreCase))
+                            {
+                                properties[element.Name.LocalName] = element.Value;
+                            }
+                            // Also read IncludeSpine property for spine-c integration
+                            if (element.Name.LocalName.Equals("IncludeSpine", StringComparison.OrdinalIgnoreCase))
                             {
                                 properties[element.Name.LocalName] = element.Value;
                             }

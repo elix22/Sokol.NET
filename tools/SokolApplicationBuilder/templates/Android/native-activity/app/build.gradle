@@ -25,7 +25,9 @@ android {
                 def cmakeArgs = project.hasProperty('cmakeArgs') ? 
                     project.property('cmakeArgs') : ""
                 if (cmakeArgs) {
-                    arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26', cmakeArgs
+                    // Split cmakeArgs string into individual arguments
+                    def argList = cmakeArgs.split(/\s+/) as List
+                    arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26', *argList
                 } else {
                     arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-26'
                 }
