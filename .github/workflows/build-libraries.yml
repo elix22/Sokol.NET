@@ -47,7 +47,6 @@ jobs:
           # Files/directories that affect library builds
           BUILD_AFFECTING_PATTERNS="
             ^ext/
-            ^src/sokol/
             ^bindgen/
             ^scripts/build-.*\.sh$
             ^scripts/build-.*\.ps1$
