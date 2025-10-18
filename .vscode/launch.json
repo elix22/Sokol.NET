@@ -74,7 +74,8 @@
                 "miprender",
                 "cubemap_jpeg",
                 "spine_simple",
-                "spine_skinsets"
+                "spine_skinsets",
+                "spine_inspector"
             ],
             "default": "cube"
         },

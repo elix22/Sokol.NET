@@ -366,6 +366,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-spine_inspector",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/spine_inspector"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-spine_inspector-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/spine_inspector"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -583,7 +597,8 @@
 				"miprender",
 				"cubemap_jpeg",
 				"spine_simple",
-				"spine_skinsets"
+				"spine_skinsets",
+				"spine_inspector"
 			],
 			"default": "cube"
 		},
