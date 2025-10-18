@@ -352,6 +352,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-spine_skinsets",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/spine_skinsets"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-spine_skinsets-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/spine_skinsets"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -568,7 +582,8 @@
 				"cubemaprt",
 				"miprender",
 				"cubemap_jpeg",
-				"spine_simple"
+				"spine_simple",
+				"spine_skinsets"
 			],
 			"default": "cube"
 		},
@@ -601,7 +616,8 @@
 				"examples/cubemaprt",
 				"examples/miprender",
 				"examples/cubemap_jpeg",
-				"examples/spine_simple"
+				"examples/spine_simple",
+				"examples/spine_skinsets"
 			]
 		},
 		{

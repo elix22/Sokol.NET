@@ -400,7 +400,7 @@ public static unsafe class SpineSimpleApp
             width = 1024,
             height = 768,
             sample_count = 1,
-            window_title = "spine-simple-sapp",
+            window_title = "spine-simple-app",
             icon = { sokol_default = true },
         };
     }
