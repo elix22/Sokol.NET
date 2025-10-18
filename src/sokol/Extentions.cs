@@ -1,4 +1,6 @@
 using System.Numerics;
+using System.Text;
+using static Sokol.SSpine;
 
 namespace Sokol
 {
@@ -69,5 +71,16 @@ namespace Sokol
             return new Vector4(quaternion.X, quaternion.Y, quaternion.Z, quaternion.W);
         }
 #endif
+
+        public static string String(this sspine_string str)
+        {
+            byte[] data = new byte[str.len];
+            for (int i = 0; i < str.len; i++)
+            {
+            data[i] = (byte)str.cstr[i];
+            }
+            return Encoding.UTF8.GetString(data);
+        }
+
     }
 }
