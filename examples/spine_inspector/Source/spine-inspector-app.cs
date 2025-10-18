@@ -258,7 +258,7 @@ public static unsafe class SpineInspectorApp
         {
             width = sapp_width(),
             height = sapp_height(),
-            dpi_scale = sapp_dpi_scale(),
+            dpi_scale = 1,// TBD ELI , too small on Android sapp_dpi_scale(),
             delta_time = delta_time
         });
 
