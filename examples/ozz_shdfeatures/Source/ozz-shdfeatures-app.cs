@@ -252,7 +252,7 @@ public static unsafe class OzzShdFeaturesApp
             width = fb_width,
             height = fb_height,
             delta_time = state.frame_time_sec,
-            dpi_scale = sapp_dpi_scale()
+            dpi_scale = 1//TBD ELI , Android issue sapp_dpi_scale()
         });
 
         // Update lighting

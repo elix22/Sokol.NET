@@ -578,6 +578,15 @@
 			"options": {
 				"cwd": "${workspaceFolder}"
 			}
+		},
+		{
+			"label": "Android: Extract Sokol Libraries",
+			"type": "shell",
+			"command": "${workspaceFolder}/scripts/extract-sokol-libraries-from-apk.sh",
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
 		}
 	],
 	"inputs": [
@@ -612,7 +621,8 @@
 				"cubemap_jpeg",
 				"spine_simple",
 				"spine_skinsets",
-				"spine_inspector"
+				"spine_inspector",
+				"ozz_shdfeatures"
 			],
 			"default": "cube"
 		},
@@ -647,7 +657,8 @@
 				"examples/cubemap_jpeg",
 				"examples/spine_simple",
 				"examples/spine_skinsets",
-				"examples/spine_inspector"
+				"examples/spine_inspector",
+				"examples/ozz_shdfeatures"
 			]
 		},
 		{

@@ -397,6 +397,9 @@ namespace SokolApplicationBuilder
                 // Publish .NET assemblies for different architectures
                 PublishAssemblies(buildType);
 
+                // Copy additional native libraries before Gradle build
+                CopyNativeLibraries(buildType);
+
                 // Build Android app (APK or AAB)
                 if (buildAAB)
                     BuildAndroidAAB(appName, buildType);
@@ -987,6 +990,334 @@ namespace SokolApplicationBuilder
                     Log.LogError($"Publishing for {arch} failed: {ex.Message}");
                     throw;
                 }
+            }
+        }
+
+        void CopyNativeLibraries(string buildType)
+        {
+            Log.LogMessage(MessageImportance.High, "📚 Processing native libraries configuration...");
+            
+            string libsDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "libs");
+            
+            // Architectures to process
+            var architectures = new[]
+            {
+                ("linux-bionic-arm64", "arm64-v8a"),
+                ("linux-bionic-arm", "armeabi-v7a"),
+                ("linux-bionic-x64", "x86_64")
+            };
+
+            int librariesProcessed = 0;
+
+            // Scan all Android properties looking for AndroidNativeLibrary_*Path pattern
+            foreach (var property in androidProperties)
+            {
+                if (property.Key.StartsWith("AndroidNativeLibrary_", StringComparison.OrdinalIgnoreCase) &&
+                    property.Key.EndsWith("Path", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extract library name from property name
+                    // AndroidNativeLibrary_OzzUtilPath -> OzzUtil -> ozzutil
+                    string libraryNamePart = property.Key.Substring("AndroidNativeLibrary_".Length);
+                    libraryNamePart = libraryNamePart.Substring(0, libraryNamePart.Length - "Path".Length);
+                    string libraryName = libraryNamePart.ToLowerInvariant();
+                    
+                    string libraryBasePath = property.Value;
+                    
+                    // Make path relative to project if needed
+                    if (!Path.IsPathRooted(libraryBasePath))
+                    {
+                        libraryBasePath = Path.GetFullPath(Path.Combine(opts.ProjectPath, libraryBasePath));
+                    }
+                    
+                    Log.LogMessage(MessageImportance.High, $"🔧 Processing library '{libraryName}' from: {libraryBasePath} (build: {buildType})");
+
+                    // Copy library for each architecture
+                    foreach (var (runtimeId, abiName) in architectures)
+                    {
+                        string sourceLibFile = null;
+                        string sourceLibDir = Path.Combine(libraryBasePath, abiName);
+                        
+                        // Try build-type specific subdirectory first (debug/release)
+                        string buildTypeDir = Path.Combine(sourceLibDir, buildType);
+                        string buildTypeLibFile = Path.Combine(buildTypeDir, $"lib{libraryName}.so");
+                        
+                        if (File.Exists(buildTypeLibFile))
+                        {
+                            sourceLibFile = buildTypeLibFile;
+                            sourceLibDir = buildTypeDir;
+                        }
+                        else
+                        {
+                            // Fallback to direct architecture directory
+                            string directLibFile = Path.Combine(sourceLibDir, $"lib{libraryName}.so");
+                            if (File.Exists(directLibFile))
+                            {
+                                sourceLibFile = directLibFile;
+                            }
+                            else
+                            {
+                                // Try common subdirectories as fallback
+                                string[] fallbackDirs = { "release", "debug" };
+                                foreach (string fallbackDir in fallbackDirs)
+                                {
+                                    string fallbackPath = Path.Combine(sourceLibDir, fallbackDir, $"lib{libraryName}.so");
+                                    if (File.Exists(fallbackPath))
+                                    {
+                                        sourceLibFile = fallbackPath;
+                                        Log.LogMessage(MessageImportance.Normal, $"ℹ️  Using fallback {fallbackDir} library for {libraryName} on {abiName}");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (sourceLibFile != null && File.Exists(sourceLibFile))
+                        {
+                            string destLibDir = Path.Combine(libsDir, abiName);
+                            string destLibFile = Path.Combine(destLibDir, $"lib{libraryName}.so");
+                            
+                            Directory.CreateDirectory(destLibDir);
+                            File.Copy(sourceLibFile, destLibFile, true);
+                            
+                            Log.LogMessage(MessageImportance.Normal, $"✅ Copied {libraryName} for {abiName}: {sourceLibFile} -> {destLibFile}");
+                        }
+                        else
+                        {
+                            Log.LogMessage(MessageImportance.Normal, $"ℹ️  Library {libraryName} not found for {abiName} in any location");
+                        }
+                    }
+                    
+                    librariesProcessed++;
+                }
+            }
+            
+            if (librariesProcessed > 0)
+            {
+                Log.LogMessage(MessageImportance.High, $"✅ Processed {librariesProcessed} native library configuration(s)");
+                
+                // Update CMakeLists.txt to include the native libraries
+                UpdateCMakeListsForNativeLibraries();
+                
+                // Configure build for native libraries (shared C++ runtime and Java loading)
+                ConfigureForNativeLibraries();
+            }
+            else
+            {
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No native library configurations found (AndroidNativeLibrary_*Path properties)");
+            }
+        }
+
+        void UpdateCMakeListsForNativeLibraries()
+        {
+            string cmakeListsPath = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "cpp", "CMakeLists.txt");
+            
+            if (!File.Exists(cmakeListsPath))
+            {
+                Log.LogMessage(MessageImportance.Normal, "⚠️  CMakeLists.txt not found, skipping native library integration");
+                return;
+            }
+
+            string cmakeContent = File.ReadAllText(cmakeListsPath);
+            
+            // Build the additional library configurations
+            var additionalLibraries = new List<string>();
+            var additionalLinkLibraries = new List<string>();
+
+            foreach (var property in androidProperties)
+            {
+                if (property.Key.StartsWith("AndroidNativeLibrary_", StringComparison.OrdinalIgnoreCase) &&
+                    property.Key.EndsWith("Path", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extract library name
+                    string libraryNamePart = property.Key.Substring("AndroidNativeLibrary_".Length);
+                    libraryNamePart = libraryNamePart.Substring(0, libraryNamePart.Length - "Path".Length);
+                    string libraryName = libraryNamePart.ToLowerInvariant();
+                    
+                    additionalLibraries.Add($@"
+# Add {libraryName} library
+add_library({libraryName} SHARED IMPORTED)
+set_target_properties({libraryName} PROPERTIES 
+    IMPORTED_LOCATION ${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}}/lib{libraryName}.so
+    IMPORTED_SONAME ""lib{libraryName}.so"")");
+                    
+                    additionalLinkLibraries.Add($"    {libraryName}");
+                }
+            }
+
+            if (additionalLibraries.Count > 0)
+            {
+                // Insert additional libraries after the main app library definition
+                string insertionPoint = "set_target_properties(";
+                int lastSetTargetProps = cmakeContent.LastIndexOf(insertionPoint);
+                
+                if (lastSetTargetProps >= 0)
+                {
+                    // Find the closing ) for this set_target_properties
+                    int openParen = cmakeContent.IndexOf('(', lastSetTargetProps);
+                    int closeParen = -1;
+                    int parenCount = 0;
+                    for (int i = openParen; i < cmakeContent.Length; i++)
+                    {
+                        if (cmakeContent[i] == '(') parenCount++;
+                        else if (cmakeContent[i] == ')')
+                        {
+                            parenCount--;
+                            if (parenCount == 0)
+                            {
+                                closeParen = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (closeParen >= 0)
+                    {
+                        string additionalLibsText = string.Join("", additionalLibraries);
+                        cmakeContent = cmakeContent.Insert(closeParen + 1, additionalLibsText);
+                        
+                        // Also add to target_link_libraries
+                        string linkLibrariesPattern = "target_link_libraries(sokol";
+                        int linkIndex = cmakeContent.LastIndexOf(linkLibrariesPattern);
+                        if (linkIndex >= 0)
+                        {
+                            // Find the closing parenthesis
+                            int linkOpenParen = cmakeContent.IndexOf('(', linkIndex);
+                            int linkCloseParen = cmakeContent.IndexOf(')', linkOpenParen);
+                            if (linkOpenParen >= 0 && linkCloseParen >= 0)
+                            {
+                                string additionalLinks = string.Join("\n", additionalLinkLibraries);
+                                cmakeContent = cmakeContent.Insert(linkCloseParen, "\n" + additionalLinks);
+                            }
+                        }
+                        
+                        File.WriteAllText(cmakeListsPath, cmakeContent);
+                        Log.LogMessage(MessageImportance.Normal, $"📝 Updated CMakeLists.txt with {additionalLibraries.Count} additional native libraries");
+                    }
+                    else
+                    {
+                        Log.LogMessage(MessageImportance.Normal, "⚠️  Could not find insertion point in CMakeLists.txt");
+                    }
+                }
+            }
+        }
+
+        void ConfigureForNativeLibraries()
+        {
+            Log.LogMessage(MessageImportance.High, "🔧 Configuring build for native library dependencies...");
+            
+            // 1. Update build.gradle to use shared C++ runtime
+            ConfigureBuildGradleForSharedCppRuntime();
+            
+            // 2. Update Java activity to load native libraries in correct order
+            ConfigureJavaLibraryLoading();
+        }
+
+        void ConfigureBuildGradleForSharedCppRuntime()
+        {
+            string buildGradlePath = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "build.gradle");
+            
+            if (!File.Exists(buildGradlePath))
+            {
+                Log.LogMessage(MessageImportance.Normal, "⚠️  build.gradle not found, skipping C++ runtime configuration");
+                return;
+            }
+
+            string content = File.ReadAllText(buildGradlePath);
+            
+            // Replace c++_static with c++_shared for native library compatibility
+            bool modified = false;
+            if (content.Contains("'-DANDROID_STL=c++_static'"))
+            {
+                content = content.Replace("'-DANDROID_STL=c++_static'", "'-DANDROID_STL=c++_shared'");
+                modified = true;
+                Log.LogMessage(MessageImportance.Normal, "📝 Updated build.gradle to use c++_shared runtime for native library compatibility");
+            }
+            
+            if (modified)
+            {
+                File.WriteAllText(buildGradlePath, content);
+            }
+        }
+
+        void ConfigureJavaLibraryLoading()
+        {
+            // Collect all native library names from AndroidNativeLibrary_*Path properties
+            var nativeLibraries = new List<string>();
+            
+            foreach (var property in androidProperties)
+            {
+                if (property.Key.StartsWith("AndroidNativeLibrary_", StringComparison.OrdinalIgnoreCase) &&
+                    property.Key.EndsWith("Path", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extract library name from property name
+                    // AndroidNativeLibrary_OzzUtilPath -> OzzUtil -> ozzutil
+                    string libraryNamePart = property.Key.Substring("AndroidNativeLibrary_".Length);
+                    libraryNamePart = libraryNamePart.Substring(0, libraryNamePart.Length - "Path".Length);
+                    string libraryName = libraryNamePart.ToLowerInvariant();
+                    nativeLibraries.Add(libraryName);
+                }
+            }
+            
+            // Only modify Java loading if we have native libraries
+            if (nativeLibraries.Count == 0)
+            {
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No native libraries detected, keeping default sokol loading");
+                return;
+            }
+            
+            string javaActivityPath = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "java", "com", "sokol", "app", "SokolNativeActivity.java");
+            
+            if (!File.Exists(javaActivityPath))
+            {
+                Log.LogMessage(MessageImportance.Normal, "⚠️  SokolNativeActivity.java not found, skipping library loading configuration");
+                return;
+            }
+
+            string content = File.ReadAllText(javaActivityPath);
+            
+            // Find and replace the simple sokol loading with dynamic loading
+            string oldPattern = @"    // Load native library early so JNI methods are available\s*\n\s*static\s*\{\s*\n\s*System\.loadLibrary\(""sokol""\);\s*\n\s*\}";
+            
+            var regex = new System.Text.RegularExpressions.Regex(oldPattern, System.Text.RegularExpressions.RegexOptions.Multiline);
+            if (regex.IsMatch(content))
+            {
+                // Build library loading statements dynamically
+                var loadStatements = new List<string>();
+                
+                // Add c++_shared first if we have native libraries (they likely need it)
+                loadStatements.Add("            // Load C++ shared runtime first (dependency for native libraries)");
+                loadStatements.Add("            System.loadLibrary(\"c++_shared\");");
+                
+                // Add each detected native library with comments
+                foreach (string libName in nativeLibraries)
+                {
+                    loadStatements.Add($"            // Load {libName} library");
+                    loadStatements.Add($"            System.loadLibrary(\"{libName}\");");
+                }
+                
+                // Add sokol last
+                loadStatements.Add("            // Load main sokol library last");
+                loadStatements.Add("            System.loadLibrary(\"sokol\");");
+                
+                // Create the new static block with proper error handling
+                string newPattern = $@"    // Load native library early so JNI methods are available
+    static {{
+        try {{
+{string.Join("\n", loadStatements)}
+        }} catch (UnsatisfiedLinkError e) {{
+            // Fallback: try loading just sokol if other libraries are not available
+            System.loadLibrary(""sokol"");
+        }}
+    }}";
+                
+                content = regex.Replace(content, newPattern);
+                File.WriteAllText(javaActivityPath, content);
+                
+                Log.LogMessage(MessageImportance.Normal, $"📝 Updated Java library loading for {nativeLibraries.Count} native libraries: {string.Join(", ", nativeLibraries)}");
+            }
+            else
+            {
+                Log.LogMessage(MessageImportance.Normal, "⚠️  Could not find library loading pattern in SokolNativeActivity.java");
             }
         }
 

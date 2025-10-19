@@ -14,8 +14,8 @@ echo "Building ozzutil for all Android architectures"
 echo "Build Type: $BUILD_TYPE"
 echo "=========================================="
 
-# Android ABIs to build
-ANDROID_ABIS=("arm64-v8a" "armeabi-v7a" "x86_64" "x86")
+# Android ABIs to build (excluding x86 since sokol.so is not built for x86)
+ANDROID_ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 
 for ABI in "${ANDROID_ABIS[@]}"; do
     echo ""

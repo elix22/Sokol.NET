@@ -94,6 +94,29 @@
       
       <!-- App Icon (path relative to project root, or just filename if in Assets folder) -->
       <AndroidIcon>logo_s_small.png</AndroidIcon>
+      
+      <!-- Native Libraries Configuration -->
+      <!-- Each library can have its own path configuration using AndroidNativeLibrary_[LibraryName]Path -->
+      <!-- The path should point to the directory containing architecture subdirectories -->
+      <!-- Build system automatically detects debug/release variants based on build configuration -->
+      <!-- 
+      Supported directory structures:
+      1. Path/[arch]/debug|release/lib[LibraryName].so (preferred - matches build type)
+      2. Path/[arch]/lib[LibraryName].so (direct)
+      3. Path/[arch]/release/lib[LibraryName].so (fallback)
+      4. Path/[arch]/debug/lib[LibraryName].so (fallback)
+      -->
+      <!-- Examples: -->
+      <!--   <AndroidNativeLibrary_OzzUtilPath>../../ext/ozzutil/libs/android</AndroidNativeLibrary_OzzUtilPath> -->
+      <!--   <AndroidNativeLibrary_MyLibPath>/custom/path/to/mylib</AndroidNativeLibrary_MyLibPath> -->
+      <!--   <AndroidNativeLibrary_AnotherPath>../../../external/libs/another</AndroidNativeLibrary_AnotherPath> -->
+      
+      <!-- OzzUtil Library Configuration -->
+      <AndroidNativeLibrary_OzzUtilPath>../../ext/ozzutil/libs/android</AndroidNativeLibrary_OzzUtilPath>
+      
+      <!-- Add more libraries as needed: -->
+      <!-- <AndroidNativeLibrary_YourLibraryPath>path/to/your/library</AndroidNativeLibrary_YourLibraryPath> -->
+      <!-- <AndroidNativeLibrary_YourLibrarySubDir>optional_subdir</AndroidNativeLibrary_YourLibrarySubDir> -->
    </PropertyGroup>
 
    <!-- iOS Configuration -->

@@ -62,13 +62,20 @@ jobs:
           echo "Missing binaries for:$MISSING_BINARIES"
         fi
         
-        # Check if sokol-tools source changed
+        # Check if sokol-tools source changed or submodule was updated
         if git rev-parse HEAD~1 >/dev/null 2>&1; then
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           
           echo "Changed files in this commit:"
           echo "$CHANGED_FILES"
           
+          # Check if tools/sokol-tools appears as a changed file (submodule update)
+          if echo "$CHANGED_FILES" | grep -q "^tools/sokol-tools$"; then
+            echo "sokol-tools submodule updated"
+            SHOULD_BUILD=true
+          fi
+          
+          # Also check if any files within sokol-tools changed (for direct edits)
           if echo "$CHANGED_FILES" | grep -q "^tools/sokol-tools/"; then
             echo "sokol-tools source code changed"
             SHOULD_BUILD=true
