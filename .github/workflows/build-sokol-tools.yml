@@ -66,6 +66,9 @@ jobs:
         if git rev-parse HEAD~1 >/dev/null 2>&1; then
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           
+          echo "Changed files in this commit:"
+          echo "$CHANGED_FILES"
+          
           if echo "$CHANGED_FILES" | grep -q "^tools/sokol-tools/"; then
             echo "sokol-tools source code changed"
             SHOULD_BUILD=true
@@ -99,28 +102,13 @@ jobs:
     - name: Setup CMake
       uses: lukka/get-cmake@latest
     
-    - name: Check if binary already exists
-      id: check_binary
-      shell: pwsh
-      run: |
-        $binaryPath = "tools/bin/windows/x64/sokol-shdc.exe"
-        if (Test-Path $binaryPath) {
-          Write-Output "Binary already exists"
-          Write-Output "exists=true" >> $env:GITHUB_OUTPUT
-        } else {
-          Write-Output "Binary does not exist"
-          Write-Output "exists=false" >> $env:GITHUB_OUTPUT
-        }
-    
     - name: Build sokol-shdc
-      if: steps.check_binary.outputs.exists == 'false'
       shell: cmd
       run: |
         cd tools\sokol-tools
         python fips build win64-vstudio-release
     
     - name: Copy binary to tools/bin
-      if: steps.check_binary.outputs.exists == 'false'
       shell: pwsh
       run: |
         $sourceDir = "tools\fips-deploy\sokol-tools\win64-vstudio-release"
@@ -137,7 +125,6 @@ jobs:
         }
     
     - name: Upload artifacts
-      if: steps.check_binary.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: sokol-shdc-windows-x64
@@ -159,25 +146,12 @@ jobs:
     - name: Setup CMake
       uses: lukka/get-cmake@latest
     
-    - name: Check if binary already exists
-      id: check_binary
-      run: |
-        if [ -f "tools/bin/osx/arm64/sokol-shdc" ]; then
-          echo "Binary already exists"
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "Binary does not exist"
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-    
     - name: Build sokol-shdc
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
         python3 fips build osx-xcode-release
     
     - name: Copy binary to tools/bin
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         SOURCE_DIR="tools/fips-deploy/sokol-tools/osx-xcode-release"
         DEST_DIR="tools/bin/osx/arm64"
@@ -194,7 +168,6 @@ jobs:
         fi
     
     - name: Upload artifacts
-      if: steps.check_binary.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: sokol-shdc-macos-arm64
@@ -216,25 +189,12 @@ jobs:
     - name: Setup CMake
       uses: lukka/get-cmake@latest
     
-    - name: Check if binary already exists
-      id: check_binary
-      run: |
-        if [ -f "tools/bin/osx/x86_64/sokol-shdc" ]; then
-          echo "Binary already exists"
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "Binary does not exist"
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-    
     - name: Build sokol-shdc
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
         python3 fips build osx-xcode-release
     
     - name: Copy binary to tools/bin
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         SOURCE_DIR="tools/fips-deploy/sokol-tools/osx-xcode-release"
         DEST_DIR="tools/bin/osx/x86_64"
@@ -251,7 +211,6 @@ jobs:
         fi
     
     - name: Upload artifacts
-      if: steps.check_binary.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: sokol-shdc-macos-x64
@@ -278,30 +237,16 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential git python3 cmake ninja-build
     
-    - name: Check if binary already exists
-      id: check_binary
-      run: |
-        if [ -f "tools/bin/linux/x86_64/sokol-shdc" ]; then
-          echo "Binary already exists"
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "Binary does not exist"
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-    
     - name: Build sokol-shdc
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
         python3 fips build linux-ninja-release
     
     - name: Strip binary
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         strip tools/fips-deploy/sokol-tools/linux-ninja-release/sokol-shdc
     
     - name: Copy binary to tools/bin
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-ninja-release"
         DEST_DIR="tools/bin/linux/x86_64"
@@ -318,7 +263,6 @@ jobs:
         fi
     
     - name: Upload artifacts
-      if: steps.check_binary.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: sokol-shdc-linux-x64
@@ -352,19 +296,7 @@ jobs:
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu
     
-    - name: Check if binary already exists
-      id: check_binary
-      run: |
-        if [ -f "tools/bin/linux/aarch64/sokol-shdc" ]; then
-          echo "Binary already exists"
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "Binary does not exist"
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-    
     - name: Create CMake toolchain file for ARM64
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         cat > $GITHUB_WORKSPACE/arm64-toolchain.cmake << 'EOF'
         set(CMAKE_SYSTEM_NAME Linux)
@@ -380,7 +312,6 @@ jobs:
         EOF
     
     - name: Build sokol-shdc for ARM64 (cross-compile directly with CMake)
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         cd tools/sokol-tools
         
@@ -405,7 +336,6 @@ jobs:
         ninja sokol-shdc
     
     - name: Verify and strip binary
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         # Check what was actually built
         echo "Checking build output directory:"
@@ -429,7 +359,6 @@ jobs:
         fi
     
     - name: Copy binary to tools/bin
-      if: steps.check_binary.outputs.exists == 'false'
       run: |
         SOURCE_DIR="tools/fips-deploy/sokol-tools/linux-arm64-ninja-release"
         DEST_DIR="tools/bin/linux/aarch64"
@@ -446,7 +375,6 @@ jobs:
         fi
     
     - name: Upload artifacts
-      if: steps.check_binary.outputs.exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: sokol-shdc-linux-arm64
