@@ -1,0 +1,167 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <ImportDirectoryBuildProps Condition="'$(ImportDirectoryBuildProps)' == ''">true</ImportDirectoryBuildProps>
+        <TargetFramework>net8.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <TargetOS>browser</TargetOS>
+        <TargetArchitecture>wasm</TargetArchitecture>
+        <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <WasmBuildNative>true</WasmBuildNative>
+        <RunAOTCompilation>true</RunAOTCompilation>
+        <WasmEnableSIMD>false</WasmEnableSIMD>
+        <EmccEnableAssertions>true</EmccEnableAssertions>
+        <EnableAggressiveTrimming>true</EnableAggressiveTrimming>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>partial</TrimMode>
+        <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <DefineConstants>WEB</DefineConstants>
+        <IsWeb>true</IsWeb>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+        <!-- Exclude build artifacts from project view -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
+        <HomeDir>$(UserProfile)</HomeDir>
+        <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
+        <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
+        <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
+    </PropertyGroup>
+
+    <Import Project="$(SokolNetHome)/Directory.Build.props" />
+
+    <PropertyGroup>
+      <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
+      <SokolLibPath>$(SokolLibsPath)emscripten/x86/$(BuildConfigLower)/sokol.a</SokolLibPath>
+      <OzzUtilLibsPath>$(SokolNetHome)/ext/ozzutil/</OzzUtilLibsPath>
+      <OzzUtilLibPath>$(OzzUtilLibsPath)libs/emscripten/x86/release/ozzutil.a</OzzUtilLibPath>
+      <OzzAnimationLibsPath>$(SokolNetHome)/ext/ozz-animation/bin/emscripten/wasm32/release</OzzAnimationLibsPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <NativeFileReference Include="$(SokolLibPath)">
+        <Link>libs\sokol.a</Link>
+      </NativeFileReference>
+      <NativeFileReference Include="$(OzzUtilLibPath)">
+        <Link>libs\ozzutil.a</Link>
+      </NativeFileReference>
+      <!-- ozz-animation libraries -->
+      <NativeFileReference Include="$(OzzAnimationLibsPath)/libozz_animation.a">
+        <Link>libs\libozz_animation.a</Link>
+      </NativeFileReference>
+      <NativeFileReference Include="$(OzzAnimationLibsPath)/libozz_base.a">
+        <Link>libs\libozz_base.a</Link>
+      </NativeFileReference>
+    </ItemGroup>
+
+    <Target Name="ValidateSokolLib" BeforeTargets="Build">
+      <Error Condition="!Exists('$(SokolLibPath)')" Text="sokol.a not found at $(SokolLibPath). Please build the library using ./scripts/build-web-library.sh" />
+      <Error Condition="!Exists('$(OzzUtilLibPath)')" Text="ozzutil.a not found at $(OzzUtilLibPath). Please build the library using ./scripts/build-ozzutil-web.sh" />
+      <Error Condition="!Exists('$(OzzAnimationLibsPath)/libozz_animation.a')" Text="libozz_animation.a not found. Please build ozz-animation for emscripten." />
+      <Error Condition="!Exists('$(OzzAnimationLibsPath)/libozz_base.a')" Text="libozz_base.a not found. Please build ozz-animation for emscripten." />
+    </Target>
+
+    <PropertyGroup>
+      <HostShaderFolder>web</HostShaderFolder>
+      <ShaderSlang>glsl300es</ShaderSlang>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Compile Remove="Android/**/*" />
+      <Compile Remove="ios/**/*" />
+      <Compile Remove="obj/**/*" />
+      <Compile Remove="bin/**/*" />
+    </ItemGroup>
+
+  <!-- Exclude shaders from other platform folders -->
+  <ItemGroup>
+    <Compile Remove="shaders/compiled/ios/**/*.cs" />
+    <Compile Remove="shaders/compiled/osx/**/*.cs" />
+    <Compile Remove="shaders/compiled/windows/**/*.cs" />
+    <Compile Remove="shaders/compiled/linux/**/*.cs" />
+    <Compile Remove="shaders/compiled/android/**/*.cs" />
+  </ItemGroup>
+
+    
+  <ItemGroup>
+    <WasmExtraFilesToDeploy Include="wwwroot/main.js" />
+    <WasmExtraFilesToDeploy Include="wwwroot/index.html" />
+  </ItemGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <DefineConstants>DEBUG;TRACE;WEB</DefineConstants>
+    </PropertyGroup>
+    
+    <Choose>
+        <When Condition=" $(Configuration) == 'Debug' ">
+            <PropertyGroup>
+                <WasmEmitSymbolMap>true</WasmEmitSymbolMap>
+                <EmccFlags>
+                    -s EXPORT_ALL=1
+                    --bind  
+                    -Wbad-function-cast -Wcast-function-type 
+                    -O1 
+                    -g3 
+                    -s VERBOSE=1
+                    -s FULL_ES3
+                    -s USE_WEBGL2=1
+                    -s MIN_WEBGL_VERSION=2 
+                    -s MAX_WEBGL_VERSION=2
+                    -s ASSERTIONS=1
+                    -s WASM=1
+                    -s INITIAL_MEMORY=128MB
+                    -s MAXIMUM_MEMORY=2048MB
+                    -s ALLOW_MEMORY_GROWTH=1
+                    -s ASYNCIFY_STACK_SIZE=10000000
+                    -s TOTAL_MEMORY=520MB
+                    -s EXPORTED_RUNTIME_METHODS=cwrap
+                </EmccFlags>
+                <EmccExtraLDFlags>
+                    -lidbfs.js
+                    --js-library wwwroot/sokol_js_lib.js
+                    -s EXPORTED_RUNTIME_METHODS='['ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
+                </EmccExtraLDFlags>
+            </PropertyGroup>
+        </When>
+        <When Condition=" $(Configuration) == 'Release' ">
+            <PropertyGroup>
+                <EmccFlags>
+                    -s EXPORT_ALL=1
+                    -O3 
+                    --bind
+                    -s WASM=1
+                    -s VERBOSE=1
+                    -s FULL_ES3
+                    -s USE_WEBGL2=1
+                    -s MIN_WEBGL_VERSION=2 
+                    -s MAX_WEBGL_VERSION=2
+                    -s ASSERTIONS=1
+                    -s INITIAL_MEMORY=128MB
+                    -s MAXIMUM_MEMORY=2048MB
+                    -s ALLOW_MEMORY_GROWTH=1
+                    -s TOTAL_MEMORY=520MB
+                </EmccFlags>
+                <EmccExtraLDFlags>
+                    -lexports.js
+                    --js-library wwwroot/sokol_js_lib.js
+                    -s EXPORTED_RUNTIME_METHODS='[ 'ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush']'
+                </EmccExtraLDFlags>
+            </PropertyGroup>
+        </When>
+    </Choose>
+    
+  <!-- Copy assets with folder structure -->
+  <Target Name="CopyAssetsWithStructure" AfterTargets="_WasmGenerateAppBundle">
+    <Message Text="Copying assets to AppBundle..." Importance="high" />
+    <ItemGroup>
+      <AssetFiles Include="Assets/**/*.*" />
+    </ItemGroup>
+    <Message Text="Found @(AssetFiles->Count()) asset files" Importance="high" />
+    <Copy SourceFiles="@(AssetFiles)" DestinationFiles="$(OutDir)AppBundle/%(RecursiveDir)%(Filename)%(Extension)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

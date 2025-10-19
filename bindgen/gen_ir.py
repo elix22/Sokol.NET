@@ -191,7 +191,35 @@ def gen(header_path, source_path, module, main_prefix, dep_prefixes, with_commen
             first_comment = match.group(1)
             if first_comment and "Project URL" in first_comment:
                 outp['comment'] = first_comment
-        for decl in inp['inner']:
+        # Pre-process to find anonymous RecordDecls that should be associated with TypedefDecls
+        decls_to_process = []
+        i = 0
+        while i < len(inp['inner']):
+            decl = inp['inner'][i]
+            
+            # Check if this is an anonymous RecordDecl followed by a TypedefDecl
+            if (decl.get('kind') == 'RecordDecl' and 
+                not decl.get('name') and  # anonymous
+                'inner' in decl and len(decl['inner']) > 0 and  # has fields
+                i + 1 < len(inp['inner'])):
+                
+                next_decl = inp['inner'][i + 1]
+                if (next_decl.get('kind') == 'TypedefDecl' and 
+                    next_decl.get('name') and
+                    next_decl.get('name').startswith(main_prefix)):
+                    
+                    # This is a typedef struct pattern, merge them
+                    merged_decl = decl.copy()
+                    merged_decl['name'] = next_decl['name']  # Use the typedef name
+                    decls_to_process.append(merged_decl)
+                    i += 2  # Skip both the RecordDecl and TypedefDecl
+                    continue
+            
+            decls_to_process.append(decl)
+            i += 1
+        
+        # Now process the merged declarations
+        for decl in decls_to_process:
             is_dep = is_dep_decl(decl, dep_prefixes)
             if is_api_decl(decl, main_prefix) or is_dep:
                 outp_decl = parse_decl(decl, source)

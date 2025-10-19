@@ -20,6 +20,7 @@ tasks = [
     [ '../ext/sokol/util/sokol_fontstash.h', 'sfons_',   ['sg_','sapp_'] ],
     [ '../ext/fontstash/fontstash.h',        'fons',     [] ],
     [ '../ext/stb/stb_image.h',              'stbi_',    [] ],
+    [ '../ext/ozzutil/ozzutil.h',            'ozz_',     ['sg_'] ],
     
 ]
 
@@ -52,3 +53,10 @@ spine_header_output_path = '../ext/spine-c/spine_c_csharp_internal_wrappers.h'
 with open(spine_header_output_path, 'w', newline='\n') as f_header:
     f_header.write(spine_header_content)
 print(f'  Generated Spine-C wrappers: {spine_header_output_path}')
+
+# Generate ozzutil wrappers header (only ozz functions)
+ozzutil_header_content = gen_csharp.gen_c_ozzutil_wrappers_header(all_irs)
+ozzutil_header_output_path = '../ext/ozzutil/ozzutil_csharp_internal_wrappers.h'
+with open(ozzutil_header_output_path, 'w', newline='\n') as f_header:
+    f_header.write(ozzutil_header_content)
+print(f'  Generated OzzUtil wrappers: {ozzutil_header_output_path}')

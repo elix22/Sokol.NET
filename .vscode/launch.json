@@ -75,7 +75,8 @@
                 "cubemap_jpeg",
                 "spine_simple",
                 "spine_skinsets",
-                "spine_inspector"
+                "spine_inspector",
+                "ozz_shdfeatures"
             ],
             "default": "cube"
         },

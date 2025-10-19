@@ -380,6 +380,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-ozz_shdfeatures",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/ozz_shdfeatures"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-ozz_shdfeatures-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/ozz_shdfeatures"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
