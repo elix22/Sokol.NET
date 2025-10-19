@@ -34,14 +34,14 @@ public struct ozz_desc_t
     public int max_instances;
 }
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_setup", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_setup", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_setup", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_setup(in ozz_desc_t desc);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_shutdown", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -56,7 +56,7 @@ public static sg_image ozz_joint_texture()
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_texture", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_texture", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_texture", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -72,7 +72,7 @@ public static sg_view ozz_joint_texture_view()
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_texture_view", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_texture_view", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_texture_view", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -88,7 +88,7 @@ public static sg_sampler ozz_joint_sampler()
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_sampler", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_sampler", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_sampler", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -96,14 +96,14 @@ public static extern sg_sampler ozz_joint_sampler();
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_create_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_create_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_create_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern IntPtr ozz_create_instance(int index);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -118,7 +118,7 @@ public static sg_buffer ozz_vertex_buffer(IntPtr ozz)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_vertex_buffer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_vertex_buffer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_vertex_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -134,7 +134,7 @@ public static sg_buffer ozz_index_buffer(IntPtr ozz)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_index_buffer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_index_buffer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_index_buffer", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -142,84 +142,84 @@ public static extern sg_buffer ozz_index_buffer(IntPtr ozz);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_all_loaded", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_all_loaded", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_all_loaded", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool ozz_all_loaded(IntPtr ozz);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_load_failed", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_load_failed", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_load_failed", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool ozz_load_failed(IntPtr ozz);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_load_skeleton", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_load_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_load_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_load_skeleton(IntPtr ozz, void* data, nuint num_bytes);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_load_animation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_load_animation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_load_animation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_load_animation(IntPtr ozz, void* data, nuint num_bytes);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_load_mesh", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_load_mesh", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_load_mesh", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_load_mesh(IntPtr ozz, void* data, nuint num_bytes);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_set_load_failed", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_set_load_failed", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_set_load_failed", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_set_load_failed(IntPtr ozz);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_update_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_update_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_update_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_update_instance(IntPtr ozz, double seconds);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_update_joint_texture", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_update_joint_texture", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_update_joint_texture", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void ozz_update_joint_texture();
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_texture_pixel_width", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_texture_pixel_width", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_texture_pixel_width", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern float ozz_joint_texture_pixel_width();
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_texture_u", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_texture_u", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_texture_u", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern float ozz_joint_texture_u(IntPtr ozz);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_joint_texture_v", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_joint_texture_v", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_joint_texture_v", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern float ozz_joint_texture_v(IntPtr ozz);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "ozz_num_triangle_indices", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/ozzutil.framework/ozzutil", EntryPoint = "ozz_num_triangle_indices", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("ozzutil", EntryPoint = "ozz_num_triangle_indices", CallingConvention = CallingConvention.Cdecl)]
 #endif

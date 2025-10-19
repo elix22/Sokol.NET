@@ -39,7 +39,7 @@ if(PLATFORM_WEB)
     set(OZZUTIL_LIBRARY_TYPE STATIC)
     message(STATUS "Building STATIC library for ${CMAKE_SYSTEM_NAME}")
 elseif(PLATFORM_IOS)
-    set(OZZUTIL_LIBRARY_TYPE STATIC)  # Framework will be created from static lib
+    set(OZZUTIL_LIBRARY_TYPE SHARED)  # Framework will be created from dynamic lib
     message(STATUS "Building FRAMEWORK for ${CMAKE_SYSTEM_NAME}")
 else()
     set(OZZUTIL_LIBRARY_TYPE SHARED)
@@ -132,7 +132,7 @@ elseif(PLATFORM_ANDROID)
     endif()
 elseif(PLATFORM_IOS)
     # iOS uses a universal framework
-    set(SOKOL_LIB_PATH "${LIBS_DIR}/ios/release/sokol.framework")
+    set(SOKOL_LIB_PATH "${LIBS_DIR}/ios/arm64/sokol.framework")
 endif()
 
 # Link sokol library if found

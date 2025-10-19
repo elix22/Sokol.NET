@@ -90,24 +90,20 @@ endif()
 set(FRAMEWORK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/frameworks")
 
 
-# Embed sokol.framework
-set(CMAKE_XCODE_ATTRIBUTE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/TEMPLATE_PROJECT_NAME.framework")
+# Embed frameworks (dynamically configured based on detected native libraries)
+set(CMAKE_XCODE_ATTRIBUTE_EMBED_FRAMEWORKS "TEMPLATE_EMBED_FRAMEWORKS_LIST")
 set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES
-    XCODE_EMBED_FRAMEWORKS "${FRAMEWORK_DIR}/sokol.framework;${FRAMEWORK_DIR}/TEMPLATE_PROJECT_NAME.framework"
+    XCODE_EMBED_FRAMEWORKS "TEMPLATE_EMBED_FRAMEWORKS_LIST"
     XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY ON
     XCODE_ATTRIBUTE_STRIP_STYLE "non-global"
     XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING "NO"
     XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "NO"
 )
 
-
-# Embed sokol.framework
-
-# Link against the frameworks
+# Link against the frameworks (dynamically configured based on detected native libraries)
 target_link_libraries(TEMPLATE_PROJECT_NAME-ios-app
     "-F${FRAMEWORK_DIR}"
-    "-framework sokol"
-    "-framework TEMPLATE_PROJECT_NAME"
+    TEMPLATE_FRAMEWORK_LINKS
     "-framework UIKit"
     "-framework Foundation"
 )

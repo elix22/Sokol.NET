@@ -676,7 +676,10 @@ def gen_func_c(decl, prefix):
             l("#endif")
         else:
             l("#if __IOS__")
-            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+            if current_library_name == 'sokol':
+                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+            else:
+                l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
             l("#else")
             l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
             l("#endif")
@@ -763,7 +766,10 @@ def gen_func_csharp(decl, prefix):
             l("#endif")
         else:
             l("#if __IOS__")
-            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+            if current_library_name == 'sokol':
+                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+            else:
+                l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
             l("#else")
             l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
             l("#endif")

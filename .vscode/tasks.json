@@ -569,6 +569,7 @@
 				"${input:iOSBuildType}",
 				"--architecture",
 				"ios",
+				"--interactive",
 				"--orientation",
 				"landscape",
 				"--path",

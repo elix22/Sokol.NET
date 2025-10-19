@@ -113,9 +113,11 @@
       
       <!-- OzzUtil Library Configuration -->
       <AndroidNativeLibrary_OzzUtilPath>../../ext/ozzutil/libs/android</AndroidNativeLibrary_OzzUtilPath>
+      <IOSNativeLibrary_OzzUtilPath>../../ext/ozzutil/libs/ios/release</IOSNativeLibrary_OzzUtilPath>
       
       <!-- Add more libraries as needed: -->
       <!-- <AndroidNativeLibrary_YourLibraryPath>path/to/your/library</AndroidNativeLibrary_YourLibraryPath> -->
+      <!-- <IOSNativeLibrary_YourLibraryPath>path/to/your/library</IOSNativeLibrary_YourLibraryPath> -->
       <!-- <AndroidNativeLibrary_YourLibrarySubDir>optional_subdir</AndroidNativeLibrary_YourLibrarySubDir> -->
    </PropertyGroup>
 

@@ -64,6 +64,7 @@ namespace SokolApplicationBuilder
         private string iOSIcon = string.Empty;
         private string appVersion = "1.0"; // Application version (common across all platforms)
         private bool includeSpine = false; // Whether to include spine-c in sokol framework
+        private Dictionary<string, string> iOSNativeLibraries = new Dictionary<string, string>(); // iOS native library paths
 
         private string CLANG_CMD = string.Empty;
         private string AR_CMD = string.Empty;
@@ -280,6 +281,9 @@ namespace SokolApplicationBuilder
                     CopyDirectory(sourceFramework, destFramework);
                 }
 
+                // Copy iOS native libraries to frameworks directory
+                CopyIOSNativeLibraries(frameworksDir);
+
                 return true;
             }
             catch (Exception ex)
@@ -483,6 +487,9 @@ namespace SokolApplicationBuilder
                 
                 content = content.Replace("TEMPLATE_IOS_ORIENTATIONS", iosOrientations);
                 content = content.Replace("TEMPLATE_IPAD_ORIENTATIONS", ipadOrientations);
+                
+                // Configure native libraries in CMakeLists.txt
+                ConfigureIOSNativeLibrariesInCMake(ref content, projectName);
                 
                 File.WriteAllText(cmakeDest, content);
 
@@ -1117,6 +1124,28 @@ namespace SokolApplicationBuilder
                         includeSpine = includeSpineElement.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
                         propertyCount++;
                     }
+
+                    // Detect iOS native libraries (IOSNativeLibrary_*Path properties)
+                    foreach (var element in propertyGroup.Elements())
+                    {
+                        string elementName = element.Name.LocalName;
+                        if (elementName.StartsWith("IOSNativeLibrary_") && elementName.EndsWith("Path"))
+                        {
+                            // Extract library name from IOSNativeLibrary_[LibraryName]Path
+                            string libraryName = elementName.Substring("IOSNativeLibrary_".Length);
+                            libraryName = libraryName.Substring(0, libraryName.Length - "Path".Length);
+                            
+                            if (!string.IsNullOrEmpty(element.Value))
+                            {
+                                string absolutePath = Path.IsPathRooted(element.Value) 
+                                    ? element.Value 
+                                    : Path.Combine(projectPath, element.Value);
+                                    
+                                iOSNativeLibraries[libraryName] = absolutePath;
+                                propertyCount++;
+                            }
+                        }
+                    }
                 }
 
                 if (propertyCount > 0)
@@ -1138,6 +1167,12 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"   - IOSDevelopmentTeam: {iOSDevelopmentTeam}");
                     if (!string.IsNullOrEmpty(iOSIcon))
                         Log.LogMessage(MessageImportance.High, $"   - IOSIcon: {iOSIcon}");
+                    
+                    // Log iOS native libraries
+                    foreach (var library in iOSNativeLibraries)
+                    {
+                        Log.LogMessage(MessageImportance.High, $"   - IOSNativeLibrary_{library.Key}Path: {library.Value}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -1255,6 +1290,108 @@ namespace SokolApplicationBuilder
             Log.LogError("❌ Development Team ID is required for iOS builds");
             Log.LogError("   Provide it via --development-team flag or use --interactive mode");
             return false;
+        }
+
+        private void CopyIOSNativeLibraries(string frameworksDir)
+        {
+            if (iOSNativeLibraries.Count == 0)
+            {
+                return;
+            }
+
+            Log.LogMessage(MessageImportance.High, "📦 Copying iOS native libraries to frameworks directory...");
+
+            foreach (var library in iOSNativeLibraries)
+            {
+                string libraryName = library.Key;
+                string libraryPath = library.Value;
+                
+                Log.LogMessage(MessageImportance.High, $"   Processing {libraryName} from {libraryPath}");
+
+                if (!Directory.Exists(libraryPath))
+                {
+                    Log.LogWarning($"iOS native library directory not found: {libraryPath}");
+                    continue;
+                }
+
+                // Look for .framework directories in the library path
+                string[] frameworks = Directory.GetDirectories(libraryPath, "*.framework", SearchOption.TopDirectoryOnly);
+                
+                if (frameworks.Length == 0)
+                {
+                    Log.LogWarning($"No .framework directories found in {libraryPath}");
+                    continue;
+                }
+
+                foreach (string frameworkDir in frameworks)
+                {
+                    string frameworkName = Path.GetFileName(frameworkDir);
+                    string destFramework = Path.Combine(frameworksDir, frameworkName);
+
+                    if (Directory.Exists(destFramework))
+                    {
+                        Log.LogMessage(MessageImportance.Normal, $"   Removing existing framework: {frameworkName}");
+                        Directory.Delete(destFramework, true);
+                    }
+
+                    Log.LogMessage(MessageImportance.High, $"   ✅ Copying {frameworkName} framework");
+                    CopyDirectory(frameworkDir, destFramework);
+                }
+            }
+
+            Log.LogMessage(MessageImportance.High, "📦 iOS native libraries copied successfully");
+        }
+
+        private void ConfigureIOSNativeLibrariesInCMake(ref string content, string projectName)
+        {
+            // Build the framework lists for iOS
+            var frameworkList = new List<string>();
+            var frameworkLinks = new List<string>();
+
+            // Always include the required frameworks
+            frameworkList.Add("${FRAMEWORK_DIR}/sokol.framework");
+            frameworkList.Add($"${{FRAMEWORK_DIR}}/{projectName}.framework");
+            
+            frameworkLinks.Add("\"-framework sokol\"");
+            frameworkLinks.Add($"\"-framework {projectName}\"");
+
+            // Add detected native libraries
+            foreach (var library in iOSNativeLibraries)
+            {
+                string libraryName = library.Key;
+                string libraryPath = library.Value;
+
+                if (!Directory.Exists(libraryPath))
+                {
+                    continue;
+                }
+
+                // Look for .framework directories in the library path
+                string[] frameworks = Directory.GetDirectories(libraryPath, "*.framework", SearchOption.TopDirectoryOnly);
+                
+                foreach (string frameworkDir in frameworks)
+                {
+                    string frameworkName = Path.GetFileNameWithoutExtension(frameworkDir); // Remove .framework extension
+                    frameworkList.Add($"${{FRAMEWORK_DIR}}/{frameworkName}.framework");
+                    frameworkLinks.Add($"\"-framework {frameworkName}\"");
+                }
+            }
+
+            // Replace placeholders in CMakeLists.txt
+            string embedFrameworksList = string.Join(";", frameworkList);
+            string frameworkLinksList = string.Join("\n    ", frameworkLinks);
+
+            content = content.Replace("TEMPLATE_EMBED_FRAMEWORKS_LIST", embedFrameworksList);
+            content = content.Replace("TEMPLATE_FRAMEWORK_LINKS", frameworkLinksList);
+
+            if (iOSNativeLibraries.Count > 0)
+            {
+                Log.LogMessage(MessageImportance.High, $"📋 Configured {iOSNativeLibraries.Count} iOS native libraries in CMakeLists.txt");
+                foreach (var library in iOSNativeLibraries)
+                {
+                    Log.LogMessage(MessageImportance.High, $"   - {library.Key}");
+                }
+            }
         }
 
         private void CopyDirectory(string sourceDir, string destDir)
