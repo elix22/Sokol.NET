@@ -664,25 +664,12 @@ def gen_enum(decl, prefix):
 def gen_func_c(decl, prefix):
     c_func_name = decl['name']
     if c_func_name not in web_wrapper_struct_return_functions:
-        # For spine-c on iOS/Android, use sokol library since spine-c is compiled into sokol
-        # For other platforms, spine-c is a separate library
-        if current_library_name == 'spine-c':
-            l("#if __IOS__")
-            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#elif __ANDROID__")
-            l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#else")
-            l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#endif")
-        else:
-            l("#if __IOS__")
-            if current_library_name == 'sokol':
-                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            else:
-                l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#else")
-            l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#endif")
+        # Use framework path on iOS, library name on all other platforms
+        l("#if __IOS__")
+        l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#else")
+        l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#endif")
 
 def gen_func_csharp(decl, prefix):
     c_func_name = decl['name']
@@ -755,24 +742,12 @@ def gen_func_csharp(decl, prefix):
         l("    return result;")
         l("}")
         l("#else")
-        # For spine-c on iOS/Android, use sokol library since spine-c is compiled into sokol
-        if current_library_name == 'spine-c':
-            l("#if __IOS__")
-            l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#elif __ANDROID__")
-            l(f"[DllImport(\"sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#else")
-            l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#endif")
-        else:
-            l("#if __IOS__")
-            if current_library_name == 'sokol':
-                l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            else:
-                l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#else")
-            l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
-            l("#endif")
+        # Use framework path on iOS, library name on all other platforms
+        l("#if __IOS__")
+        l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#else")
+        l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{decl['name']}\", CallingConvention = CallingConvention.Cdecl)]")
+        l("#endif")
         if csharp_res_type == "string":
             # Manual string marshalling for WebAssembly to avoid corruption
             l(f"private static extern IntPtr {csharp_func_name}_native({funcdecl_args_csharp(decl, prefix)});")
@@ -901,11 +876,9 @@ def gen_internal_functions(inp, prefix):
                 csharp_func_name = as_pascal_case(check_name_override(decl['name']), prefix)
                 csharp_res_type = funcdecl_result_csharp(decl, prefix)
                 
+                # Use framework path on iOS, library name on all other platforms
                 l("#if __IOS__")
-                if current_library_name == 'sokol':
-                    l(f"[DllImport(\"@rpath/sokol.framework/sokol\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
-                else:
-                    l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
+                l(f"[DllImport(\"@rpath/{current_library_name}.framework/{current_library_name}\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
                 l("#else")
                 l(f"[DllImport(\"{current_library_name}\", EntryPoint = \"{c_func_name}_internal\", CallingConvention = CallingConvention.Cdecl)]")
                 l("#endif")

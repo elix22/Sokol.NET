@@ -550,18 +550,14 @@ public struct sspine_desc
     public sspine_logger logger;
 }
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_setup", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_setup", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_setup", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_setup", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_setup(in sspine_desc desc);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_shutdown", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_shutdown", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_shutdown", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -576,9 +572,7 @@ public static sspine_context sspine_make_context(in sspine_context_desc desc)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_make_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -586,18 +580,14 @@ public static extern sspine_context sspine_make_context(in sspine_context_desc d
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_context", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_destroy_context", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_destroy_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_destroy_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_destroy_context(sspine_context ctx);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_context", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_context", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -612,9 +602,7 @@ public static sspine_context sspine_get_context()
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -630,9 +618,7 @@ public static sspine_context sspine_default_context()
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_default_context", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -648,9 +634,7 @@ public static sspine_context_info sspine_get_context_info(sspine_context ctx)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_context_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -666,9 +650,7 @@ public static sspine_atlas sspine_make_atlas(in sspine_atlas_desc desc)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_make_atlas", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -684,9 +666,7 @@ public static sspine_skeleton sspine_make_skeleton(in sspine_skeleton_desc desc)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_make_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -702,9 +682,7 @@ public static sspine_skinset sspine_make_skinset(in sspine_skinset_desc desc)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_make_skinset", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -720,9 +698,7 @@ public static sspine_instance sspine_make_instance(in sspine_instance_desc desc)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_make_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -730,63 +706,49 @@ public static extern sspine_instance sspine_make_instance(in sspine_instance_des
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_atlas", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_destroy_atlas", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_destroy_atlas", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_destroy_atlas", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_destroy_atlas(sspine_atlas atlas);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_skeleton", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_destroy_skeleton", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_destroy_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_destroy_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_destroy_skeleton(sspine_skeleton skeleton);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_skinset", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_destroy_skinset", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_destroy_skinset", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_destroy_skinset", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_destroy_skinset(sspine_skinset skinset);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_destroy_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_destroy_instance(sspine_instance instance);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_skinset", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_skinset", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_skinset", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_skinset", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_skinset(sspine_instance instance, sspine_skinset skinset);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_update_instance", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_update_instance", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_update_instance", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_update_instance", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_update_instance(sspine_instance instance, float delta_time);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_triggered_events", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_triggered_events", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_triggered_events", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_triggered_events", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -801,9 +763,7 @@ public static sspine_triggered_event_info sspine_get_triggered_event_info(sspine
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_triggered_event_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -811,18 +771,14 @@ public static extern sspine_triggered_event_info sspine_get_triggered_event_info
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_draw_instance_in_layer(sspine_instance instance, int layer);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_context_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_context_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_context_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_context_draw_instance_in_layer", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -837,9 +793,7 @@ public static sspine_mat4 sspine_layer_transform_to_mat4(in sspine_layer_transfo
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_layer_transform_to_mat4", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -847,108 +801,84 @@ public static extern sspine_mat4 sspine_layer_transform_to_mat4(in sspine_layer_
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_draw_layer", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_draw_layer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_draw_layer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_draw_layer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_draw_layer(int layer, in sspine_layer_transform tform);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_context_draw_layer", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_context_draw_layer", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_context_draw_layer", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_context_draw_layer", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_context_draw_layer(sspine_context ctx, int layer, in sspine_layer_transform tform);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_context_resource_state", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_context_resource_state", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_context_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_context_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_resource_state sspine_get_context_resource_state(sspine_context context);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_atlas_resource_state", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_atlas_resource_state", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_atlas_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_atlas_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_resource_state sspine_get_atlas_resource_state(sspine_atlas atlas);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skeleton_resource_state", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_skeleton_resource_state", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_skeleton_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_skeleton_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_resource_state sspine_get_skeleton_resource_state(sspine_skeleton skeleton);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skinset_resource_state", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_skinset_resource_state", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_skinset_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_skinset_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_resource_state sspine_get_skinset_resource_state(sspine_skinset skinset);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_instance_resource_state", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_instance_resource_state", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_instance_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_instance_resource_state", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sspine_resource_state sspine_get_instance_resource_state(sspine_instance instance);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_context_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_context_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_context_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_context_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_context_valid(sspine_context context);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_atlas_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_atlas_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_atlas_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_atlas_valid(sspine_atlas atlas);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skeleton_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skeleton_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skeleton_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skeleton_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_skeleton_valid(sspine_skeleton skeleton);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_instance_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_instance_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_instance_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_instance_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_instance_valid(sspine_instance instance);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skinset_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skinset_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skinset_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skinset_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -963,9 +893,7 @@ public static sspine_atlas sspine_get_skeleton_atlas(sspine_skeleton skeleton)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_skeleton_atlas", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -981,9 +909,7 @@ public static sspine_skeleton sspine_get_instance_skeleton(sspine_instance insta
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_instance_skeleton", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -991,9 +917,7 @@ public static extern sspine_skeleton sspine_get_instance_skeleton(sspine_instanc
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_images", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_images", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_images", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_images", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1008,9 +932,7 @@ public static sspine_image sspine_image_by_index(sspine_atlas atlas, int index)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_image_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1018,18 +940,14 @@ public static extern sspine_image sspine_image_by_index(sspine_atlas atlas, int 
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_image_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_image_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_image_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_image_valid(sspine_image image);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_image_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_image_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_image_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_image_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1044,9 +962,7 @@ public static sspine_image_info sspine_get_image_info(sspine_image image)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_image_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1054,9 +970,7 @@ public static extern sspine_image_info sspine_get_image_info(sspine_image image)
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_atlas_pages", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_atlas_pages", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_atlas_pages", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_atlas_pages", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1071,9 +985,7 @@ public static sspine_atlas_page sspine_atlas_page_by_index(sspine_atlas atlas, i
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_atlas_page_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1081,18 +993,14 @@ public static extern sspine_atlas_page sspine_atlas_page_by_index(sspine_atlas a
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_atlas_page_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_atlas_page_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_atlas_page_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_atlas_page_valid(sspine_atlas_page page);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_atlas_page_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_atlas_page_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_atlas_page_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_atlas_page_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1107,9 +1015,7 @@ public static sspine_atlas_page_info sspine_get_atlas_page_info(sspine_atlas_pag
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_atlas_page_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1117,27 +1023,21 @@ public static extern sspine_atlas_page_info sspine_get_atlas_page_info(sspine_at
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_position", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_position", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_position(sspine_instance instance, sspine_vec2 position);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_scale", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_scale", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_scale(sspine_instance instance, sspine_vec2 scale);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_color", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_color", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_color", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_color", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1152,9 +1052,7 @@ public static sspine_vec2 sspine_get_position(sspine_instance instance)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1170,9 +1068,7 @@ public static sspine_vec2 sspine_get_scale(sspine_instance instance)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1180,18 +1076,14 @@ public static extern sspine_vec2 sspine_get_scale(sspine_instance instance);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_color", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_color", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_color", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_color", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_color sspine_get_color(sspine_instance instance);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_anims", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_anims", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_anims", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_anims", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1206,9 +1098,7 @@ public static sspine_anim sspine_anim_by_name(sspine_skeleton skeleton, [M(U.LPU
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_anim_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1224,9 +1114,7 @@ public static sspine_anim sspine_anim_by_index(sspine_skeleton skeleton, int ind
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_anim_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1234,18 +1122,14 @@ public static extern sspine_anim sspine_anim_by_index(sspine_skeleton skeleton, 
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_anim_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_anim_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_anim_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_anim_valid(sspine_anim anim);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_anim_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_anim_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_anim_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_anim_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1260,9 +1144,7 @@ public static sspine_anim_info sspine_get_anim_info(sspine_anim anim)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_anim_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1270,63 +1152,49 @@ public static extern sspine_anim_info sspine_get_anim_info(sspine_anim anim);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_clear_animation_tracks", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_clear_animation_tracks", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_clear_animation_tracks", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_clear_animation_tracks", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_clear_animation_tracks(sspine_instance instance);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_clear_animation_track", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_clear_animation_track", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_clear_animation_track", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_clear_animation_track", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_clear_animation_track(sspine_instance instance, int track_index);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_animation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_animation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_animation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_animation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_animation(sspine_instance instance, sspine_anim anim, int track_index, bool loop);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_add_animation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_add_animation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_add_animation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_add_animation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_add_animation(sspine_instance instance, sspine_anim anim, int track_index, bool loop, float delay);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_empty_animation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_empty_animation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_empty_animation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_empty_animation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_empty_animation(sspine_instance instance, int track_index, float mix_duration);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_add_empty_animation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_add_empty_animation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_add_empty_animation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_add_empty_animation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_add_empty_animation(sspine_instance instance, int track_index, float mix_duration, float delay);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_bones", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_bones", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_bones", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_bones", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1341,9 +1209,7 @@ public static sspine_bone sspine_bone_by_name(sspine_skeleton skeleton, [M(U.LPU
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1359,9 +1225,7 @@ public static sspine_bone sspine_bone_by_index(sspine_skeleton skeleton, int ind
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1369,18 +1233,14 @@ public static extern sspine_bone sspine_bone_by_index(sspine_skeleton skeleton, 
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_bone_valid(sspine_bone bone);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1395,9 +1255,7 @@ public static sspine_bone_info sspine_get_bone_info(sspine_bone bone)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1405,45 +1263,35 @@ public static extern sspine_bone_info sspine_get_bone_info(sspine_bone bone);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_transform", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_bone_transform", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_bone_transform(sspine_instance instance, sspine_bone bone, in sspine_bone_transform transform);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_position", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_bone_position", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_bone_position(sspine_instance instance, sspine_bone bone, sspine_vec2 position);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_bone_rotation(sspine_instance instance, sspine_bone bone, float rotation);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_scale", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_bone_scale", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_bone_scale(sspine_instance instance, sspine_bone bone, sspine_vec2 scale);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_bone_shear", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_bone_shear", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1458,9 +1306,7 @@ public static sspine_bone_transform sspine_get_bone_transform(sspine_instance in
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_transform", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1476,9 +1322,7 @@ public static sspine_vec2 sspine_get_bone_position(sspine_instance instance, ssp
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1486,9 +1330,7 @@ public static extern sspine_vec2 sspine_get_bone_position(sspine_instance instan
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_rotation", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1503,9 +1345,7 @@ public static sspine_vec2 sspine_get_bone_scale(sspine_instance instance, sspine
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_scale", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1521,9 +1361,7 @@ public static sspine_vec2 sspine_get_bone_shear(sspine_instance instance, sspine
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_shear", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1539,9 +1377,7 @@ public static sspine_vec2 sspine_get_bone_world_position(sspine_instance instanc
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_bone_world_position", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1557,9 +1393,7 @@ public static sspine_vec2 sspine_bone_local_to_world(sspine_instance instance, s
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_local_to_world", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1575,9 +1409,7 @@ public static sspine_vec2 sspine_bone_world_to_local(sspine_instance instance, s
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_bone_world_to_local", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1585,9 +1417,7 @@ public static extern sspine_vec2 sspine_bone_world_to_local(sspine_instance inst
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_slots", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_slots", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_slots", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_slots", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1602,9 +1432,7 @@ public static sspine_slot sspine_slot_by_name(sspine_skeleton skeleton, [M(U.LPU
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_slot_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1620,9 +1448,7 @@ public static sspine_slot sspine_slot_by_index(sspine_skeleton skeleton, int ind
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_slot_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1630,18 +1456,14 @@ public static extern sspine_slot sspine_slot_by_index(sspine_skeleton skeleton, 
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_slot_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_slot_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_slot_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_slot_valid(sspine_slot slot);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_slot_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_slot_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_slot_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_slot_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1656,9 +1478,7 @@ public static sspine_slot_info sspine_get_slot_info(sspine_slot slot)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_slot_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1666,27 +1486,21 @@ public static extern sspine_slot_info sspine_get_slot_info(sspine_slot slot);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_slot_color", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_slot_color", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_slot_color", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_slot_color", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_slot_color(sspine_instance instance, sspine_slot slot, sg_color color);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_slot_color", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_slot_color", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_slot_color", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_slot_color", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern sg_color sspine_get_slot_color(sspine_instance instance, sspine_slot slot);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_events", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_events", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_events", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_events", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1701,9 +1515,7 @@ public static sspine_event sspine_event_by_name(sspine_skeleton skeleton, [M(U.L
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_event_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1719,9 +1531,7 @@ public static sspine_event sspine_event_by_index(sspine_skeleton skeleton, int i
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_event_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1729,18 +1539,14 @@ public static extern sspine_event sspine_event_by_index(sspine_skeleton skeleton
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_event_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_event_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_event_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_event_valid(sspine_event _event);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_event_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_event_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_event_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_event_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1755,9 +1561,7 @@ public static sspine_event_info sspine_get_event_info(sspine_event _event)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_event_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1765,9 +1569,7 @@ public static extern sspine_event_info sspine_get_event_info(sspine_event _event
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_iktargets", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_iktargets", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_iktargets", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_iktargets", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1782,9 +1584,7 @@ public static sspine_iktarget sspine_iktarget_by_name(sspine_skeleton skeleton, 
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_iktarget_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1800,9 +1600,7 @@ public static sspine_iktarget sspine_iktarget_by_index(sspine_skeleton skeleton,
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_iktarget_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1810,18 +1608,14 @@ public static extern sspine_iktarget sspine_iktarget_by_index(sspine_skeleton sk
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_iktarget_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_iktarget_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_iktarget_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_iktarget_valid(sspine_iktarget iktarget);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_iktarget_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_iktarget_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_iktarget_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_iktarget_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1836,9 +1630,7 @@ public static sspine_iktarget_info sspine_get_iktarget_info(sspine_iktarget ikta
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_iktarget_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1846,18 +1638,14 @@ public static extern sspine_iktarget_info sspine_get_iktarget_info(sspine_iktarg
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_iktarget_world_pos", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_iktarget_world_pos", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_iktarget_world_pos", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_iktarget_world_pos", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern void sspine_set_iktarget_world_pos(sspine_instance instance, sspine_iktarget iktarget, sspine_vec2 world_pos);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_num_skins", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_num_skins", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_num_skins", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_num_skins", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1872,9 +1660,7 @@ public static sspine_skin sspine_skin_by_name(sspine_skeleton skeleton, [M(U.LPU
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skin_by_name", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1890,9 +1676,7 @@ public static sspine_skin sspine_skin_by_index(sspine_skeleton skeleton, int ind
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skin_by_index", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1900,18 +1684,14 @@ public static extern sspine_skin sspine_skin_by_index(sspine_skeleton skeleton, 
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_valid", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skin_valid", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skin_valid", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skin_valid", CallingConvention = CallingConvention.Cdecl)]
 #endif
 public static extern bool sspine_skin_valid(sspine_skin skin);
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_skin_equal", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_skin_equal", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_skin_equal", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_skin_equal", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1926,9 +1706,7 @@ public static sspine_skin_info sspine_get_skin_info(sspine_skin skin)
 }
 #else
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_get_skin_info", CallingConvention = CallingConvention.Cdecl)]
 #endif
@@ -1936,9 +1714,7 @@ public static extern sspine_skin_info sspine_get_skin_info(sspine_skin skin);
 #endif
 
 #if __IOS__
-[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
-#elif __ANDROID__
-[DllImport("sokol", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
+[DllImport("@rpath/spine-c.framework/spine-c", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("spine-c", EntryPoint = "sspine_set_skin", CallingConvention = CallingConvention.Cdecl)]
 #endif

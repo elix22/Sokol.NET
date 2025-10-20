@@ -132,7 +132,7 @@ elseif(PLATFORM_ANDROID)
     endif()
 elseif(PLATFORM_IOS)
     # iOS uses a universal framework
-    set(SOKOL_LIB_PATH "${LIBS_DIR}/ios/arm64/sokol.framework")
+    set(SOKOL_LIB_PATH "${LIBS_DIR}/ios/arm64/release/sokol.framework")
 endif()
 
 # Link sokol library if found

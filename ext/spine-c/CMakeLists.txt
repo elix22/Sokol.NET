@@ -32,11 +32,15 @@ else()
 endif()
 
 # Determine library type based on platform
-# Web, iOS, and Android typically use static libraries
-# Desktop platforms (macOS, Windows, Linux) use dynamic libraries
-if(PLATFORM_WEB OR PLATFORM_IOS)
+# Web uses static libraries
+# iOS uses frameworks (shared)
+# Desktop platforms (macOS, Windows, Linux) and Android use dynamic libraries
+if(PLATFORM_WEB)
     set(SPINE_LIBRARY_TYPE STATIC)
     message(STATUS "Building STATIC library for ${CMAKE_SYSTEM_NAME}")
+elseif(PLATFORM_IOS)
+    set(SPINE_LIBRARY_TYPE SHARED)  # Framework will be created from dynamic lib
+    message(STATUS "Building FRAMEWORK for ${CMAKE_SYSTEM_NAME}")
 else()
     set(SPINE_LIBRARY_TYPE SHARED)
     message(STATUS "Building SHARED library for ${CMAKE_SYSTEM_NAME}")
@@ -119,6 +123,9 @@ elseif(PLATFORM_ANDROID)
     else()
         message(WARNING "Unsupported Android ABI: ${ANDROID_ABI}")
     endif()
+elseif(PLATFORM_IOS)
+    # iOS uses a universal framework
+    set(SOKOL_LIB_PATH "${LIBS_DIR}/ios/arm64/release/sokol.framework")
 endif()
 
 # Link sokol library if found
@@ -162,10 +169,14 @@ if(PLATFORM_WEB)
     )
     
 elseif(PLATFORM_IOS)
-    # iOS-specific settings
+    # iOS Framework creation
     set_target_properties(spine-c PROPERTIES
-        FRAMEWORK FALSE
+        FRAMEWORK TRUE
+        FRAMEWORK_VERSION A
+        MACOSX_FRAMEWORK_IDENTIFIER com.sokol.spinec
+        MACOSX_FRAMEWORK_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "13.0"
+        PUBLIC_HEADER "${SPINE_C_HEADERS}"
     )
     
 elseif(PLATFORM_MACOS)
@@ -256,7 +267,7 @@ elseif(PLATFORM_ANDROID)
     set(LIBRARY_FILE_NAME "libspine-c.so")
 elseif(PLATFORM_IOS)
     set(LIBS_PLATFORM_DIR "${LIBS_OUTPUT_DIR}/ios/${BUILD_TYPE_LOWER}")
-    set(LIBRARY_FILE_NAME "libspine-c.a")
+    set(LIBRARY_FILE_NAME "spine-c.framework")
 endif()
 
 # Add post-build command to copy library to libs folder
@@ -268,6 +279,14 @@ if(LIBS_PLATFORM_DIR)
             COMMAND codesign --force --sign - "$<TARGET_FILE:spine-c>"
             COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:spine-c>" "${LIBS_PLATFORM_DIR}/${LIBRARY_FILE_NAME}"
             COMMENT "Signing and copying spine-c library to ${LIBS_PLATFORM_DIR}/${LIBRARY_FILE_NAME}"
+        )
+    elseif(PLATFORM_IOS)
+        # iOS: Copy the entire framework
+        add_custom_command(TARGET spine-c POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${LIBS_PLATFORM_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E remove_directory "${LIBS_PLATFORM_DIR}/${LIBRARY_FILE_NAME}"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:spine-c>" "${LIBS_PLATFORM_DIR}/${LIBRARY_FILE_NAME}"
+            COMMENT "Copying spine-c framework to ${LIBS_PLATFORM_DIR}/${LIBRARY_FILE_NAME}"
         )
     else()
         # Other platforms: Just copy the library

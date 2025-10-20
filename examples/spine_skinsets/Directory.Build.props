@@ -6,9 +6,6 @@
       <!-- Application Version (used across all platforms) -->
       <AppVersion>1.0</AppVersion>
       
-      <!-- Spine-C Integration: Set to true to include spine-c in sokol library for iOS/Android -->
-      <IncludeSpine>true</IncludeSpine>
-      
       <IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</IsWindows> 
       <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX> 
       <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
@@ -97,11 +94,18 @@
    </PropertyGroup>
 
    <!-- iOS Configuration -->
+   <!-- Native Library Configuration for Android and iOS -->
    <PropertyGroup>
-      <!-- Spine-C Integration for iOS: spine-c will be compiled into sokol.framework -->
-      <!-- This is controlled by the global IncludeSpine property set above -->
-      <!-- When IncludeSpine=true, spine-c sources are included in the iOS framework build -->
+      <!-- Android and iOS Native Library Paths -->
+      <!-- Format: AndroidNativeLibrary_[LibraryName]Path or IOSNativeLibrary_[LibraryName]Path -->
+      <!-- The library name must match the actual library filename (e.g., spine-c for libspine-c.so or spine-c.framework) -->
       
+      <!-- Spine-C Library Configuration -->
+      <AndroidNativeLibrary_spine-cPath>../../ext/spine-c/libs/android</AndroidNativeLibrary_spine-cPath>
+      <IOSNativeLibrary_spine-cPath>../../ext/spine-c/libs/ios/release</IOSNativeLibrary_spine-cPath>
+   </PropertyGroup>
+
+   <PropertyGroup>
       <!-- Bundle Identifier Prefix (e.g., com.yourcompany will create com.yourcompany.appname-ios-app) -->
       <IOSBundlePrefix>com.sokol</IOSBundlePrefix>
       
@@ -122,14 +126,6 @@
       
       <!-- App Icon (path relative to project root, or just filename if in Assets folder) -->
       <IOSIcon>logo_s_small.png</IOSIcon>
-   </PropertyGroup>
-
-   <!-- Library Dependencies Configuration -->
-   <PropertyGroup>
-      <!-- Semicolon-separated list of sokol extension libraries to include -->
-      <!-- Available libraries: spine-c, imgui, pl_mpeg, cgltf -->
-      <!-- Note: imgui is always included by default -->
-      <SokolLibraries>spine-c</SokolLibraries>
    </PropertyGroup>
 
    <!-- Desktop Configuration (Windows, macOS, Linux) -->
