@@ -77,7 +77,8 @@
                 "spine_skinsets",
                 "spine_inspector",
                 "ozz_shdfeatures",
-                "vertextexture"
+                "vertextexture",
+                "mrt"
             ],
             "default": "cube"
         },

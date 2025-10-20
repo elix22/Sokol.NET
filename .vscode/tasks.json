@@ -408,6 +408,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-mrt",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/mrt"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-mrt-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/mrt"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -638,7 +652,8 @@
 				"spine_skinsets",
 				"spine_inspector",
 				"ozz_shdfeatures",
-				"vertextexture"
+				"vertextexture",
+				"mrt"
 			],
 			"default": "cube"
 		},
@@ -675,7 +690,8 @@
 				"examples/spine_skinsets",
 				"examples/spine_inspector",
 				"examples/ozz_shdfeatures",
-				"examples/vertextexture"
+				"examples/vertextexture",
+				"examples/mrt"
 			]
 		},
 		{
