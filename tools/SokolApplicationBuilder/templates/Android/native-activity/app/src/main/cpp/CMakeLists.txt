@@ -32,22 +32,6 @@ add_definitions(-DCIMGUI_VARGS0)
 
 set(EXT_ROOT_DIR "../../../../../../../../ext")
 
-# Conditionally include spine-c sources if INCLUDE_SPINE is defined
-set(SPINE_SOURCE_FILES "")
-if(DEFINED INCLUDE_SPINE AND INCLUDE_SPINE)
-    message(STATUS "Including spine-c in sokol library")
-    
-    # Collect all spine-c source files
-    file(GLOB SPINE_SOURCE_FILES
-        ${EXT_ROOT_DIR}/spine-c/src/spine/*.c
-    )
-    
-    # Add spine-c sokol extension
-    list(APPEND SPINE_SOURCE_FILES ${EXT_ROOT_DIR}/spine-c/sokol_spine_extension.c)
-    
-    message(STATUS "Found ${CMAKE_MATCH_0} spine-c source files")
-endif()
-
 set(IMGUI_SOURCE_FILES
         ${EXT_ROOT_DIR}/cimgui/cimgui.cpp
         ${EXT_ROOT_DIR}/cimgui/imgui/imgui_demo.cpp
@@ -82,10 +66,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-add_library(sokol SHARED  ${EXT_ROOT_DIR}/sokol.c ${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp ${IMGUI_SOURCE_FILES} ${FILEUTIL_SRCS} ${SPINE_SOURCE_FILES})
+add_library(sokol SHARED  ${EXT_ROOT_DIR}/sokol.c ${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp ${IMGUI_SOURCE_FILES} ${FILEUTIL_SRCS})
 
 target_include_directories(sokol PRIVATE
-    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR} ${EXT_ROOT_DIR}/cimgui ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf ${EXT_ROOT_DIR}/spine-c/include .)
+    ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR} ${EXT_ROOT_DIR}/cimgui ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf .)
 
 target_compile_options(sokol PRIVATE
     -Wunused-function

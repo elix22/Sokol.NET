@@ -1339,14 +1339,6 @@ set_target_properties({libraryName} PROPERTIES
             // Build CMake arguments
             string cmakeArgs = $"-DAPP_NAME={appName}";
             
-            // Add INCLUDE_SPINE flag if enabled in Directory.Build.props
-            if (androidProperties.TryGetValue("IncludeSpine", out string includeSpine) && 
-                includeSpine.Equals("true", StringComparison.OrdinalIgnoreCase))
-            {
-                cmakeArgs += " -DINCLUDE_SPINE=ON";
-                Log.LogMessage(MessageImportance.High, "🦴 Including spine-c in sokol library build");
-            }
-            
             if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
             {
                 Log.LogMessage(MessageImportance.High, $"📦 Configuring Gradle to use NDK version: {DETECTED_NDK_VERSION}");
@@ -1405,14 +1397,6 @@ set_target_properties({libraryName} PROPERTIES
             
             // Build CMake arguments
             string cmakeArgs = $"-DAPP_NAME={appName}";
-            
-            // Add INCLUDE_SPINE flag if enabled in Directory.Build.props
-            if (androidProperties.TryGetValue("IncludeSpine", out string includeSpine) && 
-                includeSpine.Equals("true", StringComparison.OrdinalIgnoreCase))
-            {
-                cmakeArgs += " -DINCLUDE_SPINE=ON";
-                Log.LogMessage(MessageImportance.High, "🦴 Including spine-c in sokol library build");
-            }
             
             if (!string.IsNullOrEmpty(DETECTED_NDK_VERSION))
             {
@@ -1644,11 +1628,6 @@ set_target_properties({libraryName} PROPERTIES
                             }
                             // Also read AppVersion property (used across all platforms)
                             if (element.Name.LocalName.Equals("AppVersion", StringComparison.OrdinalIgnoreCase))
-                            {
-                                properties[element.Name.LocalName] = element.Value;
-                            }
-                            // Also read IncludeSpine property for spine-c integration
-                            if (element.Name.LocalName.Equals("IncludeSpine", StringComparison.OrdinalIgnoreCase))
                             {
                                 properties[element.Name.LocalName] = element.Value;
                             }

@@ -168,39 +168,6 @@
       <Message Text="Copied $(LibraryName).so to $(ArchitectureOutputPath)" Importance="high" />
   </Target>
 
-  <!-- Copy spine-c native library for Android (called after Publish for each ABI) -->
-  <!-- Note: This is only needed when IncludeSpine is NOT true. -->
-  <!-- When IncludeSpine=true, spine-c is compiled into libsokol.so and doesn't need separate copying -->
-  <Target Name="CopySpineCAndroidLibrary" AfterTargets="Publish" Condition="'$(IsAndroid)' == 'true' And '$(ArchitectureOutputPath)' != '' And '$(IncludeSpine)' != 'true'">
-      <PropertyGroup>
-        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm64'))">arm64-v8a</AndroidAbiName>
-        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('arm'))">armeabi-v7a</AndroidAbiName>
-        <AndroidAbiName Condition="$(RuntimeIdentifier.EndsWith('x64'))">x86_64</AndroidAbiName>
-        <libSpineCAndroid>$(SpineCLibsPath)android/$(AndroidAbiName)/release/libspine-c.so</libSpineCAndroid>
-      </PropertyGroup>
-      <Error Condition="! Exists('$(libSpineCAndroid)')" Text="libspine-c.so not found at $(libSpineCAndroid). Please build the library using ./libs/spine-c/scripts/build-spine-c-android.sh" />
-      <Copy SourceFiles="$(libSpineCAndroid)" DestinationFolder="$(ArchitectureOutputPath)" SkipUnchangedFiles="true" />
-      <Message Text="Copied spine-c Android library ($(AndroidAbiName)) to $(ArchitectureOutputPath)" Importance="high" />
-  </Target>
-
-  <!-- Copy spine-c framework for iOS -->
-  <!-- Note: This is only needed when IncludeSpine is NOT true. -->
-  <!-- When IncludeSpine=true, spine-c is compiled into sokol.framework and doesn't need separate copying -->
-  <Target Name="CopySpineCIOSFramework" BeforeTargets="BuildIOS;BuildIOSDebug;BuildIOSInstall;BuildIOSDebugInstall" Condition="('$(IsIOS)' == 'true' Or '$(DefineConstants.Contains(__IOS__))' == 'true') And '$(IncludeSpine)' != 'true'">
-      <PropertyGroup>
-        <SpineCFramework>$(SpineCLibsPath)ios/arm64/release/spine-c.framework</SpineCFramework>
-        <IOSFrameworksDir>$(MSBuildProjectDirectory)/ios/Frameworks</IOSFrameworksDir>
-      </PropertyGroup>
-      <Error Condition="! Exists('$(SpineCFramework)')" Text="spine-c.framework not found at $(SpineCFramework). Please build the library using ./libs/spine-c/scripts/build-spine-c-ios.sh" />
-      <MakeDir Directories="$(IOSFrameworksDir)" />
-      <Message Text="Copying spine-c.framework to $(IOSFrameworksDir)" Importance="high" />
-      <!-- Remove old framework if exists -->
-      <RemoveDir Directories="$(IOSFrameworksDir)/spine-c.framework" Condition="Exists('$(IOSFrameworksDir)/spine-c.framework')" />
-      <!-- Copy the entire framework directory -->
-      <Exec Command="cp -R &quot;$(SpineCFramework)&quot; &quot;$(IOSFrameworksDir)/&quot;" />
-      <Message Text="Copied spine-c.framework to iOS Frameworks directory" Importance="high" />
-  </Target>
-
   <!-- Import Android build configuration -->
   <Import Project="$(SokolNetHome)/Android.Build.targets" />
 

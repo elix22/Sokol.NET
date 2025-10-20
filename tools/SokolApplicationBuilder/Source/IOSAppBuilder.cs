@@ -63,7 +63,6 @@ namespace SokolApplicationBuilder
         private string iOSDevelopmentTeam = string.Empty;
         private string iOSIcon = string.Empty;
         private string appVersion = "1.0"; // Application version (common across all platforms)
-        private bool includeSpine = false; // Whether to include spine-c in sokol framework
         private Dictionary<string, string> iOSNativeLibraries = new Dictionary<string, string>(); // iOS native library paths
 
         private string CLANG_CMD = string.Empty;
@@ -222,16 +221,8 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
-                // Build CMake arguments with optional spine-c inclusion
-                string cmakeArgs = $"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET={iOSMinVersion} -DCMAKE_OSX_ARCHITECTURES=\"arm64\"";
-                
-                if (includeSpine)
-                {
-                    cmakeArgs += " -DINCLUDE_SPINE=ON";
-                    Log.LogMessage(MessageImportance.High, "🦴 Including spine-c in sokol framework build");
-                }
-                
-                cmakeArgs += $" \"{extDir}\"";
+                // Build CMake arguments
+                string cmakeArgs = $"-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET={iOSMinVersion} -DCMAKE_OSX_ARCHITECTURES=\"arm64\" \"{extDir}\"";
 
                 // Build sokol framework using CMake
                 var cmakeResult = Cli.Wrap("cmake")
@@ -1117,14 +1108,6 @@ namespace SokolApplicationBuilder
                         propertyCount++;
                     }
 
-                    // Include Spine
-                    var includeSpineElement = propertyGroup.Element("IncludeSpine");
-                    if (includeSpineElement != null && !string.IsNullOrEmpty(includeSpineElement.Value))
-                    {
-                        includeSpine = includeSpineElement.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                        propertyCount++;
-                    }
-
                     // Detect iOS native libraries (IOSNativeLibrary_*Path properties)
                     foreach (var element in propertyGroup.Elements())
                     {
@@ -1153,8 +1136,6 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.High, $"📋 Read {propertyCount} iOS properties from Directory.Build.props");
                     if (!string.IsNullOrEmpty(appVersion))
                         Log.LogMessage(MessageImportance.High, $"   - AppVersion: {appVersion}");
-                    if (includeSpine)
-                        Log.LogMessage(MessageImportance.High, $"   - IncludeSpine: true");
                     if (!string.IsNullOrEmpty(iOSBundlePrefix))
                         Log.LogMessage(MessageImportance.High, $"   - IOSBundlePrefix: {iOSBundlePrefix}");
                     if (!string.IsNullOrEmpty(iOSMinVersion))

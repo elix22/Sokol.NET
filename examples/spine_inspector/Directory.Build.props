@@ -65,10 +65,6 @@
 
    <!-- Android Configuration -->
    <PropertyGroup>
-      <!-- Spine-C Integration for Android: spine-c will be compiled into libsokol.so -->
-      <!-- This is controlled by the global IncludeSpine property set above -->
-      <!-- When IncludeSpine=true, spine-c sources are included in the Android native build -->
-      
       <!-- Package Prefix (e.g., com.yourcompany will create com.yourcompany.appname) -->
       <AndroidPackagePrefix>com.sokol</AndroidPackagePrefix>
       
