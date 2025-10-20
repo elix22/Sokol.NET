@@ -112,6 +112,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "spine_inspector", "examples
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "spine_inspectorWeb", "examples\spine_inspector\spine_inspectorWeb.csproj", "{A65801A3-7A12-4218-8DCC-B3E200150063}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ozz_shdfeatures", "examples\ozz_shdfeatures\ozz_shdfeatures.csproj", "{96B8B883-677A-4C82-855E-D788B7B15F03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ozz_shdfeaturesWeb", "examples\ozz_shdfeatures\ozz_shdfeaturesWeb.csproj", "{7AD9D16E-D050-453F-9694-B7E0F379FA16}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -334,6 +338,14 @@ Global
 		{A65801A3-7A12-4218-8DCC-B3E200150063}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A65801A3-7A12-4218-8DCC-B3E200150063}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A65801A3-7A12-4218-8DCC-B3E200150063}.Release|Any CPU.Build.0 = Release|Any CPU
+		{96B8B883-677A-4C82-855E-D788B7B15F03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{96B8B883-677A-4C82-855E-D788B7B15F03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{96B8B883-677A-4C82-855E-D788B7B15F03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{96B8B883-677A-4C82-855E-D788B7B15F03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -393,6 +405,8 @@ Global
 		{9C8F9CEE-1DF5-44DB-BC2D-FEF3BCB8ACC2} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{541D7658-7362-4727-9793-6AF696CEA0E2} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{A65801A3-7A12-4218-8DCC-B3E200150063} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{96B8B883-677A-4C82-855E-D788B7B15F03} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{7AD9D16E-D050-453F-9694-B7E0F379FA16} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}
