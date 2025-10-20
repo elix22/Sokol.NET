@@ -17,7 +17,7 @@ using static Sokol.SImgui;
 using static Sokol.SGImgui;
 using Imgui;
 using static Imgui.ImguiNative;
-using StbImageSharp;
+using static Sokol.StbImage;
 using System.Diagnostics;
 
 public static unsafe class SpineInspectorApp
@@ -563,20 +563,32 @@ public static unsafe class SpineInspectorApp
 
         if (response->fetched)
         {
-            var pixels = ImageResult.FromMemory(state.buffers.image.Buffer, ColorComponents.RedGreenBlueAlpha);
+            // Decode image using native STB from the fetched data in the buffer
+            int img_width = 0, img_height = 0, channels = 0;
+            byte* pixels = stbi_load_csharp(
+                in state.buffers.image.Buffer[0],
+                (int)response->data.size,
+                ref img_width,
+                ref img_height,
+                ref channels,
+                4  // desired_channels: force RGBA
+            );
+
             if (pixels != null)
             {
+                int pixel_data_size = img_width * img_height * 4;
+                ReadOnlySpan<byte> pixelSpan = new ReadOnlySpan<byte>(pixels, pixel_data_size);
+                
                 sg_image_desc img_desc = default;
-                img_desc.width = pixels.Width;
-                img_desc.height = pixels.Height;
+                img_desc.width = img_width;
+                img_desc.height = img_height;
                 img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
                 img_desc.label = img_info.filename.String();
-                img_desc.data.mip_levels[0] = new sg_range
-                {
-                    ptr = Unsafe.AsPointer(ref pixels.Data[0]),
-                    size = (uint)(pixels.Width * pixels.Height * 4)
-                };
+                img_desc.data.mip_levels[0] = SG_RANGE(pixelSpan);
                 sg_init_image(img_info.sgimage, img_desc);
+
+                // Free the native STB image data
+                stbi_image_free_csharp(pixels);
 
                 sg_init_view(img_info.sgview, new sg_view_desc
                 {

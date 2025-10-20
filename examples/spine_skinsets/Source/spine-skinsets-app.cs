@@ -12,9 +12,7 @@ using static Sokol.SSpine;
 using static Sokol.SFetch;
 using static Sokol.STM;
 using static Sokol.SDebugText;
-
-
-using StbImageSharp;
+using static Sokol.StbImage;
 
 using vec2 = Sokol.SSpine.sspine_vec2;
 using System.Diagnostics;
@@ -294,20 +292,34 @@ public static unsafe class SpineSkinSetApp
         // assert(img_info.valid);
         if (response->fetched)
         {
-            var pixels = ImageResult.FromMemory(state.image_buffer.Buffer, ColorComponents.RedGreenBlueAlpha);
+            // Decode image using native STB from the fetched data in the buffer
+            int img_width = 0, img_height = 0, channels = 0;
+            byte* pixels = stbi_load_csharp(
+                in state.image_buffer.Buffer[0],
+                (int)response->data.size,
+                ref img_width,
+                ref img_height,
+                ref channels,
+                4  // desired_channels: force RGBA
+            );
+
             if (pixels != null)
             {
                 // sokol-spine has already allocated a sokol-gfx image and sampler handle for use,
                 // now "populate" the handles with an actual image and sampler
+                int pixel_data_size = img_width * img_height * 4;
+                ReadOnlySpan<byte> pixelSpan = new ReadOnlySpan<byte>(pixels, pixel_data_size);
 
                 sg_image_desc image_Desc = default;
-                image_Desc.width = pixels.Width;
-                image_Desc.height = pixels.Height;
+                image_Desc.width = img_width;
+                image_Desc.height = img_height;
                 image_Desc.pixel_format = SG_PIXELFORMAT_RGBA8;
                 image_Desc.label = img_info.filename.String();
-                image_Desc.data.mip_levels[0] = new sg_range() { ptr = Unsafe.AsPointer(ref pixels.Data[0]), size = (uint)(pixels.Width * pixels.Height * 4) };
+                image_Desc.data.mip_levels[0] = SG_RANGE(pixelSpan);
                 sg_init_image(img_info.sgimage, image_Desc);
 
+                // Free the native STB image data
+                stbi_image_free_csharp(pixels);
 
                 sg_init_view(img_info.sgview, new sg_view_desc()
                 {
