@@ -142,6 +142,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-debugtext_context",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/debugtext_context"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-debugtext_context-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/debugtext_context"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "prepare-imgui_usercallback",
 			"type": "shell",
 			"command": "dotnet",
@@ -634,6 +648,7 @@
 				"sgl",
 				"sgl_lines",
 				"debugtext",
+				"debugtext_context",
 				"imgui_usercallback",
 				"offscreen",
 				"sdf",
@@ -672,6 +687,7 @@
 				"examples/sgl",
 				"examples/sgl_lines",
 				"examples/debugtext",
+				"examples/debugtext_context",
 				"examples/imgui_usercallback",
 				"examples/offscreen",
 				"examples/sdf",

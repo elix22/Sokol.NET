@@ -59,6 +59,7 @@
                 "sgl",
                 "sgl_lines",
                 "debugtext",
+                "debugtext_context",
                 "imgui_usercallback",
                 "offscreen",
                 "sdf",
