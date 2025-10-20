@@ -116,6 +116,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ozz_shdfeatures", "examples
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ozz_shdfeaturesWeb", "examples\ozz_shdfeatures\ozz_shdfeaturesWeb.csproj", "{7AD9D16E-D050-453F-9694-B7E0F379FA16}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vertextexture", "examples\vertextexture\vertextexture.csproj", "{984CE21B-DA73-49BD-9A06-E8FFA62CC180}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vertextextureWeb", "examples\vertextexture\vertextextureWeb.csproj", "{112CEBFE-D976-411E-8B4F-6F73CC0C27C2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -346,6 +350,14 @@ Global
 		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7AD9D16E-D050-453F-9694-B7E0F379FA16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{984CE21B-DA73-49BD-9A06-E8FFA62CC180}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{984CE21B-DA73-49BD-9A06-E8FFA62CC180}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{984CE21B-DA73-49BD-9A06-E8FFA62CC180}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{984CE21B-DA73-49BD-9A06-E8FFA62CC180}.Release|Any CPU.Build.0 = Release|Any CPU
+		{112CEBFE-D976-411E-8B4F-6F73CC0C27C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{112CEBFE-D976-411E-8B4F-6F73CC0C27C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{112CEBFE-D976-411E-8B4F-6F73CC0C27C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{112CEBFE-D976-411E-8B4F-6F73CC0C27C2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -407,6 +419,8 @@ Global
 		{A65801A3-7A12-4218-8DCC-B3E200150063} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{96B8B883-677A-4C82-855E-D788B7B15F03} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{7AD9D16E-D050-453F-9694-B7E0F379FA16} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{984CE21B-DA73-49BD-9A06-E8FFA62CC180} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{112CEBFE-D976-411E-8B4F-6F73CC0C27C2} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

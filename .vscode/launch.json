@@ -76,7 +76,8 @@
                 "spine_simple",
                 "spine_skinsets",
                 "spine_inspector",
-                "ozz_shdfeatures"
+                "ozz_shdfeatures",
+                "vertextexture"
             ],
             "default": "cube"
         },

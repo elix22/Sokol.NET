@@ -394,6 +394,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-vertextexture",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/vertextexture"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-vertextexture-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/vertextexture"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -623,7 +637,8 @@
 				"spine_simple",
 				"spine_skinsets",
 				"spine_inspector",
-				"ozz_shdfeatures"
+				"ozz_shdfeatures",
+				"vertextexture"
 			],
 			"default": "cube"
 		},
@@ -659,7 +674,8 @@
 				"examples/spine_simple",
 				"examples/spine_skinsets",
 				"examples/spine_inspector",
-				"examples/ozz_shdfeatures"
+				"examples/ozz_shdfeatures",
+				"examples/vertextexture"
 			]
 		},
 		{
