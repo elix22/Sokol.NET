@@ -1,7 +1,7 @@
 // fontstash C wrapper for C# bindings
 #include <stddef.h>
 #include <stdlib.h>
-#include "../../ext/fontstash/fontstash.h"
+#include "ext/fontstash/fontstash.h"
 
 // Additional API functions that are in the implementation but should be exposed
 #ifdef __cplusplus
