@@ -30,6 +30,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-assimp_simple-android",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "android", "--path", "${workspaceFolder}/examples/assimp_simple"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-assimp_simple-ios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "ios", "--path", "${workspaceFolder}/examples/assimp_simple"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "prepare-dyntex",
 			"type": "shell",
 			"command": "dotnet",
