@@ -23,7 +23,6 @@ public static unsafe class InstancingSApp
 
     static bool PauseUpdate = false;
 
-    private static IntPtr _descPtr = IntPtr.Zero;
 
     const int MAX_PARTICLES = 512 * 1024;
     const int NUM_PARTICLES_EMITTED_PER_FRAME = 10;
@@ -200,11 +199,6 @@ public static unsafe class InstancingSApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
         sg_shutdown();
 
         if (Debugger.IsAttached)

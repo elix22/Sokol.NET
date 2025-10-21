@@ -47,8 +47,6 @@ public static unsafe class DynTextApp
 
     static _state state = new _state();
 
-    private static IntPtr _descPtr = IntPtr.Zero;
-
 
     [UnmanagedCallersOnly]
     private static unsafe void Init()
@@ -284,11 +282,6 @@ public static unsafe class DynTextApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
         sg_shutdown();
         if (Debugger.IsAttached)
         {

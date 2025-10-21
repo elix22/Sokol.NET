@@ -28,8 +28,6 @@ public static unsafe class LoadPngSApp
 
     static bool PauseUpdate = false;
 
-    private static IntPtr _descPtr = IntPtr.Zero;
-
     private class State
     {
         public float rx, ry;
@@ -288,11 +286,6 @@ public static unsafe class LoadPngSApp
             sg_destroy_view(state.bind.views[VIEW_tex]);
         }
 
-        if (_descPtr != IntPtr.Zero)
-        {
-            Marshal.FreeHGlobal(_descPtr);
-            _descPtr = IntPtr.Zero;
-        }
         sfetch_shutdown();
         sg_shutdown();
 
