@@ -86,7 +86,8 @@ namespace Assimp
     /// </summary>
     static LogStream()
     {
-      AssimpLibrary.Instance.LibraryFreed += AssimpLibraryFreed;
+      // No longer needed with DllImport - library is managed by .NET runtime
+      // AssimpLibrary.Instance.LibraryFreed += AssimpLibraryFreed;
     }
 
     /// <summary>
