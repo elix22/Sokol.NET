@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <RootNamespace>Assimp.Sample</RootNamespace>
+    <ApplicationIcon />
+    <StartupObject />
+    <LangVersion>latest</LangVersion>
+    <ShaderOutputPath>$(BaseIntermediateOutputPath)</ShaderOutputPath>
+    <ShaderContentIncludePath>Shaders</ShaderContentIncludePath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ForceCopyNativeAssimp>true</ForceCopyNativeAssimp>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ShaderGen" Version="1.2.0-beta2" />
+    <PackageReference Include="ShaderGen.Build" Version="1.2.0-beta2" />
+    <PackageReference Include="ShaderGen.Primitives" Version="1.2.0-beta2" />
+    <PackageReference Include="TeximpNet" Version="1.4.3" />
+    <PackageReference Include="Veldrid" Version="4.9.0" />
+    <PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AssimpNet\AssimpNet.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Assets\duck.dae">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\duckCM.bmp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="IncludeGeneratedShaderEmbeddedResource" AfterTargets="AssignTargetPaths" Condition="'$(ShaderContentIncludePath)' != ''">
+    <ItemGroup>
+      <EmbeddedResource Include="@(GeneratedShader)">
+        <LogicalName>%(FileName)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+</Project>

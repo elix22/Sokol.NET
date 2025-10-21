@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <!-- Include metadata files for some files since we want to preserve DLL settings and such -->
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\AssimpNet.dll.meta" Link="UnityPlugin\Plugins\AssimpNet\AssimpNet.dll.meta" />
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\AssimpUnity.cs.meta" Link="UnityPlugin\Plugins\AssimpNet\AssimpUnity.cs.meta" />
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\AssimpUnity.cs" Link="UnityPlugin\Plugins\AssimpNet\AssimpUnity.cs" />
+    <UnityContent Include="..\License.txt" Link="UnityPlugin\Plugins\AssimpNet\License_AssimpNet.txt" />
+
+    <!-- Linux -->
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\Native\linux\x86_64\libassimp.so.meta" Link="UnityPlugin\Plugins\AssimpNet\Native\linux\x86_64\libassimp.so.meta" />
+    <UnityContent Include="..\libs\Assimp\linux-x64\libassimp.so" Link="UnityPlugin\Plugins\AssimpNet\Native\linux\x86_64\libassimp.so" />
+    
+    <!-- OSX -->
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\Native\osx\x86_64\libassimp.bundle.meta" Link="UnityPlugin\Plugins\AssimpNet\Native\osx\x86_64\libassimp.bundle.meta" />
+    <UnityContent Include="..\libs\Assimp\osx-x64\libassimp.dylib" Link="UnityPlugin\Plugins\AssimpNet\Native\osx\x86_64\libassimp.bundle" />
+    
+    <!-- Windows -->
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\Native\win\x86_64\assimp.dll.meta" Link="UnityPlugin\Plugins\AssimpNet\Native\win\x86_64\assimp.dll.meta" />
+    <UnityContent Include="..\libs\Assimp\win-x64\assimp.dll" Link="UnityPlugin\Plugins\AssimpNet\Native\win\x86_64\assimp.dll" />
+    
+    <UnityContent Include="$(MSBuildThisFileDirectory)Plugins\AssimpNet\Native\win\x86\assimp.dll.meta" Link="UnityPlugin\Plugins\AssimpNet\Native\win\x86\assimp.dll.meta" />
+    <UnityContent Include="..\libs\Assimp\win-x86\assimp.dll" Link="UnityPlugin\Plugins\AssimpNet\Native\win\x86\assimp.dll" />
+       
+  </ItemGroup>
+  
+  <!-- Copy build output, AFTER ILPatching finishes -->
+  <Target Name="CopyBuildOutputForUnity" AfterTargets="MemoryInteropILPatching" Condition="'$(TargetFramework)' == 'netstandard1.3'">
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(OutputPath)..\UnityPlugin\Plugins\AssimpNet\" />
+    <Copy Condition="Exists('$(TargetDir)$(AssemblyName).xml')" SourceFiles="$(TargetDir)$(AssemblyName).xml" DestinationFolder="$(OutputPath)..\UnityPlugin\Plugins\AssimpNet\" />
+    <Copy SourceFiles="%(UnityContent.Identity)" DestinationFiles="bin\$(Configuration)\%(UnityContent.Link)" SkipUnchangedFiles="true" Condition="'%(UnityContent.Link)' != ''" />
+  </Target>
+    
+</Project>

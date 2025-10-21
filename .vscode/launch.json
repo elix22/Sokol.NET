@@ -79,7 +79,8 @@
                 "spine_inspector",
                 "ozz_shdfeatures",
                 "vertextexture",
-                "mrt"
+                "mrt",
+                "assimp_simple"
             ],
             "default": "cube"
         },
