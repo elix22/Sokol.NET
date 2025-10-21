@@ -57,7 +57,7 @@ cmake .. \
     -DASSIMP_BUILD_TESTS=OFF \
     -DASSIMP_BUILD_ASSIMP_TOOLS=OFF \
     -DASSIMP_BUILD_SAMPLES=OFF \
-    -DASSIMP_BUILD_ZLIB=OFF \
+    -DASSIMP_BUILD_ZLIB=ON \
     -DASSIMP_NO_EXPORT=ON \
     -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF \
     -DASSIMP_BUILD_OBJ_IMPORTER=ON \
@@ -65,8 +65,11 @@ cmake .. \
     -DASSIMP_BUILD_GLTF_IMPORTER=ON \
     -DASSIMP_BUILD_COLLADA_IMPORTER=ON \
     -DASSIMP_ANDROID_JNIIOSYSTEM=OFF \
-    -DCMAKE_C_FLAGS="-Dfopen64=fopen -Dftello64=ftell -Dfseeko64=fseek" \
-    -DCMAKE_CXX_FLAGS="-Dfopen64=fopen -Dftello64=ftell -Dfseeko64=fseek"
+    -DASSIMP_IGNORE_GIT_HASH=ON \
+    -DAI_CONFIG_ANDROID_JNI_ASSIMP_MANAGER_SUPPORT=OFF \
+    -DCMAKE_C_FLAGS="-Dfopen64=fopen -Dftello64=ftell -Dfseeko64=fseek -fno-omit-frame-pointer -Os" \
+    -DCMAKE_CXX_FLAGS="-Dfopen64=fopen -Dftello64=ftell -Dfseeko64=fseek -fno-omit-frame-pointer -fno-strict-aliasing -Os -ffunction-sections -fdata-sections" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections"
 
 # Build
 cmake --build . --config "$BUILD_TYPE" -- -j$(nproc)

@@ -18,7 +18,9 @@ using static Sokol.SDebugUI;
 using Assimp.Configs;
 using static Sokol.SFetch;
 using static Sokol.SDebugText;
+using static assimp_simple_app_shader_cs.Shaders;
 using Assimp;
+
 public static unsafe class AssimpSimpleApp
 {
     private const int NUM_FONTS = 3;
@@ -30,6 +32,102 @@ public static unsafe class AssimpSimpleApp
         public byte r, g, b;
     };
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct VertexPositionNormalTexture
+    {
+        public static readonly uint SizeInBytes = (uint)MemoryHelper.SizeOf<VertexPositionNormalTexture>();
+
+        public float PosX;
+        public float PosY;
+        public float PosZ;
+
+        public float NormX;
+        public float NormY;
+        public float NormZ;
+
+        public float TexU;
+        public float TexV;
+
+        public VertexPositionNormalTexture(in Vector3 pos, in Vector3 norm, in Vector2 uv)
+        {
+            PosX = pos.X;
+            PosY = pos.Y;
+            PosZ = pos.Z;
+
+            NormX = norm.X;
+            NormY = norm.Y;
+            NormZ = norm.Z;
+
+            TexU = uv.X;
+            TexV = uv.Y;
+        }
+    }
+
+    public struct MeshPart
+    {
+        public int MaterialIndex;
+
+        public int IndexOffset;
+        public int IndexCount;
+
+        public MeshPart(int matIndex, int indexOffset, int indexCount)
+        {
+            MaterialIndex = matIndex;
+
+            IndexOffset = indexOffset;
+            IndexCount = indexCount;
+        }
+    }
+
+    public class SimpleMesh
+    {
+
+        public SimpleMesh(float[] vertices, UInt16[] indices)
+        {
+            VertexBuffer = sg_make_buffer(new sg_buffer_desc()
+            {
+                data = SG_RANGE(vertices),
+                label = "assimp-simple-vertex-buffer"
+            });
+            IndexBuffer = sg_make_buffer(new sg_buffer_desc()
+            {
+                usage = new sg_buffer_usage { index_buffer = true },
+                data = SG_RANGE(indices),
+                label = "assimp-simple-index-buffer"
+            });
+
+            VertexCount = vertices.Length / 7; // 3 pos + 4 color
+            IndexCount = indices.Length;
+        }
+
+        public void Draw()
+        {
+            sg_bindings bind = default;
+            bind.vertex_buffers[0] = VertexBuffer;
+            bind.index_buffer = IndexBuffer;
+            sg_apply_bindings(bind);
+            sg_draw(0, (uint)IndexCount, 1);
+        }
+        
+        public sg_buffer VertexBuffer;
+        public sg_buffer IndexBuffer;
+
+        public int VertexCount;
+        public int IndexCount;
+    }
+
+    public struct MeshDrawCall
+    {
+        public int MeshPartIndex;
+        public Matrix4x4 World;
+
+        public MeshDrawCall(int meshIndex, in Matrix4x4 world)
+        {
+            MeshPartIndex = meshIndex;
+            World = world;
+        }
+    }
+
     enum state_loading_enum
     {
         STATE_IDLE = 0,
@@ -40,10 +138,23 @@ public static unsafe class AssimpSimpleApp
 
     class _state
     {
+        public float rx, ry;
         public sg_pass_action pass_action;
         public color_t[] palette = new color_t[NUM_FONTS];
-        public SharedBuffer fetch_buffer = SharedBuffer.Create(1024 * 1024);
+        public SharedBuffer fetch_buffer = SharedBuffer.Create(285 * 1024);
         public state_loading_enum state_loading = state_loading_enum.STATE_IDLE;
+
+        public List<MeshPart> m_meshesData;
+        // private List<SimpleMaterial> m_materials;
+        public List<MeshDrawCall> m_meshesToDraw;
+
+        public List<SimpleMesh> m_simpleMeshes;
+
+        public sg_pipeline pip;
+        public Sokol.Camera camera = new Sokol.Camera();
+
+        public sg_buffer cube_vbuf;
+        public sg_buffer cube_ibuf;
     }
 
     static _state state = new _state();
@@ -59,6 +170,15 @@ public static unsafe class AssimpSimpleApp
             logger = {
                 func = &slog_func,
             }
+        });
+
+        state.camera.Init(new CameraDesc()
+        {
+            Aspect = 60.0f,
+            NearZ = 0.01f,
+            FarZ = 500.0f,
+            Center = new Vector3(0.0f, 150f, 0.0f),
+            Distance = 400.0f,
         });
 
         state.palette[FONT_KC854] = new color_t { r = 0xf4, g = 0x43, b = 0x36 };
@@ -87,6 +207,24 @@ public static unsafe class AssimpSimpleApp
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         state.pass_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
 
+        sg_shader shd = sg_make_shader(assimp_shader_desc(sg_query_backend()));
+
+        var pipeline_desc = default(sg_pipeline_desc);
+        pipeline_desc.layout.buffers[0].stride = 28;
+        pipeline_desc.layout.attrs[ATTR_assimp_position].format = SG_VERTEXFORMAT_FLOAT3;
+        pipeline_desc.layout.attrs[ATTR_assimp_color0].format = SG_VERTEXFORMAT_FLOAT4;
+
+        pipeline_desc.shader = shd;
+        pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+        pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+        pipeline_desc.depth.write_enabled = true;
+        pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+        pipeline_desc.label = "assimp-simple-pipeline";
+
+        state.pip = sg_make_pipeline(pipeline_desc);
+
+        create_cube_buffers();
+
         sfetch_request_t request = default;
         // Use .collada extension to prevent iOS from converting the XML file to binary plist
         request.path = util_get_file_path("duck.collada");
@@ -102,6 +240,75 @@ public static unsafe class AssimpSimpleApp
 
     }
 
+    static void create_cube_buffers()
+    {
+/* cube vertex buffer */
+        float[] vertices =  {
+            -1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f, 1.0f,
+            1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f, 1.0f,
+            1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.0f, 1.0f,
+
+            -1.0f, -1.0f,  1.0f,   0.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f,   0.0f, 1.0f, 0.0f, 1.0f,
+            1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f, 1.0f,
+
+            -1.0f, -1.0f, -1.0f,   0.0f, 0.0f, 1.0f, 1.0f,
+            -1.0f,  1.0f, -1.0f,   0.0f, 0.0f, 1.0f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   0.0f, 0.0f, 1.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f, 0.0f, 1.0f, 1.0f,
+
+            1.0f, -1.0f, -1.0f,   1.0f, 0.5f, 0.0f, 1.0f,
+            1.0f,  1.0f, -1.0f,   1.0f, 0.5f, 0.0f, 1.0f,
+            1.0f,  1.0f,  1.0f,   1.0f, 0.5f, 0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f,   1.0f, 0.5f, 0.0f, 1.0f,
+
+            -1.0f, -1.0f, -1.0f,   0.0f, 0.5f, 1.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f, 0.5f, 1.0f, 1.0f,
+            1.0f, -1.0f,  1.0f,   0.0f, 0.5f, 1.0f, 1.0f,
+            1.0f, -1.0f, -1.0f,   0.0f, 0.5f, 1.0f, 1.0f,
+
+            -1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.5f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.5f, 1.0f,
+            1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.5f, 1.0f,
+            1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.5f, 1.0f
+        };
+
+   
+        fixed (float* ptr_vertices = vertices)
+        {
+            state.cube_vbuf = sg_make_buffer(new sg_buffer_desc()
+            {
+                data = SG_RANGE(vertices),
+                label = "cube-vertices"
+            }
+            );
+        }
+
+        UInt16[] indices = {
+                0, 1, 2,  0, 2, 3,
+                6, 5, 4,  7, 6, 4,
+                8, 9, 10,  8, 10, 11,
+                14, 13, 12,  15, 14, 12,
+                16, 17, 18,  16, 18, 19,
+                22, 21, 20,  23, 22, 20
+            };
+
+
+        fixed (UInt16* ptr_indices = indices)
+        {
+            state.cube_ibuf = sg_make_buffer(new sg_buffer_desc()
+            {
+                usage = new sg_buffer_usage { index_buffer = true },
+                data = SG_RANGE(indices),
+                label = "cube-indices"
+            }
+            );
+        }
+    }
+    
+
     [UnmanagedCallersOnly]
     static void fetch_callback(sfetch_response_t* response)
     {
@@ -115,7 +322,7 @@ public static unsafe class AssimpSimpleApp
             if (response->failed)
             {
                 Console.WriteLine($"Assimp: Failed to fetch file: {response->error_code}");
-                 state.state_loading = state_loading_enum.STATE_FAILED;
+                state.state_loading = state_loading_enum.STATE_FAILED;
                 return;
             }
 
@@ -137,8 +344,9 @@ public static unsafe class AssimpSimpleApp
             Scene scene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
             if (scene != null)
             {
-                    state.state_loading = state_loading_enum.STATE_LOADED;
+                state.state_loading = state_loading_enum.STATE_LOADED;
                 Console.WriteLine($"Assimp: Successfully loaded model (format: {formatHint}).");
+                ProcesScene(scene);
             }
             else
             {
@@ -148,10 +356,169 @@ public static unsafe class AssimpSimpleApp
         }
     }
 
+    private static void ProcesScene(Scene scene)
+    {
+        state.m_meshesData = new List<MeshPart>();
+        // state.m_materials = new List<SimpleMaterial>();
+        state.m_meshesToDraw = new List<MeshDrawCall>();
+
+        state.m_simpleMeshes = new List<SimpleMesh>();
+
+        GatherVertexCounts(scene, out int vertexCount, out int indexCount);
+        VertexPositionNormalTexture[] vertices = new VertexPositionNormalTexture[vertexCount];
+        uint[] indices = new uint[indexCount];
+
+         var   m_sceneMin = new Vector3(1e10f, 1e10f, 1e10f);
+         var   m_sceneMax = new Vector3(-1e10f, -1e10f, -1e10f);
+      
+
+        int vIndex = 0;
+        int iIndex = 0;
+        int vertexOffset = 0;
+        int indexOffset = 0;
+        foreach (Mesh m in scene.Meshes)
+        {
+          
+
+            List<Vector3> verts = m.Vertices;
+            List<Vector3> norms = (m.HasNormals) ? m.Normals : null;
+            List<Vector3> uvs = m.HasTextureCoords(0) ? m.TextureCoordinateChannels[0] : null;
+
+            float[] float_vertices = new float[verts.Count * 7]; // 8 floats per vertex
+            UInt16[] int_indices = new UInt16[m.FaceCount * 3];
+              
+            for (int i = 0; i < verts.Count; i++)
+            {
+                Vector3 pos = verts[i];
+                Vector3 norm = (norms != null) ? norms[i] : new Vector3(0, 0, 0);
+                Vector3 uv = (uvs != null) ? uvs[i] : new Vector3(0, 0, 0);
+
+                float_vertices[i * 7 + 0] = pos.X;
+                float_vertices[i * 7 + 1] = pos.Y;
+                float_vertices[i * 7 + 2] = pos.Z;
+                float_vertices[i * 7 + 3] = 1.0f;
+                float_vertices[i * 7 + 4] = 0;
+                float_vertices[i * 7 + 5] = 0;
+                float_vertices[i * 7 + 6] = 1.0f;
+
+                m_sceneMin.X = Math.Min(m_sceneMin.X, pos.X);
+                m_sceneMin.Y = Math.Min(m_sceneMin.Y, pos.Y);
+                m_sceneMin.Z = Math.Min(m_sceneMin.Z, pos.Z);
+
+                m_sceneMax.X = Math.Max(m_sceneMax.X, pos.X);
+                m_sceneMax.Y = Math.Max(m_sceneMax.Y, pos.Y);
+                m_sceneMax.Z = Math.Max(m_sceneMax.Z, pos.Z);
+
+                vertices[vIndex++] = new VertexPositionNormalTexture(pos, norm, new Vector2(uv.X, 1 - uv.Y)); //Invert Y coordinate!
+            }
+
+            List<Face> faces = m.Faces;
+            for (int i = 0; i < faces.Count; i++)
+            {
+                Face f = faces[i];
+
+                //Ignore non-triangle faces
+                if (f.IndexCount != 3)
+                {
+                    indices[iIndex++] = 0;
+                    indices[iIndex++] = 0;
+                    indices[iIndex++] = 0;
+                    continue;
+                }
+
+                indices[iIndex++] = (uint)(f.Indices[0] + vertexOffset);
+                indices[iIndex++] = (uint)(f.Indices[1] + vertexOffset);
+                indices[iIndex++] = (uint)(f.Indices[2] + vertexOffset);
+
+                int_indices[i * 3 + 0] = (UInt16)(f.Indices[0]);
+                int_indices[i * 3 + 1] = (UInt16)(f.Indices[1]);
+                int_indices[i * 3 + 2] = (UInt16)(f.Indices[2]);
+            }
+
+            int indexCountForMesh = faces.Count * 3;
+            state.m_meshesData.Add(new MeshPart(m.MaterialIndex, indexOffset, indexCountForMesh));
+
+            vertexOffset += verts.Count;
+            indexOffset += indexCountForMesh;
+
+            state.m_simpleMeshes.Add(new SimpleMesh(float_vertices, int_indices));
+        }
+
+        //Gather up all the nodes (and their final world transform) that have meshes
+        FindAllMeshInstances(scene.RootNode, Matrix4x4.Identity);
+    }
+
+    public static void ToNumerics(in Matrix4x4 matIn, out Matrix4x4 matOut)
+    {
+        //Assimp matrices are column vector, so X,Y,Z axes are columns 1-3 and 4th column is translation.
+        //Columns => Rows to make it compatible with numerics
+        matOut = new System.Numerics.Matrix4x4(matIn.M11, matIn.M21, matIn.M31, matIn.M41, //X
+            matIn.M12, matIn.M22, matIn.M32, matIn.M42, //Y
+            matIn.M13, matIn.M23, matIn.M33, matIn.M43, //Z
+            matIn.M14, matIn.M24, matIn.M34, matIn.M44); //Translation
+    }
+    private static void FindAllMeshInstances(Node parent, in Matrix4x4 rootTransform)
+    {
+        Matrix4x4 trafo;
+        ToNumerics(parent.Transform, out trafo);
+
+        Matrix4x4 world = trafo * rootTransform;
+
+        foreach (int meshIndex in parent.MeshIndices)
+            state.m_meshesToDraw.Add(new MeshDrawCall(meshIndex, world));
+
+        foreach (Node child in parent.Children)
+            FindAllMeshInstances(child, world);
+    }
+
+
+    private static void GatherVertexCounts(Scene scene, out int vertexCount, out int indexCount)
+    {
+        vertexCount = 0;
+        indexCount = 0;
+
+        foreach (Mesh m in scene.Meshes)
+        {
+            vertexCount += m.VertexCount;
+            indexCount += 3 * m.FaceCount;
+        }
+    }
+
     [UnmanagedCallersOnly]
     private static unsafe void Frame()
     {
         sfetch_dowork();
+
+        float deltaSeconds = (float)(Sokol.SApp.sapp_frame_duration());
+
+        state.rx += 1.0f * deltaSeconds;
+        state.ry += 2.0f * deltaSeconds;
+
+
+        vs_params_t vs_params = default;
+
+        var rotationMatrixX = Matrix4x4.CreateFromAxisAngle(Vector3.UnitX, state.rx);
+        var rotationMatrixY = Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, state.ry);
+        var modelMatrix = rotationMatrixX * rotationMatrixY;
+        modelMatrix = Matrix4x4.Identity;
+
+        var width = SApp.sapp_widthf();
+        var height = SApp.sapp_heightf();
+
+        state.camera.Update(sapp_width(), sapp_height());
+
+        var projectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(
+            (float)(60.0f * Math.PI / 180),
+            width / height,
+            0.01f,
+            500.0f);
+        var viewMatrix = Matrix4x4.CreateLookAt(
+            new Vector3(0.0f, 50f, 260.0f),
+            Vector3.Zero,
+            Vector3.UnitY);
+
+        // vs_params.mvp = modelMatrix * viewMatrix * projectionMatrix;
+        vs_params.mvp = modelMatrix  * state.camera.ViewProj;
 
         sdtx_canvas(sapp_width() * 0.5f, sapp_height() * 0.5f);
         sdtx_origin(3.0f, 3.0f);
@@ -161,10 +528,28 @@ public static unsafe class AssimpSimpleApp
         sdtx_print("Assimp Simple App\n");
         sdtx_print("Loading State: {0}\n", state.state_loading.ToString());
 
-        float g = state.pass_action.colors[0].clear_value.g + 0.01f;
-        state.pass_action.colors[0].clear_value.g = (g > 1.0f) ? 0.0f : g;
-
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+        sg_apply_pipeline(state.pip);
+
+
+        sg_apply_bindings(new sg_bindings
+        {
+            vertex_buffers = { [0] = state.cube_vbuf },
+            index_buffer = state.cube_ibuf
+        });
+        sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
+        sg_draw(0, 36, 1);
+
+        if (state.m_simpleMeshes != null)
+        {
+            foreach (var simpleMesh in state.m_simpleMeshes)
+            {
+                sg_apply_uniforms(UB_vs_params, SG_RANGE<vs_params_t>(ref vs_params));
+                simpleMesh.Draw();
+            }
+        }
+    
+
         sdtx_draw();
         sg_end_pass();
         sg_commit();
@@ -174,7 +559,7 @@ public static unsafe class AssimpSimpleApp
     [UnmanagedCallersOnly]
     private static unsafe void Event(sapp_event* e)
     {
-
+           state.camera.HandleEvent(e);
     }
 
     [UnmanagedCallersOnly]
