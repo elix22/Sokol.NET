@@ -91,9 +91,9 @@ public static unsafe class AssimpSimpleApp
         sg_shader shd = sg_make_shader(assimp_shader_desc(sg_query_backend()));
 
         var pipeline_desc = default(sg_pipeline_desc);
-        pipeline_desc.layout.buffers[0].stride = 28;
         pipeline_desc.layout.attrs[ATTR_assimp_position].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[ATTR_assimp_color0].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[ATTR_assimp_texcoord0].format = SG_VERTEXFORMAT_FLOAT2;
 
         pipeline_desc.shader = shd;
         pipeline_desc.index_type = SG_INDEXTYPE_UINT16;

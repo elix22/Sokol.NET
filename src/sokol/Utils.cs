@@ -188,6 +188,29 @@ namespace Sokol
 
         public static string util_get_file_path(string filename)
         {
+            // Remove problematic path prefixes that can cause platform-specific loading issues
+            
+            // Remove "./" prefix (current directory reference)
+            if (filename.StartsWith("./"))
+            {
+                filename = filename.Substring(2);
+            }
+            // Remove ".\\" prefix (Windows current directory reference)
+            else if (filename.StartsWith(".\\"))
+            {
+                filename = filename.Substring(2);
+            }
+            // Remove leading "/" (absolute path - convert to relative)
+            else if (filename.StartsWith("/") && !filename.StartsWith("//"))
+            {
+                filename = filename.Substring(1);
+            }
+            // Remove leading "\" (Windows absolute path - convert to relative)
+            else if (filename.StartsWith("\\") && !filename.StartsWith("\\\\"))
+            {
+                filename = filename.Substring(1);
+            }
+            
             string fullPath = "";
             byte[] temp_buf = new byte[1024];
             fixed (byte* buf_ptr = &temp_buf[0])

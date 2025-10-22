@@ -15,10 +15,11 @@ using static Sokol.SG.sg_compare_func;
 using static Sokol.Utils;
 using static Sokol.SLog;
 using static Sokol.SDebugUI;
-using Assimp.Configs;
+
 using static Sokol.SFetch;
 using static Sokol.SDebugText;
-using static assimp_simple_app_shader_cs.Shaders;
+using static Sokol.StbImage;
+using Assimp.Configs;
 using Assimp;
 
 
@@ -27,6 +28,7 @@ public class SimpleModel
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
+    public Texture diffuseTexture;
     public List<SimpleMesh>? SimpleMeshes;
     public SimpleModel(string filePath)
     {
@@ -86,7 +88,8 @@ public class SimpleModel
             List<Vector3>? norms = (m.HasNormals) ? m.Normals : null;
             List<Vector3>? uvs = m.HasTextureCoords(0) ? m.TextureCoordinateChannels[0] : null;
 
-            float[] float_vertices = new float[verts.Count * 7]; // 8 floats per vertex
+            int floats_per_vertex = 9; // 3 pos + 3 random color + 2 uv + 1 padding
+            float[] float_vertices = new float[verts.Count * floats_per_vertex]; // 9 floats per vertex
             UInt16[] int_indices = new UInt16[m.FaceCount * 3];
 
             for (int i = 0; i < verts.Count; i++)
@@ -95,13 +98,15 @@ public class SimpleModel
                 Vector3 norm = (norms != null) ? norms[i] : new Vector3(0, 0, 0);
                 Vector3 uv = (uvs != null) ? uvs[i] : new Vector3(0, 0, 0);
 
-                float_vertices[i * 7 + 0] = pos.X;
-                float_vertices[i * 7 + 1] = pos.Y;
-                float_vertices[i * 7 + 2] = pos.Z;
-                float_vertices[i * 7 + 3] = NextRandom(0.0f, 1.0f);
-                float_vertices[i * 7 + 4] = NextRandom(0.0f, 1.0f);
-                float_vertices[i * 7 + 5] = NextRandom(0.0f, 1.0f);
-                float_vertices[i * 7 + 6] = 1.0f;
+                float_vertices[i * floats_per_vertex + 0] = pos.X;
+                float_vertices[i * floats_per_vertex + 1] = pos.Y;
+                float_vertices[i * floats_per_vertex + 2] = pos.Z;
+                float_vertices[i * floats_per_vertex + 3] = NextRandom(0.0f, 1.0f);
+                float_vertices[i * floats_per_vertex + 4] = NextRandom(0.0f, 1.0f);
+                float_vertices[i * floats_per_vertex + 5] = NextRandom(0.0f, 1.0f);
+                float_vertices[i * floats_per_vertex + 6] = 1.0f;
+                float_vertices[i * floats_per_vertex + 7] = uv.X;
+                float_vertices[i * floats_per_vertex + 8] = 1-uv.Y;
 
                 m_sceneMin.X = Math.Min(m_sceneMin.X, pos.X);
                 m_sceneMin.Y = Math.Min(m_sceneMin.Y, pos.Y);
@@ -128,7 +133,53 @@ public class SimpleModel
                 int_indices[i * 3 + 2] = (UInt16)(f.Indices[2]);
             }
 
-            SimpleMeshes.Add(new SimpleMesh(float_vertices, int_indices));
+            var material = scene.Materials[m.MaterialIndex];
+
+            int texture_diffuse_count = material.GetMaterialTextureCount(TextureType.Diffuse);
+            if (texture_diffuse_count > 0)
+            {
+                TextureSlot texSlot;
+                material.GetMaterialTexture(TextureType.Diffuse, 0, out texSlot);
+                Console.WriteLine($"Assimp: Mesh uses diffuse texture: {texSlot.FilePath}");
+                string filePath = util_get_file_path(texSlot.FilePath);
+                FileSystem.Instance.LoadFile(filePath, OnDiffuseTextureLoaded);
+            }
+
+            SimpleMeshes.Add(new SimpleMesh(this,float_vertices, int_indices));
+        }
+
+    }
+
+    unsafe void OnDiffuseTextureLoaded(string filePath, byte[]? buffer, FileLoadStatus status)
+    {
+        if (status == FileLoadStatus.Success && buffer != null)
+        {
+            Console.WriteLine($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+            // Further processing of the texture data would go here
+                   int png_width = 0, png_height = 0, channels = 0 , desired_channels=4;
+            byte* pixels = stbi_load_csharp(
+                in buffer[0],
+                (int)buffer.Length,
+                ref png_width,
+                ref png_height,
+                ref channels,
+                desired_channels
+            );
+
+            if (pixels == null)
+            {
+                Console.WriteLine($"Assimp: Failed to decode texture file: {filePath}");
+                return;
+            }
+
+            diffuseTexture = new Texture(pixels, png_width, png_height);
+            
+            // Free the native STB image data
+            stbi_image_free_csharp(pixels);
+        }
+        else
+        {
+            Console.WriteLine($"Assimp: Failed to load texture file: {status}");
         }
 
     }

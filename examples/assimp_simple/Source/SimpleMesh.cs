@@ -24,8 +24,9 @@ using Assimp;
 public class SimpleMesh
 {
 
-    public SimpleMesh(float[] vertices, UInt16[] indices)
+    public SimpleMesh(SimpleModel  parentModel , float[] vertices, UInt16[] indices)
     {
+        _parentModel = parentModel;
         VertexBuffer = sg_make_buffer(new sg_buffer_desc()
         {
             data = SG_RANGE(vertices),
@@ -44,9 +45,15 @@ public class SimpleMesh
 
     public void Draw()
     {
+        if(_parentModel.diffuseTexture == null)
+        {
+            return;
+        }
         sg_bindings bind = default;
         bind.vertex_buffers[0] = VertexBuffer;
         bind.index_buffer = IndexBuffer;
+        bind.views[0] = _parentModel.diffuseTexture.View;
+        bind.samplers[0] = _parentModel.diffuseTexture.Sampler;
         sg_apply_bindings(bind);
         sg_draw(0, (uint)IndexCount, 1);
     }
@@ -56,5 +63,6 @@ public class SimpleMesh
 
     public int VertexCount;
     public int IndexCount;
+    SimpleModel _parentModel;
 }
 
