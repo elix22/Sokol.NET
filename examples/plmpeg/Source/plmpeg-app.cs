@@ -77,7 +77,7 @@ public static unsafe partial class PlMpegApp
         request.path = util_get_file_path(filename);
         request.callback = &fetch_callback;
         var buf = sharedBuffer[state.cur_download_buffer];
-        request.buffer = SFETCH_RANGE(sharedBuffer[state.cur_download_buffer].Buffer);
+        request.buffer = SFETCH_RANGE(sharedBuffer[state.cur_download_buffer]);
         request.chunk_size = CHUNK_SIZE;
 
         sfetch_send(request);
@@ -301,7 +301,7 @@ public static unsafe partial class PlMpegApp
                 // ...otherwise start streaming into the next free buffer
                 state.cur_download_buffer = ring_dequeue(state.free_buffers);
                 sfetch_unbind_buffer(response->handle);
-                sfetch_bind_buffer(response->handle, SFETCH_RANGE(sharedBuffer[state.cur_download_buffer].Buffer));
+                sfetch_bind_buffer(response->handle, SFETCH_RANGE(sharedBuffer[state.cur_download_buffer]));
             }
         }
         else if (response->paused)
@@ -312,7 +312,7 @@ public static unsafe partial class PlMpegApp
             {
                 state.cur_download_buffer = ring_dequeue(state.free_buffers);
                 sfetch_unbind_buffer(response->handle);
-                sfetch_bind_buffer(response->handle, SFETCH_RANGE(sharedBuffer[state.cur_download_buffer].Buffer));
+                sfetch_bind_buffer(response->handle, SFETCH_RANGE(sharedBuffer[state.cur_download_buffer]));
                 sfetch_continue(response->handle);
             }
         }

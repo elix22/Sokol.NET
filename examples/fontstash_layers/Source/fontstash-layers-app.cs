@@ -91,7 +91,7 @@ public static unsafe class FontStashLayersApp
         {
             path = util_get_file_path("DroidSerif-Regular.ttf"),
             callback = &FontLoaded,
-            buffer = SFETCH_RANGE(state.font_data.Buffer)
+            buffer = SFETCH_RANGE(state.font_data)
         });
 
         // Pass action to clear framebuffer to black

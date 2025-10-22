@@ -200,7 +200,7 @@ public static unsafe class SpineSkinSetApp
         {
             path = util_get_file_path(Path.Combine("spine", "mix-and-match-pma.atlas")),
             channel = 0,
-            buffer = SFETCH_RANGE(state.atlas_buffer.Buffer),
+            buffer = SFETCH_RANGE(state.atlas_buffer),
             callback = &atlas_data_loaded,
         });
 
@@ -208,7 +208,7 @@ public static unsafe class SpineSkinSetApp
         {
             path = util_get_file_path(Path.Combine("spine", "mix-and-match-pro.skel")),
             channel = 1,
-            buffer = SFETCH_RANGE(state.skeleton_buffer.Buffer),
+            buffer = SFETCH_RANGE(state.skeleton_buffer),
             callback = &skeleton_data_loaded,
         });
 
@@ -380,7 +380,7 @@ public static unsafe class SpineSkinSetApp
             {
                 path = util_get_file_path(Path.Combine("spine", img_info.filename.String())),
                 channel = 0,
-                buffer = SFETCH_RANGE(state.image_buffer.Buffer),
+                buffer = SFETCH_RANGE(state.image_buffer),
                 callback = &image_data_loaded,
                 user_data = new sfetch_range_t { ptr = Unsafe.AsPointer(ref img), size = (uint)Marshal.SizeOf<sspine_image>() }
             });

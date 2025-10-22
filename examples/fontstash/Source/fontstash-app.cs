@@ -86,32 +86,28 @@ public static unsafe class FontStashApp
         {
             path = util_get_file_path("DroidSerif-Regular.ttf"),
             callback = &FontNormalLoaded,
-            buffer = SFETCH_RANGE(state.font_normal_data.Buffer)
+            buffer = SFETCH_RANGE(state.font_normal_data)
         });
 
         sfetch_send(new sfetch_request_t()
         {
             path = util_get_file_path("DroidSerif-Italic.ttf"),
             callback = &FontItalicLoaded,
-            buffer = SFETCH_RANGE(state.font_italic_data.Buffer)
+            buffer = SFETCH_RANGE(state.font_italic_data)
         });
 
         sfetch_send(new sfetch_request_t()
         {
             path = util_get_file_path("DroidSerif-Bold.ttf"),
             callback = &FontBoldLoaded,
-            buffer = new sfetch_range_t()
-            {
-                ptr = Unsafe.AsPointer(ref state.font_bold_data.Buffer[0]),
-                size = (uint)state.font_bold_data.Buffer.Length
-            }
+            buffer = SFETCH_RANGE(state.font_bold_data)
         });
 
         sfetch_send(new sfetch_request_t()
         {
             path = util_get_file_path("DroidSansJapanese.ttf"),
             callback = &FontJapaneseLoaded,
-            buffer = SFETCH_RANGE(state.font_japanese_data.Buffer)
+            buffer = SFETCH_RANGE(state.font_japanese_data)
         });
     }
 

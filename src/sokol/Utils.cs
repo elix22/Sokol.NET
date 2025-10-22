@@ -181,6 +181,11 @@ namespace Sokol
             return result;
         }
 
+        public static sfetch_range_t SFETCH_RANGE(SharedBuffer buffer)
+        {
+            return SFETCH_RANGE(buffer.Buffer);
+        }
+
         public static string util_get_file_path(string filename)
         {
             string fullPath = "";

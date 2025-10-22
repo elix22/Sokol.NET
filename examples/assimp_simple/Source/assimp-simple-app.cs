@@ -32,52 +32,9 @@ public static unsafe class AssimpSimpleApp
         public byte r, g, b;
     };
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct VertexPositionNormalTexture
-    {
-        public static readonly uint SizeInBytes = (uint)MemoryHelper.SizeOf<VertexPositionNormalTexture>();
+    static readonly Random random = new Random();
+    public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
-        public float PosX;
-        public float PosY;
-        public float PosZ;
-
-        public float NormX;
-        public float NormY;
-        public float NormZ;
-
-        public float TexU;
-        public float TexV;
-
-        public VertexPositionNormalTexture(in Vector3 pos, in Vector3 norm, in Vector2 uv)
-        {
-            PosX = pos.X;
-            PosY = pos.Y;
-            PosZ = pos.Z;
-
-            NormX = norm.X;
-            NormY = norm.Y;
-            NormZ = norm.Z;
-
-            TexU = uv.X;
-            TexV = uv.Y;
-        }
-    }
-
-    public struct MeshPart
-    {
-        public int MaterialIndex;
-
-        public int IndexOffset;
-        public int IndexCount;
-
-        public MeshPart(int matIndex, int indexOffset, int indexCount)
-        {
-            MaterialIndex = matIndex;
-
-            IndexOffset = indexOffset;
-            IndexCount = indexCount;
-        }
-    }
 
     public class SimpleMesh
     {
@@ -116,17 +73,6 @@ public static unsafe class AssimpSimpleApp
         public int IndexCount;
     }
 
-    public struct MeshDrawCall
-    {
-        public int MeshPartIndex;
-        public Matrix4x4 World;
-
-        public MeshDrawCall(int meshIndex, in Matrix4x4 world)
-        {
-            MeshPartIndex = meshIndex;
-            World = world;
-        }
-    }
 
     enum state_loading_enum
     {
@@ -143,10 +89,6 @@ public static unsafe class AssimpSimpleApp
         public color_t[] palette = new color_t[NUM_FONTS];
         public SharedBuffer fetch_buffer = SharedBuffer.Create(285 * 1024);
         public state_loading_enum state_loading = state_loading_enum.STATE_IDLE;
-
-        public List<MeshPart> m_meshesData;
-        // private List<SimpleMaterial> m_materials;
-        public List<MeshDrawCall> m_meshesToDraw;
 
         public List<SimpleMesh> m_simpleMeshes;
 
@@ -229,11 +171,7 @@ public static unsafe class AssimpSimpleApp
         // Use .collada extension to prevent iOS from converting the XML file to binary plist
         request.path = util_get_file_path("duck.collada");
         request.callback = &fetch_callback;
-        request.buffer = new sfetch_range_t()
-        {
-            ptr = Unsafe.AsPointer(ref state.fetch_buffer.Buffer[0]),
-            size = (uint)state.fetch_buffer.Buffer.Length
-        };
+        request.buffer = SFETCH_RANGE(state.fetch_buffer);
         sfetch_send(request);
 
         state.state_loading = state_loading_enum.STATE_LOADING;
@@ -358,28 +296,15 @@ public static unsafe class AssimpSimpleApp
 
     private static void ProcesScene(Scene scene)
     {
-        state.m_meshesData = new List<MeshPart>();
-        // state.m_materials = new List<SimpleMaterial>();
-        state.m_meshesToDraw = new List<MeshDrawCall>();
 
         state.m_simpleMeshes = new List<SimpleMesh>();
 
-        GatherVertexCounts(scene, out int vertexCount, out int indexCount);
-        VertexPositionNormalTexture[] vertices = new VertexPositionNormalTexture[vertexCount];
-        uint[] indices = new uint[indexCount];
 
          var   m_sceneMin = new Vector3(1e10f, 1e10f, 1e10f);
          var   m_sceneMax = new Vector3(-1e10f, -1e10f, -1e10f);
       
-
-        int vIndex = 0;
-        int iIndex = 0;
-        int vertexOffset = 0;
-        int indexOffset = 0;
         foreach (Mesh m in scene.Meshes)
         {
-          
-
             List<Vector3> verts = m.Vertices;
             List<Vector3> norms = (m.HasNormals) ? m.Normals : null;
             List<Vector3> uvs = m.HasTextureCoords(0) ? m.TextureCoordinateChannels[0] : null;
@@ -396,9 +321,9 @@ public static unsafe class AssimpSimpleApp
                 float_vertices[i * 7 + 0] = pos.X;
                 float_vertices[i * 7 + 1] = pos.Y;
                 float_vertices[i * 7 + 2] = pos.Z;
-                float_vertices[i * 7 + 3] = 1.0f;
-                float_vertices[i * 7 + 4] = 0;
-                float_vertices[i * 7 + 5] = 0;
+                float_vertices[i * 7 + 3] = NextRandom(0.0f, 1.0f);
+                float_vertices[i * 7 + 4] = NextRandom(0.0f, 1.0f);
+                float_vertices[i * 7 + 5] = NextRandom(0.0f, 1.0f);
                 float_vertices[i * 7 + 6] = 1.0f;
 
                 m_sceneMin.X = Math.Min(m_sceneMin.X, pos.X);
@@ -408,8 +333,6 @@ public static unsafe class AssimpSimpleApp
                 m_sceneMax.X = Math.Max(m_sceneMax.X, pos.X);
                 m_sceneMax.Y = Math.Max(m_sceneMax.Y, pos.Y);
                 m_sceneMax.Z = Math.Max(m_sceneMax.Z, pos.Z);
-
-                vertices[vIndex++] = new VertexPositionNormalTexture(pos, norm, new Vector2(uv.X, 1 - uv.Y)); //Invert Y coordinate!
             }
 
             List<Face> faces = m.Faces;
@@ -420,69 +343,20 @@ public static unsafe class AssimpSimpleApp
                 //Ignore non-triangle faces
                 if (f.IndexCount != 3)
                 {
-                    indices[iIndex++] = 0;
-                    indices[iIndex++] = 0;
-                    indices[iIndex++] = 0;
                     continue;
                 }
-
-                indices[iIndex++] = (uint)(f.Indices[0] + vertexOffset);
-                indices[iIndex++] = (uint)(f.Indices[1] + vertexOffset);
-                indices[iIndex++] = (uint)(f.Indices[2] + vertexOffset);
 
                 int_indices[i * 3 + 0] = (UInt16)(f.Indices[0]);
                 int_indices[i * 3 + 1] = (UInt16)(f.Indices[1]);
                 int_indices[i * 3 + 2] = (UInt16)(f.Indices[2]);
             }
 
-            int indexCountForMesh = faces.Count * 3;
-            state.m_meshesData.Add(new MeshPart(m.MaterialIndex, indexOffset, indexCountForMesh));
-
-            vertexOffset += verts.Count;
-            indexOffset += indexCountForMesh;
-
             state.m_simpleMeshes.Add(new SimpleMesh(float_vertices, int_indices));
         }
 
-        //Gather up all the nodes (and their final world transform) that have meshes
-        FindAllMeshInstances(scene.RootNode, Matrix4x4.Identity);
+
     }
 
-    public static void ToNumerics(in Matrix4x4 matIn, out Matrix4x4 matOut)
-    {
-        //Assimp matrices are column vector, so X,Y,Z axes are columns 1-3 and 4th column is translation.
-        //Columns => Rows to make it compatible with numerics
-        matOut = new System.Numerics.Matrix4x4(matIn.M11, matIn.M21, matIn.M31, matIn.M41, //X
-            matIn.M12, matIn.M22, matIn.M32, matIn.M42, //Y
-            matIn.M13, matIn.M23, matIn.M33, matIn.M43, //Z
-            matIn.M14, matIn.M24, matIn.M34, matIn.M44); //Translation
-    }
-    private static void FindAllMeshInstances(Node parent, in Matrix4x4 rootTransform)
-    {
-        Matrix4x4 trafo;
-        ToNumerics(parent.Transform, out trafo);
-
-        Matrix4x4 world = trafo * rootTransform;
-
-        foreach (int meshIndex in parent.MeshIndices)
-            state.m_meshesToDraw.Add(new MeshDrawCall(meshIndex, world));
-
-        foreach (Node child in parent.Children)
-            FindAllMeshInstances(child, world);
-    }
-
-
-    private static void GatherVertexCounts(Scene scene, out int vertexCount, out int indexCount)
-    {
-        vertexCount = 0;
-        indexCount = 0;
-
-        foreach (Mesh m in scene.Meshes)
-        {
-            vertexCount += m.VertexCount;
-            indexCount += 3 * m.FaceCount;
-        }
-    }
 
     [UnmanagedCallersOnly]
     private static unsafe void Frame()

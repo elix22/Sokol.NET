@@ -192,7 +192,7 @@ public static unsafe class CubemapJpegApp
             {
                 path = util_get_file_path(filenames[i]),
                 callback = &fetch_callback,
-                buffer = SFETCH_RANGE(state.fetch_buffers[i].Buffer)
+                buffer = SFETCH_RANGE(state.fetch_buffers[i])
             });
         }
     }

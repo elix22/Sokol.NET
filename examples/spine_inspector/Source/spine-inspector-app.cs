@@ -375,7 +375,7 @@ public static unsafe class SpineInspectorApp
         {
             path = util_get_file_path(spine_scenes[scene_index].atlas_file),
             channel = 0,
-            buffer = SFETCH_RANGE(state.buffers.atlas.Buffer),
+            buffer = SFETCH_RANGE(state.buffers.atlas),
             callback = &AtlasDataLoaded
         });
         state.load_status.pending_count++;
@@ -392,7 +392,7 @@ public static unsafe class SpineInspectorApp
         {
             path = util_get_file_path(skel_file),
             channel = 1,
-            buffer = SFETCH_RANGE(state.buffers.skeleton.Buffer),
+            buffer = SFETCH_RANGE(state.buffers.skeleton),
             callback = &SkeletonDataLoaded
         });
         state.load_status.pending_count++;
@@ -538,7 +538,7 @@ public static unsafe class SpineInspectorApp
             sfetch_request_t req = default;
             req.path = util_get_file_path(img_info.filename.String());
             req.channel = 0;
-            req.buffer = SFETCH_RANGE(state.buffers.image.Buffer);
+            req.buffer = SFETCH_RANGE(state.buffers.image);
             req.callback = &ImageDataLoaded;
             req.user_data = new sfetch_range_t { ptr = Unsafe.AsPointer(ref img), size = (uint)sizeof(sspine_image) };
             sfetch_send(req);

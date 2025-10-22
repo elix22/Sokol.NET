@@ -285,11 +285,7 @@ public static unsafe class TexViewApp
         {
             path = util_get_file_path(filename),
             callback = &FetchCallback,
-            buffer = new sfetch_range_t
-            {
-                ptr = Unsafe.AsPointer(ref state.fetch_buffer.Buffer[0]),
-                size = (uint)state.fetch_buffer.Buffer.Length
-            }
+            buffer = SFETCH_RANGE(state.fetch_buffer)
         };
         sfetch_send(request);
     }

@@ -111,14 +111,14 @@ public static unsafe class SpineSimpleApp
         sfetch_request_t req = default;
         req.path = util_get_file_path("spine/raptor-pma.atlas");
         req.channel = 0;
-        req.buffer = SFETCH_RANGE(state.buffers.atlas.Buffer);
+        req.buffer = SFETCH_RANGE(state.buffers.atlas);
         req.callback = &atlas_data_loaded;
         sfetch_send(req);
 
         req = default;
         req.path = util_get_file_path("spine/raptor-pro.skel");
         req.channel = 1;
-        req.buffer = SFETCH_RANGE(state.buffers.skeleton.Buffer);
+        req.buffer = SFETCH_RANGE(state.buffers.skeleton);
         req.callback = &skeleton_data_loaded;
         sfetch_send(req);
 
@@ -248,7 +248,7 @@ public static unsafe class SpineSimpleApp
             req.path = util_get_file_path(Path.Combine("spine",result));
             Console.WriteLine("Loading image data req.path: " + req.path);
             req.channel = 0;
-            req.buffer = SFETCH_RANGE(state.buffers.image.Buffer);
+            req.buffer = SFETCH_RANGE(state.buffers.image);
             req.callback = &image_data_loaded;
             req.user_data = new sfetch_range_t() { ptr = Unsafe.AsPointer(ref img), size = (uint)Marshal.SizeOf<sspine_image>() };
             sfetch_send(req);

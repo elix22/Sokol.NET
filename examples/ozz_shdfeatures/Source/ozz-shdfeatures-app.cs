@@ -712,11 +712,7 @@ public static unsafe class OzzShdFeaturesApp
         {
             path = util_get_file_path("ozz_skin_skeleton.ozz"),
             callback = &SkeletonDataLoaded,
-            buffer = new sfetch_range_t
-            {
-                ptr = (void*)state.skeleton_buffer.GetBufferPointer(),
-                size = (UIntPtr)state.skeleton_buffer.Size
-            }
+            buffer = SFETCH_RANGE(state.skeleton_buffer)
         });
 
         // Load animation data  
@@ -724,11 +720,7 @@ public static unsafe class OzzShdFeaturesApp
         {
             path = util_get_file_path("ozz_skin_animation.ozz"),
             callback = &AnimationDataLoaded,
-            buffer = new sfetch_range_t
-            {
-                ptr = (void*)state.animation_buffer.GetBufferPointer(),
-                size = (UIntPtr)state.animation_buffer.Size
-            }
+            buffer = SFETCH_RANGE(state.animation_buffer)
         });
 
         // Load mesh data
@@ -736,11 +728,7 @@ public static unsafe class OzzShdFeaturesApp
         {
             path = util_get_file_path("ozz_skin_mesh.ozz"),
             callback = &MeshDataLoaded,
-            buffer = new sfetch_range_t
-            {
-                ptr = (void*)state.mesh_buffer.GetBufferPointer(),
-                size = (UIntPtr)state.mesh_buffer.Size
-            }
+            buffer = SFETCH_RANGE(state.mesh_buffer)
         });
     }
 

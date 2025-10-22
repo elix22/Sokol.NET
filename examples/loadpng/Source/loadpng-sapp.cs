@@ -173,11 +173,7 @@ public static unsafe class LoadPngSApp
         sfetch_request_t request = default;
         request.path = util_get_file_path("baboon.png");
         request.callback = &fetch_callback;
-        request.buffer = new sfetch_range_t()
-        {
-            ptr = Unsafe.AsPointer(ref state.fetch_buffer.Buffer[0]),
-            size = (uint)state.fetch_buffer.Buffer.Length
-        };
+        request.buffer = SFETCH_RANGE(state.fetch_buffer);
         sfetch_send(request);
 
     }
