@@ -1,6 +1,10 @@
 #!/bin/bash
 # Build script for assimp library for Web/Emscripten
-# Usage: ./build-assimp-web.sh [build_type]
+# Usage:    -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF \
+    -DASSIMP_BUILD_OBJ_IMPORTER=ON \
+    -DASSIMP_BUILD_FBX_IMPORTER=ON \
+    -DASSIMP_BUILD_NO_GLTF1_IMPORTER=ON \
+    -DASSIMP_BUILD_COLLADA_IMPORTER=ONld-assimp-web.sh [build_type]
 # Example: ./build-assimp-web.sh Release
 # Example: ./build-assimp-web.sh Debug
 
@@ -75,6 +79,7 @@ emcmake cmake .. \
     -DASSIMP_BUILD_OBJ_IMPORTER=ON \
     -DASSIMP_BUILD_FBX_IMPORTER=ON \
     -DASSIMP_BUILD_GLTF_IMPORTER=ON \
+    -DCMAKE_CXX_FLAGS="-DASSIMP_BUILD_NO_GLTF1_IMPORTER" \
     -DASSIMP_BUILD_COLLADA_IMPORTER=ON
 
 # Build

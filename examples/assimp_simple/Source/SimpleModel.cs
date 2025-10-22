@@ -28,7 +28,6 @@ public class SimpleModel
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
-    public Texture diffuseTexture;
     public List<SimpleMesh>? SimpleMeshes;
     public SimpleModel(string filePath)
     {
@@ -42,7 +41,7 @@ public class SimpleModel
         if (status == FileLoadStatus.Success && buffer != null)
         {
             Console.WriteLine($"Assimp: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
-            
+
             // Check first few bytes to verify data is XML (not binary plist)
             int previewLength = Math.Min(10, buffer.Length);
             Console.WriteLine($"Assimp: First {previewLength} bytes: {BitConverter.ToString(buffer, 0, previewLength)}");
@@ -53,12 +52,15 @@ public class SimpleModel
             AssimpContext importer = new AssimpContext();
             importer.SetConfig(new NormalSmoothingAngleConfig(66f));
 
-            // Extract file extension from the file path to use as format hint
+
+            // Extract file extension for other files
             string formatHint = Path.GetExtension(filePath).TrimStart('.');
             if (string.IsNullOrEmpty(formatHint))
             {
-                formatHint = "collada"; // fallback default
+                formatHint = "gltf2"; // fallback default
             }
+            Console.WriteLine($"Assimp: Using format hint: '{formatHint}' for non-binary file");
+
 
             Scene? scene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
             if (scene != null)
@@ -77,7 +79,7 @@ public class SimpleModel
         }
     }
 
-    private void ProcesScene(Scene scene)
+    unsafe private void ProcesScene(Scene scene)
     {
         var m_sceneMin = new Vector3(1e10f, 1e10f, 1e10f);
         var m_sceneMax = new Vector3(-1e10f, -1e10f, -1e10f);
@@ -106,7 +108,7 @@ public class SimpleModel
                 float_vertices[i * floats_per_vertex + 5] = NextRandom(0.0f, 1.0f);
                 float_vertices[i * floats_per_vertex + 6] = 1.0f;
                 float_vertices[i * floats_per_vertex + 7] = uv.X;
-                float_vertices[i * floats_per_vertex + 8] = 1-uv.Y;
+                float_vertices[i * floats_per_vertex + 8] = uv.Y;
 
                 m_sceneMin.X = Math.Min(m_sceneMin.X, pos.X);
                 m_sceneMin.Y = Math.Min(m_sceneMin.Y, pos.Y);
@@ -135,52 +137,101 @@ public class SimpleModel
 
             var material = scene.Materials[m.MaterialIndex];
 
+            List<Texture> textures = new List<Texture>();
             int texture_diffuse_count = material.GetMaterialTextureCount(TextureType.Diffuse);
             if (texture_diffuse_count > 0)
             {
                 TextureSlot texSlot;
                 material.GetMaterialTexture(TextureType.Diffuse, 0, out texSlot);
                 Console.WriteLine($"Assimp: Mesh uses diffuse texture: {texSlot.FilePath}");
-                string filePath = util_get_file_path(texSlot.FilePath);
-                FileSystem.Instance.LoadFile(filePath, OnDiffuseTextureLoaded);
+
+                if (texSlot.FilePath[0] == '*')
+                {
+                    // this is an embedded texture
+                    texSlot.FilePath = texSlot.FilePath.Substring(1);
+                    if (!int.TryParse(texSlot.FilePath, out int textureIndex))
+                    {
+                        Console.WriteLine($"Assimp: Failed to parse embedded texture index from '{texSlot.FilePath}'");
+                        textureIndex = -1;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Assimp: Found embedded texture index: {textureIndex}");
+                        if (textureIndex < scene.TextureCount)
+                        {
+                            EmbeddedTexture embeddedTexture = scene.Textures[textureIndex];
+                            if (embeddedTexture.IsCompressed)
+                            {
+                                Console.WriteLine($"Assimp: Embedded texture is compressed, size: {embeddedTexture.CompressedData.Length} bytes");
+                                int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
+
+                                byte* pixels = stbi_load_csharp(
+                                    embeddedTexture.CompressedData[0],
+                                    embeddedTexture.CompressedData.Length,
+                                    ref png_width,
+                                    ref png_height,
+                                    ref channels,
+                                    desired_channels
+                                );
+
+                                if (pixels == null)
+                                {
+                                    Console.WriteLine($"Assimp: Failed to decode embedded texture index: {textureIndex}");
+                                }
+                                else
+                                {
+
+                                    textures.Add(new Texture(pixels, png_width, png_height));
+
+                                    // Free the native STB image data
+                                    stbi_image_free_csharp(pixels);
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Assimp: Embedded texture is uncompressed, size: {embeddedTexture.NonCompressedData.Length} texels");
+
+                                // Convert Texel[] to byte[] (each Texel has 4 bytes: B, G, R, A)
+                                var texelData = embeddedTexture.NonCompressedData;
+                                byte[] imageBytes = new byte[texelData.Length * 4];
+
+                                for (int i = 0; i < texelData.Length; i++)
+                                {
+                                    var texel = texelData[i];
+                                    imageBytes[i * 4 + 0] = texel.R;  // Red
+                                    imageBytes[i * 4 + 1] = texel.G;  // Green
+                                    imageBytes[i * 4 + 2] = texel.B;  // Blue
+                                    imageBytes[i * 4 + 3] = texel.A;  // Alpha
+                                }
+
+                                fixed (byte* ptr = imageBytes)
+                                {
+                                    textures.Add(new Texture(ptr, embeddedTexture.Width, embeddedTexture.Height));
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Embedded texture index out of range: {textureIndex}");
+
+                        }
+                    }
+                }
+                else
+                {
+                    string filePath = util_get_file_path(texSlot.FilePath);
+                    textures.Add(new Texture(filePath));
+                }
+
             }
 
-            SimpleMeshes.Add(new SimpleMesh(this,float_vertices, int_indices));
+            SimpleMeshes.Add(new SimpleMesh(this, float_vertices, int_indices, textures));
         }
 
     }
 
-    unsafe void OnDiffuseTextureLoaded(string filePath, byte[]? buffer, FileLoadStatus status)
-    {
-        if (status == FileLoadStatus.Success && buffer != null)
-        {
-            Console.WriteLine($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
-            // Further processing of the texture data would go here
-                   int png_width = 0, png_height = 0, channels = 0 , desired_channels=4;
-            byte* pixels = stbi_load_csharp(
-                in buffer[0],
-                (int)buffer.Length,
-                ref png_width,
-                ref png_height,
-                ref channels,
-                desired_channels
-            );
-
-            if (pixels == null)
-            {
-                Console.WriteLine($"Assimp: Failed to decode texture file: {filePath}");
-                return;
-            }
-
-            diffuseTexture = new Texture(pixels, png_width, png_height);
-            
-            // Free the native STB image data
-            stbi_image_free_csharp(pixels);
-        }
-        else
-        {
-            Console.WriteLine($"Assimp: Failed to load texture file: {status}");
-        }
-
-    }
 }
+
+
+

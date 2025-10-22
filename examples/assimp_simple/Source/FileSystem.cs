@@ -57,7 +57,7 @@ namespace Sokol
         private const int NUM_CHANNELS = 2;             // Separate channels for different request types
         private const int NUM_LANES = 2;               // Lanes per channel
         private const int DEFAULT_BUFFER_SIZE = 1024 * 1024; // 1MB default buffer size
-        private const int MAX_RETRY_ATTEMPTS = 2;      // Maximum retry attempts for buffer too small
+        private const int MAX_RETRY_ATTEMPTS = 4;      // Maximum retry attempts for buffer too small
         private const int RETRY_BUFFER_MULTIPLIER = 4; // Multiply buffer size by this factor on retry
 
         // Request management
@@ -345,7 +345,6 @@ namespace Sokol
                 {
                     // Check if buffer was too small and we can retry
                     if (response->error_code == sfetch_error_t.SFETCH_ERROR_BUFFER_TOO_SMALL && 
-                        !request.IsRetry && 
                         request.RetryCount < MAX_RETRY_ATTEMPTS)
                     {
                         // Automatically retry with a larger buffer
@@ -401,8 +400,8 @@ namespace Sokol
 
         private void RetryWithLargerBuffer(FileLoadRequest originalRequest)
         {
-            // Calculate new buffer size (4x the original requested size)
-            int newBufferSize = originalRequest.OriginalBufferSize * RETRY_BUFFER_MULTIPLIER;
+            // Calculate new buffer size (4x the current buffer size, not original)
+            int newBufferSize = originalRequest.Buffer.Size * RETRY_BUFFER_MULTIPLIER;
 
             Console.WriteLine($"FileSystem: Retrying {originalRequest.FilePath} with larger buffer ({newBufferSize} bytes, attempt {originalRequest.RetryCount + 1})");
 
@@ -414,7 +413,7 @@ namespace Sokol
                 Buffer = SharedBuffer.Create(newBufferSize), // Always create new buffer for retry
                 Handle = default,
                 IsActive = false,
-                OriginalBufferSize = originalRequest.OriginalBufferSize, // Keep original size
+                OriginalBufferSize = originalRequest.OriginalBufferSize, // Keep original size for reference
                 IsRetry = true,
                 RetryCount = originalRequest.RetryCount + 1
             };

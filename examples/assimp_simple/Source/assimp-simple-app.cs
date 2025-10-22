@@ -62,13 +62,15 @@ public static unsafe class AssimpSimpleApp
             }
         });
 
+        // duck center = new Vector3(0.0f, 150, 0.0f);
+        // Distance = 400.0f,
         state.camera.Init(new CameraDesc()
         {
             Aspect = 60.0f,
             NearZ = 0.01f,
             FarZ = 500.0f,
-            Center = new Vector3(0.0f, 150f, 0.0f),
-            Distance = 400.0f,
+            Center = new Vector3(0.0f, 0, 0.0f),
+            Distance = 5.0f,
         });
 
         state.palette[FONT_KC854] = new color_t { r = 0xf4, g = 0x43, b = 0x36 };
@@ -105,7 +107,7 @@ public static unsafe class AssimpSimpleApp
         state.pip = sg_make_pipeline(pipeline_desc);
 
         // Use FileSystem to load the model file
-        string filePath = util_get_file_path("duck.collada");
+        string filePath = util_get_file_path("vampire_modified.glb");
         state.m_simpleModel = new SimpleModel(filePath);
 
 

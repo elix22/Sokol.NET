@@ -131,6 +131,8 @@ extern "C"
 // stbi_load wrapper that returns image data pointer
 // Caller is responsible for freeing with stbi_image_free
 SOKOL_API_IMPL unsigned char* stbi_load_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels) {
+    
+    stbi_set_flip_vertically_on_load(true);
     return stbi_load_from_memory(buffer, len, x, y, channels_in_file, desired_channels);
 }
 
