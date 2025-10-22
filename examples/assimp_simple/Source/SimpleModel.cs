@@ -35,11 +35,11 @@ public class SimpleModel
     }
 
 
-    void OnFileLoaded(byte[]? buffer, FileLoadStatus status)
+    void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status)
     {
         if (status == FileLoadStatus.Success && buffer != null)
         {
-            Console.WriteLine($"Assimp: File loaded successfully, size: {buffer.Length} bytes");
+            Console.WriteLine($"Assimp: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
             
             // Check first few bytes to verify data is XML (not binary plist)
             int previewLength = Math.Min(10, buffer.Length);
@@ -51,8 +51,12 @@ public class SimpleModel
             AssimpContext importer = new AssimpContext();
             importer.SetConfig(new NormalSmoothingAngleConfig(66f));
 
-            // Extract file extension to use as format hint (assuming .collada extension)
-            string formatHint = "collada";
+            // Extract file extension from the file path to use as format hint
+            string formatHint = Path.GetExtension(filePath).TrimStart('.');
+            if (string.IsNullOrEmpty(formatHint))
+            {
+                formatHint = "collada"; // fallback default
+            }
 
             Scene? scene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
             if (scene != null)

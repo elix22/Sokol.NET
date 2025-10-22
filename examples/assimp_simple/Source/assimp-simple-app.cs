@@ -36,19 +36,10 @@ public static unsafe class AssimpSimpleApp
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
 
-    enum state_loading_enum
-    {
-        STATE_IDLE = 0,
-        STATE_LOADING,
-        STATE_LOADED,
-        STATE_FAILED
-    }
-
     class _state
     {
         public sg_pass_action pass_action;
         public color_t[] palette = new color_t[NUM_FONTS];
-        public state_loading_enum state_loading = state_loading_enum.STATE_IDLE;
 
         public sg_pipeline pip;
         public Sokol.Camera camera = new Sokol.Camera();
@@ -115,8 +106,6 @@ public static unsafe class AssimpSimpleApp
 
         // Use FileSystem to load the model file
         string filePath = util_get_file_path("duck.collada");
-        state.state_loading = state_loading_enum.STATE_LOADING;
-
         state.m_simpleModel = new SimpleModel(filePath);
 
 
@@ -140,7 +129,6 @@ public static unsafe class AssimpSimpleApp
         sdtx_color3b(color.r, color.g, color.b);
         sdtx_font((uint)0);
         sdtx_print("Assimp Simple App\n");
-        sdtx_print("Loading State: {0}\n", state.state_loading.ToString());
 
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);

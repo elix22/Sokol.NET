@@ -23,9 +23,10 @@ namespace Sokol
     /// <summary>
     /// Delegate signature for file load completion callbacks
     /// </summary>
+    /// <param name="filePath">Path of the file that was loaded</param>
     /// <param name="buffer">Loaded file data (null if failed)</param>
     /// <param name="status">Load operation status</param>
-    public delegate void FileLoadCallback(byte[]? buffer, FileLoadStatus status);
+    public delegate void FileLoadCallback(string filePath, byte[]? buffer, FileLoadStatus status);
 
     /// <summary>
     /// Internal structure to track pending file load requests
@@ -173,7 +174,7 @@ namespace Sokol
 
             if (string.IsNullOrEmpty(filePath))
             {
-                callback?.Invoke(null, FileLoadStatus.Failed);
+                callback?.Invoke(filePath ?? "", null, FileLoadStatus.Failed);
                 return;
             }
 
@@ -316,7 +317,7 @@ namespace Sokol
             else
             {
                 Console.WriteLine($"FileSystem: Failed to start request for {request.FilePath}");
-                request.Callback?.Invoke(null, FileLoadStatus.Failed);
+                request.Callback?.Invoke(request.FilePath, null, FileLoadStatus.Failed);
                 ReturnPooledBuffer(request.Buffer);
             }
         }
@@ -379,7 +380,7 @@ namespace Sokol
                 // Invoke callback
                 try
                 {
-                    request.Callback?.Invoke(buffer, status);
+                    request.Callback?.Invoke(request.FilePath, buffer, status);
                 }
                 catch (Exception ex)
                 {
