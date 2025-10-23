@@ -77,7 +77,7 @@ public static unsafe class AssimpAnimationApp
             NearZ = 0.01f,
             FarZ = 500.0f,
             Center = new Vector3(0.0f, 1.1f, 0.0f),
-            Distance = 5.0f,
+            Distance = 3.0f,
         });
 
         state.palette[FONT_KC854] = new color_t { r = 0xf4, g = 0x43, b = 0x36 };
@@ -253,8 +253,9 @@ public static unsafe class AssimpAnimationApp
             {
                 int animCount = state.m_animationManager.GetAnimationCount();
                 string? currentAnimName = state.m_animationManager.GetCurrentAnimationName();
+                int currentIndex = state.m_animationManager.GetCurrentAnimationIndex();
                 
-                igText($"Current Animation: {currentAnimName ?? "None"}");
+                igText($"Current Animation: {currentAnimName ?? "None"} (Index: {currentIndex})");
                 igText($"Total Animations: {animCount}");
                 igSeparator();
                 

@@ -85,6 +85,11 @@ namespace Sokol
             return null;
         }
 
+        public int GetCurrentAnimationIndex()
+        {
+            return m_CurrentAnimationIndex;
+        }
+
         public string? GetAnimationName(int index)
         {
             if (index >= 0 && index < m_AnimationNames.Count)

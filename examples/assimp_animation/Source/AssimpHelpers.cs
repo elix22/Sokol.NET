@@ -20,22 +20,5 @@ namespace Sokol
             );
         }
 
-        public static Matrix4x4 FromNumerics(Matrix4x4 matIn)
-        {
-            // Numerics: rows are X, Y, Z axes and 4th row is translation
-            // Assimp: columns are X, Y, Z axes and 4th column is translation
-            // Convert Rows => Columns (transpose)
-            return new Matrix4x4(
-                matIn.M11, matIn.M21, matIn.M31, matIn.M41, // Column 1 (was X axis row)
-                matIn.M12, matIn.M22, matIn.M32, matIn.M42, // Column 2 (was Y axis row)
-                matIn.M13, matIn.M23, matIn.M33, matIn.M43, // Column 3 (was Z axis row)
-                matIn.M14, matIn.M24, matIn.M34, matIn.M44  // Column 4 (was translation row)
-            );
-        }
-
-        public static Quaternion GetNumericsQuat(Quaternion pOrientation)
-        {
-            return new Quaternion(pOrientation.Y, pOrientation.Z, pOrientation.W, pOrientation.X);
-        }
     }
 }
