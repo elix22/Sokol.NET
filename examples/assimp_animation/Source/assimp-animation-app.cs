@@ -306,7 +306,8 @@ public static unsafe class AssimpAnimationApp
     [UnmanagedCallersOnly]
     private static unsafe void Event(sapp_event* e)
     {
-        simgui_handle_event(in *e);
+        if (simgui_handle_event(in *e))
+            return;
         state.camera.HandleEvent(e);
     }
 
