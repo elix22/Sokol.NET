@@ -183,7 +183,7 @@ public static unsafe class AssimpSimpleApp
             width = 0,
             height = 0,
             sample_count = 4,
-            window_title = "Clear (sokol-app)",
+            window_title = "Assimp Simple (sokol-app)",
             icon = { sokol_default = true },
             logger = {
                 func = &slog_func,

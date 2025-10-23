@@ -30,17 +30,17 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
-			"label": "prepare-assimp_simple-android",
+			"label": "prepare-assimp_animation",
 			"type": "shell",
 			"command": "dotnet",
-			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "android", "--path", "${workspaceFolder}/examples/assimp_simple"],
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/assimp_animation"],
 			"problemMatcher": "$msCompile"
 		},
 		{
-			"label": "prepare-assimp_simple-ios",
+			"label": "prepare-assimp_animation-web",
 			"type": "shell",
 			"command": "dotnet",
-			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "ios", "--path", "${workspaceFolder}/examples/assimp_simple"],
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/assimp_animation"],
 			"problemMatcher": "$msCompile"
 		},
 		{

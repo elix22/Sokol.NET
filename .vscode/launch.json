@@ -80,7 +80,8 @@
                 "ozz_shdfeatures",
                 "vertextexture",
                 "mrt",
-                "assimp_simple"
+                "assimp_simple",
+                "assimp_animation"
             ],
             "default": "cube"
         },
