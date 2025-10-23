@@ -139,8 +139,16 @@ public static unsafe class AssimpAnimationApp
         {
             string animPath = util_get_file_path("vampire/vampire_modified.glb");
             state.m_animation = new Sokol.Animation(animPath, state.m_animatedModel);
+            Console.WriteLine("Animation loading started...");
+        }
+
+        // Initialize animator once animation is loaded
+        if (state.m_animation != null && 
+            state.m_animation.IsLoaded && 
+            state.m_animator == null)
+        {
             state.m_animator = new Sokol.Animator(state.m_animation);
-            Console.WriteLine("Animation initialized successfully");
+            Console.WriteLine("Animator initialized successfully");
         }
 
         // Update animator

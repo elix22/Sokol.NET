@@ -37,12 +37,5 @@ namespace Sokol
         {
             return new Quaternion(pOrientation.Y, pOrientation.Z, pOrientation.W, pOrientation.X);
         }
-
-        /*
- GetGLMQuat(const aiQuaternion& pOrientation)
-	{
-		return glm::quat(pOrientation.w, pOrientation.x, pOrientation.y, pOrientation.z);
-	}
-        */
     }
 }

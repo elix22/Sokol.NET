@@ -21,30 +21,60 @@ namespace Sokol
         private AssimpNodeData m_RootNode;
         private Dictionary<string, BoneInfo> m_BoneInfoMap = new Dictionary<string, BoneInfo>();
 
+        public string FilePath { get; private set; } = "";
+        public bool IsLoaded { get; private set; } = false;
+
         public Animation() { }
 
         public Animation(string animationPath, Sokol.AnimatedModel model)
         {
-            var importer = new AssimpContext();
-            Scene? scene = importer.ImportFile(animationPath, PostProcessSteps.Triangulate);
-            
-            if (scene == null || scene.RootNode == null)
-            {
-                Console.WriteLine($"Failed to load animation from {animationPath}");
-                return;
-            }
+            FilePath = animationPath;
+            FileSystem.Instance.LoadFile(animationPath, (path, buffer, status) => OnFileLoaded(path, buffer, status, model));
+        }
 
-            var animation = scene.Animations[0];
-            m_Duration = (float)animation.DurationInTicks;
-            m_TicksPerSecond = (float)animation.TicksPerSecond;
-            
-            // Assimp already uses Matrix4x4 from System.Numerics
-            Matrix4x4 globalTransformation = scene.RootNode.Transform;
-            Matrix4x4.Invert(globalTransformation, out globalTransformation);
-            
-            m_RootNode = new AssimpNodeData();
-            ReadHierarchyData(ref m_RootNode, scene.RootNode, 0);
-            ReadMissingBones(animation, model);
+        void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status, Sokol.AnimatedModel model)
+        {
+            if (status == FileLoadStatus.Success && buffer != null)
+            {
+                Console.WriteLine($"Animation: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+
+                var stream = new System.IO.MemoryStream(buffer);
+                PostProcessSteps ppSteps = PostProcessSteps.Triangulate;
+
+                AssimpContext importer = new AssimpContext();
+                string formatHint = System.IO.Path.GetExtension(filePath).TrimStart('.');
+                if (string.IsNullOrEmpty(formatHint))
+                {
+                    formatHint = "gltf2";
+                }
+
+                Scene? scene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
+                
+                if (scene == null || scene.RootNode == null || scene.AnimationCount == 0)
+                {
+                    Console.WriteLine($"Animation: Failed to load animation from {filePath}");
+                    return;
+                }
+
+                var animation = scene.Animations[0];
+                m_Duration = (float)animation.DurationInTicks;
+                m_TicksPerSecond = (float)animation.TicksPerSecond;
+                
+                // Assimp already uses Matrix4x4 from System.Numerics
+                Matrix4x4 globalTransformation = scene.RootNode.Transform;
+                Matrix4x4.Invert(globalTransformation, out globalTransformation);
+                
+                m_RootNode = new AssimpNodeData();
+                ReadHierarchyData(ref m_RootNode, scene.RootNode, 0);
+                ReadMissingBones(animation, model);
+                
+                IsLoaded = true;
+                Console.WriteLine($"Animation: Successfully loaded animation from {filePath}");
+            }
+            else
+            {
+                Console.WriteLine($"Animation: Failed to load file: {status}");
+            }
         }
 
         public Bone? FindBone(string name)
