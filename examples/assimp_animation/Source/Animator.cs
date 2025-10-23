@@ -21,6 +21,15 @@ namespace Sokol
                 m_FinalBoneMatrices.Add(Matrix4x4.Identity);
         }
 
+        public void SetAnimation(Animation? animation)
+        {
+            m_CurrentAnimation = animation;
+            m_CurrentTime = 0.0f;
+            m_FinalBoneMatrices = new List<Matrix4x4>();
+            for (int i = 0; i < 100; i++)
+                m_FinalBoneMatrices.Add(Matrix4x4.Identity);
+        }
+
         public void UpdateAnimation(float dt)
         {
             m_DeltaTime = dt;

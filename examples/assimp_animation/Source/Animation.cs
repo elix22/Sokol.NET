@@ -49,7 +49,7 @@ namespace Sokol
                 }
 
                 Scene? scene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
-                
+
                 if (scene == null || scene.RootNode == null || scene.AnimationCount == 0)
                 {
                     Console.WriteLine($"Animation: Failed to load animation from {filePath}");
@@ -59,15 +59,15 @@ namespace Sokol
                 var animation = scene.Animations[0];
                 m_Duration = (float)animation.DurationInTicks;
                 m_TicksPerSecond = (float)animation.TicksPerSecond;
-                
+
                 // Assimp already uses Matrix4x4 from System.Numerics
                 Matrix4x4 globalTransformation = scene.RootNode.Transform;
                 Matrix4x4.Invert(globalTransformation, out globalTransformation);
-                
+
                 m_RootNode = new AssimpNodeData();
                 ReadHierarchyData(ref m_RootNode, scene.RootNode, 0);
                 ReadMissingBones(animation, model);
-                
+
                 IsLoaded = true;
                 Console.WriteLine($"Animation: Successfully loaded animation from {filePath}");
             }
@@ -75,6 +75,18 @@ namespace Sokol
             {
                 Console.WriteLine($"Animation: Failed to load file: {status}");
             }
+        }
+
+        public void SetAsssimpAnimation(Assimp.Scene? scene, Assimp.Animation animation, Sokol.AnimatedModel model)
+        {
+                
+            m_Duration = (float)animation.DurationInTicks;
+            m_TicksPerSecond = (float)animation.TicksPerSecond;
+
+            m_RootNode = new AssimpNodeData();
+            ReadHierarchyData(ref m_RootNode, scene.RootNode, 0);
+            ReadMissingBones(animation, model);
+            IsLoaded = true;
         }
 
         public Bone? FindBone(string name)

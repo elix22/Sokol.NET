@@ -1,11 +1,15 @@
 @ctype mat4 mat44_t
 
 @vs vs
+
+const int MAX_BONES = 100;
+const int MAX_BONE_INFLUENCE = 4;
+
 layout(binding=0) uniform vs_params {
     uniform mat4 projection;
     uniform mat4 view;
     uniform mat4 model;
-    mat4 finalBonesMatrices[100];
+    mat4 finalBonesMatrices[MAX_BONES];
 };
 
 in vec4 position;
@@ -21,11 +25,11 @@ layout(location=1) out vec2 uv;
 void main() {
 
     vec4 totalPosition = vec4(0.0f);
-    for(int i = 0 ; i < 4 ; i++)
+    for(int i = 0 ; i < MAX_BONE_INFLUENCE ; i++)
     {
         if(int(boneIds[i]) == -1) 
             continue;
-        if(int(boneIds[i]) >=100) 
+        if(int(boneIds[i]) >=MAX_BONES) 
         {
             totalPosition = vec4(position.xyz,1.0);
             break;

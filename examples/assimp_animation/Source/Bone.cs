@@ -60,7 +60,7 @@ namespace Sokol
                 var aiOrientation = channel.RotationKeys[rotationIndex];
                 KeyRotation data = new KeyRotation
                 {
-                    Orientation = AssimpHelpers.GetNumericsQuat(aiOrientation.Value),  // Already Quaternion
+                    Orientation = AssimpHelpers.GetNumericsQuat(aiOrientation.Value),  // elix22 , Assimp nonsense  , doesn't make sense , I don't get it
                     TimeStamp = (float)aiOrientation.Time
                 };
                 m_Rotations.Add(data);

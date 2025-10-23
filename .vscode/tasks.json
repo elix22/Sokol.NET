@@ -668,6 +668,7 @@
 			"options": [
 				"cube",
 				"assimp_simple",
+				"assimp_animation",
 				"dyntex",
 				"cimgui",
 				"loadpng",
@@ -708,6 +709,7 @@
 			"options": [
 				"examples/cube",
 				"examples/assimp_simple",
+				"examples/assimp_animation",
 				"examples/dyntex",
 				"examples/cimgui",
 				"examples/loadpng",

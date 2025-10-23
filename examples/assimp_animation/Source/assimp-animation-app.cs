@@ -35,6 +35,7 @@ public static unsafe class AssimpAnimationApp
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
+    static string modelPath = "vampire/dancing_vampire.glb";
 
     class _state
     {
@@ -45,7 +46,7 @@ public static unsafe class AssimpAnimationApp
         public Sokol.Camera camera = new Sokol.Camera();
 
         public Sokol.AnimatedModel? m_animatedModel;
-        public Sokol.Animation? m_animation;
+        public Sokol.AnimationManager? m_animationManager;
         public Sokol.Animator? m_animator;
         
     }
@@ -113,7 +114,7 @@ public static unsafe class AssimpAnimationApp
         state.pip = sg_make_pipeline(pipeline_desc);
 
         // Use FileSystem to load the model file
-        string filePath = util_get_file_path("vampire/vampire_modified.glb");
+        string filePath = util_get_file_path(modelPath);
         state.m_animatedModel = new Sokol.AnimatedModel(filePath);
         
         // Wait for model to load, then initialize animation
@@ -131,24 +132,29 @@ public static unsafe class AssimpAnimationApp
         // Update FileSystem to process pending requests
         FileSystem.Instance.Update();
 
-        // Initialize animation once model is loaded
+        // Initialize animation manager once model is loaded
         if (state.m_animatedModel != null && 
             state.m_animatedModel.SimpleMeshes != null && 
             state.m_animatedModel.SimpleMeshes.Count > 0 &&
-            state.m_animation == null)
+            state.m_animationManager == null)
         {
-            string animPath = util_get_file_path("vampire/vampire_modified.glb");
-            state.m_animation = new Sokol.Animation(animPath, state.m_animatedModel);
+            state.m_animationManager = new Sokol.AnimationManager();
+            string animPath = util_get_file_path(modelPath);
+            state.m_animationManager.LoadAnimation(animPath, state.m_animatedModel);
             Console.WriteLine("Animation loading started...");
         }
 
         // Initialize animator once animation is loaded
-        if (state.m_animation != null && 
-            state.m_animation.IsLoaded && 
+        if (state.m_animationManager != null && 
+            state.m_animationManager.GetAnimationCount() > 0 && 
             state.m_animator == null)
         {
-            state.m_animator = new Sokol.Animator(state.m_animation);
-            Console.WriteLine("Animator initialized successfully");
+            var animation = state.m_animationManager.GetFirstAnimation();
+            if (animation != null)
+            {
+                state.m_animator = new Sokol.Animator(animation);
+                Console.WriteLine("Animator initialized successfully");
+            }
         }
 
         // Update animator
@@ -192,9 +198,12 @@ public static unsafe class AssimpAnimationApp
         sdtx_print($"Camera Position: {state.camera.Center}\n");
         sdtx_print($"Camera Distance: {state.camera.Distance}\n");
         sdtx_print($"Camera Orientation: {state.camera.Latitude}, {state.camera.Longitude}\n");
-        if (state.m_animator != null)
+        if (state.m_animator != null && state.m_animationManager != null)
         {
-            sdtx_print($"Animation Playing\n");
+            string? currentAnimName = state.m_animationManager.GetCurrentAnimationName();
+            int animCount = state.m_animationManager.GetAnimationCount();
+            sdtx_print($"Animation: {currentAnimName} ({animCount} total)\n");
+            sdtx_print($"Click to switch animations\n");
         }
 
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
@@ -230,6 +239,22 @@ public static unsafe class AssimpAnimationApp
     [UnmanagedCallersOnly]
     private static unsafe void Event(sapp_event* e)
     {
+        // Handle mouse click to switch animations
+        if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN && 
+            e->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
+        {
+            if (state.m_animationManager != null && state.m_animationManager.GetAnimationCount() > 1)
+            {
+                var nextAnimation = state.m_animationManager.GetNextAnimation();
+                if (nextAnimation != null && state.m_animator != null)
+                {
+                    state.m_animator.SetAnimation(nextAnimation);
+                    string? animName = state.m_animationManager.GetCurrentAnimationName();
+                    Console.WriteLine($"Switched to animation: {animName}");
+                }
+            }
+        }
+
         state.camera.HandleEvent(e);
     }
 
