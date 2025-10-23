@@ -80,5 +80,15 @@ namespace Sokol
         {
             return m_FinalBoneMatrices;
         }
+
+        public float GetCurrentTime()
+        {
+            return m_CurrentTime;
+        }
+
+        public Animation? GetCurrentAnimation()
+        {
+            return m_CurrentAnimation;
+        }
     }
 }

@@ -23,6 +23,7 @@ using Assimp;
 
 namespace Sokol
 {
+    [StructLayout(LayoutKind.Sequential)]
     public struct AnimatedVertex
     {
         public Vector3 Position;
@@ -111,7 +112,7 @@ namespace Sokol
 
         unsafe private void ProcessMesh(Mesh mesh, Scene scene)
         {
-            List<AnimatedVertex> vertices = new List<AnimatedVertex>();
+            AnimatedVertex[] vertices = new AnimatedVertex[mesh.VertexCount];
             
             // Initialize vertices with default bone data
             for (int i = 0; i < mesh.VertexCount; i++)
@@ -139,11 +140,11 @@ namespace Sokol
                 vertex.BoneIDs = new Vector4(-1, -1, -1, -1);
                 vertex.BoneWeights = Vector4.Zero;
 
-                vertices.Add(vertex);
+                vertices[i] = vertex;
             }
 
             // Extract bone weights
-            ExtractBoneWeights(vertices, mesh, scene);
+            ExtractBoneWeights(ref vertices, mesh, scene);
 
             // Build index buffer
             List<UInt16> indices = new List<UInt16>();
@@ -155,40 +156,10 @@ namespace Sokol
                 indices.Add((UInt16)face.Indices[1]);
                 indices.Add((UInt16)face.Indices[2]);
             }
-
-            // Convert vertices to float array (17 floats per vertex)
-            // 3 pos + 4 color + 2 uv + 4 bone IDs + 4 bone weights = 17 floats
-            int floatsPerVertex = 17;
-            float[] vertexData = new float[vertices.Count * floatsPerVertex];
-            
-            for (int i = 0; i < vertices.Count; i++)
-            {
-                var v = vertices[i];
-                int offset = i * floatsPerVertex;
-                
-                vertexData[offset + 0] = v.Position.X;
-                vertexData[offset + 1] = v.Position.Y;
-                vertexData[offset + 2] = v.Position.Z;
-                vertexData[offset + 3] = v.Color.X;
-                vertexData[offset + 4] = v.Color.Y;
-                vertexData[offset + 5] = v.Color.Z;
-                vertexData[offset + 6] = v.Color.W;
-                vertexData[offset + 7] = v.TexCoord.X;
-                vertexData[offset + 8] = v.TexCoord.Y;
-                vertexData[offset + 9] = v.BoneIDs.X;
-                vertexData[offset + 10] = v.BoneIDs.Y;
-                vertexData[offset + 11] = v.BoneIDs.Z;
-                vertexData[offset + 12] = v.BoneIDs.W;
-                vertexData[offset + 13] = v.BoneWeights.X;
-                vertexData[offset + 14] = v.BoneWeights.Y;
-                vertexData[offset + 15] = v.BoneWeights.Z;
-                vertexData[offset + 16] = v.BoneWeights.W;
-            }
-
             // Load textures
-            List<Texture> textures = LoadTextures(mesh, scene);
+            List<Texture> textures = Texture.LoadTextures(scene, mesh, FilePath);
 
-            SimpleMeshes?.Add(new SimpleMesh(null!, vertexData, indices.ToArray(), textures));
+            SimpleMeshes?.Add(new SimpleMesh(null!, vertices, indices.ToArray(), textures));
         }
 
         private void SetVertexBoneData(ref AnimatedVertex vertex, int boneID, float weight)
@@ -221,7 +192,7 @@ namespace Sokol
             }
         }
 
-        private void ExtractBoneWeights(List<AnimatedVertex> vertices, Mesh mesh, Scene scene)
+        private void ExtractBoneWeights(ref AnimatedVertex[] vertices, Mesh mesh, Scene scene)
         {
             for (int boneIndex = 0; boneIndex < mesh.BoneCount; ++boneIndex)
             {
@@ -252,7 +223,7 @@ namespace Sokol
                     int vertexId = weights[weightIndex].VertexID;
                     float weight = weights[weightIndex].Weight;
                     
-                    Debug.Assert(vertexId < vertices.Count);
+                    Debug.Assert(vertexId < vertices.Length);
                     
                     if (weight != 0)
                     {
@@ -264,47 +235,5 @@ namespace Sokol
             }
         }
 
-        unsafe private List<Texture> LoadTextures(Mesh mesh, Scene scene)
-        {
-            List<Texture> textures = new List<Texture>();
-            var material = scene.Materials[mesh.MaterialIndex];
-
-            int textureDiffuseCount = material.GetMaterialTextureCount(TextureType.Diffuse);
-            if (textureDiffuseCount > 0)
-            {
-                TextureSlot texSlot;
-                material.GetMaterialTexture(TextureType.Diffuse, 0, out texSlot);
-
-                if (texSlot.FilePath[0] == '*')
-                {
-                    // Embedded texture
-                    string indexStr = texSlot.FilePath.Substring(1);
-                    if (int.TryParse(indexStr, out int textureIndex) && textureIndex < scene.TextureCount)
-                    {
-                        EmbeddedTexture embeddedTexture = scene.Textures[textureIndex];
-                        if (embeddedTexture.IsCompressed)
-                        {
-                            int pngWidth = 0, pngHeight = 0, channels = 0, desiredChannels = 4;
-                            byte* pixels = stbi_load_csharp(
-                                embeddedTexture.CompressedData[0],
-                                embeddedTexture.CompressedData.Length,
-                                ref pngWidth,
-                                ref pngHeight,
-                                ref channels,
-                                desiredChannels
-                            );
-
-                            if (pixels != null)
-                            {
-                                textures.Add(new Texture(pixels, pngWidth, pngHeight));
-                                stbi_image_free_csharp(pixels);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return textures;
-        }
     }
 }

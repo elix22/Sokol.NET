@@ -257,6 +257,27 @@ public static unsafe class AssimpAnimationApp
                 
                 igText($"Current Animation: {currentAnimName ?? "None"} (Index: {currentIndex})");
                 igText($"Total Animations: {animCount}");
+                
+                // Display animation timing info
+                if (state.m_animator != null)
+                {
+                    var currentAnim = state.m_animator.GetCurrentAnimation();
+                    if (currentAnim != null)
+                    {
+                        float duration = currentAnim.GetDuration();
+                        float currentTime = state.m_animator.GetCurrentTime();
+                        float ticksPerSecond = currentAnim.GetTicksPerSecond();
+                        
+                        // Convert to seconds for display
+                        float durationInSeconds = duration / ticksPerSecond;
+                        float currentTimeInSeconds = currentTime / ticksPerSecond;
+                        
+                        igText($"Duration: {durationInSeconds:F2}s");
+                        igText($"Current Time: {currentTimeInSeconds:F2}s");
+                        igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                    }
+                }
+                
                 igSeparator();
                 
                 if (animCount > 1)

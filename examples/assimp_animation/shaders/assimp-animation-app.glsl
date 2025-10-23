@@ -12,7 +12,7 @@ layout(binding=0) uniform vs_params {
     mat4 finalBonesMatrices[MAX_BONES];
 };
 
-in vec4 position;
+in vec3 position;
 in vec4 color0;
 in vec2 texcoord0;
 in vec4 boneIds; 
@@ -31,10 +31,10 @@ void main() {
             continue;
         if(int(boneIds[i]) >=MAX_BONES) 
         {
-            totalPosition = vec4(position.xyz,1.0);
+            totalPosition = vec4(position,1.0);
             break;
         }
-        vec4 localPosition = finalBonesMatrices[int(boneIds[i])] * vec4(position.xyz,1.0);
+        vec4 localPosition = finalBonesMatrices[int(boneIds[i])] * vec4(position,1.0);
         totalPosition += localPosition * weights[i];
    }
 	
