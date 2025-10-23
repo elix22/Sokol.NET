@@ -20,6 +20,9 @@ using static Sokol.SFetch;
 using static Sokol.SDebugText;
 using static assimp_animation_app_shader_cs.Shaders;
 using Assimp;
+using static Sokol.SImgui;
+using Imgui;
+using static Imgui.ImguiNative;
 
 public static unsafe class AssimpAnimationApp
 {
@@ -35,7 +38,7 @@ public static unsafe class AssimpAnimationApp
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
-    static string modelPath = "vampire/dancing_vampire.glb";
+    static string modelPath = "Granny.glb";
 
     class _state
     {
@@ -87,6 +90,12 @@ public static unsafe class AssimpAnimationApp
         desc.fonts[FONT_ORIC] = sdtx_font_oric();
         sdtx_setup(desc);
 
+        // Setup sokol-imgui
+        simgui_setup(new simgui_desc_t
+        {
+            logger = { func = &slog_func }
+        });
+
         // Initialize FileSystem for file loading
         FileSystem.Instance.Initialize();
 
@@ -131,6 +140,15 @@ public static unsafe class AssimpAnimationApp
     {
         // Update FileSystem to process pending requests
         FileSystem.Instance.Update();
+
+        // Start new imgui frame
+        simgui_new_frame(new simgui_frame_desc_t
+        {
+            width = sapp_width(),
+            height = sapp_height(),
+            delta_time = sapp_frame_duration(),
+            dpi_scale = 1 // TBD ELI doesn't work on Android sapp_dpi_scale()
+        });
 
         // Initialize animation manager once model is loaded
         if (state.m_animatedModel != null && 
@@ -189,22 +207,8 @@ public static unsafe class AssimpAnimationApp
             }
         }
 
-        sdtx_canvas(sapp_width() * 0.5f, sapp_height() * 0.5f);
-        sdtx_origin(3.0f, 3.0f);
-        color_t color = state.palette[0];
-        sdtx_color3b(color.r, color.g, color.b);
-        sdtx_font((uint)0);
-        sdtx_print("Assimp Animation App\n");
-        sdtx_print($"Camera Position: {state.camera.Center}\n");
-        sdtx_print($"Camera Distance: {state.camera.Distance}\n");
-        sdtx_print($"Camera Orientation: {state.camera.Latitude}, {state.camera.Longitude}\n");
-        if (state.m_animator != null && state.m_animationManager != null)
-        {
-            string? currentAnimName = state.m_animationManager.GetCurrentAnimationName();
-            int animCount = state.m_animationManager.GetAnimationCount();
-            sdtx_print($"Animation: {currentAnimName} ({animCount} total)\n");
-            sdtx_print($"Click to switch animations\n");
-        }
+        // Draw UI
+        DrawUI();
 
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);
@@ -230,31 +234,79 @@ public static unsafe class AssimpAnimationApp
             }
         }
 
-        sdtx_draw();
+        simgui_render();
         sg_end_pass();
         sg_commit();
+    }
+
+    static void DrawUI()
+    {
+        igSetNextWindowPos(new Vector2(30, 30), ImGuiCond.Once, Vector2.Zero);
+        igSetNextWindowBgAlpha(0.85f);
+        byte open = 1;
+        if (igBegin("Animation Controls", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            igText("Assimp Animation App");
+            igSeparator();
+            
+            if (state.m_animationManager != null && state.m_animationManager.GetAnimationCount() > 0)
+            {
+                int animCount = state.m_animationManager.GetAnimationCount();
+                string? currentAnimName = state.m_animationManager.GetCurrentAnimationName();
+                
+                igText($"Current Animation: {currentAnimName ?? "None"}");
+                igText($"Total Animations: {animCount}");
+                igSeparator();
+                
+                if (animCount > 1)
+                {
+                    if (igButton("<- Previous Animation", Vector2.Zero))
+                    {
+                        var prevAnimation = state.m_animationManager.GetPreviousAnimation();
+                        if (prevAnimation != null && state.m_animator != null)
+                        {
+                            state.m_animator.SetAnimation(prevAnimation);
+                            string? animName = state.m_animationManager.GetCurrentAnimationName();
+                            Console.WriteLine($"Switched to animation: {animName}");
+                        }
+                    }
+                    
+                    igSameLine(0, 10);
+                    
+                    if (igButton("Next Animation ->", Vector2.Zero))
+                    {
+                        var nextAnimation = state.m_animationManager.GetNextAnimation();
+                        if (nextAnimation != null && state.m_animator != null)
+                        {
+                            state.m_animator.SetAnimation(nextAnimation);
+                            string? animName = state.m_animationManager.GetCurrentAnimationName();
+                            Console.WriteLine($"Switched to animation: {animName}");
+                        }
+                    }
+                }
+                else
+                {
+                    igText("Only one animation available");
+                }
+            }
+            else
+            {
+                igText("Loading animations...");
+            }
+            
+            igSeparator();
+            igText($"Camera Distance: {state.camera.Distance:F2}");
+            igText($"Camera Latitude: {state.camera.Latitude:F2}");
+            igText($"Camera Longitude: {state.camera.Longitude:F2}");
+        }
+        igEnd();
     }
 
 
     [UnmanagedCallersOnly]
     private static unsafe void Event(sapp_event* e)
     {
-        // Handle mouse click to switch animations
-        if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN && 
-            e->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
-        {
-            if (state.m_animationManager != null && state.m_animationManager.GetAnimationCount() > 1)
-            {
-                var nextAnimation = state.m_animationManager.GetNextAnimation();
-                if (nextAnimation != null && state.m_animator != null)
-                {
-                    state.m_animator.SetAnimation(nextAnimation);
-                    string? animName = state.m_animationManager.GetCurrentAnimationName();
-                    Console.WriteLine($"Switched to animation: {animName}");
-                }
-            }
-        }
-
+        simgui_handle_event(in *e);
         state.camera.HandleEvent(e);
     }
 
@@ -262,6 +314,7 @@ public static unsafe class AssimpAnimationApp
     static void Cleanup()
     {
         FileSystem.Instance.Shutdown();
+        simgui_shutdown();
         sdtx_shutdown();
         sg_shutdown();
 
