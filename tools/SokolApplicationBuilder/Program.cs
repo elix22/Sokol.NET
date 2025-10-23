@@ -36,15 +36,17 @@ namespace SokolApplicationBuilder
     class Program
     {
         static SokolBuildEngine buildEngine = new SokolBuildEngine();
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
             Utils.RegisterMSBuild();
+            int exitCode = 0;
             Parser.Default.ParseArguments<Options>(args)
-           .WithParsed(RunOptions);
-
+                .WithParsed(opts => exitCode = RunOptions(opts))
+                .WithNotParsed(errors => exitCode = 1);
+            return exitCode;
         }
 
-        static void RunOptions(Options opts)
+        static int RunOptions(Options opts)
         {
             if (opts.Task != string.Empty)
             {
@@ -52,7 +54,7 @@ namespace SokolApplicationBuilder
                 if (opts.Task != "register" && string.IsNullOrEmpty(opts.ProjectPath))
                 {
                     Console.WriteLine("ERROR: --path is required for task '" + opts.Task + "'");
-                    return;
+                    return 1;
                 }
 
                 // Check if sokolnet_home config exists, if not, run register task first
@@ -84,7 +86,7 @@ namespace SokolApplicationBuilder
                         if (!registerResult)
                         {
                             Console.WriteLine("ERROR: Failed to create SokolNetHome configuration. Cannot proceed with task '" + opts.Task + "'.");
-                            return;
+                            return 1;
                         }
                         
                         Console.WriteLine("SokolNetHome configuration created successfully. Continuing with task '" + opts.Task + "'...");
@@ -92,6 +94,7 @@ namespace SokolApplicationBuilder
                     }
                 }
 
+                bool taskSuccess = false;
                 switch (opts.Task)
                 {
                     case "build":
@@ -102,7 +105,7 @@ namespace SokolApplicationBuilder
                                     {
                                         var task = new AndroidBuildTask(opts);
                                         task.BuildEngine = buildEngine;
-                                        task.Execute();
+                                        taskSuccess = task.Execute();
                                     }
                                     break;
 
@@ -110,7 +113,7 @@ namespace SokolApplicationBuilder
                                     {
                                         var task = new IOSBuildTask(opts);
                                         task.BuildEngine = buildEngine;
-                                        task.Execute();
+                                        taskSuccess = task.Execute();
                                     }
                                     break;
 
@@ -118,7 +121,7 @@ namespace SokolApplicationBuilder
                                     {
                                         var task = new DesktopBuildTask(opts);
                                         task.BuildEngine = buildEngine;
-                                        task.Execute();
+                                        taskSuccess = task.Execute();
                                     }
                                     break;
 
@@ -126,15 +129,15 @@ namespace SokolApplicationBuilder
                                     {
                                         var task = new WebBuildTask(opts);
                                         task.BuildEngine = buildEngine;
-                                        task.Execute();
+                                        taskSuccess = task.Execute();
                                     }
                                     break;
 
                                 default:
                                     {
-                                        Console.WriteLine("Unknown Architecture " + opts.Task);
+                                        Console.WriteLine("Unknown Architecture " + opts.Arch);
+                                        return 1;
                                     }
-                                    break;
                             }
 
                         }
@@ -145,7 +148,7 @@ namespace SokolApplicationBuilder
 
                             var task = new CleanTask(opts);
                             task.BuildEngine = buildEngine;
-                            task.Execute();
+                            taskSuccess = task.Execute();
                         }
                         break;
 
@@ -153,7 +156,7 @@ namespace SokolApplicationBuilder
                         {
                             var task = new RegisterTask(opts);
                             task.BuildEngine = buildEngine;
-                            task.Execute();
+                            taskSuccess = task.Execute();
                         }
                         break;
 
@@ -161,17 +164,20 @@ namespace SokolApplicationBuilder
                         {
                             var task = new PrepareTask(opts);
                             task.BuildEngine = buildEngine;
-                            task.Execute();
+                            taskSuccess = task.Execute();
                         }
                         break;
 
                     default:
                         {
                             Console.WriteLine("Unknown task " + opts.Task);
+                            return 1;
                         }
-                        break;
                 }
+                
+                return taskSuccess ? 0 : 1;
             }
+            return 0;
         }
     }
 }

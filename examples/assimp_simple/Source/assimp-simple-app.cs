@@ -69,7 +69,7 @@ public static unsafe class AssimpSimpleApp
             Aspect = 60.0f,
             NearZ = 0.01f,
             FarZ = 500.0f,
-            Center = new Vector3(0.0f, 0, 0.0f),
+            Center = new Vector3(0.0f, 1.1f, 0.0f),
             Distance = 5.0f,
         });
 
@@ -107,7 +107,7 @@ public static unsafe class AssimpSimpleApp
         state.pip = sg_make_pipeline(pipeline_desc);
 
         // Use FileSystem to load the model file
-        string filePath = util_get_file_path("vampire_modified.glb");
+        string filePath = util_get_file_path("vampire/dancing_vampire.glb");
         state.m_simpleModel = new SimpleModel(filePath);
 
 
@@ -131,6 +131,9 @@ public static unsafe class AssimpSimpleApp
         sdtx_color3b(color.r, color.g, color.b);
         sdtx_font((uint)0);
         sdtx_print("Assimp Simple App\n");
+        sdtx_print($"Camera Position: {state.camera.Center}\n");
+        sdtx_print($"Camera Distance: {state.camera.Distance}\n");
+        sdtx_print($"Camera Orientation: {state.camera.Latitude}, {state.camera.Longitude}\n");
 
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);

@@ -28,9 +28,12 @@ public class SimpleModel
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
+    public string FilePath { get; private set; } = "";
+
     public List<SimpleMesh>? SimpleMeshes;
     public SimpleModel(string filePath)
     {
+        FilePath = filePath;
         SimpleMeshes = new List<SimpleMesh>();
         FileSystem.Instance.LoadFile(filePath, OnFileLoaded);
     }
@@ -221,7 +224,9 @@ public class SimpleModel
                 else
                 {
                     string filePath = util_get_file_path(texSlot.FilePath);
-                    textures.Add(new Texture(filePath));
+                    string modelDirectory = Path.GetDirectoryName(FilePath) ?? "";
+                    string fullTexturePath = Path.Combine(modelDirectory, filePath);
+                    textures.Add(new Texture(fullTexturePath));
                 }
 
             }

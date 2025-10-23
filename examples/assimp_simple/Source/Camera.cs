@@ -123,6 +123,25 @@ namespace Sokol
 
             switch (ev->type)
             {
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
+                    if (ev->key_code == sapp_keycode.SAPP_KEYCODE_UP)
+                    {
+                        Center = Center + Vector3.UnitY * 0.1f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_DOWN)
+                    {
+                        Center = Center - Vector3.UnitY * 0.1f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_LEFT)
+                    {
+                        Center = Center - Vector3.UnitX * 0.1f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_RIGHT)
+                    {
+                        Center = Center + Vector3.UnitX * 0.1f;
+                    }
+                    
+                    break;
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
                     {
