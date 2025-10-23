@@ -38,7 +38,7 @@ public static unsafe class AssimpAnimationApp
     static readonly Random random = new Random();
     public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
 
-    static string modelPath = "Granny.glb";
+    static string modelPath = "DancingGangster.glb";
 
     class _state
     {
