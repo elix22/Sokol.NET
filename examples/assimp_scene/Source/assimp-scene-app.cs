@@ -39,7 +39,11 @@ public static unsafe class AssimpSceneApp
         public Sokol.Model? model;
         public Sokol.AnimationManager? animationManager;
         public Sokol.Animator? animator;
-
+        
+        // Culling statistics
+        public int totalMeshes = 0;
+        public int visibleMeshes = 0;
+        public int culledMeshes = 0;
     }
 
     static _state state = new _state();
@@ -67,7 +71,7 @@ public static unsafe class AssimpSceneApp
             Aspect = 60.0f,
             NearZ = 0.1f,    // Increased from 0.01 - improves depth precision dramatically
             FarZ = 1500.0f,
-            Center = new Vector3(0.0f, 1.1f, 0.0f),
+            Center = new Vector3(0.0f, 10f, 0.0f),
             Distance = 3.0f,
         });
 
@@ -181,8 +185,8 @@ public static unsafe class AssimpSceneApp
         // else
         {
             // Initialize with identity matrices - optimized bulk initialization
-            var bonesSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
-            bonesSpan.Fill(Matrix4x4.Identity);
+            // var bonesSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
+            // bonesSpan.Fill(Matrix4x4.Identity);
         }
 
         // Draw UI
@@ -194,7 +198,14 @@ public static unsafe class AssimpSceneApp
         // Draw the scene graph recursively
         if (state.model?.SceneGraph != null)
         {
-            DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params);
+            // Reset culling statistics
+            state.totalMeshes = 0;
+            state.visibleMeshes = 0;
+            state.culledMeshes = 0;
+            
+            // Calculate view-projection matrix for frustum culling
+            Matrix4x4 viewProjection = vs_params.view * vs_params.projection;
+            DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params, viewProjection);
         }
 
         simgui_render();
@@ -202,7 +213,7 @@ public static unsafe class AssimpSceneApp
         sg_commit();
     }
 
-    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params)
+    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params, Matrix4x4 viewProjection)
     {
         if (node == null) return;
 
@@ -212,17 +223,27 @@ public static unsafe class AssimpSceneApp
         // Apply uniforms ONCE per node with the current node's transform
          sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
 
-        // Draw all meshes attached to this node
+        // Draw all meshes attached to this node (with frustum culling)
         foreach (var mesh in node.Meshes)
         {
-          
-            mesh.Draw();
+            state.totalMeshes++;
+            
+            // Check if mesh is visible before drawing
+            if (mesh.IsVisible(node.WorldTransform, viewProjection))
+            {
+                state.visibleMeshes++;
+                mesh.Draw();
+            }
+            else
+            {
+                state.culledMeshes++;
+            }
         }
 
         // Recursively draw all children
         foreach (var child in node.Children)
         {
-            DrawSceneNode(child, ref vs_params);
+            DrawSceneNode(child, ref vs_params, viewProjection);
         }
     }
 
@@ -303,6 +324,23 @@ public static unsafe class AssimpSceneApp
                 igText("Loading animations...");
             }
 
+            igSeparator();
+            
+            // Display FPS (calculated from frame duration)
+            double frameDuration = sapp_frame_duration();
+            float fps = frameDuration > 0 ? (float)(1.0 / frameDuration) : 0.0f;
+            igText($"FPS: {fps:F1}");
+            igText($"Frame Time: {frameDuration * 1000.0:F2} ms");
+            
+            igSeparator();
+            
+            // Display frustum culling statistics
+            igText($"Total Meshes: {state.totalMeshes}");
+            igText($"Visible: {state.visibleMeshes}");
+            igText($"Culled: {state.culledMeshes}");
+            float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
+            igText($"Culled: {cullPercent:F1}%%");
+            
             igSeparator();
             igText($"Camera Distance: {state.camera.Distance:F2}");
             igText($"Camera Latitude: {state.camera.Latitude:F2}");
