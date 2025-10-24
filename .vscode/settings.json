@@ -96,7 +96,8 @@
         "fontstash.h": "c",
         "sokol_fontstash.h": "c",
         "sokol_spine.h": "c",
-        "ozzutil.h": "c"
+        "ozzutil.h": "c",
+        "__config": "cpp"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5503,

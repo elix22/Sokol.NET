@@ -215,19 +215,10 @@ public static unsafe class AssimpAnimationApp
 
         if (state.m_animatedModel?.SimpleMeshes != null)
         {
-            // Pack all uniforms into a single contiguous memory block
-            // Don't transpose - keep as-is for GLSL
-            Span<Matrix4x4> uniformMatrices = stackalloc Matrix4x4[103];
-            uniformMatrices[0] = vs_params.projection;
-            uniformMatrices[1] = vs_params.view;
-            uniformMatrices[2] = vs_params.model;
-            for (int i = 0; i < 100; i++) {
-                uniformMatrices[3 + i] = vs_params.finalBonesMatrices[i];
-            }
+            // Pass the entire vs_params struct directly - no intermediate copies needed!
+            // The finalBonesMatricesCollection is already part of the struct layout
+            sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
             
-            fixed (Matrix4x4* ptr = uniformMatrices) {
-                sg_apply_uniforms(UB_vs_params, new sg_range { ptr = ptr, size = (nuint)(sizeof(Matrix4x4) * 103) });
-            }
             foreach (var simpleMesh in state.m_animatedModel.SimpleMeshes)
             {
                 simpleMesh.Draw();
