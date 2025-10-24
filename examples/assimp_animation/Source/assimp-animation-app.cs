@@ -26,24 +26,11 @@ using static Imgui.ImguiNative;
 
 public static unsafe class AssimpAnimationApp
 {
-    private const int NUM_FONTS = 3;
-    private const int FONT_KC854 = 0;
-    private const int FONT_C64 = 1;
-    private const int FONT_ORIC = 2;
-    struct color_t
-    {
-        public byte r, g, b;
-    };
-
-    static readonly Random random = new Random();
-    public static float NextRandom(float min, float max) { return (float)((random.NextDouble() * (max - min)) + min); }
-
     static string modelPath = "DancingGangster.glb";
 
     class _state
     {
         public sg_pass_action pass_action;
-        public color_t[] palette = new color_t[NUM_FONTS];
 
         public sg_pipeline pip;
         public Sokol.Camera camera = new Sokol.Camera();
@@ -79,16 +66,6 @@ public static unsafe class AssimpAnimationApp
             Center = new Vector3(0.0f, 1.1f, 0.0f),
             Distance = 3.0f,
         });
-
-        state.palette[FONT_KC854] = new color_t { r = 0xf4, g = 0x43, b = 0x36 };
-        state.palette[FONT_C64] = new color_t { r = 0x21, g = 0x96, b = 0xf3 };
-        state.palette[FONT_ORIC] = new color_t { r = 0x4c, g = 0xaf, b = 0x50 };
-
-        sdtx_desc_t desc = default;
-        desc.fonts[FONT_KC854] = sdtx_font_kc854();
-        desc.fonts[FONT_C64] = sdtx_font_c64();
-        desc.fonts[FONT_ORIC] = sdtx_font_oric();
-        sdtx_setup(desc);
 
         // Setup sokol-imgui
         simgui_setup(new simgui_desc_t
@@ -220,7 +197,6 @@ public static unsafe class AssimpAnimationApp
             simpleMesh.Draw();
         }
 
-
         simgui_render();
         sg_end_pass();
         sg_commit();
@@ -325,7 +301,6 @@ public static unsafe class AssimpAnimationApp
     {
         FileSystem.Instance.Shutdown();
         simgui_shutdown();
-        sdtx_shutdown();
         sg_shutdown();
 
         // Force a complete shutdown if debugging

@@ -44,6 +44,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-assimp_scene",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/assimp_scene"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-assimp_scene-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/assimp_scene"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "prepare-dyntex",
 			"type": "shell",
 			"command": "dotnet",
@@ -669,6 +683,7 @@
 				"cube",
 				"assimp_simple",
 				"assimp_animation",
+				"assimp_scene",
 				"dyntex",
 				"cimgui",
 				"loadpng",
@@ -710,6 +725,7 @@
 				"examples/cube",
 				"examples/assimp_simple",
 				"examples/assimp_animation",
+				"examples/assimp_scene",
 				"examples/dyntex",
 				"examples/cimgui",
 				"examples/loadpng",

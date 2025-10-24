@@ -81,7 +81,8 @@
                 "vertextexture",
                 "mrt",
                 "assimp_simple",
-                "assimp_animation"
+                "assimp_animation",
+                "assimp_scene"
             ],
             "default": "cube"
         },
