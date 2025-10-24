@@ -27,7 +27,7 @@ using System.Diagnostics.Metrics;
 
 public static unsafe class AssimpSceneApp
 {
-    static string modelPath = "assimpScene.glb";
+    static string modelPath = "raceTrack.glb";
 
     class _state
     {
@@ -65,7 +65,7 @@ public static unsafe class AssimpSceneApp
         state.camera.Init(new CameraDesc()
         {
             Aspect = 60.0f,
-            NearZ = 0.01f,
+            NearZ = 0.1f,    // Increased from 0.01 - improves depth precision dramatically
             FarZ = 1500.0f,
             Center = new Vector3(0.0f, 1.1f, 0.0f),
             Distance = 3.0f,
