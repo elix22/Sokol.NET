@@ -48,10 +48,10 @@ public static unsafe class AssimpAnimationApp
         public sg_pipeline pip;
         public Sokol.Camera camera = new Sokol.Camera();
 
-        public Sokol.AnimatedModel? m_animatedModel;
-        public Sokol.AnimationManager? m_animationManager;
-        public Sokol.Animator? m_animator;
-        
+        public Sokol.Model? model;
+        public Sokol.AnimationManager? animationManager;
+        public Sokol.Animator? animator;
+
     }
 
     static _state state = new _state();
@@ -124,8 +124,8 @@ public static unsafe class AssimpAnimationApp
 
         // Use FileSystem to load the model file
         string filePath = util_get_file_path(modelPath);
-        state.m_animatedModel = new Sokol.AnimatedModel(filePath);
-        
+        state.model = new Sokol.Model(filePath);
+
         // Wait for model to load, then initialize animation
         // Animation will be created in Frame() once model is loaded
 
@@ -151,49 +151,49 @@ public static unsafe class AssimpAnimationApp
         });
 
         // Initialize animation manager once model is loaded
-        if (state.m_animatedModel != null && 
-            state.m_animatedModel.SimpleMeshes != null && 
-            state.m_animatedModel.SimpleMeshes.Count > 0 &&
-            state.m_animationManager == null)
+        if (state.model != null &&
+            state.model.SimpleMeshes != null &&
+            state.model.SimpleMeshes.Count > 0 &&
+            state.animationManager == null)
         {
-            state.m_animationManager = new Sokol.AnimationManager();
+            state.animationManager = new Sokol.AnimationManager();
             string animPath = util_get_file_path(modelPath);
-            state.m_animationManager.LoadAnimation(animPath, state.m_animatedModel);
+            state.animationManager.LoadAnimation(animPath, state.model);
             Console.WriteLine("Animation loading started...");
         }
 
         // Initialize animator once animation is loaded
-        if (state.m_animationManager != null && 
-            state.m_animationManager.GetAnimationCount() > 0 && 
-            state.m_animator == null)
+        if (state.animationManager != null &&
+            state.animationManager.GetAnimationCount() > 0 &&
+            state.animator == null)
         {
-            var animation = state.m_animationManager.GetFirstAnimation();
+            var animation = state.animationManager.GetFirstAnimation();
             if (animation != null)
             {
-                state.m_animator = new Sokol.Animator(animation);
+                state.animator = new Sokol.Animator(animation);
                 Console.WriteLine("Animator initialized successfully");
             }
         }
 
         // Update animator
-        if (state.m_animator != null)
+        if (state.animator != null)
         {
-            state.m_animator.UpdateAnimation((float)sapp_frame_duration());
+            state.animator.UpdateAnimation((float)sapp_frame_duration());
         }
 
-        state.camera.Update(sapp_width(), sapp_height()); 
-        
+        state.camera.Update(sapp_width(), sapp_height());
+
         // Prepare uniform data
         vs_params_t vs_params = new vs_params_t();
         vs_params.projection = state.camera.Proj;
         vs_params.view = state.camera.View;
         vs_params.model = Matrix4x4.Identity;
-        
+
         // Get bone matrices from animator
-        if (state.m_animator != null)
+        if (state.animator != null)
         {
             // Optimized bulk copy - both arrays are exactly AnimationConstants.MAX_BONES elements
-            var boneMatrices = state.m_animator.GetFinalBoneMatrices();
+            var boneMatrices = state.animator.GetFinalBoneMatrices();
             var destSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
             boneMatrices.AsSpan().CopyTo(destSpan);
         }
@@ -210,17 +210,16 @@ public static unsafe class AssimpAnimationApp
         sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
         sg_apply_pipeline(state.pip);
 
-        if (state.m_animatedModel?.SimpleMeshes != null)
+
+        // Pass the entire vs_params struct directly - no intermediate copies needed!
+        // The finalBonesMatricesCollection is already part of the struct layout
+        sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
+
+        foreach (var simpleMesh in state.model.SimpleMeshes)
         {
-            // Pass the entire vs_params struct directly - no intermediate copies needed!
-            // The finalBonesMatricesCollection is already part of the struct layout
-            sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
-            
-            foreach (var simpleMesh in state.m_animatedModel.SimpleMeshes)
-            {
-                simpleMesh.Draw();
-            }
+            simpleMesh.Draw();
         }
+
 
         simgui_render();
         sg_end_pass();
@@ -236,60 +235,60 @@ public static unsafe class AssimpAnimationApp
         {
             igText("Assimp Animation App");
             igSeparator();
-            
-            if (state.m_animationManager != null && state.m_animationManager.GetAnimationCount() > 0)
+
+            if (state.animationManager != null && state.animationManager.GetAnimationCount() > 0)
             {
-                int animCount = state.m_animationManager.GetAnimationCount();
-                string? currentAnimName = state.m_animationManager.GetCurrentAnimationName();
-                int currentIndex = state.m_animationManager.GetCurrentAnimationIndex();
-                
+                int animCount = state.animationManager.GetAnimationCount();
+                string? currentAnimName = state.animationManager.GetCurrentAnimationName();
+                int currentIndex = state.animationManager.GetCurrentAnimationIndex();
+
                 igText($"Current Animation: {currentAnimName ?? "None"} (Index: {currentIndex})");
                 igText($"Total Animations: {animCount}");
-                
+
                 // Display animation timing info
-                if (state.m_animator != null)
+                if (state.animator != null)
                 {
-                    var currentAnim = state.m_animator.GetCurrentAnimation();
+                    var currentAnim = state.animator.GetCurrentAnimation();
                     if (currentAnim != null)
                     {
                         float duration = currentAnim.GetDuration();
-                        float currentTime = state.m_animator.GetCurrentTime();
+                        float currentTime = state.animator.GetCurrentTime();
                         float ticksPerSecond = currentAnim.GetTicksPerSecond();
-                        
+
                         // Convert to seconds for display
                         float durationInSeconds = duration / ticksPerSecond;
                         float currentTimeInSeconds = currentTime / ticksPerSecond;
-                        
+
                         igText($"Duration: {durationInSeconds:F2}s");
                         igText($"Current Time: {currentTimeInSeconds:F2}s");
                         igText($"Progress: {(currentTime / duration * 100):F1}%%");
                     }
                 }
-                
+
                 igSeparator();
-                
+
                 if (animCount > 1)
                 {
                     if (igButton("<- Previous Animation", Vector2.Zero))
                     {
-                        var prevAnimation = state.m_animationManager.GetPreviousAnimation();
-                        if (prevAnimation != null && state.m_animator != null)
+                        var prevAnimation = state.animationManager.GetPreviousAnimation();
+                        if (prevAnimation != null && state.animator != null)
                         {
-                            state.m_animator.SetAnimation(prevAnimation);
-                            string? animName = state.m_animationManager.GetCurrentAnimationName();
+                            state.animator.SetAnimation(prevAnimation);
+                            string? animName = state.animationManager.GetCurrentAnimationName();
                             Console.WriteLine($"Switched to animation: {animName}");
                         }
                     }
-                    
+
                     igSameLine(0, 10);
-                    
+
                     if (igButton("Next Animation ->", Vector2.Zero))
                     {
-                        var nextAnimation = state.m_animationManager.GetNextAnimation();
-                        if (nextAnimation != null && state.m_animator != null)
+                        var nextAnimation = state.animationManager.GetNextAnimation();
+                        if (nextAnimation != null && state.animator != null)
                         {
-                            state.m_animator.SetAnimation(nextAnimation);
-                            string? animName = state.m_animationManager.GetCurrentAnimationName();
+                            state.animator.SetAnimation(nextAnimation);
+                            string? animName = state.animationManager.GetCurrentAnimationName();
                             Console.WriteLine($"Switched to animation: {animName}");
                         }
                     }
@@ -303,7 +302,7 @@ public static unsafe class AssimpAnimationApp
             {
                 igText("Loading animations...");
             }
-            
+
             igSeparator();
             igText($"Camera Distance: {state.camera.Distance:F2}");
             igText($"Camera Latitude: {state.camera.Latitude:F2}");

@@ -26,13 +26,13 @@ namespace Sokol
 
         public Animation() { }
 
-        public Animation(string animationPath, Sokol.AnimatedModel model)
+        public Animation(string animationPath, Sokol.Model model)
         {
             FilePath = animationPath;
             FileSystem.Instance.LoadFile(animationPath, (path, buffer, status) => OnFileLoaded(path, buffer, status, model));
         }
 
-        void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status, Sokol.AnimatedModel model)
+        void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status, Sokol.Model model)
         {
             if (status == FileLoadStatus.Success && buffer != null)
             {
@@ -77,7 +77,7 @@ namespace Sokol
             }
         }
 
-        public void SetAsssimpAnimation(Assimp.Scene? scene, Assimp.Animation animation, Sokol.AnimatedModel model)
+        public void SetAsssimpAnimation(Assimp.Scene? scene, Assimp.Animation animation, Sokol.Model model)
         {
                 
             m_Duration = (float)animation.DurationInTicks;
@@ -99,7 +99,7 @@ namespace Sokol
         public ref AssimpNodeData GetRootNode() => ref m_RootNode;
         public Dictionary<string, BoneInfo> GetBoneIDMap() => m_BoneInfoMap;
 
-        private void ReadMissingBones(Assimp.Animation animation, Sokol.AnimatedModel model)
+        private void ReadMissingBones(Assimp.Animation animation, Sokol.Model model)
         {
             int size = animation.NodeAnimationChannelCount;
             var boneInfoMap = model.GetBoneInfoMap();

@@ -24,7 +24,7 @@ using Assimp;
 namespace Sokol
 {
     [StructLayout(LayoutKind.Sequential)]
-    public struct AnimatedVertex
+    public struct Vertex
     {
         public Vector3 Position;
         public Vector4 Color;
@@ -33,19 +33,19 @@ namespace Sokol
         public Vector4 BoneWeights; // Corresponding weights
     }
 
-    public class AnimatedModel
+    public class Model
     {
         private const int MAX_BONE_INFLUENCE = 4;
 
         public string FilePath { get; private set; } = "";
-        public List<SimpleMesh>? SimpleMeshes;
+        public List<Mesh>? SimpleMeshes = new List<Mesh>();
         private Dictionary<string, BoneInfo> m_BoneInfoMap = new Dictionary<string, BoneInfo>();
         private int m_BoneCounter = 0;
 
-        public AnimatedModel(string filePath)
+        public Model(string filePath)
         {
             FilePath = filePath;
-            SimpleMeshes = new List<SimpleMesh>();
+            SimpleMeshes = new List<Mesh>();
             FileSystem.Instance.LoadFile(filePath, OnFileLoaded);
         }
 
@@ -104,20 +104,20 @@ namespace Sokol
 
         unsafe private void ProcessScene(Scene scene)
         {
-            foreach (Mesh m in scene.Meshes)
+            foreach (Assimp.Mesh m in scene.Meshes)
             {
                 ProcessMesh(m, scene);
             }
         }
 
-        unsafe private void ProcessMesh(Mesh mesh, Scene scene)
+        unsafe private void ProcessMesh(Assimp.Mesh mesh, Scene scene)
         {
-            AnimatedVertex[] vertices = new AnimatedVertex[mesh.VertexCount];
+            Vertex[] vertices = new Vertex[mesh.VertexCount];
             
             // Initialize vertices with default bone data
             for (int i = 0; i < mesh.VertexCount; i++)
             {
-                AnimatedVertex vertex = new AnimatedVertex();
+                Vertex vertex = new Vertex();
                 vertex.Position = mesh.Vertices[i];  // Already Vector3
                 
                 // Use actual vertex colors if available, otherwise use white
@@ -164,10 +164,10 @@ namespace Sokol
             // Load textures
             List<Texture> textures = Texture.LoadTextures(scene, mesh, FilePath);
 
-            SimpleMeshes?.Add(new SimpleMesh(null!, vertices, indices.ToArray(), textures));
+            SimpleMeshes?.Add(new Mesh( vertices, indices.ToArray(), textures));
         }
 
-        private void SetVertexBoneData(ref AnimatedVertex vertex, int boneID, float weight)
+        private void SetVertexBoneData(ref Vertex vertex, int boneID, float weight)
         {
             if (weight == 0) return;
 
@@ -197,7 +197,7 @@ namespace Sokol
             }
         }
 
-        private void ExtractBoneWeights(ref AnimatedVertex[] vertices, Mesh mesh, Scene scene)
+        private void ExtractBoneWeights(ref Vertex[] vertices, Assimp.Mesh mesh, Scene scene)
         {
             for (int boneIndex = 0; boneIndex < mesh.BoneCount; ++boneIndex)
             {

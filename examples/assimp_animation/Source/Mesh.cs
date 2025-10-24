@@ -22,12 +22,11 @@ using Assimp;
 
 namespace Sokol
 {
-    public class SimpleMesh
+    public class Mesh
     {
 
-        public SimpleMesh(SimpleModel? parentModel, AnimatedVertex[] vertices, UInt16[] indices, List<Texture> textures)
+        public Mesh( Vertex[] vertices, UInt16[] indices, List<Texture> textures)
         {
-            _parentModel = parentModel;
 
             Textures = textures;
 
@@ -45,29 +44,7 @@ namespace Sokol
 
             VertexCount = vertices.Length;
             IndexCount = indices.Length;
-        }
-        public SimpleMesh(SimpleModel? parentModel, Vertex[] vertices, UInt16[] indices, List<Texture> textures)
-        {
-            _parentModel = parentModel;
-
-            Textures = textures;
-
-            VertexBuffer = sg_make_buffer(new sg_buffer_desc()
-            {
-                data = SG_RANGE(vertices),
-                label = "assimp-simple-vertex-buffer"
-            });
-            IndexBuffer = sg_make_buffer(new sg_buffer_desc()
-            {
-                usage = new sg_buffer_usage { index_buffer = true },
-                data = SG_RANGE(indices),
-                label = "assimp-simple-index-buffer"
-            });
-
-            VertexCount = vertices.Length;
-            IndexCount = indices.Length;
-        }
-        
+        }       
 
         public void Draw()
         {
@@ -96,7 +73,6 @@ namespace Sokol
 
         public int VertexCount;
         public int IndexCount;
-        SimpleModel? _parentModel;
 
         public List<Texture> Textures = new List<Texture>();
     }

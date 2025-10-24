@@ -116,7 +116,7 @@ public unsafe class Texture
 
     }
 
-    public static unsafe List<Texture> LoadTextures(Scene scene, Mesh mesh, string FilePath , TextureType textureTypetype = TextureType.Diffuse)
+    public static unsafe List<Texture> LoadTextures(Scene scene, Assimp.Mesh mesh, string FilePath , TextureType textureTypetype = TextureType.Diffuse)
     {
         var material = scene.Materials[mesh.MaterialIndex];
 

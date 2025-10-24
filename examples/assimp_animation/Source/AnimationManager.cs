@@ -119,11 +119,11 @@ namespace Sokol
         }
 
 
-        public void LoadAnimation(string filePath, AnimatedModel model)
+        public void LoadAnimation(string filePath, Model model)
         {
             FileSystem.Instance.LoadFile(filePath, (path, buffer, status) => OnFileLoaded(path, buffer, status, model));
         }
-        void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status, Sokol.AnimatedModel model)
+        void OnFileLoaded(string filePath, byte[]? buffer, FileLoadStatus status, Sokol.Model model)
         {
             if (status == FileLoadStatus.Success && buffer != null)
             {
