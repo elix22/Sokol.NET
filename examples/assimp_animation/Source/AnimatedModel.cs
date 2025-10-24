@@ -119,12 +119,17 @@ namespace Sokol
             {
                 AnimatedVertex vertex = new AnimatedVertex();
                 vertex.Position = mesh.Vertices[i];  // Already Vector3
-                vertex.Color = new Vector4(
-                    SimpleModel.NextRandom(0.0f, 1.0f),
-                    SimpleModel.NextRandom(0.0f, 1.0f),
-                    SimpleModel.NextRandom(0.0f, 1.0f),
-                    1.0f
-                );
+                
+                // Use actual vertex colors if available, otherwise use white
+                if (mesh.HasVertexColors(0))
+                {
+                    var color = mesh.VertexColorChannels[0][i];
+                    vertex.Color = new Vector4(color.X, color.Y, color.Z, color.W);
+                }
+                else
+                {
+                    vertex.Color = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+                }
                 
                 if (mesh.HasTextureCoords(0))
                 {

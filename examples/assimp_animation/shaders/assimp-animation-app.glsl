@@ -25,6 +25,8 @@ layout(location=1) out vec2 uv;
 void main() {
 
     vec4 totalPosition = vec4(0.0f);
+    bool hasValidBone = false;
+    
     for(int i = 0 ; i < MAX_BONE_INFLUENCE ; i++)
     {
         if(int(boneIds[i]) == -1) 
@@ -32,11 +34,18 @@ void main() {
         if(int(boneIds[i]) >=MAX_BONES) 
         {
             totalPosition = vec4(position,1.0);
+            hasValidBone = true;
             break;
         }
         vec4 localPosition = finalBonesMatrices[int(boneIds[i])] * vec4(position,1.0);
         totalPosition += localPosition * weights[i];
+        hasValidBone = true;
    }
+   
+    // Handle static vertices (no bone influences)
+    if (!hasValidBone) {
+        totalPosition = vec4(position, 1.0);
+    }
 	
     gl_Position =  projection * view * model * totalPosition;
     color = color0;
@@ -52,7 +61,7 @@ layout(location=1) in vec2 uv;
 out vec4 frag_color;
 
 void main() {
-    frag_color = texture(sampler2D(tex, smp), uv);
+    frag_color = texture(sampler2D(tex, smp), uv) * color;
 }
 @end
 
