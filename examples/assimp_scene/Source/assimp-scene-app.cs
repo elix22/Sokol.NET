@@ -57,7 +57,7 @@ public static unsafe class AssimpSceneApp
         
         // Distance culling settings
         public float maxDrawDistance = 500.0f;  // Maximum distance to draw objects
-        public bool enableDistanceCulling = false;  // TEMPORARILY DISABLED FOR DEBUG
+        public bool enableDistanceCulling = false;  
         public int distanceCulledMeshes = 0;
     }
 
