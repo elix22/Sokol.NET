@@ -69,28 +69,6 @@ namespace Sokol
         }
         
 
-        public SimpleMesh(SimpleModel? parentModel, float[] vertices, UInt16[] indices, List<Texture> textures)
-        {
-            _parentModel = parentModel;
-
-            Textures = textures;
-
-            VertexBuffer = sg_make_buffer(new sg_buffer_desc()
-            {
-                data = SG_RANGE(vertices),
-                label = "assimp-simple-vertex-buffer"
-            });
-            IndexBuffer = sg_make_buffer(new sg_buffer_desc()
-            {
-                usage = new sg_buffer_usage { index_buffer = true },
-                data = SG_RANGE(indices),
-                label = "assimp-simple-index-buffer"
-            });
-
-            VertexCount = vertices.Length / 7; // 3 pos + 4 color
-            IndexCount = indices.Length;
-        }
-
         public void Draw()
         {
             if (Textures.Count == 0 || Textures[0] == null)
