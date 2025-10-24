@@ -44,6 +44,21 @@ public static unsafe class AssimpSceneApp
         public int totalMeshes = 0;
         public int visibleMeshes = 0;
         public int culledMeshes = 0;
+        
+        // Hierarchical culling statistics
+        public int nodesTestedForCulling = 0;
+        public int nodesCulled = 0;  // Entire branches culled
+        public bool enableHierarchicalCulling = true;
+        
+        // Octree culling
+        public bool enableOctreeCulling = true;
+        public int octreeNodesTestedForCulling = 0;
+        public int octreeNodesCulled = 0;
+        
+        // Distance culling settings
+        public float maxDrawDistance = 500.0f;  // Maximum distance to draw objects
+        public bool enableDistanceCulling = false;  // TEMPORARILY DISABLED FOR DEBUG
+        public int distanceCulledMeshes = 0;
     }
 
     static _state state = new _state();
@@ -198,14 +213,40 @@ public static unsafe class AssimpSceneApp
         // Draw the scene graph recursively
         if (state.model?.SceneGraph != null)
         {
+            // Build octree on first frame if enabled
+            if (state.enableOctreeCulling && state.model.SceneGraph.SpatialIndex == null)
+            {
+                Console.WriteLine("Building Octree spatial index...");
+                state.model.SceneGraph.BuildSpatialIndex();
+            }
+            
             // Reset culling statistics
             state.totalMeshes = 0;
             state.visibleMeshes = 0;
             state.culledMeshes = 0;
+            state.nodesTestedForCulling = 0;
+            state.nodesCulled = 0;
+            state.distanceCulledMeshes = 0;
+            state.octreeNodesTestedForCulling = 0;
+            state.octreeNodesCulled = 0;
             
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = vs_params.view * vs_params.projection;
-            DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params, viewProjection);
+            
+            // Get camera position for distance culling
+            Matrix4x4 viewInverse;
+            Matrix4x4.Invert(vs_params.view, out viewInverse);
+            Vector3 cameraPosition = new Vector3(viewInverse.M41, viewInverse.M42, viewInverse.M43);
+            
+            // Use octree culling if enabled and available
+            if (state.enableOctreeCulling && state.model.SceneGraph.SpatialIndex != null)
+            {
+                DrawSceneUsingOctree(ref vs_params, viewProjection, cameraPosition);
+            }
+            else
+            {
+                DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params, viewProjection, cameraPosition);
+            }
         }
 
         simgui_render();
@@ -213,22 +254,121 @@ public static unsafe class AssimpSceneApp
         sg_commit();
     }
 
-    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params, Matrix4x4 viewProjection)
+    static void DrawSceneUsingOctree(ref vs_params_t vs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
+    {
+        if (state.model?.SceneGraph?.SpatialIndex == null)
+            return;
+
+        // Query visible meshes from octree
+        var visibleMeshes = state.model.SceneGraph.SpatialIndex.QueryVisible(
+            viewProjection,
+            cameraPosition,
+            state.maxDrawDistance,
+            state.enableDistanceCulling,
+            out state.octreeNodesTestedForCulling,
+            out state.octreeNodesCulled);
+
+        state.totalMeshes = state.model.SceneGraph.AllMeshes.Count;
+        state.visibleMeshes = visibleMeshes.Count;
+        state.culledMeshes = state.totalMeshes - state.visibleMeshes;
+
+        // Draw all visible meshes
+        foreach (var (mesh, transform) in visibleMeshes)
+        {
+            vs_params.model = transform;
+            sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
+            mesh.Draw();
+        }
+    }
+
+    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
     {
         if (node == null) return;
+        
+        state.nodesTestedForCulling++;
+        
+        // HIERARCHICAL CULLING: Test node's hierarchical bounding box first (if enabled)
+        // If the entire node (including all children) is outside frustum, skip everything
+        if (state.enableHierarchicalCulling)
+        {
+            var nodeWorldBounds = node.HierarchicalBounds.Transform(node.WorldTransform);
+            
+            // Extract frustum planes from view-projection matrix (same as in Mesh.IsVisible)
+            Matrix4x4 m = viewProjection;
+            
+            // Left plane: m.M14 + m.M11, etc.
+            Vector4 leftPlane = new Vector4(m.M14 + m.M11, m.M24 + m.M21, m.M34 + m.M31, m.M44 + m.M41);
+            Vector4 rightPlane = new Vector4(m.M14 - m.M11, m.M24 - m.M21, m.M34 - m.M31, m.M44 - m.M41);
+            Vector4 topPlane = new Vector4(m.M14 - m.M12, m.M24 - m.M22, m.M34 - m.M32, m.M44 - m.M42);
+            Vector4 bottomPlane = new Vector4(m.M14 + m.M12, m.M24 + m.M22, m.M34 + m.M32, m.M44 + m.M42);
+            Vector4 nearPlane = new Vector4(m.M14 + m.M13, m.M24 + m.M23, m.M34 + m.M33, m.M44 + m.M43);
+            Vector4 farPlane = new Vector4(m.M14 - m.M13, m.M24 - m.M23, m.M34 - m.M33, m.M44 - m.M43);
+            
+            Vector4[] frustumPlanes = { leftPlane, rightPlane, topPlane, bottomPlane, nearPlane, farPlane };
+            
+            // Test node's hierarchical bounds against frustum
+            bool nodeVisible = true;
+            foreach (var plane in frustumPlanes)
+            {
+                Vector3 planeNormal = new Vector3(plane.X, plane.Y, plane.Z);
+                float planeDistance = plane.W;
+                
+                // Find the positive vertex (furthest point in the direction of plane normal)
+                Vector3 positiveVertex = new Vector3(
+                    planeNormal.X >= 0 ? nodeWorldBounds.Max.X : nodeWorldBounds.Min.X,
+                    planeNormal.Y >= 0 ? nodeWorldBounds.Max.Y : nodeWorldBounds.Min.Y,
+                    planeNormal.Z >= 0 ? nodeWorldBounds.Max.Z : nodeWorldBounds.Min.Z
+                );
+                
+                // If positive vertex is outside this plane, the entire box is outside
+                if (Vector3.Dot(planeNormal, positiveVertex) + planeDistance < 0)
+                {
+                    nodeVisible = false;
+                    break;
+                }
+            }
+            
+            // If entire node is culled, skip this node and ALL children
+            if (!nodeVisible)
+            {
+                state.nodesCulled++;
+                
+                // Count all meshes in this branch as culled
+                int meshesInBranch = CountMeshesInBranch(node);
+                state.totalMeshes += meshesInBranch;
+                state.culledMeshes += meshesInBranch;
+                return;  // EARLY EXIT - skip entire branch
+            }
+        }
 
         // Update model matrix with the node's world transform
         vs_params.model = node.WorldTransform;
         
         // Apply uniforms ONCE per node with the current node's transform
-         sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
+        sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
 
-        // Draw all meshes attached to this node (with frustum culling)
+        // Draw all meshes attached to this node (with frustum and distance culling)
         foreach (var mesh in node.Meshes)
         {
             state.totalMeshes++;
             
-            // Check if mesh is visible before drawing
+            // DISTANCE CULLING: Check if mesh is within draw distance
+            if (state.enableDistanceCulling)
+            {
+                // Calculate mesh center in world space
+                var meshBounds = mesh.Bounds.Transform(node.WorldTransform);
+                Vector3 meshCenter = (meshBounds.Min + meshBounds.Max) * 0.5f;
+                float distanceToCamera = Vector3.Distance(cameraPosition, meshCenter);
+                
+                if (distanceToCamera > state.maxDrawDistance)
+                {
+                    state.distanceCulledMeshes++;
+                    state.culledMeshes++;
+                    continue;  // Skip this mesh
+                }
+            }
+            
+            // FRUSTUM CULLING: Check if mesh is visible (already implemented)
             if (mesh.IsVisible(node.WorldTransform, viewProjection))
             {
                 state.visibleMeshes++;
@@ -243,8 +383,21 @@ public static unsafe class AssimpSceneApp
         // Recursively draw all children
         foreach (var child in node.Children)
         {
-            DrawSceneNode(child, ref vs_params, viewProjection);
+            DrawSceneNode(child, ref vs_params, viewProjection, cameraPosition);
         }
+    }
+    
+    // Helper function to count all meshes in a node and its children (for statistics)
+    static int CountMeshesInBranch(Sokol.Node? node)
+    {
+        if (node == null) return 0;
+        
+        int count = node.Meshes.Count;
+        foreach (var child in node.Children)
+        {
+            count += CountMeshesInBranch(child);
+        }
+        return count;
     }
 
     static void DrawUI()
@@ -335,11 +488,80 @@ public static unsafe class AssimpSceneApp
             igSeparator();
             
             // Display frustum culling statistics
+            igText("=== Culling Statistics ===");
             igText($"Total Meshes: {state.totalMeshes}");
             igText($"Visible: {state.visibleMeshes}");
             igText($"Culled: {state.culledMeshes}");
             float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
             igText($"Culled: {cullPercent:F1}%%");
+            
+            igSeparator();
+            igText("=== Octree Culling ===");
+            byte octreeCullingEnabled = state.enableOctreeCulling ? (byte)1 : (byte)0;
+            if (igCheckbox("Enable Octree Culling", ref octreeCullingEnabled))
+            {
+                state.enableOctreeCulling = octreeCullingEnabled != 0;
+                // Clear octree to rebuild next frame
+                if (state.model?.SceneGraph != null)
+                {
+                    state.model.SceneGraph.SpatialIndex = null;
+                }
+            }
+            
+            if (state.enableOctreeCulling && state.model?.SceneGraph?.SpatialIndex != null)
+            {
+                var octreeStats = state.model.SceneGraph.SpatialIndex.GetStats();
+                igText($"Octree Nodes: {octreeStats.totalNodes} ({octreeStats.leafNodes} leaves)");
+                igText($"Nodes Tested: {state.octreeNodesTestedForCulling}");
+                igText($"Nodes Culled: {state.octreeNodesCulled}");
+                
+                if (state.octreeNodesCulled > 0)
+                {
+                    float octreeCullPercent = state.octreeNodesTestedForCulling > 0 
+                        ? (state.octreeNodesCulled * 100.0f / state.octreeNodesTestedForCulling) 
+                        : 0;
+                    igTextColored(new Vector4(0, 1, 0, 1), $"Spatial culling: {octreeCullPercent:F1}%% branches");
+                }
+            }
+            else if (!state.enableOctreeCulling)
+            {
+                igTextColored(new Vector4(1, 1, 0, 1), "Octree disabled - using scene graph");
+            }
+            
+            igSeparator();
+            igText("=== Hierarchical Culling ===");
+            
+            if (!state.enableOctreeCulling)
+            {
+                byte hierarchicalCullingEnabled = state.enableHierarchicalCulling ? (byte)1 : (byte)0;
+                if (igCheckbox("Enable Hierarchical Culling", ref hierarchicalCullingEnabled))
+                {
+                    state.enableHierarchicalCulling = hierarchicalCullingEnabled != 0;
+                }
+                igText($"Nodes Tested: {state.nodesTestedForCulling}");
+                igText($"Nodes Culled: {state.nodesCulled}");
+                if (state.nodesCulled > 0 && state.enableHierarchicalCulling)
+                {
+                    igTextColored(new Vector4(0, 1, 0, 1), $"Branch culling active!");
+                }
+            }
+            else
+            {
+                igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "(Disabled when Octree is active)");
+            }
+            
+            igSeparator();
+            igText("=== Distance Culling ===");
+            byte distanceCullingEnabled = state.enableDistanceCulling ? (byte)1 : (byte)0;
+            if (igCheckbox("Enable Distance Culling", ref distanceCullingEnabled))
+            {
+                state.enableDistanceCulling = distanceCullingEnabled != 0;
+            }
+            if (state.enableDistanceCulling)
+            {
+                igSliderFloat("Max Distance", ref state.maxDrawDistance, 50.0f, 2000.0f, "%.0f", ImGuiSliderFlags.None);
+                igText($"Distance Culled: {state.distanceCulledMeshes}");
+            }
             
             igSeparator();
             igText($"Camera Distance: {state.camera.Distance:F2}");

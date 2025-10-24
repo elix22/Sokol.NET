@@ -13,6 +13,7 @@ namespace Sokol
         public List<Mesh> AllMeshes { get; private set; } = new List<Mesh>();
         public Dictionary<string, BoneInfo> BoneInfoMap { get; private set; } = new Dictionary<string, BoneInfo>();
         public int BoneCount { get; private set; } = 0;
+        public Octree? SpatialIndex { get; set; }
 
         public Scene(Node rootNode)
         {
@@ -22,6 +23,21 @@ namespace Sokol
             if (RootNode != null)
             {
                 RootNode.CollectMeshes(AllMeshes);
+            }
+        }
+        
+        /// <summary>
+        /// Builds the octree spatial index for efficient culling
+        /// Call this after the scene is fully loaded and transforms are updated
+        /// </summary>
+        public void BuildSpatialIndex()
+        {
+            if (RootNode != null)
+            {
+                SpatialIndex = Octree.BuildFromScene(this);
+                
+                var stats = SpatialIndex.GetStats();
+                Console.WriteLine($"Octree built: {stats.totalNodes} nodes, {stats.leafNodes} leaves, {stats.totalMeshReferences} mesh references");
             }
         }
 

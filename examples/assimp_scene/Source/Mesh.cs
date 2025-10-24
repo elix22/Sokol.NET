@@ -181,6 +181,14 @@ namespace Sokol
             // Far plane
             Vector4 far = new Vector4(vp.M14 - vp.M13, vp.M24 - vp.M23, vp.M34 - vp.M33, vp.M44 - vp.M43);
             
+            // Normalize planes
+            left = NormalizePlane(left);
+            right = NormalizePlane(right);
+            bottom = NormalizePlane(bottom);
+            top = NormalizePlane(top);
+            near = NormalizePlane(near);
+            far = NormalizePlane(far);
+            
             Vector4[] planes = { left, right, bottom, top, near, far };
             
             // Test bounding box against each plane
@@ -196,14 +204,30 @@ namespace Sokol
                     planeNormal.Z >= 0 ? worldBounds.Max.Z : worldBounds.Min.Z
                 );
                 
+                float distance = Vector3.Dot(planeNormal, positiveVertex) + planeDistance;
+                
                 // If positive vertex is outside this plane, box is completely outside frustum
-                if (Vector3.Dot(planeNormal, positiveVertex) + planeDistance < 0)
-                {
+                if (distance < 0)
                     return false;
-                }
             }
             
             return true;
+        }
+        
+        private static Vector4 NormalizePlane(Vector4 plane)
+        {
+            Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
+            float length = normal.Length();
+            if (length > 0.0001f)
+            {
+                return new Vector4(
+                    plane.X / length,
+                    plane.Y / length,
+                    plane.Z / length,
+                    plane.W / length
+                );
+            }
+            return plane;
         }
     }
 }
