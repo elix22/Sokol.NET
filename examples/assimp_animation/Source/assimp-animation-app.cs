@@ -192,19 +192,16 @@ public static unsafe class AssimpAnimationApp
         // Get bone matrices from animator
         if (state.m_animator != null)
         {
+            // Optimized bulk copy - both arrays are exactly AnimationConstants.MAX_BONES elements
             var boneMatrices = state.m_animator.GetFinalBoneMatrices();
-            for (int i = 0; i < boneMatrices.Count && i < 100; i++)
-            {
-                vs_params.finalBonesMatrices[i] = boneMatrices[i];
-            }
+            var destSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
+            boneMatrices.AsSpan().CopyTo(destSpan);
         }
         else
         {
-            // Initialize with identity matrices
-            for (int i = 0; i < 100; i++)
-            {
-                vs_params.finalBonesMatrices[i] = Matrix4x4.Identity;
-            }
+            // Initialize with identity matrices - optimized bulk initialization
+            var bonesSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
+            bonesSpan.Fill(Matrix4x4.Identity);
         }
 
         // Draw UI

@@ -6,7 +6,7 @@ namespace Sokol
 {
     public class Animator
     {
-        private List<Matrix4x4> m_FinalBoneMatrices = new List<Matrix4x4>();
+        private Matrix4x4[] m_FinalBoneMatrices = new Matrix4x4[AnimationConstants.MAX_BONES];
         private Animation? m_CurrentAnimation;
         private float m_CurrentTime;
         private float m_DeltaTime;
@@ -16,18 +16,17 @@ namespace Sokol
             m_CurrentTime = 0.0f;
             m_CurrentAnimation = animation;
 
-            // Reserve space for 100 bone matrices
-            for (int i = 0; i < 100; i++)
-                m_FinalBoneMatrices.Add(Matrix4x4.Identity);
+            // Initialize bone matrices to identity
+            Array.Fill(m_FinalBoneMatrices, Matrix4x4.Identity);
         }
 
         public void SetAnimation(Animation? animation)
         {
             m_CurrentAnimation = animation;
             m_CurrentTime = 0.0f;
-            m_FinalBoneMatrices = new List<Matrix4x4>();
-            for (int i = 0; i < 100; i++)
-                m_FinalBoneMatrices.Add(Matrix4x4.Identity);
+            
+            // Reset bone matrices to identity
+            Array.Fill(m_FinalBoneMatrices, Matrix4x4.Identity);
         }
 
         public void UpdateAnimation(float dt)
@@ -76,7 +75,7 @@ namespace Sokol
                 CalculateBoneTransform(node.Children[i], globalTransformation);
         }
 
-        public List<Matrix4x4> GetFinalBoneMatrices()
+        public Matrix4x4[] GetFinalBoneMatrices()
         {
             return m_FinalBoneMatrices;
         }
