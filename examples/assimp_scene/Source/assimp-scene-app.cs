@@ -62,6 +62,11 @@ public static unsafe class AssimpSceneApp
         public float maxDrawDistance = 500.0f;  // Maximum distance to draw objects
         public bool enableDistanceCulling = false;  
         public int distanceCulledMeshes = 0;
+        
+        // Lighting
+        public List<Sokol.Light> lights = new List<Sokol.Light>();
+        public Vector3 ambientColor = new Vector3(0.2f, 0.2f, 0.2f);
+        public float ambientIntensity = 1.0f;
     }
 
     static _state state = new _state();
@@ -110,8 +115,9 @@ public static unsafe class AssimpSceneApp
         sg_shader shd = sg_make_shader(assimp_shader_desc(sg_query_backend()));
 
         var pipeline_desc = default(sg_pipeline_desc);
-        // pipeline_desc.layout.buffers[0].stride = (17 * sizeof(float)); // 3 pos + 4 color + 2 texcoord + 4 boneIds + 4 weights
+        // pipeline_desc.layout.buffers[0].stride = (20 * sizeof(float)); // 3 pos + 3 normal + 4 color + 2 texcoord + 4 boneIds + 4 weights
         pipeline_desc.layout.attrs[ATTR_assimp_position].format = SG_VERTEXFORMAT_FLOAT3;
+        pipeline_desc.layout.attrs[ATTR_assimp_normal].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[ATTR_assimp_color0].format = SG_VERTEXFORMAT_FLOAT4;
         pipeline_desc.layout.attrs[ATTR_assimp_texcoord0].format = SG_VERTEXFORMAT_FLOAT2;
         pipeline_desc.layout.attrs[ATTR_assimp_boneIds].format = SG_VERTEXFORMAT_FLOAT4;
@@ -129,6 +135,21 @@ public static unsafe class AssimpSceneApp
         // Use FileSystem to load the model file
         string filePath = util_get_file_path(modelPath);
         state.model = new Sokol.Model(filePath);
+
+        // Initialize default lights
+        // Main directional light (sun-like) from upper right
+        state.lights.Add(Sokol.Light.CreateDirectionalLight(
+            new Vector3(-0.3f, -0.7f, -0.5f),  // Direction (from upper right)
+            new Vector3(1.0f, 0.95f, 0.9f),    // Warm white color
+            0.8f                                // Intensity
+        ));
+        
+        // Fill light (softer, from left)
+        state.lights.Add(Sokol.Light.CreateDirectionalLight(
+            new Vector3(0.5f, -0.3f, 0.2f),   // Direction (from left)
+            new Vector3(0.7f, 0.8f, 1.0f),    // Cool blue tint
+            0.3f                               // Lower intensity
+        ));
 
         // Wait for model to load, then initialize animation
         // Animation will be created in Frame() once model is loaded
@@ -228,6 +249,43 @@ public static unsafe class AssimpSceneApp
             bonesSpan.Fill(Matrix4x4.Identity);
         }
 
+        // Prepare lighting uniform data
+        fs_params_t fs_params = new fs_params_t();
+        
+        // Extract camera position from view matrix inverse
+        Matrix4x4.Invert(vs_params.view, out Matrix4x4 viewInv);
+        Vector3 cameraPos = new Vector3(viewInv.M41, viewInv.M42, viewInv.M43);
+        fs_params.camera_pos = cameraPos;
+        
+        // Set ambient lighting
+        fs_params.ambient_color = state.ambientColor;
+        fs_params.ambient_intensity = state.ambientIntensity;
+        
+        // Set number of lights (max 4)
+        int numLights = Math.Min(state.lights.Count, 4);
+        fs_params.num_lights = numLights;
+        
+        // Populate light arrays
+        for (int i = 0; i < numLights; i++)
+        {
+            Sokol.Light light = state.lights[i];
+            if (!light.Enabled) continue;
+            
+            // Light position with type in w component
+            fs_params.light_positions[i] = new Vector4(light.Position, (float)light.Type);
+            
+            // Light direction with spot inner cutoff (cosine) in w component
+            float innerCutoff = (float)Math.Cos(light.SpotInnerAngle * Math.PI / 180.0);
+            fs_params.light_directions[i] = new Vector4(light.Direction, innerCutoff);
+            
+            // Light color with intensity in w component
+            fs_params.light_colors[i] = new Vector4(light.Color, light.Intensity);
+            
+            // Light parameters: range in x, spot outer cutoff (cosine) in y
+            float outerCutoff = (float)Math.Cos(light.SpotOuterAngle * Math.PI / 180.0);
+            fs_params.light_params[i] = new Vector4(light.Range, outerCutoff, 0, 0);
+        }
+
         // Draw UI
         DrawUI();
 
@@ -265,11 +323,11 @@ public static unsafe class AssimpSceneApp
             // Use octree culling if enabled and available
             if (state.enableOctreeCulling && state.model.SceneGraph.SpatialIndex != null)
             {
-                DrawSceneUsingOctree(ref vs_params, viewProjection, cameraPosition);
+                DrawSceneUsingOctree(ref vs_params, ref fs_params, viewProjection, cameraPosition);
             }
             else
             {
-                DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params, viewProjection, cameraPosition);
+                DrawSceneNode(state.model.SceneGraph.RootNode, ref vs_params, ref fs_params, viewProjection, cameraPosition);
             }
         }
 
@@ -278,7 +336,7 @@ public static unsafe class AssimpSceneApp
         sg_commit();
     }
 
-    static void DrawSceneUsingOctree(ref vs_params_t vs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
+    static void DrawSceneUsingOctree(ref vs_params_t vs_params, ref fs_params_t fs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
     {
         if (state.model?.SceneGraph?.SpatialIndex == null)
             return;
@@ -301,11 +359,12 @@ public static unsafe class AssimpSceneApp
         {
             vs_params.model = transform;
             sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
+            sg_apply_uniforms(UB_fs_params, SG_RANGE(ref fs_params));
             mesh.Draw();
         }
     }
 
-    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
+    static void DrawSceneNode(Sokol.Node? node, ref vs_params_t vs_params, ref fs_params_t fs_params, Matrix4x4 viewProjection, Vector3 cameraPosition)
     {
         if (node == null) return;
         
@@ -370,6 +429,7 @@ public static unsafe class AssimpSceneApp
         
         // Apply uniforms ONCE per node with the current node's transform
         sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
+        sg_apply_uniforms(UB_fs_params, SG_RANGE(ref fs_params));
 
         // Draw all meshes attached to this node (with frustum and distance culling)
         foreach (var mesh in node.Meshes)
@@ -407,7 +467,7 @@ public static unsafe class AssimpSceneApp
         // Recursively draw all children
         foreach (var child in node.Children)
         {
-            DrawSceneNode(child, ref vs_params, viewProjection, cameraPosition);
+            DrawSceneNode(child, ref vs_params, ref fs_params, viewProjection, cameraPosition);
         }
     }
     

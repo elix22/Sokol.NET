@@ -27,6 +27,7 @@ namespace Sokol
     public struct Vertex
     {
         public Vector3 Position;
+        public Vector3 Normal;
         public Vector4 Color;
         public Vector2 TexCoord;
         public Vector4 BoneIDs;    // Up to 4 bone influences
@@ -182,6 +183,16 @@ namespace Sokol
             {
                 Vertex vertex = new Vertex();
                 vertex.Position = mesh.Vertices[i];  // Already Vector3
+                
+                // Extract normals
+                if (mesh.HasNormals)
+                {
+                    vertex.Normal = mesh.Normals[i];
+                }
+                else
+                {
+                    vertex.Normal = Vector3.UnitY; // Default up normal
+                }
                 
                 // Use vertex colors if available, otherwise use material diffuse color
                 if (mesh.HasVertexColors(0))
