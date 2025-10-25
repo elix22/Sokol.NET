@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Assimp;
+using static Sokol.SLog;
 
 namespace Sokol
 {
@@ -36,7 +37,7 @@ namespace Sokol
         {
             if (status == FileLoadStatus.Success && buffer != null)
             {
-                Console.WriteLine($"Animation: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+                Info($"Animation: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
 
                 var stream = new System.IO.MemoryStream(buffer);
                 PostProcessSteps ppSteps = PostProcessSteps.Triangulate;
@@ -52,7 +53,7 @@ namespace Sokol
 
                 if (scene == null || scene.RootNode == null || scene.AnimationCount == 0)
                 {
-                    Console.WriteLine($"Animation: Failed to load animation from {filePath}");
+                    Info($"Animation: Failed to load animation from {filePath}");
                     return;
                 }
 
@@ -69,11 +70,11 @@ namespace Sokol
                 ReadMissingBones(animation, model);
 
                 IsLoaded = true;
-                Console.WriteLine($"Animation: Successfully loaded animation from {filePath}");
+                Info($"Animation: Successfully loaded animation from {filePath}");
             }
             else
             {
-                Console.WriteLine($"Animation: Failed to load file: {status}");
+                Info($"Animation: Failed to load file: {status}");
             }
         }
 
@@ -137,8 +138,8 @@ namespace Sokol
             dest.ChildrenCount = src.ChildCount;
             dest.Children = new List<AssimpNodeData>();
 
-            Console.WriteLine($"{new string(' ', indentation * 2)}{dest.Name}");
-            Console.WriteLine($"{new string(' ', indentation * 2)}{{");
+            Info($"{new string(' ', indentation * 2)}{dest.Name}");
+            Info($"{new string(' ', indentation * 2)}{{");
 
             for (int i = 0; i < src.ChildCount; i++)
             {
@@ -147,7 +148,7 @@ namespace Sokol
                 dest.Children.Add(newData);
             }
 
-            Console.WriteLine($"{new string(' ', indentation * 2)}}}");
+            Info($"{new string(' ', indentation * 2)}}}");
             indentation--;
         }
     }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Assimp;
-
+using static Sokol.SLog;
 namespace Sokol
 {
     public struct KeyPosition
@@ -79,7 +79,7 @@ namespace Sokol
                 m_Scales.Add(data);
             }
 
-            Console.WriteLine($"new Bone {name} ID:{id} Positions:{m_NumPositions} Rotations:{m_NumRotations} Scalings:{m_NumScalings}");
+            Info($"new Bone {name} ID:{id} Positions:{m_NumPositions} Rotations:{m_NumRotations} Scalings:{m_NumScalings}");
         }
 
         public void Update(float animationTime)

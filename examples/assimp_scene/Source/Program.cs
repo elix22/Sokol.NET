@@ -2,7 +2,7 @@
 
 using System.Runtime.InteropServices;
 using Sokol;
-
+using static Sokol.SLog;
 public static unsafe class MainClass
 {
     // Host platform entry point
@@ -24,7 +24,7 @@ public static unsafe class MainClass
     [UnmanagedCallersOnly(EntryPoint = "AndroidMain")]
     public static unsafe IntPtr AndroidMain()
     {
-        Console.WriteLine(" AndroidMain() Enter");
+        Info(" AndroidMain() Enter");
         SApp.sapp_desc desc = CreateAppDesc();
         _descPtr = Marshal.AllocHGlobal(Marshal.SizeOf(desc));
         Marshal.StructureToPtr(desc, _descPtr, false);
@@ -35,7 +35,7 @@ public static unsafe class MainClass
     [UnmanagedCallersOnly(EntryPoint = "IOSMain")]
     public static unsafe void IOSMain()
     {
-        Console.WriteLine(" IOSMain() Enter");
+        Info(" IOSMain() Enter");
         SApp.sapp_run(CreateAppDesc());
     }
 

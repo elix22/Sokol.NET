@@ -91,7 +91,7 @@ public unsafe class Texture : IDisposable
     {
         if (status == FileLoadStatus.Success && buffer != null)
         {
-            Console.WriteLine($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+            Info($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
             // Further processing of the texture data would go here
             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
             byte* pixels = stbi_load_csharp(
@@ -105,7 +105,7 @@ public unsafe class Texture : IDisposable
 
             if (pixels == null)
             {
-                Console.WriteLine($"Assimp: Failed to decode texture file: {filePath}");
+                Info($"Assimp: Failed to decode texture file: {filePath}");
                 return;
             }
 
@@ -116,7 +116,7 @@ public unsafe class Texture : IDisposable
         }
         else
         {
-            Console.WriteLine($"Assimp: Failed to load texture file: {status}");
+            Info($"Assimp: Failed to load texture file: {status}");
         }
 
     }
@@ -131,7 +131,7 @@ public unsafe class Texture : IDisposable
         {
             TextureSlot texSlot;
             material.GetMaterialTexture(textureTypetype, 0, out texSlot);
-            // Console.WriteLine($"Assimp: Mesh uses diffuse texture: {texSlot.FilePath}");
+            // Info($"Assimp: Mesh uses diffuse texture: {texSlot.FilePath}");
 
             if (texSlot.FilePath[0] == '*')
             {
@@ -139,7 +139,7 @@ public unsafe class Texture : IDisposable
                 texSlot.FilePath = texSlot.FilePath.Substring(1);
                 if (!int.TryParse(texSlot.FilePath, out int textureIndex))
                 {
-                    Console.WriteLine($"Assimp: Failed to parse embedded texture index from '{texSlot.FilePath}'");
+                    Info($"Assimp: Failed to parse embedded texture index from '{texSlot.FilePath}'");
                     textureIndex = -1;
                 }
                 else
@@ -147,13 +147,13 @@ public unsafe class Texture : IDisposable
                     // Create unique identifier for embedded texture
                     string embeddedTextureKey = $"embedded_{Path.GetFileName(FilePath)}_{textureIndex}";
                     
-                    // Console.WriteLine($"Assimp: Found embedded texture index: {textureIndex}");
+                    // Info($"Assimp: Found embedded texture index: {textureIndex}");
                     if (textureIndex < scene.TextureCount)
                     {
                         EmbeddedTexture embeddedTexture = scene.Textures[textureIndex];
                         if (embeddedTexture.IsCompressed)
                         {
-                            // Console.WriteLine($"Assimp: Embedded texture is compressed, size: {embeddedTexture.CompressedData.Length} bytes");
+                            // Info($"Assimp: Embedded texture is compressed, size: {embeddedTexture.CompressedData.Length} bytes");
                             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
 
                             byte* pixels = stbi_load_csharp(
@@ -167,7 +167,7 @@ public unsafe class Texture : IDisposable
 
                             if (pixels == null)
                             {
-                                Console.WriteLine($"Assimp: Failed to decode embedded texture index: {textureIndex}");
+                                Info($"Assimp: Failed to decode embedded texture index: {textureIndex}");
                             }
                             else
                             {
@@ -181,7 +181,7 @@ public unsafe class Texture : IDisposable
                         }
                         else
                         {
-                            // Console.WriteLine($"Assimp: Embedded texture is uncompressed, size: {embeddedTexture.NonCompressedData.Length} texels");
+                            // Info($"Assimp: Embedded texture is uncompressed, size: {embeddedTexture.NonCompressedData.Length} texels");
 
                             // Convert Texel[] to byte[] (each Texel has 4 bytes: B, G, R, A)
                             var texelData = embeddedTexture.NonCompressedData;
@@ -207,7 +207,7 @@ public unsafe class Texture : IDisposable
                     }
                     else
                     {
-                        Console.WriteLine($"Embedded texture index out of range: {textureIndex}");
+                        Info($"Embedded texture index out of range: {textureIndex}");
 
                     }
                 }

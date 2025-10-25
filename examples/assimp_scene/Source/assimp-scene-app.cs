@@ -27,7 +27,7 @@ using System.Diagnostics.Metrics;
 
 public static unsafe class AssimpSceneApp
 {
-    static string modelPath = "raceTrack.glb";
+    static string modelPath = "assimpScene.glb";
 
     class _state
     {
@@ -170,7 +170,7 @@ public static unsafe class AssimpSceneApp
         // Animation will be created in Frame() once model is loaded
 
 
-        Console.WriteLine($"Assimp: Requested file load for: {filePath}");
+        Info($"Assimp: Requested file load for: {filePath}");
 
     }
 
@@ -199,7 +199,7 @@ public static unsafe class AssimpSceneApp
         //     state.animationManager = new Sokol.AnimationManager();
         //     string animPath = util_get_file_path(modelPath);
         //     state.animationManager.LoadAnimation(animPath, state.model);
-        //     Console.WriteLine("Animation loading started...");
+        //     Info("Animation loading started...");
         // }
 
         // Initialize animator once animation is loaded
@@ -211,29 +211,29 @@ public static unsafe class AssimpSceneApp
             if (animation != null)
             {
                 state.animator = new Sokol.Animator(animation);
-                Console.WriteLine("Animator initialized successfully");
+                Info("Animator initialized successfully");
             }
         }
 
         // Auto-position camera on first load to capture entire scene
-        // if (!state.cameraInitialized && state.model?.SceneGraph != null)
-        // {
-        //     var sceneBounds = state.model.SceneGraph.GetSceneBounds();
-        //     Vector3 sceneCenter = (sceneBounds.Min + sceneBounds.Max) * 0.5f;
-        //     Vector3 sceneSize = sceneBounds.Max - sceneBounds.Min;
-        //     float maxDimension = Math.Max(Math.Max(sceneSize.X, sceneSize.Y), sceneSize.Z);
+        if (!state.cameraInitialized && state.model?.SceneGraph != null)
+        {
+            var sceneBounds = state.model.SceneGraph.GetSceneBounds();
+            Vector3 sceneCenter = (sceneBounds.Min + sceneBounds.Max) * 0.5f;
+            Vector3 sceneSize = sceneBounds.Max - sceneBounds.Min;
+            float maxDimension = Math.Max(Math.Max(sceneSize.X, sceneSize.Y), sceneSize.Z);
             
-        //     // Calculate distance to fit entire scene in view (closer view with tight framing)
-        //     float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
-        //     float distance = (maxDimension * 0.5f) / (float)Math.Tan(fovRadians * 0.5f) * 0.95f; // 0.95x for tighter framing
+            // Calculate distance to fit entire scene in view (closer view with tight framing)
+            float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
+            float distance = (maxDimension * 0.5f) / (float)Math.Tan(fovRadians * 0.5f) * 0.95f; // 0.95x for tighter framing
             
-        //     state.camera.Center = sceneCenter;
-        //     state.camera.Distance = distance;
+            state.camera.Center = sceneCenter;
+            state.camera.Distance = distance;
             
-        //     state.cameraInitialized = true;
-        //     Console.WriteLine($"Camera auto-positioned: Center={sceneCenter}, Distance={distance:F2}");
-        //     Console.WriteLine($"Scene bounds: Min={sceneBounds.Min}, Max={sceneBounds.Max}, Size={sceneSize}");
-        // }
+            state.cameraInitialized = true;
+            Info($"Camera auto-positioned: Center={sceneCenter}, Distance={distance:F2}");
+            Info($"Scene bounds: Min={sceneBounds.Min}, Max={sceneBounds.Max}, Size={sceneSize}");
+        }
 
         // Update animator
         if (state.animator != null)
@@ -326,7 +326,7 @@ public static unsafe class AssimpSceneApp
             // Build octree on first frame if enabled
             if (state.enableOctreeCulling && state.model.SceneGraph.SpatialIndex == null)
             {
-                Console.WriteLine("Building Octree spatial index...");
+                Info("Building Octree spatial index...");
                 state.model.SceneGraph.BuildSpatialIndex();
             }
             
@@ -540,7 +540,7 @@ public static unsafe class AssimpSceneApp
             if (igCheckbox("Enable Lighting", ref lightingEnabled))
             {
                 state.enableLighting = lightingEnabled != 0;
-                Console.WriteLine($"Lighting {(state.enableLighting ? "ENABLED" : "DISABLED")}");
+                Info($"Lighting {(state.enableLighting ? "ENABLED" : "DISABLED")}");
             }
             if (!state.enableLighting)
             {
@@ -564,7 +564,7 @@ public static unsafe class AssimpSceneApp
                     if (igCheckbox($"Light {i + 1}", ref lightEnabled))
                     {
                         light.Enabled = lightEnabled != 0;
-                        Console.WriteLine($"Light {i + 1} {(light.Enabled ? "ON" : "OFF")}");
+                        Info($"Light {i + 1} {(light.Enabled ? "ON" : "OFF")}");
                     }
                     
                     // Show light details
@@ -610,7 +610,7 @@ public static unsafe class AssimpSceneApp
                         {
                             state.animator.SetAnimation(prevAnimation);
                             string? animName = state.animationManager.GetCurrentAnimationName();
-                            Console.WriteLine($"Switched to animation: {animName}");
+                            Info($"Switched to animation: {animName}");
                         }
                     }
 
@@ -623,7 +623,7 @@ public static unsafe class AssimpSceneApp
                         {
                             state.animator.SetAnimation(nextAnimation);
                             string? animName = state.animationManager.GetCurrentAnimationName();
-                            Console.WriteLine($"Switched to animation: {animName}");
+                            Info($"Switched to animation: {animName}");
                         }
                     }
                 }

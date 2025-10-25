@@ -61,7 +61,7 @@ namespace Sokol
         {
             if (status == FileLoadStatus.Success && buffer != null)
             {
-                Console.WriteLine($"AnimatedModel: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+                Info($"AnimatedModel: File '{filePath}' loaded successfully, size: {buffer.Length} bytes");
 
                 var stream = new MemoryStream(buffer);
                 PostProcessSteps ppSteps = PostProcessSteps.JoinIdenticalVertices |
@@ -92,17 +92,17 @@ namespace Sokol
                 Assimp.Scene? assimpScene = importer.ImportFileFromStream(stream, ppSteps, formatHint);
                 if (assimpScene != null)
                 {
-                    Console.WriteLine($"AnimatedModel: Successfully loaded model (format: {formatHint}).");
+                    Info($"AnimatedModel: Successfully loaded model (format: {formatHint}).");
                     ProcessScene(assimpScene);
                 }
                 else
                 {
-                    Console.WriteLine($"AnimatedModel: Failed to load model (format: {formatHint}).");
+                    Info($"AnimatedModel: Failed to load model (format: {formatHint}).");
                 }
             }
             else
             {
-                Console.WriteLine($"AnimatedModel: Failed to load file: {status}");
+                Info($"AnimatedModel: Failed to load file: {status}");
             }
         }
 
@@ -127,8 +127,8 @@ namespace Sokol
                 // Update all transforms initially
                 SceneGraph.UpdateTransforms();
                 
-                Console.WriteLine($"Scene graph built with root node: {rootNode.Name}");
-                Console.WriteLine($"=== Scene Processing Complete ===");
+                Info($"Scene graph built with root node: {rootNode.Name}");
+                Info($"=== Scene Processing Complete ===");
             }
         }
 
@@ -231,7 +231,7 @@ namespace Sokol
             {
                 if (face.IndexCount != 3)
                 {
-                    Console.WriteLine($"Warning: Skipping non-triangular face with {face.IndexCount} indices.");
+                    Info($"Warning: Skipping non-triangular face with {face.IndexCount} indices.");
                     continue;
                 }
                 

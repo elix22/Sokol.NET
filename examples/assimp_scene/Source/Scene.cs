@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using static Sokol.SLog;
 
 namespace Sokol
 {
@@ -37,7 +38,7 @@ namespace Sokol
                 SpatialIndex = Octree.BuildFromScene(this);
                 
                 var stats = SpatialIndex.GetStats();
-                Console.WriteLine($"Octree built: {stats.totalNodes} nodes, {stats.leafNodes} leaves, {stats.totalMeshReferences} mesh references");
+                Info($"Octree built: {stats.totalNodes} nodes, {stats.leafNodes} leaves, {stats.totalMeshReferences} mesh references");
             }
         }
 

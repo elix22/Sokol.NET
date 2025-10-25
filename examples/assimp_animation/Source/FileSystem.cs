@@ -99,7 +99,7 @@ namespace Sokol
             if (_isInitialized)
                 return;
 
-            Console.WriteLine("FileSystem: Initializing sokol-fetch...");
+            Info("FileSystem: Initializing sokol-fetch...");
 
             // Setup sokol-fetch with multiple channels and lanes for concurrent loading
             sfetch_setup(new sfetch_desc_t()
@@ -119,7 +119,7 @@ namespace Sokol
             }
 
             _isInitialized = true;
-            Console.WriteLine($"FileSystem: Initialized with {MAX_CONCURRENT_REQUESTS} max requests, {NUM_CHANNELS} channels, {NUM_LANES} lanes");
+            Info($"FileSystem: Initialized with {MAX_CONCURRENT_REQUESTS} max requests, {NUM_CHANNELS} channels, {NUM_LANES} lanes");
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace Sokol
             if (!_isInitialized)
                 return;
 
-            Console.WriteLine("FileSystem: Shutting down...");
+            Info("FileSystem: Shutting down...");
 
             // Cancel all active requests
             foreach (var request in _activeRequests.Values)
@@ -180,7 +180,7 @@ namespace Sokol
 
             if (callback == null)
             {
-                Console.WriteLine($"FileSystem: Warning - No callback provided for file: {filePath}");
+                Info($"FileSystem: Warning - No callback provided for file: {filePath}");
                 return;
             }
 
@@ -203,7 +203,7 @@ namespace Sokol
             lock (_lock)
             {
                 _pendingRequests.Enqueue(request);
-                Console.WriteLine($"FileSystem: Queued file load request: {filePath} (Queue size: {_pendingRequests.Count})");
+                Info($"FileSystem: Queued file load request: {filePath} (Queue size: {_pendingRequests.Count})");
             }
 
             // Try to process immediately if we have capacity
@@ -292,7 +292,7 @@ namespace Sokol
 
         private void StartRequest(FileLoadRequest request)
         {
-            Console.WriteLine($"FileSystem: Starting file load: {request.FilePath}");
+            Info($"FileSystem: Starting file load: {request.FilePath}");
 
             // Choose channel based on request count to distribute load
             uint channel = (uint)(_activeRequests.Count % NUM_CHANNELS);
@@ -312,11 +312,11 @@ namespace Sokol
                 request.Handle = handle;
                 request.IsActive = true;
                 _activeRequests[handle.id] = request;
-                Console.WriteLine($"FileSystem: Started request for {request.FilePath} (handle: {handle.id}, channel: {channel})");
+                Info($"FileSystem: Started request for {request.FilePath} (handle: {handle.id}, channel: {channel})");
             }
             else
             {
-                Console.WriteLine($"FileSystem: Failed to start request for {request.FilePath}");
+                Info($"FileSystem: Failed to start request for {request.FilePath}");
                 request.Callback?.Invoke(request.FilePath, null, FileLoadStatus.Failed);
                 ReturnPooledBuffer(request.Buffer);
             }
@@ -332,7 +332,7 @@ namespace Sokol
         {
             if (!_activeRequests.TryGetValue(response->handle.id, out var request))
             {
-                Console.WriteLine($"FileSystem: Received response for unknown handle: {response->handle.id}");
+                Info($"FileSystem: Received response for unknown handle: {response->handle.id}");
                 return;
             }
 
@@ -359,7 +359,7 @@ namespace Sokol
                         sfetch_error_t.SFETCH_ERROR_CANCELLED => FileLoadStatus.Cancelled,
                         _ => FileLoadStatus.Failed
                     };
-                    Console.WriteLine($"FileSystem: Failed to load {request.FilePath}: {response->error_code}");
+                    Info($"FileSystem: Failed to load {request.FilePath}: {response->error_code}");
                 }
                 else
                 {
@@ -367,7 +367,7 @@ namespace Sokol
                     // Copy data to managed array
                     buffer = new byte[response->data.size];
                     Marshal.Copy((IntPtr)response->data.ptr, buffer, 0, (int)response->data.size);
-                    Console.WriteLine($"FileSystem: Successfully loaded {request.FilePath} ({response->data.size} bytes)");
+                    Info($"FileSystem: Successfully loaded {request.FilePath} ({response->data.size} bytes)");
                 }
 
                 // Remove from active requests
@@ -383,7 +383,7 @@ namespace Sokol
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"FileSystem: Exception in callback for {request.FilePath}: {ex.Message}");
+                    Info($"FileSystem: Exception in callback for {request.FilePath}: {ex.Message}");
                 }
 
                 // Return buffer to pool (or dispose if large)
@@ -394,7 +394,7 @@ namespace Sokol
             }
             else if (response->fetched)
             {
-                Console.WriteLine($"FileSystem: Fetching {request.FilePath} - {response->data.size} bytes received");
+                Info($"FileSystem: Fetching {request.FilePath} - {response->data.size} bytes received");
             }
         }
 
@@ -403,7 +403,7 @@ namespace Sokol
             // Calculate new buffer size (4x the current buffer size, not original)
             int newBufferSize = originalRequest.Buffer.Size * RETRY_BUFFER_MULTIPLIER;
 
-            Console.WriteLine($"FileSystem: Retrying {originalRequest.FilePath} with larger buffer ({newBufferSize} bytes, attempt {originalRequest.RetryCount + 1})");
+            Info($"FileSystem: Retrying {originalRequest.FilePath} with larger buffer ({newBufferSize} bytes, attempt {originalRequest.RetryCount + 1})");
 
             // Create retry request
             var retryRequest = new FileLoadRequest
