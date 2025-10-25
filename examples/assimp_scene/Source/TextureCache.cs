@@ -74,11 +74,26 @@ public class TextureCache
     }
 
     /// <summary>
+    /// Remove a texture from the cache (typically called when the texture is disposed).
+    /// </summary>
+    public void Remove(string key)
+    {
+        _cache.Remove(key);
+    }
+
+    /// <summary>
     /// Clear the cache and destroy all textures.
     /// </summary>
     public void Clear()
     {
         Console.WriteLine($"TextureCache: Clearing cache with {_cache.Count} textures");
+        
+        // Dispose all textures
+        foreach (var texture in _cache.Values)
+        {
+            texture.Dispose();
+        }
+        
         _cache.Clear();
         _cacheHits = 0;
         _cacheMisses = 0;

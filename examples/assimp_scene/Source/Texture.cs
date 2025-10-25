@@ -15,7 +15,7 @@ using Sokol;
 using Assimp;
 
 
-public unsafe class Texture
+public unsafe class Texture : IDisposable
 {
     public sg_image Image { get; private set; } = default;
     public sg_view View { get; private set; } = default;
@@ -23,9 +23,13 @@ public unsafe class Texture
     public sg_sampler Sampler { get; private set; } = default;
 
     public bool IsValid => Image.id != 0;
+    
+    private bool disposed;
+    private string? _cacheKey; // Track the cache key for removal on dispose
 
     public Texture(byte* data, int width, int height , string name ="sokol-texture")
     {
+        _cacheKey = name; // Use name as cache key for embedded textures
         Image = sg_make_image(new sg_image_desc()
         {
             width = width,
@@ -53,6 +57,7 @@ public unsafe class Texture
     public Texture(string filePath)
     {
         filePath = util_get_file_path(filePath);
+        _cacheKey = filePath; // Store cache key for later removal
         FileSystem.Instance.LoadFile(filePath, OnTextureLoaded);
     }
 
@@ -221,6 +226,50 @@ public unsafe class Texture
         }
 
         return textures;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposed)
+        {
+            // Remove from cache if we have a cache key
+            if (_cacheKey != null)
+            {
+                TextureCache.Instance.Remove(_cacheKey);
+            }
+            
+            // Destroy sokol graphics resources
+            if (Image.id != 0)
+            {
+                sg_destroy_image(Image);
+                Image = default;
+            }
+            
+            if (View.id != 0)
+            {
+                sg_destroy_view(View);
+                View = default;
+            }
+            
+            if (Sampler.id != 0)
+            {
+                sg_destroy_sampler(Sampler);
+                Sampler = default;
+            }
+            
+            disposed = true;
+        }
+    }
+
+    ~Texture()
+    {
+        Dispose(false);
     }
 
 }
