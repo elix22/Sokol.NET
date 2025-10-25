@@ -95,6 +95,39 @@ namespace Sokol
             if (fbWidth <= 0 || fbHeight <= 0)
                 throw new ArgumentException("Invalid framebuffer dimensions");
 
+            // Apply smooth keyboard movement based on current key states
+            float moveSpeed = 0.1f;  // Units per frame
+            
+            // Double speed if shift is held
+            if (key_shift)
+                moveSpeed *= 2.0f;
+            
+            // Arrow keys: move center in world X/Y
+            if (key_up)
+                Center = Center + Vector3.UnitY * moveSpeed;
+            if (key_down)
+                Center = Center - Vector3.UnitY * moveSpeed;
+            if (key_left)
+                Center = Center - Vector3.UnitX * moveSpeed;
+            if (key_right)
+                Center = Center + Vector3.UnitX * moveSpeed;
+            
+            // WASD: move center in camera-relative space
+            if (key_w || key_s || key_a || key_d)
+            {
+                Vector3 forward = Vector3.Normalize(Center - EyePos);
+                Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+                
+                if (key_w)
+                    Center = Center + forward * moveSpeed;
+                if (key_s)
+                    Center = Center - forward * moveSpeed;
+                if (key_a)
+                    Center = Center - right * moveSpeed;
+                if (key_d)
+                    Center = Center + right * moveSpeed;
+            }
+
             float w = fbWidth;
             float h = fbHeight;
 
@@ -118,6 +151,17 @@ namespace Sokol
         float last_touch_y = 0;
         bool touch_is_active = false;  // Track if touch is currently being handled by camera
         
+        // Track key states for smooth movement
+        bool key_w = false;
+        bool key_s = false;
+        bool key_a = false;
+        bool key_d = false;
+        bool key_up = false;
+        bool key_down = false;
+        bool key_left = false;
+        bool key_right = false;
+        bool key_shift = false;
+        
         public unsafe void HandleEvent(sapp_event*  ev)
         {
             if (ev == null)
@@ -127,48 +171,46 @@ namespace Sokol
             {
                 case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
                     if (ev->key_code == sapp_keycode.SAPP_KEYCODE_UP)
-                    {
-                        Center = Center + Vector3.UnitY * 0.1f;
-                    }
+                        key_up = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_DOWN)
-                    {
-                        Center = Center - Vector3.UnitY * 0.1f;
-                    }
+                        key_down = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_LEFT)
-                    {
-                        Center = Center - Vector3.UnitX * 0.1f;
-                    }
+                        key_left = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_RIGHT)
-                    {
-                        Center = Center + Vector3.UnitX * 0.1f;
-                    }
+                        key_right = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_W)
-                    {
-                        // Move forward in world space (direction from eye to center)
-                        Vector3 forward = Vector3.Normalize(Center - EyePos);
-                        Center = Center + forward * 0.5f;
-                    }
+                        key_w = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_S)
-                    {
-                        // Move backward in world space (opposite direction from eye to center)
-                        Vector3 forward = Vector3.Normalize(Center - EyePos);
-                        Center = Center - forward * 0.5f;
-                    }
+                        key_s = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_A)
-                    {
-                        // Strafe left in world space (perpendicular to forward direction)
-                        Vector3 forward = Vector3.Normalize(Center - EyePos);
-                        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-                        Center = Center - right * 0.5f;
-                    }
+                        key_a = true;
                     else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_D)
-                    {
-                        // Strafe right in world space (perpendicular to forward direction)
-                        Vector3 forward = Vector3.Normalize(Center - EyePos);
-                        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-                        Center = Center + right * 0.5f;
-                    }
+                        key_d = true;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_LEFT_SHIFT || 
+                             ev->key_code == sapp_keycode.SAPP_KEYCODE_RIGHT_SHIFT)
+                        key_shift = true;
+                    break;
                     
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_UP:
+                    if (ev->key_code == sapp_keycode.SAPP_KEYCODE_UP)
+                        key_up = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_DOWN)
+                        key_down = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_LEFT)
+                        key_left = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_RIGHT)
+                        key_right = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_W)
+                        key_w = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_S)
+                        key_s = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_A)
+                        key_a = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_D)
+                        key_d = false;
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_LEFT_SHIFT || 
+                             ev->key_code == sapp_keycode.SAPP_KEYCODE_RIGHT_SHIFT)
+                        key_shift = false;
                     break;
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
