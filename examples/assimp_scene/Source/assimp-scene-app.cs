@@ -54,7 +54,7 @@ public static unsafe class AssimpSceneApp
         public bool enableHierarchicalCulling = true;
         
         // Octree culling
-        public bool enableOctreeCulling = true;
+        public bool enableOctreeCulling = false;  // Disabled by default on mobile - scene graph culling is faster
         public int octreeNodesTestedForCulling = 0;
         public int octreeNodesCulled = 0;
         
@@ -273,30 +273,32 @@ public static unsafe class AssimpSceneApp
             fs_params.ambient_color = state.ambientColor;
             fs_params.ambient_intensity = state.ambientIntensity;
             
-            // Set number of lights (max 4)
-            int numLights = Math.Min(state.lights.Count, 4);
-            fs_params.num_lights = numLights;
-            
-            // Populate light arrays
-            for (int i = 0; i < numLights; i++)
+            // Count enabled lights and populate light arrays (max 4)
+            int enabledLightIndex = 0;
+            for (int i = 0; i < state.lights.Count && enabledLightIndex < 4; i++)
             {
                 Sokol.Light light = state.lights[i];
-                if (!light.Enabled) continue;
+                if (!light.Enabled) continue;  // Skip disabled lights
                 
                 // Light position with type in w component
-                fs_params.light_positions[i] = new Vector4(light.Position, (float)light.Type);
+                fs_params.light_positions[enabledLightIndex] = new Vector4(light.Position, (float)light.Type);
                 
                 // Light direction with spot inner cutoff (cosine) in w component
                 float innerCutoff = (float)Math.Cos(light.SpotInnerAngle * Math.PI / 180.0);
-                fs_params.light_directions[i] = new Vector4(light.Direction, innerCutoff);
+                fs_params.light_directions[enabledLightIndex] = new Vector4(light.Direction, innerCutoff);
                 
                 // Light color with intensity in w component
-                fs_params.light_colors[i] = new Vector4(light.Color, light.Intensity);
+                fs_params.light_colors[enabledLightIndex] = new Vector4(light.Color, light.Intensity);
                 
                 // Light parameters: range in x, spot outer cutoff (cosine) in y
                 float outerCutoff = (float)Math.Cos(light.SpotOuterAngle * Math.PI / 180.0);
-                fs_params.light_params[i] = new Vector4(light.Range, outerCutoff, 0, 0);
+                fs_params.light_params[enabledLightIndex] = new Vector4(light.Range, outerCutoff, 0, 0);
+                
+                enabledLightIndex++;
             }
+            
+            // Set number of enabled lights
+            fs_params.num_lights = enabledLightIndex;
         }
         else
         {
@@ -506,10 +508,11 @@ public static unsafe class AssimpSceneApp
 
     static void DrawUI()
     {
+        // Window 1: Controls (Lighting, Animation, Culling)
         igSetNextWindowPos(new Vector2(30, 30), ImGuiCond.Once, Vector2.Zero);
         igSetNextWindowBgAlpha(0.85f);
-        byte open = 1;
-        if (igBegin("Animation Controls", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+        byte open1 = 1;
+        if (igBegin("Controls", ref open1, ImGuiWindowFlags.AlwaysAutoResize))
         {
             igText("Assimp Animation App");
             igSeparator();
@@ -528,44 +531,62 @@ public static unsafe class AssimpSceneApp
             }
             else
             {
-                igText($"Active Lights: {state.lights.Count}");
+                int activeCount = state.lights.Count(l => l.Enabled);
+                igText($"Active Lights: {activeCount}/{state.lights.Count}");
+                
+                // Individual light controls
+                igText("Individual Lights:");
+                igIndent(20);
+                for (int i = 0; i < state.lights.Count; i++)
+                {
+                    var light = state.lights[i];
+                    
+                    // Light enable/disable checkbox with unique ID
+                    igPushID_Int(i);
+                    byte lightEnabled = light.Enabled ? (byte)1 : (byte)0;
+                    if (igCheckbox($"Light {i + 1}", ref lightEnabled))
+                    {
+                        light.Enabled = lightEnabled != 0;
+                        Console.WriteLine($"Light {i + 1} {(light.Enabled ? "ON" : "OFF")}");
+                    }
+                    
+                    // Show light details
+                    igSameLine(0, 10);
+                    if (light.Enabled)
+                    {
+                        string lightTypeName = light.Type switch
+                        {
+                            LightType.Directional => "Directional",
+                            LightType.Point => "Point",
+                            LightType.Spot => "Spot",
+                            _ => "Unknown"
+                        };
+                        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1), $"({lightTypeName})");
+                    }
+                    else
+                    {
+                        igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "(disabled)");
+                    }
+                    
+                    igPopID();
+                }
+                igUnindent(20);
             }
             igSeparator();
 
             if (state.animationManager != null && state.animationManager.GetAnimationCount() > 0)
             {
+                igText("=== Animation ===");
                 int animCount = state.animationManager.GetAnimationCount();
                 string? currentAnimName = state.animationManager.GetCurrentAnimationName();
                 int currentIndex = state.animationManager.GetCurrentAnimationIndex();
 
-                igText($"Current Animation: {currentAnimName ?? "None"} (Index: {currentIndex})");
-                igText($"Total Animations: {animCount}");
-
-                // Display animation timing info
-                if (state.animator != null)
-                {
-                    var currentAnim = state.animator.GetCurrentAnimation();
-                    if (currentAnim != null)
-                    {
-                        float duration = currentAnim.GetDuration();
-                        float currentTime = state.animator.GetCurrentTime();
-                        float ticksPerSecond = currentAnim.GetTicksPerSecond();
-
-                        // Convert to seconds for display
-                        float durationInSeconds = duration / ticksPerSecond;
-                        float currentTimeInSeconds = currentTime / ticksPerSecond;
-
-                        igText($"Duration: {durationInSeconds:F2}s");
-                        igText($"Current Time: {currentTimeInSeconds:F2}s");
-                        igText($"Progress: {(currentTime / duration * 100):F1}%%");
-                    }
-                }
-
-                igSeparator();
+                igText($"Current: {currentAnimName ?? "None"}");
+                igText($"Total: {animCount}");
 
                 if (animCount > 1)
                 {
-                    if (igButton("<- Previous Animation", Vector2.Zero))
+                    if (igButton("<- Previous", Vector2.Zero))
                     {
                         var prevAnimation = state.animationManager.GetPreviousAnimation();
                         if (prevAnimation != null && state.animator != null)
@@ -578,7 +599,7 @@ public static unsafe class AssimpSceneApp
 
                     igSameLine(0, 10);
 
-                    if (igButton("Next Animation ->", Vector2.Zero))
+                    if (igButton("Next ->", Vector2.Zero))
                     {
                         var nextAnimation = state.animationManager.GetNextAnimation();
                         if (nextAnimation != null && state.animator != null)
@@ -589,38 +610,12 @@ public static unsafe class AssimpSceneApp
                         }
                     }
                 }
-                else
-                {
-                    igText("Only one animation available");
-                }
+                igSeparator();
             }
-            else
-            {
-                igText("Loading animations...");
-            }
-
-            igSeparator();
             
-            // Display FPS (calculated from frame duration)
-            double frameDuration = sapp_frame_duration();
-            float fps = frameDuration > 0 ? (float)(1.0 / frameDuration) : 0.0f;
-            igText($"FPS: {fps:F1}");
-            igText($"Frame Time: {frameDuration * 1000.0:F2} ms");
-            
-            igSeparator();
-            
-            // Display frustum culling statistics
-            igText("=== Culling Statistics ===");
-            igText($"Total Meshes: {state.totalMeshes}");
-            igText($"Visible: {state.visibleMeshes}");
-            igText($"Culled: {state.culledMeshes}");
-            float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
-            igText($"Culled: {cullPercent:F1}%%");
-            
-            igSeparator();
             igText("=== Octree Culling ===");
             byte octreeCullingEnabled = state.enableOctreeCulling ? (byte)1 : (byte)0;
-            if (igCheckbox("Enable Octree Culling", ref octreeCullingEnabled))
+            if (igCheckbox("Enable Octree", ref octreeCullingEnabled))
             {
                 state.enableOctreeCulling = octreeCullingEnabled != 0;
                 // Clear octree to rebuild next frame
@@ -630,65 +625,118 @@ public static unsafe class AssimpSceneApp
                 }
             }
             
-            if (state.enableOctreeCulling && state.model?.SceneGraph?.SpatialIndex != null)
-            {
-                var octreeStats = state.model.SceneGraph.SpatialIndex.GetStats();
-                igText($"Octree Nodes: {octreeStats.totalNodes} ({octreeStats.leafNodes} leaves)");
-                igText($"Nodes Tested: {state.octreeNodesTestedForCulling}");
-                igText($"Nodes Culled: {state.octreeNodesCulled}");
-                
-                if (state.octreeNodesCulled > 0)
-                {
-                    float octreeCullPercent = state.octreeNodesTestedForCulling > 0 
-                        ? (state.octreeNodesCulled * 100.0f / state.octreeNodesTestedForCulling) 
-                        : 0;
-                    igTextColored(new Vector4(0, 1, 0, 1), $"Spatial culling: {octreeCullPercent:F1}%% branches");
-                }
-            }
-            else if (!state.enableOctreeCulling)
-            {
-                igTextColored(new Vector4(1, 1, 0, 1), "Octree disabled - using scene graph");
-            }
-            
-            igSeparator();
-            igText("=== Hierarchical Culling ===");
-            
             if (!state.enableOctreeCulling)
             {
+                igText("=== Hierarchical Culling ===");
                 byte hierarchicalCullingEnabled = state.enableHierarchicalCulling ? (byte)1 : (byte)0;
-                if (igCheckbox("Enable Hierarchical Culling", ref hierarchicalCullingEnabled))
+                if (igCheckbox("Enable Hierarchical", ref hierarchicalCullingEnabled))
                 {
                     state.enableHierarchicalCulling = hierarchicalCullingEnabled != 0;
                 }
-                igText($"Nodes Tested: {state.nodesTestedForCulling}");
-                igText($"Nodes Culled: {state.nodesCulled}");
-                if (state.nodesCulled > 0 && state.enableHierarchicalCulling)
-                {
-                    igTextColored(new Vector4(0, 1, 0, 1), $"Branch culling active!");
-                }
-            }
-            else
-            {
-                igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "(Disabled when Octree is active)");
             }
             
             igSeparator();
             igText("=== Distance Culling ===");
             byte distanceCullingEnabled = state.enableDistanceCulling ? (byte)1 : (byte)0;
-            if (igCheckbox("Enable Distance Culling", ref distanceCullingEnabled))
+            if (igCheckbox("Enable Distance", ref distanceCullingEnabled))
             {
                 state.enableDistanceCulling = distanceCullingEnabled != 0;
             }
             if (state.enableDistanceCulling)
             {
                 igSliderFloat("Max Distance", ref state.maxDrawDistance, 50.0f, 2000.0f, "%.0f", ImGuiSliderFlags.None);
+            }
+        }
+        igEnd();
+        
+        // Window 2: Statistics (FPS, Culling Stats, Camera Info)
+        // Position at top-right corner with some padding
+        int screenWidth = sapp_width();
+        igSetNextWindowPos(new Vector2(screenWidth - 30, 30), ImGuiCond.Once, new Vector2(1.0f, 0.0f));  // Anchor to top-right
+        igSetNextWindowBgAlpha(0.85f);
+        byte open2 = 1;
+        if (igBegin("Statistics", ref open2, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            // Display FPS (calculated from frame duration)
+            double frameDuration = sapp_frame_duration();
+            float fps = frameDuration > 0 ? (float)(1.0 / frameDuration) : 0.0f;
+            igText($"FPS: {fps:F1}");
+            igText($"Frame Time: {frameDuration * 1000.0:F2} ms");
+            
+            igSeparator();
+            
+            // Animation timing info
+            if (state.animator != null)
+            {
+                var currentAnim = state.animator.GetCurrentAnimation();
+                if (currentAnim != null)
+                {
+                    float duration = currentAnim.GetDuration();
+                    float currentTime = state.animator.GetCurrentTime();
+                    float ticksPerSecond = currentAnim.GetTicksPerSecond();
+
+                    // Convert to seconds for display
+                    float durationInSeconds = duration / ticksPerSecond;
+                    float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                    igText($"Anim Duration: {durationInSeconds:F2}s");
+                    igText($"Anim Time: {currentTimeInSeconds:F2}s");
+                    igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                    igSeparator();
+                }
+            }
+            
+            // Display frustum culling statistics
+            igText("=== Culling Statistics ===");
+            igText($"Total Meshes: {state.totalMeshes}");
+            igText($"Visible: {state.visibleMeshes}");
+            igText($"Culled: {state.culledMeshes}");
+            float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
+            igText($"Culled: {cullPercent:F1}%%");
+            
+            if (state.enableOctreeCulling && state.model?.SceneGraph?.SpatialIndex != null)
+            {
+                igSeparator();
+                igText("=== Octree Stats ===");
+                var octreeStats = state.model.SceneGraph.SpatialIndex.GetStats();
+                igText($"Nodes: {octreeStats.totalNodes}");
+                igText($"Leaves: {octreeStats.leafNodes}");
+                igText($"Tested: {state.octreeNodesTestedForCulling}");
+                igText($"Culled: {state.octreeNodesCulled}");
+                
+                if (state.octreeNodesCulled > 0)
+                {
+                    float octreeCullPercent = state.octreeNodesTestedForCulling > 0 
+                        ? (state.octreeNodesCulled * 100.0f / state.octreeNodesTestedForCulling) 
+                        : 0;
+                    igTextColored(new Vector4(0, 1, 0, 1), $"Spatial: {octreeCullPercent:F1}%%");
+                }
+            }
+            
+            if (!state.enableOctreeCulling && state.enableHierarchicalCulling)
+            {
+                igSeparator();
+                igText("=== Hierarchical Stats ===");
+                igText($"Nodes Tested: {state.nodesTestedForCulling}");
+                igText($"Nodes Culled: {state.nodesCulled}");
+                if (state.nodesCulled > 0)
+                {
+                    igTextColored(new Vector4(0, 1, 0, 1), "Branch culling active!");
+                }
+            }
+            
+            if (state.enableDistanceCulling)
+            {
+                igSeparator();
+                igText("=== Distance Stats ===");
                 igText($"Distance Culled: {state.distanceCulledMeshes}");
             }
             
             igSeparator();
-            igText($"Camera Distance: {state.camera.Distance:F2}");
-            igText($"Camera Latitude: {state.camera.Latitude:F2}");
-            igText($"Camera Longitude: {state.camera.Longitude:F2}");
+            igText("=== Camera ===");
+            igText($"Distance: {state.camera.Distance:F2}");
+            igText($"Latitude: {state.camera.Latitude:F2}");
+            igText($"Longitude: {state.camera.Longitude:F2}");
         }
         igEnd();
     }

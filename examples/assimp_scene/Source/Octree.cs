@@ -174,7 +174,7 @@ namespace Sokol
         }
 
         /// <summary>
-        /// Queries visible meshes using frustum culling
+        /// Queries visible meshes using frustum culling (optimized - minimal per-mesh tests)
         /// </summary>
         public void QueryVisible(
             Matrix4x4 viewProjection, 
@@ -182,7 +182,6 @@ namespace Sokol
             float maxDistance,
             bool enableDistanceCulling,
             List<(Mesh mesh, Matrix4x4 transform)> visibleMeshes,
-            HashSet<(Mesh, Matrix4x4)> seenMeshTransforms,  // Changed: track mesh+transform pairs
             ref int nodesTestedCount,
             ref int nodesCulledCount,
             bool inside = false)  // inside flag: true if this node is completely inside frustum
@@ -205,30 +204,57 @@ namespace Sokol
                 }
             }
 
-            // Check meshes at this level (parent nodes can have meshes even with children)
-            foreach (var (mesh, transform) in Meshes)
+            // Process meshes at this level
+            // If octant is fully inside frustum, skip per-mesh frustum tests (huge optimization!)
+            if (inside)
             {
-                // Skip if we've already added this exact mesh+transform to visible list
-                if (seenMeshTransforms.Contains((mesh, transform)))
-                    continue;
-
-                // Distance culling
+                // Octant fully inside - add all meshes (only distance culling if enabled)
                 if (enableDistanceCulling)
                 {
-                    var meshBounds = mesh.Bounds.Transform(transform);
-                    Vector3 meshCenter = (meshBounds.Min + meshBounds.Max) * 0.5f;
-                    float distanceToCamera = Vector3.Distance(cameraPosition, meshCenter);
-                    
-                    if (distanceToCamera > maxDistance)
-                        continue; // Skip this mesh, but don't mark as seen
+                    foreach (var (mesh, transform) in Meshes)
+                    {
+                        var meshBounds = mesh.Bounds.Transform(transform);
+                        Vector3 meshCenter = (meshBounds.Min + meshBounds.Max) * 0.5f;
+                        if (Vector3.Distance(cameraPosition, meshCenter) <= maxDistance)
+                        {
+                            visibleMeshes.Add((mesh, transform));
+                        }
+                    }
                 }
-
-                // Individual mesh frustum culling
-                // Skip individual test if this octant is completely inside frustum
-                if (inside || mesh.IsVisible(transform, viewProjection))
+                else
                 {
-                    visibleMeshes.Add((mesh, transform));
-                    seenMeshTransforms.Add((mesh, transform)); // Mark this mesh+transform as seen
+                    // No distance culling - add all meshes directly
+                    visibleMeshes.AddRange(Meshes);
+                }
+            }
+            else
+            {
+                // Octant intersects frustum - need per-mesh tests
+                foreach (var (mesh, transform) in Meshes)
+                {
+                    // Distance culling
+                    if (enableDistanceCulling)
+                    {
+                        var meshBounds = mesh.Bounds.Transform(transform);
+                        Vector3 meshCenter = (meshBounds.Min + meshBounds.Max) * 0.5f;
+                        
+                        if (Vector3.Distance(cameraPosition, meshCenter) > maxDistance)
+                            continue;
+                        
+                        // Per-mesh frustum test (only when octant intersects)
+                        if (mesh.IsVisible(transform, viewProjection))
+                        {
+                            visibleMeshes.Add((mesh, transform));
+                        }
+                    }
+                    else
+                    {
+                        // Per-mesh frustum test only
+                        if (mesh.IsVisible(transform, viewProjection))
+                        {
+                            visibleMeshes.Add((mesh, transform));
+                        }
+                    }
                 }
             }
 
@@ -243,7 +269,6 @@ namespace Sokol
                         maxDistance, 
                         enableDistanceCulling, 
                         visibleMeshes,
-                        seenMeshTransforms,
                         ref nodesTestedCount,
                         ref nodesCulledCount,
                         inside);  // Pass inside flag to children
@@ -488,8 +513,7 @@ namespace Sokol
             out int nodesTestedCount,
             out int nodesCulledCount)
         {
-            var visibleMeshes = new List<(Mesh mesh, Matrix4x4 transform)>();
-            var seenMeshTransforms = new HashSet<(Mesh, Matrix4x4)>(); // Track mesh+transform pairs
+            var visibleMeshes = new List<(Mesh mesh, Matrix4x4 transform)>(2048); // Pre-allocate for better performance
             nodesTestedCount = 0;
             nodesCulledCount = 0;
 
@@ -499,7 +523,6 @@ namespace Sokol
                 maxDistance,
                 enableDistanceCulling,
                 visibleMeshes,
-                seenMeshTransforms,
                 ref nodesTestedCount,
                 ref nodesCulledCount);
 
