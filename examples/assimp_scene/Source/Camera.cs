@@ -116,6 +116,8 @@ namespace Sokol
             
         float last_touch_x = 0;
         float last_touch_y = 0;
+        bool touch_is_active = false;  // Track if touch is currently being handled by camera
+        
         public unsafe void HandleEvent(sapp_event*  ev)
         {
             if (ev == null)
@@ -194,6 +196,7 @@ namespace Sokol
                     {
                         last_touch_x = ev->touches[0].pos_x;
                         last_touch_y = ev->touches[0].pos_y;
+                        touch_is_active = true;
                     }
                     break;
 
@@ -201,18 +204,36 @@ namespace Sokol
                     {
                         last_touch_x = 0;
                         last_touch_y = 0;
+                        touch_is_active = false;
                     }
                     break;
 
                 case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED:
                     {
+                        float current_x = ev->touches[0].pos_x;
+                        float current_y = ev->touches[0].pos_y;
+                        
+                        // Calculate delta from last position
+                        float dx = current_x - last_touch_x;
+                        float dy = current_y - last_touch_y;
+                        
+                        // If this is the first TOUCHES_MOVED after ImGui released control,
+                        // OR if there's a large discontinuity (indicates transition),
+                        // initialize position without orbiting (prevents jump)
+                        float deltaMagnitude = (float)Math.Sqrt(dx * dx + dy * dy);
+                        if (!touch_is_active || deltaMagnitude > 50.0f)  // 50 pixel threshold for discontinuity
+                        {
+                            last_touch_x = current_x;
+                            last_touch_y = current_y;
+                            touch_is_active = true;
+                            break;  // Don't orbit on first move or large jump
+                        }
 
-                        float dx = ev->touches[0].pos_x - last_touch_x;
-                        float dy = ev->touches[0].pos_y - last_touch_y;
+                        // Normal smooth orbit
                         Orbit(dx * 0.25f, dy * 0.25f);
 
-                        last_touch_x =ev->touches[0].pos_x;
-                        last_touch_y = ev->touches[0].pos_y;
+                        last_touch_x = current_x;
+                        last_touch_y = current_y;
                     }
 
                     break;
