@@ -64,9 +64,10 @@ public static unsafe class AssimpSceneApp
         public int distanceCulledMeshes = 0;
         
         // Lighting
+        public bool enableLighting = true;  // Toggle for performance comparison
         public List<Sokol.Light> lights = new List<Sokol.Light>();
-        public Vector3 ambientColor = new Vector3(0.2f, 0.2f, 0.2f);
-        public float ambientIntensity = 1.0f;
+        public Vector3 ambientColor = new Vector3(0.5f, 0.6f, 0.75f);  // Sky blue ambient for sunny day
+        public float ambientIntensity = 0.6f;  // Moderate ambient (shadows still visible but not too dark)
     }
 
     static _state state = new _state();
@@ -136,19 +137,27 @@ public static unsafe class AssimpSceneApp
         string filePath = util_get_file_path(modelPath);
         state.model = new Sokol.Model(filePath);
 
-        // Initialize default lights
-        // Main directional light (sun-like) from upper right
+        // Initialize sunny day lighting for urban scene
+        
+        // Sun - Strong directional light from above (midday sun position)
         state.lights.Add(Sokol.Light.CreateDirectionalLight(
-            new Vector3(-0.3f, -0.7f, -0.5f),  // Direction (from upper right)
-            new Vector3(1.0f, 0.95f, 0.9f),    // Warm white color
-            0.8f                                // Intensity
+            new Vector3(0.3f, -0.8f, -0.2f),   // Direction (slightly from side, mostly from above)
+            new Vector3(1.0f, 0.98f, 0.95f),   // Bright warm white (sunlight color)
+            1.2f                                // Strong intensity for sunny day
         ));
         
-        // Fill light (softer, from left)
+        // Sky light - Soft fill from above (simulates blue sky dome)
         state.lights.Add(Sokol.Light.CreateDirectionalLight(
-            new Vector3(0.5f, -0.3f, 0.2f),   // Direction (from left)
-            new Vector3(0.7f, 0.8f, 1.0f),    // Cool blue tint
-            0.3f                               // Lower intensity
+            new Vector3(0.0f, -1.0f, 0.0f),    // Direction (straight down from sky)
+            new Vector3(0.6f, 0.7f, 1.0f),     // Sky blue color
+            0.25f                               // Subtle fill intensity
+        ));
+        
+        // Atmospheric scatter - Very soft bounce light (simulates light bouncing off ground/buildings)
+        state.lights.Add(Sokol.Light.CreateDirectionalLight(
+            new Vector3(0.0f, 0.5f, 0.0f),     // Direction (from below - ground bounce)
+            new Vector3(0.9f, 0.85f, 0.8f),    // Warm ground reflection color
+            0.15f                               // Very subtle
         ));
 
         // Wait for model to load, then initialize animation
@@ -201,24 +210,24 @@ public static unsafe class AssimpSceneApp
         }
 
         // Auto-position camera on first load to capture entire scene
-        if (!state.cameraInitialized && state.model?.SceneGraph != null)
-        {
-            var sceneBounds = state.model.SceneGraph.GetSceneBounds();
-            Vector3 sceneCenter = (sceneBounds.Min + sceneBounds.Max) * 0.5f;
-            Vector3 sceneSize = sceneBounds.Max - sceneBounds.Min;
-            float maxDimension = Math.Max(Math.Max(sceneSize.X, sceneSize.Y), sceneSize.Z);
+        // if (!state.cameraInitialized && state.model?.SceneGraph != null)
+        // {
+        //     var sceneBounds = state.model.SceneGraph.GetSceneBounds();
+        //     Vector3 sceneCenter = (sceneBounds.Min + sceneBounds.Max) * 0.5f;
+        //     Vector3 sceneSize = sceneBounds.Max - sceneBounds.Min;
+        //     float maxDimension = Math.Max(Math.Max(sceneSize.X, sceneSize.Y), sceneSize.Z);
             
-            // Calculate distance to fit entire scene in view (closer view with tight framing)
-            float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
-            float distance = (maxDimension * 0.5f) / (float)Math.Tan(fovRadians * 0.5f) * 0.95f; // 0.95x for tighter framing
+        //     // Calculate distance to fit entire scene in view (closer view with tight framing)
+        //     float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
+        //     float distance = (maxDimension * 0.5f) / (float)Math.Tan(fovRadians * 0.5f) * 0.95f; // 0.95x for tighter framing
             
-            state.camera.Center = sceneCenter;
-            state.camera.Distance = distance;
+        //     state.camera.Center = sceneCenter;
+        //     state.camera.Distance = distance;
             
-            state.cameraInitialized = true;
-            Console.WriteLine($"Camera auto-positioned: Center={sceneCenter}, Distance={distance:F2}");
-            Console.WriteLine($"Scene bounds: Min={sceneBounds.Min}, Max={sceneBounds.Max}, Size={sceneSize}");
-        }
+        //     state.cameraInitialized = true;
+        //     Console.WriteLine($"Camera auto-positioned: Center={sceneCenter}, Distance={distance:F2}");
+        //     Console.WriteLine($"Scene bounds: Min={sceneBounds.Min}, Max={sceneBounds.Max}, Size={sceneSize}");
+        // }
 
         // Update animator
         if (state.animator != null)
@@ -257,33 +266,44 @@ public static unsafe class AssimpSceneApp
         Vector3 cameraPos = new Vector3(viewInv.M41, viewInv.M42, viewInv.M43);
         fs_params.camera_pos = cameraPos;
         
-        // Set ambient lighting
-        fs_params.ambient_color = state.ambientColor;
-        fs_params.ambient_intensity = state.ambientIntensity;
-        
-        // Set number of lights (max 4)
-        int numLights = Math.Min(state.lights.Count, 4);
-        fs_params.num_lights = numLights;
-        
-        // Populate light arrays
-        for (int i = 0; i < numLights; i++)
+        // Set lighting based on toggle
+        if (state.enableLighting)
         {
-            Sokol.Light light = state.lights[i];
-            if (!light.Enabled) continue;
+            // Set ambient lighting
+            fs_params.ambient_color = state.ambientColor;
+            fs_params.ambient_intensity = state.ambientIntensity;
             
-            // Light position with type in w component
-            fs_params.light_positions[i] = new Vector4(light.Position, (float)light.Type);
+            // Set number of lights (max 4)
+            int numLights = Math.Min(state.lights.Count, 4);
+            fs_params.num_lights = numLights;
             
-            // Light direction with spot inner cutoff (cosine) in w component
-            float innerCutoff = (float)Math.Cos(light.SpotInnerAngle * Math.PI / 180.0);
-            fs_params.light_directions[i] = new Vector4(light.Direction, innerCutoff);
-            
-            // Light color with intensity in w component
-            fs_params.light_colors[i] = new Vector4(light.Color, light.Intensity);
-            
-            // Light parameters: range in x, spot outer cutoff (cosine) in y
-            float outerCutoff = (float)Math.Cos(light.SpotOuterAngle * Math.PI / 180.0);
-            fs_params.light_params[i] = new Vector4(light.Range, outerCutoff, 0, 0);
+            // Populate light arrays
+            for (int i = 0; i < numLights; i++)
+            {
+                Sokol.Light light = state.lights[i];
+                if (!light.Enabled) continue;
+                
+                // Light position with type in w component
+                fs_params.light_positions[i] = new Vector4(light.Position, (float)light.Type);
+                
+                // Light direction with spot inner cutoff (cosine) in w component
+                float innerCutoff = (float)Math.Cos(light.SpotInnerAngle * Math.PI / 180.0);
+                fs_params.light_directions[i] = new Vector4(light.Direction, innerCutoff);
+                
+                // Light color with intensity in w component
+                fs_params.light_colors[i] = new Vector4(light.Color, light.Intensity);
+                
+                // Light parameters: range in x, spot outer cutoff (cosine) in y
+                float outerCutoff = (float)Math.Cos(light.SpotOuterAngle * Math.PI / 180.0);
+                fs_params.light_params[i] = new Vector4(light.Range, outerCutoff, 0, 0);
+            }
+        }
+        else
+        {
+            // Lighting disabled - use simple full-bright ambient
+            fs_params.ambient_color = new Vector3(1.0f, 1.0f, 1.0f);  // White
+            fs_params.ambient_intensity = 1.0f;  // Full brightness
+            fs_params.num_lights = 0;  // No lights
         }
 
         // Draw UI
@@ -492,6 +512,24 @@ public static unsafe class AssimpSceneApp
         if (igBegin("Animation Controls", ref open, ImGuiWindowFlags.AlwaysAutoResize))
         {
             igText("Assimp Animation App");
+            igSeparator();
+            
+            // Lighting toggle at the top for easy performance comparison
+            igText("=== Lighting ===");
+            byte lightingEnabled = state.enableLighting ? (byte)1 : (byte)0;
+            if (igCheckbox("Enable Lighting", ref lightingEnabled))
+            {
+                state.enableLighting = lightingEnabled != 0;
+                Console.WriteLine($"Lighting {(state.enableLighting ? "ENABLED" : "DISABLED")}");
+            }
+            if (!state.enableLighting)
+            {
+                igTextColored(new Vector4(1, 0.5f, 0, 1), "Full-bright mode (no shading)");
+            }
+            else
+            {
+                igText($"Active Lights: {state.lights.Count}");
+            }
             igSeparator();
 
             if (state.animationManager != null && state.animationManager.GetAnimationCount() > 0)
