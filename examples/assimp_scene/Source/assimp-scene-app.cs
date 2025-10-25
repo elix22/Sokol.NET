@@ -81,7 +81,8 @@ public static unsafe class AssimpSceneApp
     [UnmanagedCallersOnly]
     private static unsafe void Init()
     {
-        Console.WriteLine("Assimp: Init()");
+        Log("assimp-scene-app: Init()");
+        
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
