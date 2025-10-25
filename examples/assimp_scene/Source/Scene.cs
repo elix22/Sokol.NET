@@ -64,6 +64,20 @@ namespace Sokol
         }
 
         /// <summary>
+        /// Gets the bounding box of the entire scene in world space
+        /// </summary>
+        public BoundingBox GetSceneBounds()
+        {
+            if (RootNode == null)
+            {
+                return new BoundingBox(Vector3.Zero, Vector3.Zero);
+            }
+            
+            // Return the hierarchical bounds transformed to world space
+            return RootNode.HierarchicalBounds.Transform(RootNode.WorldTransform);
+        }
+
+        /// <summary>
         /// Finds a node by name in the scene hierarchy
         /// </summary>
         public Node? FindNode(string name)

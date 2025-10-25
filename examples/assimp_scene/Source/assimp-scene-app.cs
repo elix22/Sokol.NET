@@ -40,6 +40,9 @@ public static unsafe class AssimpSceneApp
         public Sokol.AnimationManager? animationManager;
         public Sokol.Animator? animator;
         
+        // Camera auto-positioning
+        public bool cameraInitialized = false;
+        
         // Culling statistics
         public int totalMeshes = 0;
         public int visibleMeshes = 0;
@@ -85,9 +88,10 @@ public static unsafe class AssimpSceneApp
         {
             Aspect = 60.0f,
             NearZ = 0.1f,    // Increased from 0.01 - improves depth precision dramatically
-            FarZ = 1500.0f,
+            FarZ = 2000.0f,
             Center = new Vector3(0.0f, 10f, 0.0f),
             Distance = 3.0f,
+            MaxDist = 2000.0f
         });
 
         // Setup sokol-imgui
@@ -162,24 +166,44 @@ public static unsafe class AssimpSceneApp
         //     Console.WriteLine("Animation loading started...");
         // }
 
-        // // Initialize animator once animation is loaded
-        // if (state.animationManager != null &&
-        //     state.animationManager.GetAnimationCount() > 0 &&
-        //     state.animator == null)
-        // {
-        //     var animation = state.animationManager.GetFirstAnimation();
-        //     if (animation != null)
-        //     {
-        //         state.animator = new Sokol.Animator(animation);
-        //         Console.WriteLine("Animator initialized successfully");
-        //     }
-        // }
+        // Initialize animator once animation is loaded
+        if (state.animationManager != null &&
+            state.animationManager.GetAnimationCount() > 0 &&
+            state.animator == null)
+        {
+            var animation = state.animationManager.GetFirstAnimation();
+            if (animation != null)
+            {
+                state.animator = new Sokol.Animator(animation);
+                Console.WriteLine("Animator initialized successfully");
+            }
+        }
+
+        // Auto-position camera on first load to capture entire scene
+        if (!state.cameraInitialized && state.model?.SceneGraph != null)
+        {
+            var sceneBounds = state.model.SceneGraph.GetSceneBounds();
+            Vector3 sceneCenter = (sceneBounds.Min + sceneBounds.Max) * 0.5f;
+            Vector3 sceneSize = sceneBounds.Max - sceneBounds.Min;
+            float maxDimension = Math.Max(Math.Max(sceneSize.X, sceneSize.Y), sceneSize.Z);
+            
+            // Calculate distance to fit entire scene in view (closer view with tight framing)
+            float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
+            float distance = (maxDimension * 0.5f) / (float)Math.Tan(fovRadians * 0.5f) * 0.95f; // 0.95x for tighter framing
+            
+            state.camera.Center = sceneCenter;
+            state.camera.Distance = distance;
+            
+            state.cameraInitialized = true;
+            Console.WriteLine($"Camera auto-positioned: Center={sceneCenter}, Distance={distance:F2}");
+            Console.WriteLine($"Scene bounds: Min={sceneBounds.Min}, Max={sceneBounds.Max}, Size={sceneSize}");
+        }
 
         // Update animator
-        // if (state.animator != null)
-        // {
-        //     state.animator.UpdateAnimation((float)sapp_frame_duration());
-        // }
+        if (state.animator != null)
+        {
+            state.animator.UpdateAnimation((float)sapp_frame_duration());
+        }
 
         state.camera.Update(sapp_width(), sapp_height());
 
@@ -189,19 +213,19 @@ public static unsafe class AssimpSceneApp
         vs_params.view = state.camera.View;
         vs_params.model = Matrix4x4.Identity;
 
-        // // Get bone matrices from animator
-        // if (state.animator != null)
-        // {
-        //     // Optimized bulk copy - both arrays are exactly AnimationConstants.MAX_BONES elements
-        //     var boneMatrices = state.animator.GetFinalBoneMatrices();
-        //     var destSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
-        //     boneMatrices.AsSpan().CopyTo(destSpan);
-        // }
-        // else
+        // Get bone matrices from animator
+        if (state.animator != null)
+        {
+            // Optimized bulk copy - both arrays are exactly AnimationConstants.MAX_BONES elements
+            var boneMatrices = state.animator.GetFinalBoneMatrices();
+            var destSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
+            boneMatrices.AsSpan().CopyTo(destSpan);
+        }
+        else
         {
             // Initialize with identity matrices - optimized bulk initialization
-            // var bonesSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
-            // bonesSpan.Fill(Matrix4x4.Identity);
+            var bonesSpan = MemoryMarshal.CreateSpan(ref vs_params.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
+            bonesSpan.Fill(Matrix4x4.Identity);
         }
 
         // Draw UI
