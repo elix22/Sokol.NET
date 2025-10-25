@@ -48,6 +48,11 @@ public static unsafe class AssimpSceneApp
         public int visibleMeshes = 0;
         public int culledMeshes = 0;
         
+        // Rendering statistics
+        public int totalVertices = 0;
+        public int totalIndices = 0;
+        public int totalFaces = 0;
+        
         // Hierarchical culling statistics
         public int nodesTestedForCulling = 0;
         public int nodesCulled = 0;  // Entire branches culled
@@ -334,6 +339,11 @@ public static unsafe class AssimpSceneApp
             state.octreeNodesTestedForCulling = 0;
             state.octreeNodesCulled = 0;
             
+            // Reset rendering statistics
+            state.totalVertices = 0;
+            state.totalIndices = 0;
+            state.totalFaces = 0;
+            
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = vs_params.view * vs_params.projection;
             
@@ -382,6 +392,9 @@ public static unsafe class AssimpSceneApp
             vs_params.model = transform;
             sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vs_params));
             sg_apply_uniforms(UB_fs_params, SG_RANGE(ref fs_params));
+            state.totalVertices += mesh.VertexCount;
+            state.totalIndices += mesh.IndexCount;
+            state.totalFaces += mesh.IndexCount / 3; // Convert indices to triangles
             mesh.Draw();
         }
     }
@@ -478,6 +491,9 @@ public static unsafe class AssimpSceneApp
             if (mesh.IsVisible(node.WorldTransform, viewProjection))
             {
                 state.visibleMeshes++;
+                state.totalVertices += mesh.VertexCount;
+                state.totalIndices += mesh.IndexCount;
+                state.totalFaces += mesh.IndexCount / 3; // Convert indices to triangles
                 mesh.Draw();
             }
             else
@@ -694,6 +710,21 @@ public static unsafe class AssimpSceneApp
             float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
             igText($"Culled: {cullPercent:F1}%%");
             
+            igSeparator();
+            
+            // Display rendering statistics
+            igText("=== Rendering Statistics ===");
+            igText($"Vertices: {state.totalVertices:N0}");
+            igText($"Indices: {state.totalIndices:N0}");
+            igText($"Triangles: {state.totalFaces:N0}");
+            
+            // Show vertex reuse ratio
+            if (state.totalVertices > 0)
+            {
+                float reuseRatio = (float)state.totalIndices / state.totalVertices;
+                igText($"Index/Vertex: {reuseRatio:F2}");
+            }
+            
             if (state.enableOctreeCulling && state.model?.SceneGraph?.SpatialIndex != null)
             {
                 igSeparator();
@@ -737,6 +768,54 @@ public static unsafe class AssimpSceneApp
             igText($"Distance: {state.camera.Distance:F2}");
             igText($"Latitude: {state.camera.Latitude:F2}");
             igText($"Longitude: {state.camera.Longitude:F2}");
+        }
+        igEnd();
+        
+        // Window 3: Mobile Camera Controls
+        // Position at bottom-left corner
+        int screenHeight = sapp_height();
+        igSetNextWindowPos(new Vector2(30, screenHeight - 30), ImGuiCond.Once, new Vector2(0.0f, 1.0f));  // Anchor to bottom-left
+        igSetNextWindowBgAlpha(0.85f);
+        byte open3 = 1;
+        if (igBegin("Camera Controls", ref open3, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            // Calculate forward and right vectors for camera movement
+            Vector3 forward = Vector3.Normalize(state.camera.Center - state.camera.EyePos);
+            Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+            
+            // Movement speed (scaled by frame time for smooth continuous movement)
+            float moveSpeed = 2.0f * (float)sapp_frame_duration();
+            
+            // Forward button (centered)
+            igIndent(50);
+            igButton("Forward", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center + forward * moveSpeed;
+            }
+            igUnindent(50);
+            
+            // Left and Right buttons (side by side)
+            igButton("Left", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center - right * moveSpeed;
+            }
+            igSameLine(0, 10);
+            igButton("Right", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center + right * moveSpeed;
+            }
+            
+            // Backward button (centered)
+            igIndent(50);
+            igButton("Back", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center - forward * moveSpeed;
+            }
+            igUnindent(50);
         }
         igEnd();
     }

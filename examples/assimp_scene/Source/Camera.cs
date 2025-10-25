@@ -140,6 +140,32 @@ namespace Sokol
                     {
                         Center = Center + Vector3.UnitX * 0.1f;
                     }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_W)
+                    {
+                        // Move forward in world space (direction from eye to center)
+                        Vector3 forward = Vector3.Normalize(Center - EyePos);
+                        Center = Center + forward * 0.5f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_S)
+                    {
+                        // Move backward in world space (opposite direction from eye to center)
+                        Vector3 forward = Vector3.Normalize(Center - EyePos);
+                        Center = Center - forward * 0.5f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_A)
+                    {
+                        // Strafe left in world space (perpendicular to forward direction)
+                        Vector3 forward = Vector3.Normalize(Center - EyePos);
+                        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+                        Center = Center - right * 0.5f;
+                    }
+                    else if (ev->key_code == sapp_keycode.SAPP_KEYCODE_D)
+                    {
+                        // Strafe right in world space (perpendicular to forward direction)
+                        Vector3 forward = Vector3.Normalize(Center - EyePos);
+                        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+                        Center = Center + right * 0.5f;
+                    }
                     
                     break;
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
