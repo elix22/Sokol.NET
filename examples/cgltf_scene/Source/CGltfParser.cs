@@ -455,6 +455,10 @@ namespace Sokol
             if (_pendingBufferLoads == 0 && _pendingTextureLoads == 0)
             {
                 Info($"CGltfParser: Scene fully loaded (buffers AND textures complete)");
+                
+                // Now that all textures are loaded, update material flags
+                UpdateMaterialTextureFlags();
+                
                 if (Scene != null)
                 {
                     _onLoadComplete?.Invoke(Scene);
@@ -615,8 +619,8 @@ namespace Sokol
             
             Info($"CGltfParser: Scene parsing complete - {ActiveScene.NumNodes} nodes, {ActiveScene.NumMeshes} meshes, {ActiveScene.NumPrimitives} primitives");
             
-            // Now that all synchronous image creation is done, update the material flags
-            UpdateMaterialTextureFlags();
+            // Note: UpdateMaterialTextureFlags() is now called in CheckSceneLoadComplete() 
+            // after all async textures have loaded, not here during synchronous parsing
         }
 
         #region Buffer Parsing
