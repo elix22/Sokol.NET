@@ -72,7 +72,7 @@ public static unsafe class CGLTFSceneApp
         public Shaders shaders;
         public CGltfScene scene = new CGltfScene();
         public Camera camera = new Camera();
-        // public cgltf_light_params_t point_light;     // Disabled - using unlit shader
+        // public cgltf_light_params_t point_light; // DEBUG: Commented out while testing raw texture
         public Matrix4x4 root_transform;
         public float rx;
         public float ry;
@@ -137,14 +137,12 @@ public static unsafe class CGLTFSceneApp
         _parser = new CGltfParser();
         _parser.Init(state.shaders.metallic, state.shaders.metallic); // Using metallic shader for both for now
 
-        // setup the point light (disabled - using unlit shader)
-        /*
-        state.point_light = default;
-        state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
-        state.point_light.light_range = 200.0f;
-        state.point_light.light_color = new Vector3(1.0f, 1.5f, 2.0f);
-        state.point_light.light_intensity = 700.0f;
-        */
+        // DEBUG: Light setup commented out while testing raw texture output
+        // state.point_light = default;
+        // state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
+        // state.point_light.light_range = 200.0f;
+        // state.point_light.light_color = new Vector3(1.0f, 1.5f, 2.0f);
+        // state.point_light.light_intensity = 700.0f;
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
@@ -290,110 +288,73 @@ public static unsafe class CGLTFSceneApp
                     {
                         bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
                     }
+                    
+                    // Apply VS uniforms (DEBUG: light_params commented out)
                     sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
-                    // sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() }); // Disabled - using unlit shader
+                    // sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    
                     if (mat.IsMetallic)
                     {
-                        // Debug: Log texture indices for first material
-                        // if (prim.MaterialIndex == 0 && i == 0 && node_index == 0)
-                        // {
-                        //     Info($"Material 0 texture indices: base_color={mat.Metallic.Images.BaseColor}, metallic_roughness={mat.Metallic.Images.MetallicRoughness}, normal={mat.Metallic.Images.Normal}");
-                        //     Info($"Material 0 factors: base_color=({mat->metallic.fs_params.base_color_factor.X},{mat->metallic.fs_params.base_color_factor.Y},{mat->metallic.fs_params.base_color_factor.Z},{mat->metallic.fs_params.base_color_factor.W})");
-                        //     Info($"Material 0 factors: metallic={mat->metallic.fs_params.metallic_factor}, roughness={mat->metallic.fs_params.roughness_factor}");
-                        //     if (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX)
-                        //     {
-                        //         Info($"  base_color tex_view.id={state.scene.Images[mat.Metallic.Images.BaseColor].TexView.id}");
-                        //         Info($"  base_color img.id={state.scene.Images[mat.Metallic.Images.BaseColor].img.id}");
-                        //     }
-                        // }
-
-                        // Get texture views and samplers, using placeholders if texture is not present (index == -1)
-                        sg_view base_color_tex = mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX
-                            ? state.scene.Images[mat.Metallic.Images.BaseColor].TexView
+                        // Step 1: Base color texture
+                        sg_view base_color_tex = (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX) 
+                            ? state.scene.Images[mat.Metallic.Images.BaseColor].TexView 
                             : state.placeholders.white;
-
-                        // Debug: Log if we're using placeholder
-                        if (prim.MaterialIndex == 0 && i == 0 && node_index == 0)
-                        {
-                            bool isPlaceholder = (mat.Metallic.Images.BaseColor == SCENE_INVALID_INDEX);
-                            // Info($"  Using {(isPlaceholder ? "PLACEHOLDER" : "REAL TEXTURE")} for base_color, tex_view.id={base_color_tex.id}");
-                        }
-
-                        sg_view metallic_roughness_tex = mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX
+                        
+                        // Step 2: Metallic/Roughness texture
+                        sg_view metallic_roughness_tex = (mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.MetallicRoughness].TexView
                             : state.placeholders.white;
-                        sg_view normal_tex = mat.Metallic.Images.Normal != SCENE_INVALID_INDEX
+                        
+                        // Step 3: Normal texture
+                        sg_view normal_tex = (mat.Metallic.Images.Normal != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Normal].TexView
                             : state.placeholders.normal;
-                        sg_view occlusion_tex = mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX
+                        
+                        // Step 4: Occlusion texture
+                        sg_view occlusion_tex = (mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Occlusion].TexView
                             : state.placeholders.white;
-                        sg_view emissive_tex = mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX
+                        
+                        // Step 5: Emissive texture
+                        sg_view emissive_tex = (mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Emissive].TexView
                             : state.placeholders.black;
-
-                        sg_sampler base_color_smp = mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX
+                        
+                        sg_sampler base_color_smp = (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.BaseColor].Sampler
                             : state.placeholders.smp;
-                        sg_sampler metallic_roughness_smp = mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX
+                        
+                        sg_sampler metallic_roughness_smp = (mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.MetallicRoughness].Sampler
                             : state.placeholders.smp;
-                        sg_sampler normal_smp = mat.Metallic.Images.Normal != SCENE_INVALID_INDEX
+                        
+                        sg_sampler normal_smp = (mat.Metallic.Images.Normal != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Normal].Sampler
                             : state.placeholders.smp;
-                        sg_sampler occlusion_smp = mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX
+                        
+                        sg_sampler occlusion_smp = (mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Occlusion].Sampler
                             : state.placeholders.smp;
-                        sg_sampler emissive_smp = mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX
+                        
+                        sg_sampler emissive_smp = (mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Emissive].Sampler
                             : state.placeholders.smp;
 
-                        if (base_color_tex.id == 0)
-                        {
-                            base_color_tex = state.placeholders.white;
-                            base_color_smp = state.placeholders.smp;
-                        }
-                        if (metallic_roughness_tex.id == 0)
-                        {
-                            metallic_roughness_tex = state.placeholders.white;
-                            metallic_roughness_smp = state.placeholders.smp;
-                        }
-                        if (normal_tex.id == 0)
-                        {
-                            normal_tex = state.placeholders.normal;
-                            normal_smp = state.placeholders.smp;
-                        }
-                        if (occlusion_tex.id == 0)
-                        {
-                            occlusion_tex = state.placeholders.white;
-                            occlusion_smp = state.placeholders.smp;
-                        }
-                        if (emissive_tex.id == 0)
-                        {
-                            emissive_tex = state.placeholders.black;
-                            emissive_smp = state.placeholders.smp;
-                        }
+                        // Bind all textures
                         bind.views[VIEW_cgltf_base_color_tex] = base_color_tex;
-                        bind.views[1] = metallic_roughness_tex;  // slot 1
-                        bind.views[2] = normal_tex;              // slot 2
-                        bind.views[3] = occlusion_tex;           // slot 3
-                        bind.views[4] = emissive_tex;            // slot 4
+                        bind.views[VIEW_cgltf_metallic_roughness_tex] = metallic_roughness_tex;
+                        bind.views[VIEW_cgltf_normal_tex] = normal_tex;
+                        bind.views[VIEW_cgltf_occlusion_tex] = occlusion_tex;
+                        bind.views[VIEW_cgltf_emissive_tex] = emissive_tex;
+                        
                         bind.samplers[SMP_cgltf_base_color_smp] = base_color_smp;
-                        bind.samplers[1] = metallic_roughness_smp;  // slot 1
-                        bind.samplers[2] = normal_smp;              // slot 2
-                        bind.samplers[3] = occlusion_smp;           // slot 3
-                        bind.samplers[4] = emissive_smp;            // slot 4
+                        bind.samplers[SMP_cgltf_metallic_roughness_smp] = metallic_roughness_smp;
+                        bind.samplers[SMP_cgltf_normal_smp] = normal_smp;
+                        bind.samplers[SMP_cgltf_occlusion_smp] = occlusion_smp;
+                        bind.samplers[SMP_cgltf_emissive_smp] = emissive_smp;
                         sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
                     }
-                    else
-                    {
-                        /*
-                            sg_apply_uniforms(SG_SHADERSTAGE_VS,
-                                SLOT_specular_params,
-                                &mat->specular.fs_params,
-                                sizeof(specular_params_t));
-                        */
-                    }
+                    
                     sg_apply_bindings(bind);
                     sg_draw((uint)prim.BaseElement, (uint)prim.NumElements, 1);
                 }

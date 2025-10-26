@@ -534,6 +534,75 @@ namespace Sokol
             CheckSceneLoadComplete();
         }
 
+        private void UpdateMaterialTextureFlags()
+        {
+            Info($"CGltfParser: Updating material texture flags...");
+            
+            for (int i = 0; i < ActiveScene.NumMaterials; i++)
+            {
+                if (ActiveScene.Materials[i].IsMetallic)
+                {
+                    int baseColorIdx = ActiveScene.Materials[i].Metallic.Images.BaseColor;
+                    int metallicRoughnessIdx = ActiveScene.Materials[i].Metallic.Images.MetallicRoughness;
+                    int normalIdx = ActiveScene.Materials[i].Metallic.Images.Normal;
+                    int occlusionIdx = ActiveScene.Materials[i].Metallic.Images.Occlusion;
+                    int emissiveIdx = ActiveScene.Materials[i].Metallic.Images.Emissive;
+                    
+                    // Set base_color_tex flag
+                    ActiveScene.Materials[i].Metallic.FsParams.has_base_color_tex = 
+                        (baseColorIdx != CGltfSceneLimits.INVALID_INDEX && ActiveScene.Images[baseColorIdx].Image.id != 0) ? 1.0f : 0.0f;
+                    
+                    // Set metallic_roughness_tex flag
+                    ActiveScene.Materials[i].Metallic.FsParams.has_metallic_roughness_tex = 
+                        (metallicRoughnessIdx != CGltfSceneLimits.INVALID_INDEX && ActiveScene.Images[metallicRoughnessIdx].Image.id != 0) ? 1.0f : 0.0f;
+                    
+                    // Set normal_tex flag
+                    ActiveScene.Materials[i].Metallic.FsParams.has_normal_tex = 
+                        (normalIdx != CGltfSceneLimits.INVALID_INDEX && ActiveScene.Images[normalIdx].Image.id != 0) ? 1.0f : 0.0f;
+                    
+                    // Set occlusion_tex flag
+                    ActiveScene.Materials[i].Metallic.FsParams.has_occlusion_tex = 
+                        (occlusionIdx != CGltfSceneLimits.INVALID_INDEX && ActiveScene.Images[occlusionIdx].Image.id != 0) ? 1.0f : 0.0f;
+                    
+                    // Set emissive_tex flag
+                    ActiveScene.Materials[i].Metallic.FsParams.has_emissive_tex = 
+                        (emissiveIdx != CGltfSceneLimits.INVALID_INDEX && ActiveScene.Images[emissiveIdx].Image.id != 0) ? 1.0f : 0.0f;
+                    
+                    Info($"CGltfParser: Material {i} - BaseColor index:{baseColorIdx}, flag:{ActiveScene.Materials[i].Metallic.FsParams.has_base_color_tex}");
+                    Info($"CGltfParser: Material {i} - MetallicRoughness index:{metallicRoughnessIdx}, flag:{ActiveScene.Materials[i].Metallic.FsParams.has_metallic_roughness_tex}");
+                    Info($"CGltfParser: Material {i} - Normal index:{normalIdx}, flag:{ActiveScene.Materials[i].Metallic.FsParams.has_normal_tex}");
+                    Info($"CGltfParser: Material {i} - Occlusion index:{occlusionIdx}, flag:{ActiveScene.Materials[i].Metallic.FsParams.has_occlusion_tex}");
+                    Info($"CGltfParser: Material {i} - Emissive index:{emissiveIdx}, flag:{ActiveScene.Materials[i].Metallic.FsParams.has_emissive_tex}");
+                    
+                    if (baseColorIdx != CGltfSceneLimits.INVALID_INDEX)
+                    {
+                        Info($"CGltfParser:   BaseColor image.id = {ActiveScene.Images[baseColorIdx].Image.id}");
+                    }
+                    if (metallicRoughnessIdx != CGltfSceneLimits.INVALID_INDEX)
+                    {
+                        Info($"CGltfParser:   MetallicRoughness image.id = {ActiveScene.Images[metallicRoughnessIdx].Image.id}");
+                    }
+                    if (normalIdx != CGltfSceneLimits.INVALID_INDEX)
+                    {
+                        Info($"CGltfParser:   Normal image.id = {ActiveScene.Images[normalIdx].Image.id}");
+                    }
+                    if (occlusionIdx != CGltfSceneLimits.INVALID_INDEX)
+                    {
+                        Info($"CGltfParser:   Occlusion image.id = {ActiveScene.Images[occlusionIdx].Image.id}");
+                    }
+                    if (emissiveIdx != CGltfSceneLimits.INVALID_INDEX)
+                    {
+                        Info($"CGltfParser:   Emissive image.id = {ActiveScene.Images[emissiveIdx].Image.id}");
+                    }
+                    
+                    // TODO: Uncomment when emissive texture flag is added back to shader:
+                    // int emissiveIdx = ActiveScene.Materials[i].Metallic.Images.Emissive;
+                    // ActiveScene.Materials[i].Metallic.FsParams.has_occlusion_tex = ...
+                    // ActiveScene.Materials[i].Metallic.FsParams.has_emissive_tex = ...
+                }
+            }
+        }
+
         private void ParseScene(cgltf_data* gltf)
         {
             Info($"CGltfParser: Parsing scene...");
@@ -545,6 +614,9 @@ namespace Sokol
             ParseNodes(gltf);
             
             Info($"CGltfParser: Scene parsing complete - {ActiveScene.NumNodes} nodes, {ActiveScene.NumMeshes} meshes, {ActiveScene.NumPrimitives} primitives");
+            
+            // Now that all synchronous image creation is done, update the material flags
+            UpdateMaterialTextureFlags();
         }
 
         #region Buffer Parsing
