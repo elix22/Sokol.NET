@@ -9,6 +9,8 @@ using static Sokol.CGltf;
 using static Sokol.SLog;
 using static Sokol.SFetch;
 using static Sokol.SBasisu;
+using static Sokol.StbImage;
+using static Sokol.Utils;
 using static cgltf_sapp_shader_cs_cgltf.Shaders;
 namespace Sokol
 {
@@ -46,7 +48,7 @@ namespace Sokol
     [StructLayout(LayoutKind.Sequential)]
     public struct CGltfMetallicMaterial
     {
-        public cgltf_metallic_params_t FsParams;
+        public cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_metallic_params_t FsParams;
         public CGltfMetallicImages Images;
     }
 
@@ -233,6 +235,7 @@ namespace Sokol
     public unsafe class CGltfParser
     {
         private string _basePath = "";
+        private string _filePath = "";
         private CGltfScene _scene;
         private sg_shader _metallicShader;
         private sg_shader _specularShader;
@@ -251,6 +254,10 @@ namespace Sokol
         // Callbacks for async loading
         private Action<CGltfScene>? _onLoadComplete;
         private Action<string>? _onLoadFailed;
+        
+        // Track pending async loads
+        private int _pendingTextureLoads = 0;
+        private int _pendingBufferLoads = 0;
 
         public CGltfScene? Scene => _scene;
 
@@ -297,7 +304,11 @@ namespace Sokol
                 {
                     Info($"CGltfParser: Successfully parsed GLTF - {gltfData->meshes_count} meshes, {gltfData->materials_count} materials");
                     
+                    // Parse scene structure (allocates buffers but doesn't fill them yet)
                     ParseScene(gltfData);
+                    
+                    // Start async loading of .bin buffer files using FileSystem.cs
+                    LoadBuffersAsync(gltfData);
                     
                     cgltf_free(gltfData);
                     return true;
@@ -317,9 +328,11 @@ namespace Sokol
         /// </summary>
         public void LoadFromFileAsync(string filePath, Action<CGltfScene> onComplete, Action<string>? onFailed = null)
         {
+            _filePath = filePath;
             _basePath = Path.GetDirectoryName(filePath) ?? "";
             _onLoadComplete = onComplete;
             _onLoadFailed = onFailed;
+            _pendingTextureLoads = 0;
 
             Info($"CGltfParser: Starting async load of '{filePath}'");
             FileSystem.Instance.LoadFile(filePath, OnFileLoaded);
@@ -333,7 +346,8 @@ namespace Sokol
                 
                 if (LoadFromMemory(buffer, _basePath))
                 {
-                    _onLoadComplete?.Invoke(_scene);
+                    // If no textures are pending, complete immediately
+                    CheckSceneLoadComplete();
                 }
                 else
                 {
@@ -345,6 +359,87 @@ namespace Sokol
                 Error($"CGltfParser: Failed to load file '{filePath}': {status}");
                 _onLoadFailed?.Invoke($"File load failed: {status}");
             }
+        }
+        
+        private void CheckSceneLoadComplete()
+        {
+            if (_pendingBufferLoads == 0 && _pendingTextureLoads == 0)
+            {
+                Info($"CGltfParser: Scene fully loaded (buffers AND textures complete)");
+                _onLoadComplete?.Invoke(_scene);
+            }
+            else
+            {
+                Info($"CGltfParser: Waiting for {_pendingBufferLoads} buffers, {_pendingTextureLoads} textures...");
+            }
+        }
+
+        private void LoadBuffersAsync(cgltf_data* gltf)
+        {
+            if (gltf->buffers_count == 0)
+            {
+                Info($"CGltfParser: No external buffer files to load");
+                CheckSceneLoadComplete();
+                return;
+            }
+            
+            for (nuint i = 0; i < gltf->buffers_count; i++)
+            {
+                cgltf_buffer* gltfBuf = &gltf->buffers[i];
+                if (gltfBuf->uri == null)
+                {
+                    Info($"CGltfParser: Buffer {i} has no URI (embedded data), skipping");
+                    continue;
+                }
+                
+                string uri = Marshal.PtrToStringAnsi((IntPtr)gltfBuf->uri) ?? "";
+                if (string.IsNullOrEmpty(uri))
+                {
+                    Info($"CGltfParser: Buffer {i} has empty URI, skipping");
+                    continue;
+                }
+                
+                string bufferPath = Path.Combine(_basePath, uri);
+                int bufferIndex = (int)i;
+                _pendingBufferLoads++;
+                
+                Info($"CGltfParser: Loading buffer file {i}: {uri} (expected size: {gltfBuf->size} bytes)");
+                FileSystem.Instance.LoadFile(bufferPath, (path, buffer, status) => {
+                    OnBufferFileLoaded(bufferIndex, buffer, status);
+                }, (int)gltfBuf->size);
+            }
+            
+            if (_pendingBufferLoads == 0)
+            {
+                Info($"CGltfParser: No buffer files needed async loading");
+                CheckSceneLoadComplete();
+            }
+        }
+
+        private void OnBufferFileLoaded(int gltfBufferIndex, byte[]? buffer, FileLoadStatus status)
+        {
+            if (status == FileLoadStatus.Success && buffer != null)
+            {
+                Info($"CGltfParser: Buffer {gltfBufferIndex} loaded successfully: {buffer.Length} bytes");
+                
+                // Initialize all sokol buffers that reference this GLTF buffer
+                fixed (byte* dataPtr = buffer)
+                {
+                    sg_range range = new sg_range
+                    {
+                        ptr = dataPtr,
+                        size = (nuint)buffer.Length
+                    };
+                    CreateBuffersForGltfBuffer(gltfBufferIndex, range);
+                }
+            }
+            else
+            {
+                Error($"CGltfParser: Failed to load buffer {gltfBufferIndex}: {status}");
+            }
+            
+            _pendingBufferLoads--;
+            CheckSceneLoadComplete();
         }
 
         private void ParseScene(cgltf_data* gltf)
@@ -409,15 +504,32 @@ namespace Sokol
             {
                 if (_bufferParams[i].GltfBufferIndex == gltfBufferIndex)
                 {
+                    Info($"CGltfParser: Creating buffer {i}: offset={_bufferParams[i].Offset}, size={_bufferParams[i].Size}, vertex={_bufferParams[i].Usage.vertex_buffer}, index={_bufferParams[i].Usage.index_buffer}");
+                    
+                    byte* bufferData = (byte*)data.ptr + _bufferParams[i].Offset;
+                    
+                    // Log first few values for debugging
+                    if (_bufferParams[i].Usage.index_buffer)
+                    {
+                        ushort* indices = (ushort*)bufferData;
+                        Info($"  First 6 indices: {indices[0]}, {indices[1]}, {indices[2]}, {indices[3]}, {indices[4]}, {indices[5]}");
+                    }
+                    else if (_bufferParams[i].Usage.vertex_buffer)
+                    {
+                        float* vertices = (float*)bufferData;
+                        Info($"  First 9 floats: {vertices[0]:F3}, {vertices[1]:F3}, {vertices[2]:F3}, {vertices[3]:F3}, {vertices[4]:F3}, {vertices[5]:F3}, {vertices[6]:F3}, {vertices[7]:F3}, {vertices[8]:F3}");
+                    }
+                    
                     sg_init_buffer(_scene.Buffers[i], new sg_buffer_desc
                     {
                         usage = _bufferParams[i].Usage,
                         data = new sg_range
                         {
-                            ptr = (byte*)data.ptr + _bufferParams[i].Offset,
+                            ptr = bufferData,
                             size = (nuint)_bufferParams[i].Size,
                         }
                     });
+                    Info($"CGltfParser: Buffer {i} created with id={_scene.Buffers[i].id}, state={sg_query_buffer_state(_scene.Buffers[i])}");
                 }
             }
         }
@@ -468,6 +580,56 @@ namespace Sokol
                         size = (nuint)bufView->size 
                     });
                 }
+                else if (gltfImg->uri != IntPtr.Zero)
+                {
+                    // External image file - load asynchronously
+                    string uri = Marshal.PtrToStringUTF8((IntPtr)gltfImg->uri) ?? "";
+                    string fullPath = Path.Combine(_basePath, uri);
+                    
+                    Info($"CGltfParser: Queueing external texture load: {uri}");
+                    _pendingTextureLoads++;
+                    LoadExternalTexture((int)i, fullPath);
+                }
+            }
+        }
+        
+        private void LoadExternalTexture(int gltfImageIndex, string filePath)
+        {
+            string resolvedPath = util_get_file_path(filePath);
+            Info($"CGltfParser: Loading external texture {gltfImageIndex}: {resolvedPath}");
+            
+            FileSystem.Instance.LoadFile(resolvedPath, (path, buffer, status) =>
+            {
+                if (status == FileLoadStatus.Success && buffer != null)
+                {
+                    Info($"CGltfParser: Texture file loaded ({buffer.Length} bytes), creating image...");
+                    
+                    // Use the file data directly - CreateImageSamplersForGltfImage will handle decoding
+                    fixed (byte* bufferPtr = buffer)
+                    {
+                        sg_range fileData = new sg_range { ptr = bufferPtr, size = (nuint)buffer.Length };
+                        CreateImageSamplersForGltfImage(gltfImageIndex, fileData);
+                        
+                        Info($"CGltfParser: Created image for texture {gltfImageIndex}");
+                        OnTextureLoadComplete();
+                    }
+                }
+                else
+                {
+                    Error($"CGltfParser: Failed to load texture file '{path}': {status}");
+                    OnTextureLoadComplete();
+                }
+            });
+        }
+        
+        private void OnTextureLoadComplete()
+        {
+            _pendingTextureLoads--;
+            Info($"CGltfParser: Texture loaded, {_pendingTextureLoads} remaining");
+            
+            if (_pendingTextureLoads == 0)
+            {
+                CheckSceneLoadComplete();
             }
         }
 
@@ -667,6 +829,7 @@ namespace Sokol
             desc.colors[0].blend.dst_factor_rgb = pipParams.Alpha ? sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA : 0;
 
             _scene.Pipelines[pipIdx] = sg_make_pipeline(desc);
+            Info($"CGltfParser: Pipeline created idx={pipIdx}, id={_scene.Pipelines[pipIdx].id}, state={sg_query_pipeline_state(_scene.Pipelines[pipIdx])}, primType={pipParams.PrimType}, indexType={pipParams.IndexType}");
 
             return pipIdx;
         }
@@ -683,6 +846,8 @@ namespace Sokol
                 if (attrSlot != CGltfSceneLimits.INVALID_INDEX)
                 {
                     layout.attrs[attrSlot].format = GltfToVertexFormat(attr->data);
+                    // DO NOT set offset here - it should be 0 for separate buffers (tightly packed)
+                    // The accessor->offset is the offset in the file buffer, not the vertex struct offset!
                 }
 
                 int bufferViewIndex = GetBufferViewIndex(gltf, attr->data->buffer_view);

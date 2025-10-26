@@ -53,7 +53,7 @@ namespace Sokol
         private static readonly object _lock = new object();
 
         // Sokol-fetch configuration
-        private const int MAX_CONCURRENT_REQUESTS = 4;  // Number of simultaneous downloads
+        private const int MAX_CONCURRENT_REQUESTS = 8;  // Number of simultaneous downloads (increased for texture loading)
         private const int NUM_CHANNELS = 2;             // Separate channels for different request types
         private const int NUM_LANES = 2;               // Lanes per channel
         private const int DEFAULT_BUFFER_SIZE = 1024 * 1024; // 1MB default buffer size

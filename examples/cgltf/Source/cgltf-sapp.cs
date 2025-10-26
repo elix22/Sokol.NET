@@ -519,11 +519,33 @@ public static unsafe class CGltfApp
         else
         {
             sg_begin_pass(new sg_pass { action = state.pass_actions.ok, swapchain = sglue_swapchain() });
+            
+            bool logThisFrame = sapp_frame_count() % 120 == 0;
+            if (logThisFrame)
+            {
+                Info($"[CGLTF WORKING] Camera: EyePos={state.camera.EyePos}, ViewProj rows:");
+                Info($"  Row1: {state.camera.ViewProj.M11}, {state.camera.ViewProj.M12}, {state.camera.ViewProj.M13}, {state.camera.ViewProj.M14}");
+                Info($"  Row2: {state.camera.ViewProj.M21}, {state.camera.ViewProj.M22}, {state.camera.ViewProj.M23}, {state.camera.ViewProj.M24}");
+                Info($"  Row3: {state.camera.ViewProj.M31}, {state.camera.ViewProj.M32}, {state.camera.ViewProj.M33}, {state.camera.ViewProj.M34}");
+                Info($"  Row4: {state.camera.ViewProj.M41}, {state.camera.ViewProj.M42}, {state.camera.ViewProj.M43}, {state.camera.ViewProj.M44}");
+                Info($"[CGLTF WORKING] Light: pos={state.point_light.light_pos}, intensity={state.point_light.light_intensity}, range={state.point_light.light_range}");
+            }
+            
             for (int node_index = 0; node_index < state.scene.num_nodes; node_index++)
             {
                 node_t* node = (node_t*)Unsafe.AsPointer(ref state.scene.nodes[node_index]);
                 cgltf_vs_params_t vs_params = vs_params_for_node(node_index);
                 mesh_t* mesh = (mesh_t*)Unsafe.AsPointer(ref state.scene.meshes[node->mesh]);
+                
+                if (logThisFrame)
+                {
+                    Info($"[CGLTF WORKING] Node {node_index}: model matrix rows:");
+                    Info($"  Row1: {vs_params.model.M11}, {vs_params.model.M12}, {vs_params.model.M13}, {vs_params.model.M14}");
+                    Info($"  Row2: {vs_params.model.M21}, {vs_params.model.M22}, {vs_params.model.M23}, {vs_params.model.M24}");
+                    Info($"  Row3: {vs_params.model.M31}, {vs_params.model.M32}, {vs_params.model.M33}, {vs_params.model.M34}");
+                    Info($"  Row4: {vs_params.model.M41}, {vs_params.model.M42}, {vs_params.model.M43}, {vs_params.model.M44}");
+                }
+                
                 for (int i = 0; i < mesh->num_primitives; i++)
                 {
                     primitive_t* prim = (primitive_t*)Unsafe.AsPointer(ref state.scene.primitives[i + mesh->first_primitive]);
