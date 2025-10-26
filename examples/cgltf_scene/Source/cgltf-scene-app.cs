@@ -303,17 +303,6 @@ public static unsafe class CGLTFSceneApp
         public sg_sampler smp;
     }
 
-    struct gltf_image_fetch_userdata_t
-    {
-        public cgltf_size image_index;
-    };
-
-
-    struct gltf_buffer_fetch_userdata_t
-    {
-        public uint buffer_index;
-    };
-
     [StructLayout(LayoutKind.Sequential)]
     public class _state
     {
@@ -345,115 +334,103 @@ public static unsafe class CGLTFSceneApp
     {
         try
         {
-            Info($"[MIGRATION] Copying parser scene data to state...");
-            Info($"[MIGRATION] Parser has: Nodes={parserScene.NumNodes}, Meshes={parserScene.NumMeshes}, Primitives={parserScene.NumPrimitives}");
-            
             // Copy buffers
-        state.scene.num_buffers = parserScene.NumBuffers;
-        for (int i = 0; i < parserScene.NumBuffers; i++)
-        {
-            state.scene.buffers[i] = parserScene.Buffers[i];
-        }
-        Info($"[MIGRATION] Copied {state.scene.num_buffers} buffers");
-        
-        // Copy images
-        state.scene.num_images = parserScene.NumImages;
-        for (int i = 0; i < parserScene.NumImages; i++)
-        {
-            state.scene.images[i].img = parserScene.Images[i].Image;
-            state.scene.images[i].smp = parserScene.Images[i].Sampler;
-            state.scene.images[i].tex_view = parserScene.Images[i].TexView;
-        }
-        Info($"[MIGRATION] Copied {state.scene.num_images} images");
-        
-        // Copy materials
-        state.scene.num_materials = parserScene.NumMaterials;
-        for (int i = 0; i < parserScene.NumMaterials; i++)
-        {
-            var parserMat = parserScene.Materials[i];
-            ref material_t stateMat = ref state.scene.materials[i];
-            
-            stateMat.is_metallic = parserMat.IsMetallic;
-            if (parserMat.IsMetallic)
+            state.scene.num_buffers = parserScene.NumBuffers;
+            for (int i = 0; i < parserScene.NumBuffers; i++)
             {
-                stateMat.metallic.fs_params = parserMat.Metallic.FsParams;
-                stateMat.metallic.images.base_color = parserMat.Metallic.Images.BaseColor;
-                stateMat.metallic.images.metallic_roughness = parserMat.Metallic.Images.MetallicRoughness;
-                stateMat.metallic.images.normal = parserMat.Metallic.Images.Normal;
-                stateMat.metallic.images.occlusion = parserMat.Metallic.Images.Occlusion;
-                stateMat.metallic.images.emissive = parserMat.Metallic.Images.Emissive;
-            }
-        }
-        
-        // Copy pipelines
-        state.scene.num_pipelines = parserScene.NumPipelines;
-        for (int i = 0; i < parserScene.NumPipelines; i++)
-        {
-            state.scene.pipelines[i] = parserScene.Pipelines[i];
-        }
-        Info($"[MIGRATION] Copied {state.scene.num_pipelines} pipelines");
-        
-        // Copy primitives
-        Info($"[MIGRATION] About to copy {parserScene.NumPrimitives} primitives");
-        state.scene.num_primitives = parserScene.NumPrimitives;
-        for (int i = 0; i < parserScene.NumPrimitives; i++)
-        {
-            Info($"[MIGRATION] Copying primitive {i}...");
-            var parserPrim = parserScene.Primitives[i];
-            Info($"[MIGRATION] Got primitive reference, pipeline={parserPrim.PipelineIndex}, material={parserPrim.MaterialIndex}");
-            ref primitive_t statePrim = ref state.scene.primitives[i];
-            
-            statePrim.pipeline = parserPrim.PipelineIndex;
-            statePrim.material = parserPrim.MaterialIndex;
-            statePrim.index_buffer = parserPrim.IndexBuffer;
-            statePrim.base_element = parserPrim.BaseElement;
-            statePrim.num_elements = parserPrim.NumElements;
-            
-            // Copy vertex buffer mapping
-            // Initialize the buffer array if it's null
-            if (statePrim.vertex_buffers.buffer == null)
-            {
-                statePrim.vertex_buffers.buffer = new int[SG_MAX_VERTEXBUFFER_BINDSLOTS];
+                state.scene.buffers[i] = parserScene.Buffers[i];
             }
             
-            statePrim.vertex_buffers.num = parserPrim.VertexBuffers.Num;
-            if (parserPrim.VertexBuffers.BufferIndices != null)
+            // Copy images
+            state.scene.num_images = parserScene.NumImages;
+            for (int i = 0; i < parserScene.NumImages; i++)
             {
-                for (int j = 0; j < parserPrim.VertexBuffers.Num; j++)
+                state.scene.images[i].img = parserScene.Images[i].Image;
+                state.scene.images[i].smp = parserScene.Images[i].Sampler;
+                state.scene.images[i].tex_view = parserScene.Images[i].TexView;
+            }
+            
+            // Copy materials
+            state.scene.num_materials = parserScene.NumMaterials;
+            for (int i = 0; i < parserScene.NumMaterials; i++)
+            {
+                var parserMat = parserScene.Materials[i];
+                ref material_t stateMat = ref state.scene.materials[i];
+                
+                stateMat.is_metallic = parserMat.IsMetallic;
+                if (parserMat.IsMetallic)
                 {
-                    statePrim.vertex_buffers.buffer[j] = parserPrim.VertexBuffers.BufferIndices[j];
+                    stateMat.metallic.fs_params = parserMat.Metallic.FsParams;
+                    stateMat.metallic.images.base_color = parserMat.Metallic.Images.BaseColor;
+                    stateMat.metallic.images.metallic_roughness = parserMat.Metallic.Images.MetallicRoughness;
+                    stateMat.metallic.images.normal = parserMat.Metallic.Images.Normal;
+                    stateMat.metallic.images.occlusion = parserMat.Metallic.Images.Occlusion;
+                    stateMat.metallic.images.emissive = parserMat.Metallic.Images.Emissive;
                 }
             }
-        }
-        
-        // Copy meshes
-        state.scene.num_meshes = parserScene.NumMeshes;
-        for (int i = 0; i < parserScene.NumMeshes; i++)
-        {
-            var parserMesh = parserScene.Meshes[i];
-            ref mesh_t stateMesh = ref state.scene.meshes[i];
             
-            stateMesh.first_primitive = parserMesh.FirstPrimitive;
-            stateMesh.num_primitives = parserMesh.NumPrimitives;
-        }
-        
-        // Copy nodes
-        state.scene.num_nodes = parserScene.NumNodes;
-        for (int i = 0; i < parserScene.NumNodes; i++)
-        {
-            var parserNode = parserScene.Nodes[i];
-            ref node_t stateNode = ref state.scene.nodes[i];
+            // Copy pipelines
+            state.scene.num_pipelines = parserScene.NumPipelines;
+            for (int i = 0; i < parserScene.NumPipelines; i++)
+            {
+                state.scene.pipelines[i] = parserScene.Pipelines[i];
+            }
             
-            stateNode.mesh = parserNode.MeshIndex;
-            stateNode.transform = parserNode.Transform;
-        }
-        
-        Info($"[MIGRATION] Scene copy complete - Nodes: {state.scene.num_nodes}, Meshes: {state.scene.num_meshes}, Primitives: {state.scene.num_primitives}");
+            // Copy primitives
+            state.scene.num_primitives = parserScene.NumPrimitives;
+            for (int i = 0; i < parserScene.NumPrimitives; i++)
+            {
+                var parserPrim = parserScene.Primitives[i];
+                ref primitive_t statePrim = ref state.scene.primitives[i];
+                
+                statePrim.pipeline = parserPrim.PipelineIndex;
+                statePrim.material = parserPrim.MaterialIndex;
+                statePrim.index_buffer = parserPrim.IndexBuffer;
+                statePrim.base_element = parserPrim.BaseElement;
+                statePrim.num_elements = parserPrim.NumElements;
+                
+                // Copy vertex buffer mapping
+                if (statePrim.vertex_buffers.buffer == null)
+                {
+                    statePrim.vertex_buffers.buffer = new int[SG_MAX_VERTEXBUFFER_BINDSLOTS];
+                }
+                
+                statePrim.vertex_buffers.num = parserPrim.VertexBuffers.Num;
+                if (parserPrim.VertexBuffers.BufferIndices != null)
+                {
+                    for (int j = 0; j < parserPrim.VertexBuffers.Num; j++)
+                    {
+                        statePrim.vertex_buffers.buffer[j] = parserPrim.VertexBuffers.BufferIndices[j];
+                    }
+                }
+            }
+            
+            // Copy meshes
+            state.scene.num_meshes = parserScene.NumMeshes;
+            for (int i = 0; i < parserScene.NumMeshes; i++)
+            {
+                var parserMesh = parserScene.Meshes[i];
+                ref mesh_t stateMesh = ref state.scene.meshes[i];
+                
+                stateMesh.first_primitive = parserMesh.FirstPrimitive;
+                stateMesh.num_primitives = parserMesh.NumPrimitives;
+            }
+            
+            // Copy nodes
+            state.scene.num_nodes = parserScene.NumNodes;
+            for (int i = 0; i < parserScene.NumNodes; i++)
+            {
+                var parserNode = parserScene.Nodes[i];
+                ref node_t stateNode = ref state.scene.nodes[i];
+                
+                stateNode.mesh = parserNode.MeshIndex;
+                stateNode.transform = parserNode.Transform;
+            }
         }
         catch (Exception ex)
         {
-            Error($"[MIGRATION] Exception in CopyParserSceneToState: {ex.Message}");
-            Error($"[MIGRATION] Stack trace: {ex.StackTrace}");
+            Error($"Error copying parser scene to state: {ex.Message}");
+            Error($"Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -523,19 +500,13 @@ public static unsafe class CGLTFSceneApp
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
-        Info($"[MIGRATION] Starting CGltfParser load of '{gltfFilePath}'");
         _parser.LoadFromFileAsync(gltfFilePath, 
             onComplete: (scene) => {
-                Info($"[MIGRATION] CGltfParser load complete! Nodes: {scene.NumNodes}, Meshes: {scene.NumMeshes}, Materials: {scene.NumMaterials}");
-                Info($"[MIGRATION] Buffers: {scene.NumBuffers}, Images: {scene.NumImages}, Pipelines: {scene.NumPipelines}");
-                
                 // Copy CGltfParser scene data to state.scene so existing rendering code works
                 CopyParserSceneToState(scene);
-                
-                Info($"[MIGRATION] Scene data copied to state, rendering should now work!");
             },
             onFailed: (error) => {
-                Error($"[MIGRATION] CGltfParser load failed: {error}");
+                Error($"Failed to load GLTF scene: {error}");
                 state.failed = true;
             });
 
@@ -646,17 +617,6 @@ public static unsafe class CGLTFSceneApp
         {
             sg_begin_pass(new sg_pass { action = state.pass_actions.ok, swapchain = sglue_swapchain() });
             
-            bool logThisFrame = sapp_frame_count() % 120 == 0;
-            if (logThisFrame)
-            {
-                Info($"[CGLTF WORKING] Camera: EyePos={state.camera.EyePos}, ViewProj rows:");
-                Info($"  Row1: {state.camera.ViewProj.M11}, {state.camera.ViewProj.M12}, {state.camera.ViewProj.M13}, {state.camera.ViewProj.M14}");
-                Info($"  Row2: {state.camera.ViewProj.M21}, {state.camera.ViewProj.M22}, {state.camera.ViewProj.M23}, {state.camera.ViewProj.M24}");
-                Info($"  Row3: {state.camera.ViewProj.M31}, {state.camera.ViewProj.M32}, {state.camera.ViewProj.M33}, {state.camera.ViewProj.M34}");
-                Info($"  Row4: {state.camera.ViewProj.M41}, {state.camera.ViewProj.M42}, {state.camera.ViewProj.M43}, {state.camera.ViewProj.M44}");
-                Info($"[CGLTF WORKING] Light: pos={state.point_light.light_pos}, intensity={state.point_light.light_intensity}, range={state.point_light.light_range}");
-                Info($"[CGLTF WORKING] Scene has {state.scene.num_nodes} nodes to render");
-            }
             
             for (int node_index = 0; node_index < state.scene.num_nodes; node_index++)
             {
@@ -664,35 +624,10 @@ public static unsafe class CGLTFSceneApp
                 cgltf_vs_params_t vs_params = vs_params_for_node(node_index);
                 mesh_t* mesh = (mesh_t*)Unsafe.AsPointer(ref state.scene.meshes[node->mesh]);
                 
-                if (logThisFrame)
-                {
-                    Info($"[CGLTF WORKING] Node {node_index}: model matrix rows:");
-                    Info($"  Row1: {vs_params.model.M11}, {vs_params.model.M12}, {vs_params.model.M13}, {vs_params.model.M14}");
-                    Info($"  Row2: {vs_params.model.M21}, {vs_params.model.M22}, {vs_params.model.M23}, {vs_params.model.M24}");
-                    Info($"  Row3: {vs_params.model.M31}, {vs_params.model.M32}, {vs_params.model.M33}, {vs_params.model.M34}");
-                    Info($"  Row4: {vs_params.model.M41}, {vs_params.model.M42}, {vs_params.model.M43}, {vs_params.model.M44}");
-                }
-                
                 for (int i = 0; i < mesh->num_primitives; i++)
                 {
                     primitive_t* prim = (primitive_t*)Unsafe.AsPointer(ref state.scene.primitives[i + mesh->first_primitive]);
                     material_t* mat = (material_t*)Unsafe.AsPointer(ref state.scene.materials[prim->material]);
-                    
-                    if (logThisFrame)
-                    {
-                        Info($"[CGLTF WORKING] Drawing primitive {i}: pipeline={prim->pipeline}, material={prim->material}");
-                        Info($"[CGLTF WORKING] Primitive: base_element={prim->base_element}, num_elements={prim->num_elements}, index_buffer={prim->index_buffer}");
-                        Info($"[CGLTF WORKING] Vertex buffers: num={prim->vertex_buffers.num}");
-                        for (int vb = 0; vb < prim->vertex_buffers.num; vb++)
-                        {
-                            int buf_idx = prim->vertex_buffers.buffer[vb];
-                            var buf_state = sg_query_buffer_state(state.scene.buffers[buf_idx]);
-                            Info($"[CGLTF WORKING]   VB[{vb}] -> buffer[{buf_idx}] id={state.scene.buffers[buf_idx].id}, state={buf_state}");
-                        }
-                        var idx_buf_state = sg_query_buffer_state(state.scene.buffers[prim->index_buffer]);
-                        Info($"[CGLTF WORKING] Index buffer id={state.scene.buffers[prim->index_buffer].id}, state={idx_buf_state}");
-                        Info($"[CGLTF WORKING] Pipeline id={state.scene.pipelines[prim->pipeline].id}");
-                    }
                     
                     sg_apply_pipeline(state.scene.pipelines[prim->pipeline]);
                     sg_bindings bind = default;
@@ -708,13 +643,6 @@ public static unsafe class CGLTFSceneApp
                     sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
                     if (mat->is_metallic)
                     {
-                        if (logThisFrame)
-                        {
-                            Info($"[CGLTF WORKING] Material texture indices: base_color={mat->metallic.images.base_color}, metallic_roughness={mat->metallic.images.metallic_roughness}");
-                            Info($"[CGLTF WORKING]   normal={mat->metallic.images.normal}, occlusion={mat->metallic.images.occlusion}, emissive={mat->metallic.images.emissive}");
-                            Info($"[CGLTF WORKING] Texture view IDs: images[0].tex_view.id={state.scene.images[0].tex_view.id}, images[1].tex_view.id={state.scene.images[1].tex_view.id}");
-                        }
-                        
                         sg_view base_color_tex = state.scene.images[mat->metallic.images.base_color].tex_view;
                         sg_view metallic_roughness_tex = state.scene.images[mat->metallic.images.metallic_roughness].tex_view;
                         sg_view normal_tex = state.scene.images[mat->metallic.images.normal].tex_view;
@@ -773,10 +701,6 @@ public static unsafe class CGLTFSceneApp
                         */
                     }
                     sg_apply_bindings(bind);
-                    if (logThisFrame)
-                    {
-                        Info($"[CGLTF WORKING] About to call sg_draw({prim->base_element}, {prim->num_elements}, 1)");
-                    }
                     sg_draw((uint)prim->base_element, (uint)prim->num_elements, 1);
                 }
             }
@@ -826,726 +750,14 @@ public static unsafe class CGLTFSceneApp
         state.camera.HandleEvent(e);
     }
 
-    // load-callback for the GLTF base file
-    [UnmanagedCallersOnly]
-    static void gltf_fetch_callback(sfetch_response_t* response)
-    {
-        if (response->dispatched)
-        {
 
-            var buf = Unsafe.AsPointer(ref sfetch_buffers[response->channel, response->lane].Buffer[0]);
-            // bind buffer to load file into
-            sfetch_bind_buffer(response->handle, new sfetch_range_t() { ptr = buf, size = MAX_FILE_SIZE });
-        }
-        else if (response->fetched)
-        {
-            // file has been loaded, parse as GLTF
-            gltf_parse(response->data);
-        }
-        if (response->finished)
-        {
-            if (response->failed)
-            {
-                state.failed = true;
-            }
-        }
-    }
-
-    // load GLTF data from memory, build scene and issue resource fetch requests
-    static unsafe void gltf_parse(sfetch_range_t file_data)
-    {
-        cgltf_options options = default;
-        cgltf_data* out_data = null;
-
-        cgltf_result result = cgltf_parse(in options, file_data.ptr, file_data.size, out out_data);
-        if (result == cgltf_result.cgltf_result_success)
-        {
-            gltf_parse_buffers(out_data);
-            gltf_parse_images(out_data);
-            gltf_parse_materials(out_data);
-            gltf_parse_meshes(out_data);
-            gltf_parse_nodes(out_data);
-            cgltf_free(out_data);
-        }
-    }
-
-
-    [UnmanagedCallersOnly]
-    static void gltf_buffer_fetch_callback(sfetch_response_t* response)
-    {
-        if (response->dispatched)
-        {
-            sfetch_bind_buffer(response->handle, SFETCH_RANGE(sfetch_buffers[response->channel, response->lane].Buffer));
-        }
-        else if (response->fetched)
-        {
-            gltf_buffer_fetch_userdata_t* user_data = (gltf_buffer_fetch_userdata_t*)response->user_data;
-            int gltf_buffer_index = (int)user_data->buffer_index;
-            var range = new sg_range();
-            range.ptr = response->data.ptr;
-            range.size = response->data.size;
-            create_sg_buffers_for_gltf_buffer(gltf_buffer_index, range);
-        }
-        if (response->finished)
-        {
-            if (response->failed)
-            {
-                state.failed = true;
-            }
-        }
-    }
-
-
-    // parse GLTF nodes into our own node definition
-    static void gltf_parse_nodes(cgltf_data* gltf)
-    {
-        if (gltf->nodes_count > SCENE_MAX_NODES)
-        {
-            state.failed = true;
-            return;
-        }
-        for (cgltf_size node_index = 0; node_index < gltf->nodes_count; node_index++)
-        {
-            cgltf_node* gltf_node = (cgltf_node*)Unsafe.AsPointer(ref gltf->nodes[node_index]);
-            // ignore nodes without mesh, those are not relevant since we
-            // bake the transform hierarchy into per-node world space transforms
-            if (gltf_node->mesh != null)
-            {
-                node_t* node = (node_t*)Unsafe.AsPointer(ref state.scene.nodes[state.scene.num_nodes++]);
-                node->mesh = gltf_mesh_index(gltf, gltf_node->mesh);
-                node->transform = build_transform_for_gltf_node(gltf, gltf_node);
-            }
-        }
-    }
-
-
-    static Matrix4x4 FromGltfMatrix(cgltf_node.matrixCollection coll)
-    {
-        return new Matrix4x4(
-            coll[0], coll[1], coll[2], coll[3],
-            coll[4], coll[5], coll[6], coll[7],
-            coll[8], coll[9], coll[10], coll[11],
-            coll[12], coll[13], coll[14], coll[15]
-        );
-    }
-
-
-    static Matrix4x4 build_transform_for_gltf_node(cgltf_data* gltf, cgltf_node* node)
-    {
-        Matrix4x4 parent_tform = Identity;
-        if (node->parent != null)
-        {
-            parent_tform = build_transform_for_gltf_node(gltf, node->parent);
-        }
-        if (node->has_matrix != 0)
-        {
-            return  FromGltfMatrix(node->matrix);
-        }
-        else
-        {
-            Matrix4x4 translate = Identity;
-            Matrix4x4 rotate = Identity;
-            Matrix4x4 scale = Identity;
-            if (node->has_translation != 0)
-            {
-                translate = Matrix4x4.CreateTranslation(new Vector3(node->translation[0], node->translation[1], node->translation[2]));
-            }
-            if (node->has_rotation != 0)
-            {
-                rotate = Matrix4x4.CreateFromQuaternion(new Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]));
-            }
-            if (node->has_scale != 0)
-            {
-                scale = Matrix4x4.CreateScale(new Vector3(node->scale[0], node->scale[1], node->scale[2]));
-            }
-
-            // TBD elix22
-            // NOTE: not sure if the multiplication order is correct
-            return parent_tform * scale * rotate * translate;
-        }
-    }
-
-
-    // parse the GLTF buffer definitions and start loading buffer blobs
-    static void gltf_parse_buffers(cgltf_data* gltf)
-    {
-        if (gltf->buffer_views_count > SCENE_MAX_BUFFERS)
-        {
-            state.failed = true;
-            return;
-        }
-        // load-callback for GLTF buffer files
-
-
-        // parse the buffer-view attributes
-        state.scene.num_buffers = (int)gltf->buffer_views_count;
-        for (int i = 0; i < state.scene.num_buffers; i++)
-        {
-            cgltf_buffer_view* gltf_buf_view = &gltf->buffer_views[i];
-            buffer_creation_params_t* p = (buffer_creation_params_t*)Unsafe.AsPointer(ref state.creation_params.buffers[i]);
-            p->gltf_buffer_index = gltf_buffer_index(gltf, gltf_buf_view->buffer);
-            p->offset = (int)gltf_buf_view->offset;
-            p->size = (int)gltf_buf_view->size;
-            if (gltf_buf_view->type == cgltf_buffer_view_type.cgltf_buffer_view_type_indices)
-            {
-                p->usage.index_buffer = true;
-            }
-            else
-            {
-                p->usage.vertex_buffer = true;
-            }
-            // allocate a sokol-gfx buffer handle
-            state.scene.buffers[i] = sg_alloc_buffer();
-        }
-
-        // start loading all buffers
-        for (uint i = 0; i < gltf->buffers_count; i++)
-        {
-            cgltf_buffer* gltf_buf = &gltf->buffers[i];
-            gltf_buffer_fetch_userdata_t user_data = new gltf_buffer_fetch_userdata_t
-            {
-                buffer_index = i
-            };
-
-            sfetch_request_t request = new sfetch_request_t();
-            request.path = util_get_file_path(Path.Combine("gltf", "DamagedHelmet", gltf_buf->uri.String()));
-            request.callback = &gltf_buffer_fetch_callback;
-            request.user_data.ptr = Unsafe.AsPointer(ref user_data);
-            request.user_data.size = (uint)Marshal.SizeOf<gltf_buffer_fetch_userdata_t>();
-
-            sfetch_send(request);
-
-        }
-    }
-
-    // parse all the image-related stuff in the GLTF data
-
-    // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#samplerminfilter
-    static sg_filter gltf_to_sg_min_filter(cgltf_filter_type gltf_filter)
-    {
-        switch (gltf_filter)
-        {
-            case cgltf_filter_type.cgltf_filter_type_nearest: return SG_FILTER_NEAREST;
-            case cgltf_filter_type.cgltf_filter_type_linear: return SG_FILTER_LINEAR;
-            default: return SG_FILTER_LINEAR;
-        }
-    }
-
-    static sg_filter gltf_to_sg_mag_filter(cgltf_filter_type gltf_filter)
-    {
-        switch (gltf_filter)
-        {
-            case cgltf_filter_type.cgltf_filter_type_nearest: return SG_FILTER_NEAREST;
-            case cgltf_filter_type.cgltf_filter_type_linear: return SG_FILTER_LINEAR;
-            default: return SG_FILTER_LINEAR;
-        }
-    }
-
-    static sg_filter gltf_to_sg_mipmap_filter(cgltf_filter_type gltf_filter)
-    {
-        switch (gltf_filter)
-        {
-            case cgltf_filter_type.cgltf_filter_type_nearest:
-            case cgltf_filter_type.cgltf_filter_type_linear:
-            case cgltf_filter_type.cgltf_filter_type_nearest_mipmap_nearest:
-            case cgltf_filter_type.cgltf_filter_type_linear_mipmap_nearest:
-                return SG_FILTER_NEAREST;
-            case cgltf_filter_type.cgltf_filter_type_nearest_mipmap_linear:
-            case cgltf_filter_type.cgltf_filter_type_linear_mipmap_linear:
-                return SG_FILTER_LINEAR;
-            default: return SG_FILTER_LINEAR;
-        }
-    }
-
-    // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#samplerwraps
-    static sg_wrap gltf_to_sg_wrap(cgltf_wrap_mode gltf_wrap)
-    {
-        switch (gltf_wrap)
-        {
-            case cgltf_wrap_mode.cgltf_wrap_mode_clamp_to_edge: return SG_WRAP_CLAMP_TO_EDGE;
-            case cgltf_wrap_mode.cgltf_wrap_mode_mirrored_repeat: return SG_WRAP_MIRRORED_REPEAT;
-            case cgltf_wrap_mode.cgltf_wrap_mode_repeat: return SG_WRAP_REPEAT;
-            default: return SG_WRAP_REPEAT;
-        }
-    }
-
-    static void gltf_parse_images(cgltf_data* gltf)
-    {
-        if (gltf->textures_count > SCENE_MAX_IMAGES)
-        {
-            state.failed = true;
-            return;
-        }
-
-        static image_sampler_creation_params_t* AsPointer(ref image_sampler_creation_params_t p)
-        {
-            return (image_sampler_creation_params_t*)Unsafe.AsPointer(ref p);
-        }
-
-        // parse the texture and sampler attributes
-        state.scene.num_images = (int)gltf->textures_count;
-        for (int i = 0; i < state.scene.num_images; i++)
-        {
-            cgltf_texture* gltf_tex = &gltf->textures[i];
-            image_sampler_creation_params_t* p = AsPointer(ref state.creation_params.images[i]);
-            p->gltf_image_index = gltf_image_index(gltf, gltf_tex->image);
-            p->min_filter = gltf_to_sg_min_filter(gltf_tex->sampler->min_filter);
-            p->mag_filter = gltf_to_sg_mag_filter(gltf_tex->sampler->mag_filter);
-            p->mipmap_filter = gltf_to_sg_mipmap_filter(gltf_tex->sampler->min_filter);
-            p->wrap_s = gltf_to_sg_wrap(gltf_tex->sampler->wrap_s);
-            p->wrap_t = gltf_to_sg_wrap(gltf_tex->sampler->wrap_t);
-            state.scene.images[i].img.id = SG_INVALID_ID;
-            state.scene.images[i].smp.id = SG_INVALID_ID;
-            state.scene.images[i].tex_view.id = SG_INVALID_ID;
-        }
-
-        // start loading all images
-        for (cgltf_size i = 0; i < gltf->images_count; i++)
-        {
-            cgltf_image* gltf_img = &gltf->images[i];
-            gltf_image_fetch_userdata_t user_data = new gltf_image_fetch_userdata_t
-            {
-                image_index = i
-            };
-
-            sfetch_request_t request = new sfetch_request_t();
-            request.path = util_get_file_path(Path.Combine("gltf", "DamagedHelmet", gltf_img->uri.String()));
-            request.callback = &gltf_image_fetch_callback;
-            request.user_data.ptr = Unsafe.AsPointer(ref user_data);
-            request.user_data.size = (uint)Marshal.SizeOf<gltf_buffer_fetch_userdata_t>();
-
-            sfetch_send(request);
-        }
-    }
-
-    // parse GLTF materials into our own material definition
-    static void gltf_parse_materials(cgltf_data* gltf)
-    {
-        if (gltf->materials_count > SCENE_MAX_MATERIALS)
-        {
-            state.failed = true;
-            return;
-        }
-        state.scene.num_materials = (int)gltf->materials_count;
-        for (int i = 0; i < state.scene.num_materials; i++)
-        {
-            cgltf_material* gltf_mat = &gltf->materials[i];
-            material_t* scene_mat = (material_t*)Unsafe.AsPointer(ref state.scene.materials[i]);
-            scene_mat->is_metallic = gltf_mat->has_pbr_metallic_roughness  != 0;
-            if (scene_mat->is_metallic)
-            {
-                cgltf_pbr_metallic_roughness* src = &gltf_mat->pbr_metallic_roughness;
-                metallic_material_t* dst = &scene_mat->metallic;
-                for (int d = 0; d < 4; d++)
-                {
-                    dst->fs_params.base_color_factor[d] = src->base_color_factor[d];
-                }
-                for (int d = 0; d < 3; d++)
-                {
-                    dst->fs_params.emissive_factor[d] = gltf_mat->emissive_factor[d];
-                }
-                dst->fs_params.metallic_factor = src->metallic_factor;
-                dst->fs_params.roughness_factor = src->roughness_factor;
-                dst->images = new metallic_images_t()
-                {
-                    base_color = gltf_texture_index(gltf, src->base_color_texture.texture),
-                    metallic_roughness = gltf_texture_index(gltf, src->metallic_roughness_texture.texture),
-                    normal = gltf_texture_index(gltf, gltf_mat->normal_texture.texture),
-                    occlusion = gltf_texture_index(gltf, gltf_mat->occlusion_texture.texture),
-                    emissive = gltf_texture_index(gltf, gltf_mat->emissive_texture.texture)
-                };
-            }
-        }
-    }
-
-    // parse GLTF meshes into our own mesh and submesh definition
-    static void gltf_parse_meshes(cgltf_data* gltf)
-    {
-        if (gltf->meshes_count > SCENE_MAX_MESHES)
-        {
-            state.failed = true;
-            return;
-        }
-        state.scene.num_meshes = (int)gltf->meshes_count;
-        for (cgltf_size mesh_index = 0; mesh_index < gltf->meshes_count; mesh_index++)
-        {
-            cgltf_mesh* gltf_mesh = &gltf->meshes[mesh_index];
-            if (((int)gltf_mesh->primitives_count + state.scene.num_primitives) > SCENE_MAX_PRIMITIVES)
-            {
-                state.failed = true;
-                return;
-            }
-            mesh_t* mesh = (mesh_t*)Unsafe.AsPointer(ref state.scene.meshes[mesh_index]);
-            mesh->first_primitive = state.scene.num_primitives;
-            mesh->num_primitives = (int)gltf_mesh->primitives_count;
-            for (cgltf_size prim_index = 0; prim_index < gltf_mesh->primitives_count; prim_index++)
-            {
-                cgltf_primitive* gltf_prim = &gltf_mesh->primitives[prim_index];
-                primitive_t* prim = (primitive_t*)Unsafe.AsPointer(ref state.scene.primitives[state.scene.num_primitives++]);
-
-                // // a mapping from sokol-gfx vertex buffer bind slots into the scene.buffers array
-                prim->vertex_buffers = create_vertex_buffer_mapping_for_gltf_primitive(gltf, gltf_prim);
-                // create or reuse a matching pipeline state object
-                prim->pipeline = create_sg_pipeline_for_gltf_primitive(gltf, gltf_prim, &prim->vertex_buffers);
-                // the material parameters
-                prim->material = gltf_material_index(gltf, gltf_prim->material);
-                // index buffer, base element, num elements
-                if (gltf_prim->indices != null)
-                {
-                    prim->index_buffer = gltf_bufferview_index(gltf, gltf_prim->indices->buffer_view);
-                    //     assert(state.creation_params.buffers[prim->index_buffer].type == SG_BUFFERTYPE_INDEXBUFFER);
-                    //     assert(gltf_prim->indices->stride != 0);
-                    prim->base_element = 0;
-                    prim->num_elements = (int)gltf_prim->indices->count;
-                }
-                else
-                {
-                    // hmm... looking up the number of elements to render from
-                    // a random vertex component accessor looks a bit shady
-                    prim->index_buffer = SCENE_INVALID_INDEX;
-                    prim->base_element = 0;
-                    prim->num_elements = (int)gltf_prim->attributes->data->count;
-                }
-            }
-        }
-    }
-
-    // creates a vertex buffer bind slot mapping for a specific GLTF primitive
-    static vertex_buffer_mapping_t create_vertex_buffer_mapping_for_gltf_primitive(cgltf_data* gltf, cgltf_primitive* prim)
-    {
-        vertex_buffer_mapping_t map = new vertex_buffer_mapping_t();
-        for (int i = 0; i < SG_MAX_VERTEXBUFFER_BINDSLOTS; i++)
-        {
-            map.buffer[i] = SCENE_INVALID_INDEX;
-        }
-        for (cgltf_size attr_index = 0; attr_index < prim->attributes_count; attr_index++)
-        {
-            cgltf_attribute* attr = &prim->attributes[attr_index];
-            cgltf_accessor* acc = attr->data;
-            int buffer_view_index = gltf_bufferview_index(gltf, acc->buffer_view);
-            int i = 0;
-            for (; i < map.num; i++)
-            {
-                if (map.buffer[i] == buffer_view_index)
-                {
-                    break;
-                }
-            }
-            if ((i == map.num) && (map.num < SG_MAX_VERTEXBUFFER_BINDSLOTS))
-            {
-                map.buffer[map.num++] = buffer_view_index;
-            }
-            // assert(map.num <= SG_MAX_VERTEXBUFFER_BINDSLOTS);
-        }
-        return map;
-    }
-
-    static int gltf_attr_type_to_vs_input_slot(cgltf_attribute_type attr_type)
-    {
-        switch (attr_type)
-        {
-            case cgltf_attribute_type.cgltf_attribute_type_position: return ATTR_cgltf_metallic_position;
-            case cgltf_attribute_type.cgltf_attribute_type_normal: return ATTR_cgltf_metallic_normal;
-            case cgltf_attribute_type.cgltf_attribute_type_texcoord: return ATTR_cgltf_metallic_texcoord;
-            default: return SCENE_INVALID_INDEX;
-        }
-    }
-
-    static sg_primitive_type gltf_to_prim_type(cgltf_primitive_type prim_type)
-    {
-        switch (prim_type)
-        {
-            case cgltf_primitive_type.cgltf_primitive_type_points: return SG_PRIMITIVETYPE_POINTS;
-            case cgltf_primitive_type.cgltf_primitive_type_lines: return SG_PRIMITIVETYPE_LINES;
-            case cgltf_primitive_type.cgltf_primitive_type_line_strip: return SG_PRIMITIVETYPE_LINE_STRIP;
-            case cgltf_primitive_type.cgltf_primitive_type_triangles: return SG_PRIMITIVETYPE_TRIANGLES;
-            case cgltf_primitive_type.cgltf_primitive_type_triangle_strip: return SG_PRIMITIVETYPE_TRIANGLE_STRIP;
-            default: return _SG_PRIMITIVETYPE_DEFAULT;
-        }
-    }
-
-    static sg_index_type gltf_to_index_type(cgltf_primitive* prim)
-    {
-        if (prim->indices != null)
-        {
-            if (prim->indices->component_type == cgltf_component_type.cgltf_component_type_r_16u)
-            {
-                return SG_INDEXTYPE_UINT16;
-            }
-            else
-            {
-                return SG_INDEXTYPE_UINT32;
-            }
-        }
-        else
-        {
-            return SG_INDEXTYPE_NONE;
-        }
-    }
-
-    static sg_vertex_format gltf_to_vertex_format(cgltf_accessor* acc)
-    {
-        switch (acc->component_type)
-        {
-            case cgltf_component_type.cgltf_component_type_r_8:
-                if (acc->type == cgltf_type.cgltf_type_vec4)
-                {
-                    return acc->normalized != 0 ? SG_VERTEXFORMAT_BYTE4N : SG_VERTEXFORMAT_BYTE4;
-                }
-                break;
-            case cgltf_component_type.cgltf_component_type_r_8u:
-                if (acc->type == cgltf_type.cgltf_type_vec4)
-                {
-                    return acc->normalized != 0 ? SG_VERTEXFORMAT_UBYTE4N : SG_VERTEXFORMAT_UBYTE4;
-                }
-                break;
-            case cgltf_component_type.cgltf_component_type_r_16:
-                switch (acc->type)
-                {
-                    case cgltf_type.cgltf_type_vec2: return acc->normalized != 0 ? SG_VERTEXFORMAT_SHORT2N : SG_VERTEXFORMAT_SHORT2;
-                    case cgltf_type.cgltf_type_vec4: return acc->normalized != 0 ? SG_VERTEXFORMAT_SHORT4N : SG_VERTEXFORMAT_SHORT4;
-                    default: break;
-                }
-                break;
-            case cgltf_component_type.cgltf_component_type_r_32f:
-                switch (acc->type)
-                {
-                    case cgltf_type.cgltf_type_scalar: return SG_VERTEXFORMAT_FLOAT;
-                    case cgltf_type.cgltf_type_vec2: return SG_VERTEXFORMAT_FLOAT2;
-                    case cgltf_type.cgltf_type_vec3: return SG_VERTEXFORMAT_FLOAT3;
-                    case cgltf_type.cgltf_type_vec4: return SG_VERTEXFORMAT_FLOAT4;
-                    default: break;
-                }
-                break;
-            default: break;
-        }
-        return SG_VERTEXFORMAT_INVALID;
-    }
-
-    // helper to compare to pipeline-cache items
-    static bool pipelines_equal(pipeline_cache_params_t* p0, pipeline_cache_params_t* p1)
-    {
-        if (p0->prim_type != p1->prim_type)
-        {
-            return false;
-        }
-        if (p0->alpha != p1->alpha)
-        {
-            return false;
-        }
-        if (p0->index_type != p1->index_type)
-        {
-            return false;
-        }
-        for (int i = 0; i < SG_MAX_VERTEX_ATTRIBUTES; i++)
-        {
-            sg_vertex_attr_state* a0 = (sg_vertex_attr_state*)Unsafe.AsPointer(ref p0->layout.attrs[i]);
-            sg_vertex_attr_state* a1 = (sg_vertex_attr_state*)Unsafe.AsPointer(ref p1->layout.attrs[i]);
-            if ((a0->buffer_index != a1->buffer_index) ||
-                (a0->offset != a1->offset) ||
-                (a0->format != a1->format))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-    static sg_vertex_layout_state create_sg_layout_for_gltf_primitive(cgltf_data* gltf, cgltf_primitive* prim, vertex_buffer_mapping_t* vbuf_map)
-    {
-        // assert(prim->attributes_count <= SG_MAX_VERTEX_ATTRIBUTES);
-        sg_vertex_layout_state layout = default;
-        for (cgltf_size attr_index = 0; attr_index < prim->attributes_count; attr_index++)
-        {
-            cgltf_attribute* attr = &prim->attributes[attr_index];
-            int attr_slot = gltf_attr_type_to_vs_input_slot(attr->type);
-            if (attr_slot != SCENE_INVALID_INDEX)
-            {
-                layout.attrs[attr_slot].format = gltf_to_vertex_format(attr->data);
-            }
-            int buffer_view_index = gltf_bufferview_index(gltf, attr->data->buffer_view);
-            for (int vb_slot = 0; vb_slot < vbuf_map->num; vb_slot++)
-            {
-                if (vbuf_map->buffer[vb_slot] == buffer_view_index)
-                {
-                    layout.attrs[attr_slot].buffer_index = vb_slot;
-                }
-            }
-        }
-        return layout;
-    }
-
-    // Create a unique sokol-gfx pipeline object for GLTF primitive (aka submesh),
-    // maintains a cache of shared, unique pipeline objects. Returns an index
-    // into state.scene.pipelines
-    static int create_sg_pipeline_for_gltf_primitive(cgltf_data* gltf, cgltf_primitive* prim, vertex_buffer_mapping_t* vbuf_map)
-    {
-        pipeline_cache_params_t pip_params = new pipeline_cache_params_t
-        {
-            layout = create_sg_layout_for_gltf_primitive(gltf, prim, vbuf_map),
-            prim_type = gltf_to_prim_type(prim->type),
-            index_type = gltf_to_index_type(prim),
-            alpha = prim->material->alpha_mode != cgltf_alpha_mode.cgltf_alpha_mode_opaque
-        };
-        int i = 0;
-        for (; i < state.scene.num_pipelines; i++)
-        {
-            if (pipelines_equal((pipeline_cache_params_t*)Unsafe.AsPointer(ref state.pip_cache.items[i]), &pip_params))
-            {
-                // an indentical pipeline already exists, reuse this
-                // assert(state.scene.pipelines[i].id != SG_INVALID_ID);
-                return i;
-            }
-        }
-        if ((i == state.scene.num_pipelines) && (state.scene.num_pipelines < SCENE_MAX_PIPELINES))
-        {
-            state.pip_cache.items[i] = pip_params;
-            bool is_metallic = prim->material->has_pbr_metallic_roughness  != 0;
-
-            sg_pipeline_desc desc = new sg_pipeline_desc()
-            {
-                layout = pip_params.layout,
-                shader = is_metallic ? state.shaders.metallic : state.shaders.specular,
-                primitive_type = pip_params.prim_type,
-                index_type = pip_params.index_type,
-                cull_mode = SG_CULLMODE_BACK,
-                face_winding = SG_FACEWINDING_CCW,
-                depth = new sg_depth_state
-                {
-                    write_enabled = !pip_params.alpha,
-                    compare = SG_COMPAREFUNC_LESS_EQUAL,
-                }
-            };
-            desc.colors[0].write_mask = pip_params.alpha ? sg_color_mask.SG_COLORMASK_RGB : 0;
-            desc.colors[0].blend.enabled = pip_params.alpha;
-            desc.colors[0].blend.src_factor_rgb = pip_params.alpha ? sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA : 0;
-            desc.colors[0].blend.dst_factor_rgb = pip_params.alpha ? sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA : 0;
-            state.scene.pipelines[i] = sg_make_pipeline(desc);
-
-            state.scene.num_pipelines++;
-        }
-        // assert(state.scene.num_pipelines <= SCENE_MAX_PIPELINES);
-        return i;
-    }
-
-    static sg_range Range(void* ptr, nuint size)
-    {
-        sg_range result = new sg_range()
-        {
-            ptr = ptr,
-            size = (uint)size
-        };
-        return result;
-    }
-
-    [UnmanagedCallersOnly]
-    static void gltf_image_fetch_callback(sfetch_response_t* response)
-    {
-        if (response->dispatched)
-        {
-            sfetch_bind_buffer(response->handle, SFETCH_RANGE(sfetch_buffers[response->channel, response->lane].Buffer));
-        }
-        else if (response->fetched)
-        {
-            gltf_image_fetch_userdata_t* user_data = (gltf_image_fetch_userdata_t*)response->user_data;
-            int gltf_image_index = (int)user_data->image_index;
-            create_sg_image_samplers_for_gltf_image(gltf_image_index, Range(response->data.ptr, response->data.size));
-        }
-        if (response->finished)
-        {
-            if (response->failed)
-            {
-                state.failed = true;
-            }
-        }
-    }
-
-    // create the sokol-gfx image objects associated with a GLTF image
-    static void create_sg_image_samplers_for_gltf_image(int gltf_image_index, sg_range data)
-    {
-        for (int i = 0; i < state.scene.num_images; i++)
-        {
-            image_sampler_creation_params_t* p = (image_sampler_creation_params_t*)Unsafe.AsPointer(ref state.creation_params.images[i]);
-            if (p->gltf_image_index == gltf_image_index)
-            {
-                state.scene.images[i].img = sbasisu_make_image(data);
-                state.scene.images[i].tex_view = sg_make_view(new sg_view_desc()
-                {
-                    texture = { image = state.scene.images[i].img }
-                });
-                state.scene.images[i].smp = sg_make_sampler(new sg_sampler_desc()
-                {
-                    min_filter = p->min_filter,
-                    mag_filter = p->mag_filter,
-                    mipmap_filter = p->mipmap_filter,
-                });
-            }
-        }
-    }
-
-
-    // compute indices from cgltf element pointers
-    static int gltf_buffer_index(cgltf_data* gltf, cgltf_buffer* buf)
-    {
-
-        return (int)(buf - gltf->buffers);
-    }
-
-
-    static int gltf_bufferview_index(cgltf_data* gltf, cgltf_buffer_view* buf_view)
-    {
-
-        return (int)(buf_view - gltf->buffer_views);
-    }
-
-    static int gltf_image_index(cgltf_data* gltf, cgltf_image* img)
-    {
-
-        return (int)(img - gltf->images);
-    }
-
-    static int gltf_texture_index(cgltf_data* gltf, cgltf_texture* tex)
-    {
-
-        return (int)(tex - gltf->textures);
-    }
-
-    static int gltf_material_index(cgltf_data* gltf, cgltf_material* mat)
-    {
-
-        return (int)(mat - gltf->materials);
-    }
-
-    static int gltf_mesh_index(cgltf_data* gltf, cgltf_mesh* mesh)
-    {
-
-        return (int)(mesh - gltf->meshes);
-    }
-
-    // create the sokol-gfx buffer objects associated with a GLTF buffer view
-    static void create_sg_buffers_for_gltf_buffer(int gltf_buffer_index, sg_range data)
-    {
-        for (int i = 0; i < state.scene.num_buffers; i++)
-        {
-            buffer_creation_params_t* p = (buffer_creation_params_t*)Unsafe.AsPointer(ref state.creation_params.buffers[i]);
-            if (p->gltf_buffer_index == gltf_buffer_index)
-            {
-                //     assert((size_t)(p->offset + p->size) <= data.size);
-                sg_init_buffer(state.scene.buffers[i], new sg_buffer_desc()
-                {
-                    usage = p->usage,
-                    data = {
-                    ptr = (byte*)data.ptr + p->offset,
-                    size = (nuint)p->size,
-                }
-                });
-            }
-        }
-    }
-
+    // ==========================================
+    // Old inline GLTF parsing functions removed
+    // Now using CGltfParser.cs for all GLTF operations
+    // ==========================================
 
     public static SApp.sapp_desc sokol_main()
+
     {
         return new SApp.sapp_desc()
         {
