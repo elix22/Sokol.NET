@@ -15,7 +15,6 @@ using static Sokol.Utils;
 using System.Diagnostics;
 using static Sokol.SLog;
 using static Sokol.SDebugUI;
-using Assimp.Configs;
 using static Sokol.SFetch;
 using static Sokol.SDebugText;
 
@@ -94,13 +93,13 @@ namespace Sokol
             VertexBuffer = sg_make_buffer(new sg_buffer_desc()
             {
                 data = SG_RANGE(vertices),
-                label = "assimp-simple-vertex-buffer"
+                label = "cgltf-simple-vertex-buffer"
             });
             IndexBuffer = sg_make_buffer(new sg_buffer_desc()
             {
                 usage = new sg_buffer_usage { index_buffer = true },
                 data = SG_RANGE(indices),
-                label = "assimp-simple-index-buffer"
+                label = "cgltf-simple-index-buffer"
             });
 
             VertexCount = vertices.Length;

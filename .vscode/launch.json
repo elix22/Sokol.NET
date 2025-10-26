@@ -82,7 +82,8 @@
                 "mrt",
                 "assimp_simple",
                 "assimp_animation",
-                "assimp_scene"
+                "assimp_scene",
+                "cgltf_scene"
             ],
             "default": "cube"
         },
