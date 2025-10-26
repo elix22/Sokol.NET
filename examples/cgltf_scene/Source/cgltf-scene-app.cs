@@ -72,7 +72,7 @@ public static unsafe class CGLTFSceneApp
         public Shaders shaders;
         public CGltfScene scene = new CGltfScene();
         public Camera camera = new Camera();
-        // public cgltf_light_params_t point_light; // DEBUG: Commented out while testing raw texture
+        public cgltf_light_params_t point_light;
         public Matrix4x4 root_transform;
         public float rx;
         public float ry;
@@ -137,12 +137,12 @@ public static unsafe class CGLTFSceneApp
         _parser = new CGltfParser();
         _parser.Init(state.shaders.metallic, state.shaders.metallic); // Using metallic shader for both for now
 
-        // DEBUG: Light setup commented out while testing raw texture output
-        // state.point_light = default;
-        // state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
-        // state.point_light.light_range = 200.0f;
-        // state.point_light.light_color = new Vector3(1.0f, 1.5f, 2.0f);
-        // state.point_light.light_intensity = 700.0f;
+        // Setup light (following camera position)
+        state.point_light = default;
+        state.point_light.light_pos = new Vector3(0.0f, 10.0f, 10.0f);
+        state.point_light.light_range = 200.0f;
+        state.point_light.light_color = new Vector3(1.0f, 1.0f, 1.0f);
+        state.point_light.light_intensity = 10.0f;
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
@@ -289,9 +289,12 @@ public static unsafe class CGLTFSceneApp
                         bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
                     }
                     
-                    // Apply VS uniforms (DEBUG: light_params commented out)
+                    // Update light to follow camera
+                    state.point_light.light_pos = state.camera.EyePos;
+                    
+                    // Apply uniforms
                     sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
-                    // sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
                     
                     if (mat.IsMetallic)
                     {
