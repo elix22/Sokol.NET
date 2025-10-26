@@ -39,212 +39,6 @@ public static unsafe class CGLTFSceneApp
     const string filename = "assimpScene.glb";
 
     const int SCENE_INVALID_INDEX = -1;
-    const int SCENE_MAX_BUFFERS = 128;      // Increased to match CGltfSceneLimits.MAX_BUFFERS
-    const int SCENE_MAX_IMAGES = 64;        // Increased to match CGltfSceneLimits.MAX_IMAGES
-    const int SCENE_MAX_MATERIALS = 64;     // Increased to match CGltfSceneLimits.MAX_MATERIALS
-    const int SCENE_MAX_PIPELINES = 64;     // Increased to match CGltfSceneLimits.MAX_PIPELINES
-    const int SCENE_MAX_PRIMITIVES = 256;   // Increased to match CGltfSceneLimits.MAX_PRIMITIVES
-    const int SCENE_MAX_MESHES = 128;       // Increased to match CGltfSceneLimits.MAX_MESHES
-    const int SCENE_MAX_NODES = 256;        // Increased to match CGltfSceneLimits.MAX_NODES
-
-    // statically allocated buffers for file downloads
-    // Must match FileSystem configuration (2 channels, 2 lanes)
-    const int SFETCH_NUM_CHANNELS = 2;
-    const int SFETCH_NUM_LANES = 2;
-    const int MAX_FILE_SIZE = 1024 * 1024;
-    static SharedBuffer[,] sfetch_buffers = new SharedBuffer[SFETCH_NUM_CHANNELS, SFETCH_NUM_LANES];
-
-    // per-material texture indices into scene.images for metallic material
-    public struct metallic_images_t
-    {
-        public int base_color;
-        public int metallic_roughness;
-        public int normal;
-        public int occlusion;
-        public int emissive;
-    }
-
-    // per-material texture indices into scene.images for specular material
-    public struct specular_images_t
-    {
-        public readonly int diffuse;
-        public readonly int specular_glossiness;
-        public readonly int normal;
-        public readonly int occlusion;
-        public readonly int emissive;
-    }
-
-    // fragment-shader-params and textures for metallic material
-    public struct metallic_material_t
-    {
-        public metallic_material_t()
-        {
-
-        }
-        public cgltf_metallic_params_t fs_params = new cgltf_metallic_params_t();
-        public metallic_images_t images = new metallic_images_t();
-    }
-
-
-
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct material_t
-    {
-        public material_t()
-        {
-
-        }
-        public bool is_metallic;
-        // In C this was a union; here we select the metallic material.
-        public metallic_material_t metallic = new metallic_material_t();
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct vertex_buffer_mapping_t
-    {
-        public vertex_buffer_mapping_t()
-        {
-            buffer = new int[SG_MAX_VERTEXBUFFER_BINDSLOTS];
-        }
-        public int num;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SG_MAX_VERTEXBUFFER_BINDSLOTS)]
-        public int[] buffer = new int[SG_MAX_VERTEXBUFFER_BINDSLOTS];
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct primitive_t
-    {
-        public int pipeline;           // index into scene.pipelines array
-        public int material;           // index into scene.materials array
-        public vertex_buffer_mapping_t vertex_buffers; // indices into bufferview array by vbuf bind slot
-        public int index_buffer;       // index into bufferview array for index buffer, or SCENE_INVALID_INDEX
-        public int base_element;       // index of first index or vertex to draw
-        public int num_elements;       // number of vertices or indices to draw
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct mesh_t
-    {
-        public int first_primitive;    // index into scene.primitives
-        public int num_primitives;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct node_t
-    {
-        public int mesh;           // index into scene.meshes
-        public Matrix4x4 transform;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct image_t
-    {
-        public sg_image img;
-        public sg_view tex_view;
-        public sg_sampler smp;
-    }
-
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct scene_t
-    {
-        public scene_t()
-        {
-            buffers = new sg_buffer[SCENE_MAX_BUFFERS];
-            images = new image_t[SCENE_MAX_IMAGES];
-            pipelines = new sg_pipeline[SCENE_MAX_PIPELINES];
-            materials = new material_t[SCENE_MAX_MATERIALS];
-            primitives = new primitive_t[SCENE_MAX_PRIMITIVES];
-            meshes = new mesh_t[SCENE_MAX_MESHES];
-            nodes = new node_t[SCENE_MAX_NODES];
-
-            for (int i = 0; i < SCENE_MAX_BUFFERS; i++)
-            {
-                buffers[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_IMAGES; i++)
-            {
-                images[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_PIPELINES; i++)
-            {
-                pipelines[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_MATERIALS; i++)
-            {
-                materials[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_PRIMITIVES; i++)
-            {
-                primitives[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_MESHES; i++)
-            {
-                meshes[i] = default;
-            }
-
-            for (int i = 0; i < SCENE_MAX_NODES; i++)
-            {
-                nodes[i] = default;
-            }
-        }
-        public int num_buffers;
-        public int num_images;
-        public int num_pipelines;
-        public int num_materials;
-        public int num_primitives; // aka 'submeshes'
-        public int num_meshes;
-        public int num_nodes;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_BUFFERS)]
-        public sg_buffer[] buffers;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_IMAGES)]
-        public image_t[] images;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_PIPELINES)]
-        public sg_pipeline[] pipelines;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_MATERIALS)]
-        public material_t[] materials;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_PRIMITIVES)]
-        public primitive_t[] primitives;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_MESHES)]
-        public mesh_t[] meshes;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_NODES)]
-        public node_t[] nodes;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct buffer_creation_params_t
-    {
-        public sg_buffer_usage usage;
-        public int offset;
-        public int size;
-        public int gltf_buffer_index;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct image_sampler_creation_params_t
-    {
-        public sg_filter min_filter;
-        public sg_filter mag_filter;
-        public sg_filter mipmap_filter;
-        public sg_wrap wrap_s;
-        public sg_wrap wrap_t;
-        public int gltf_image_index;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct pipeline_cache_params_t
-    {
-        public sg_vertex_layout_state layout;
-        public sg_primitive_type prim_type;
-        public sg_index_type index_type;
-        public bool alpha;
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct PassActions
@@ -260,39 +54,6 @@ public static unsafe class CGLTFSceneApp
         public sg_shader specular;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public class CreationParams
-    {
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_BUFFERS)]
-        public buffer_creation_params_t[] buffers;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_IMAGES)]
-        public image_sampler_creation_params_t[] images;
-        public CreationParams()
-        {
-            buffers = new buffer_creation_params_t[SCENE_MAX_BUFFERS];
-            for (int i = 0; i < SCENE_MAX_BUFFERS; i++)
-            {
-                buffers[i] = new buffer_creation_params_t();
-            }
-
-            images = new image_sampler_creation_params_t[SCENE_MAX_IMAGES];
-            for (int i = 0; i < SCENE_MAX_IMAGES; i++)
-            {
-                images[i] = new image_sampler_creation_params_t();
-            }
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct PipCache
-    {
-        public PipCache()
-        {
-
-        }
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = SCENE_MAX_PIPELINES)]
-        public pipeline_cache_params_t[] items = new pipeline_cache_params_t[SCENE_MAX_PIPELINES];
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Placeholders
@@ -309,15 +70,12 @@ public static unsafe class CGLTFSceneApp
         public bool failed;
         public PassActions pass_actions;
         public Shaders shaders;
-        public sg_sampler smp;
-        public scene_t scene = new scene_t();
+        public CGltfScene scene = new CGltfScene();
         public Camera camera = new Camera();
         // public cgltf_light_params_t point_light;     // Disabled - using unlit shader
         public Matrix4x4 root_transform;
         public float rx;
         public float ry;
-        public CreationParams creation_params = new CreationParams();
-        public PipCache pip_cache = new PipCache();
         public Placeholders placeholders = new Placeholders();
     }
 
@@ -329,131 +87,19 @@ public static unsafe class CGLTFSceneApp
     static double averageFrameTimeMilliseconds = 33.333;
     static ulong startTime = 0;
 
-    // Copy CGltfParser scene data to inline state structure
-    static void CopyParserSceneToState(CGltfScene parserScene)
-    {
-        try
-        {
-            // Copy buffers
-            state.scene.num_buffers = parserScene.NumBuffers;
-            for (int i = 0; i < parserScene.NumBuffers; i++)
-            {
-                state.scene.buffers[i] = parserScene.Buffers[i];
-            }
-            
-            // Copy images
-            state.scene.num_images = parserScene.NumImages;
-            for (int i = 0; i < parserScene.NumImages; i++)
-            {
-                state.scene.images[i].img = parserScene.Images[i].Image;
-                state.scene.images[i].smp = parserScene.Images[i].Sampler;
-                state.scene.images[i].tex_view = parserScene.Images[i].TexView;
-            }
-            
-            // Copy materials
-            state.scene.num_materials = parserScene.NumMaterials;
-            for (int i = 0; i < parserScene.NumMaterials; i++)
-            {
-                var parserMat = parserScene.Materials[i];
-                ref material_t stateMat = ref state.scene.materials[i];
-                
-                stateMat.is_metallic = parserMat.IsMetallic;
-                if (parserMat.IsMetallic)
-                {
-                    stateMat.metallic.fs_params = parserMat.Metallic.FsParams;
-                    stateMat.metallic.images.base_color = parserMat.Metallic.Images.BaseColor;
-                    stateMat.metallic.images.metallic_roughness = parserMat.Metallic.Images.MetallicRoughness;
-                    stateMat.metallic.images.normal = parserMat.Metallic.Images.Normal;
-                    stateMat.metallic.images.occlusion = parserMat.Metallic.Images.Occlusion;
-                    stateMat.metallic.images.emissive = parserMat.Metallic.Images.Emissive;
-                }
-            }
-            
-            // Copy pipelines
-            state.scene.num_pipelines = parserScene.NumPipelines;
-            for (int i = 0; i < parserScene.NumPipelines; i++)
-            {
-                state.scene.pipelines[i] = parserScene.Pipelines[i];
-            }
-            
-            // Copy primitives
-            state.scene.num_primitives = parserScene.NumPrimitives;
-            for (int i = 0; i < parserScene.NumPrimitives; i++)
-            {
-                var parserPrim = parserScene.Primitives[i];
-                ref primitive_t statePrim = ref state.scene.primitives[i];
-                
-                statePrim.pipeline = parserPrim.PipelineIndex;
-                statePrim.material = parserPrim.MaterialIndex;
-                statePrim.index_buffer = parserPrim.IndexBuffer;
-                statePrim.base_element = parserPrim.BaseElement;
-                statePrim.num_elements = parserPrim.NumElements;
-                
-                // Copy vertex buffer mapping
-                if (statePrim.vertex_buffers.buffer == null)
-                {
-                    statePrim.vertex_buffers.buffer = new int[SG_MAX_VERTEXBUFFER_BINDSLOTS];
-                }
-                
-                statePrim.vertex_buffers.num = parserPrim.VertexBuffers.Num;
-                if (parserPrim.VertexBuffers.BufferIndices != null)
-                {
-                    for (int j = 0; j < parserPrim.VertexBuffers.Num; j++)
-                    {
-                        statePrim.vertex_buffers.buffer[j] = parserPrim.VertexBuffers.BufferIndices[j];
-                    }
-                }
-            }
-            
-            // Copy meshes
-            state.scene.num_meshes = parserScene.NumMeshes;
-            for (int i = 0; i < parserScene.NumMeshes; i++)
-            {
-                var parserMesh = parserScene.Meshes[i];
-                ref mesh_t stateMesh = ref state.scene.meshes[i];
-                
-                stateMesh.first_primitive = parserMesh.FirstPrimitive;
-                stateMesh.num_primitives = parserMesh.NumPrimitives;
-            }
-            
-            // Copy nodes
-            state.scene.num_nodes = parserScene.NumNodes;
-            for (int i = 0; i < parserScene.NumNodes; i++)
-            {
-                var parserNode = parserScene.Nodes[i];
-                ref node_t stateNode = ref state.scene.nodes[i];
-                
-                stateNode.mesh = parserNode.MeshIndex;
-                stateNode.transform = parserNode.Transform;
-            }
-        }
-        catch (Exception ex)
-        {
-            Error($"Error copying parser scene to state: {ex.Message}");
-            Error($"Stack trace: {ex.StackTrace}");
-        }
-    }
-
     [UnmanagedCallersOnly]
     private static unsafe void Init()
     {
-        for (int i = 0; i < SFETCH_NUM_CHANNELS; i++)
-        {
-            for (int j = 0; j < SFETCH_NUM_LANES; j++)
-            {
-                sfetch_buffers[i, j] = SharedBuffer.Create(MAX_FILE_SIZE);
-            }
-        }
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
-              logger = {
+            logger = {
                 func = &slog_func,
             }
         });
 
         stm_setup();
-         var start_time = stm_now();
+        var start_time = stm_now();
 
         state.camera.Init(new CameraDesc()
         {
@@ -502,15 +148,17 @@ public static unsafe class CGLTFSceneApp
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
-        _parser.LoadFromFileAsync(gltfFilePath, 
-            onComplete: (scene) => {
-                // Copy CGltfParser scene data to state.scene so existing rendering code works
-                CopyParserSceneToState(scene);
-            },
-            onFailed: (error) => {
-                Error($"Failed to load GLTF scene: {error}");
-                state.failed = true;
-            });
+
+        _parser.LoadFromFileAsync(gltfFilePath, state.scene,
+    onComplete: () =>
+    {
+
+    },
+    onFailed: (error) =>
+    {
+        Error($"Failed to load GLTF scene: {error}");
+        state.failed = true;
+    });
 
         // create placeholder textures and sampler
         uint[] pixels = new uint[64];
@@ -524,10 +172,10 @@ public static unsafe class CGLTFSceneApp
         img_desc.height = 8;
         img_desc.pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
         img_desc.data.mip_levels[0] = SG_RANGE(pixels);
-       
+
         state.placeholders.white = sg_make_view(new sg_view_desc()
         {
-            texture = 
+            texture =
             {
                 image = sg_make_image(img_desc)
             }
@@ -539,7 +187,7 @@ public static unsafe class CGLTFSceneApp
         }
         state.placeholders.black = sg_make_view(new sg_view_desc()
         {
-            texture = 
+            texture =
             {
                 image = sg_make_image(img_desc)
             }
@@ -557,7 +205,7 @@ public static unsafe class CGLTFSceneApp
 
         state.placeholders.normal = sg_make_view(new sg_view_desc()
         {
-            texture = 
+            texture =
             {
                 image = sg_make_image(img_desc)
             }
@@ -571,17 +219,12 @@ public static unsafe class CGLTFSceneApp
 
     }
 
-    static void update_scene()
-    {
-
-        state.root_transform = Matrix4x4.CreateRotationY(state.rx);
-    }
 
     static cgltf_vs_params_t vs_params_for_node(int node_index)
     {
         return new cgltf_vs_params_t
         {
-            model = state.root_transform * state.scene.nodes[node_index].transform,
+            model = state.root_transform * state.scene.Nodes[node_index].Transform,
             view_proj = state.camera.ViewProj,
             eye_pos = state.camera.EyePos
         };
@@ -592,10 +235,10 @@ public static unsafe class CGLTFSceneApp
     {
         // if (PauseUpdate) return;
         // pump the sokol-fetch message queue
-        sfetch_dowork();
+        FileSystem.Instance.Update();
 
-        startTime = (startTime == 0)?stm_now():startTime;
-        
+        startTime = (startTime == 0) ? stm_now() : startTime;
+
         var begin_frame = stm_now();
 
         // print help text
@@ -607,7 +250,8 @@ public static unsafe class CGLTFSceneApp
         sdtx_print("FPS: {0} \n", frameRate);
         sdtx_print("Avg. Frame Time: {0:F4} ms\n", averageFrameTimeMilliseconds);
 
-        update_scene();
+        state.root_transform = Matrix4x4.CreateRotationY(state.rx);
+
         int fb_width = sapp_width();
         int fb_height = sapp_height();
         state.camera.Update(fb_width, fb_height);
@@ -623,85 +267,85 @@ public static unsafe class CGLTFSceneApp
         else
         {
             sg_begin_pass(new sg_pass { action = state.pass_actions.ok, swapchain = sglue_swapchain() });
-            
-            
-            for (int node_index = 0; node_index < state.scene.num_nodes; node_index++)
+
+
+            for (int node_index = 0; node_index < state.scene.NumNodes; node_index++)
             {
-                node_t* node = (node_t*)Unsafe.AsPointer(ref state.scene.nodes[node_index]);
+                ref CGltfNode node = ref state.scene.Nodes[node_index];
                 cgltf_vs_params_t vs_params = vs_params_for_node(node_index);
-                mesh_t* mesh = (mesh_t*)Unsafe.AsPointer(ref state.scene.meshes[node->mesh]);
-                
-                for (int i = 0; i < mesh->num_primitives; i++)
+                ref CGltfMesh mesh = ref state.scene.Meshes[node.MeshIndex];
+
+                for (int i = 0; i < mesh.NumPrimitives; i++)
                 {
-                    primitive_t* prim = (primitive_t*)Unsafe.AsPointer(ref state.scene.primitives[i + mesh->first_primitive]);
-                    material_t* mat = (material_t*)Unsafe.AsPointer(ref state.scene.materials[prim->material]);
-                    
-                    sg_apply_pipeline(state.scene.pipelines[prim->pipeline]);
+                    ref CGltfPrimitive prim = ref state.scene.Primitives[i + mesh.FirstPrimitive];
+                    ref CGltfMaterial mat = ref state.scene.Materials[prim.MaterialIndex];
+
+                    sg_apply_pipeline(state.scene.Pipelines[prim.PipelineIndex]);
                     sg_bindings bind = default;
-                    for (int vb_slot = 0; vb_slot < prim->vertex_buffers.num; vb_slot++)
+                    for (int vb_slot = 0; vb_slot < prim.VertexBuffers.Num; vb_slot++)
                     {
-                        bind.vertex_buffers[vb_slot] = state.scene.buffers[prim->vertex_buffers.buffer[vb_slot]];
+                        bind.vertex_buffers[vb_slot] = state.scene.Buffers[prim.VertexBuffers.BufferIndices[vb_slot]];
                     }
-                    if (prim->index_buffer != SCENE_INVALID_INDEX)
+                    if (prim.IndexBuffer != SCENE_INVALID_INDEX)
                     {
-                        bind.index_buffer = state.scene.buffers[prim->index_buffer];
+                        bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
                     }
                     sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
                     // sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() }); // Disabled - using unlit shader
-                    if (mat->is_metallic)
+                    if (mat.IsMetallic)
                     {
                         // Debug: Log texture indices for first material
-                        // if (prim->material == 0 && i == 0 && node_index == 0)
+                        // if (prim.MaterialIndex == 0 && i == 0 && node_index == 0)
                         // {
-                        //     Info($"Material 0 texture indices: base_color={mat->metallic.images.base_color}, metallic_roughness={mat->metallic.images.metallic_roughness}, normal={mat->metallic.images.normal}");
+                        //     Info($"Material 0 texture indices: base_color={mat.Metallic.Images.BaseColor}, metallic_roughness={mat.Metallic.Images.MetallicRoughness}, normal={mat.Metallic.Images.Normal}");
                         //     Info($"Material 0 factors: base_color=({mat->metallic.fs_params.base_color_factor.X},{mat->metallic.fs_params.base_color_factor.Y},{mat->metallic.fs_params.base_color_factor.Z},{mat->metallic.fs_params.base_color_factor.W})");
                         //     Info($"Material 0 factors: metallic={mat->metallic.fs_params.metallic_factor}, roughness={mat->metallic.fs_params.roughness_factor}");
-                        //     if (mat->metallic.images.base_color != SCENE_INVALID_INDEX)
+                        //     if (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX)
                         //     {
-                        //         Info($"  base_color tex_view.id={state.scene.images[mat->metallic.images.base_color].tex_view.id}");
-                        //         Info($"  base_color img.id={state.scene.images[mat->metallic.images.base_color].img.id}");
+                        //         Info($"  base_color tex_view.id={state.scene.Images[mat.Metallic.Images.BaseColor].TexView.id}");
+                        //         Info($"  base_color img.id={state.scene.Images[mat.Metallic.Images.BaseColor].img.id}");
                         //     }
                         // }
-                        
+
                         // Get texture views and samplers, using placeholders if texture is not present (index == -1)
-                        sg_view base_color_tex = mat->metallic.images.base_color != SCENE_INVALID_INDEX 
-                            ? state.scene.images[mat->metallic.images.base_color].tex_view 
+                        sg_view base_color_tex = mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.BaseColor].TexView
                             : state.placeholders.white;
-                        
+
                         // Debug: Log if we're using placeholder
-                        if (prim->material == 0 && i == 0 && node_index == 0)
+                        if (prim.MaterialIndex == 0 && i == 0 && node_index == 0)
                         {
-                            bool isPlaceholder = (mat->metallic.images.base_color == SCENE_INVALID_INDEX);
+                            bool isPlaceholder = (mat.Metallic.Images.BaseColor == SCENE_INVALID_INDEX);
                             // Info($"  Using {(isPlaceholder ? "PLACEHOLDER" : "REAL TEXTURE")} for base_color, tex_view.id={base_color_tex.id}");
                         }
-                        
-                        sg_view metallic_roughness_tex = mat->metallic.images.metallic_roughness != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.metallic_roughness].tex_view
+
+                        sg_view metallic_roughness_tex = mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.MetallicRoughness].TexView
                             : state.placeholders.white;
-                        sg_view normal_tex = mat->metallic.images.normal != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.normal].tex_view
+                        sg_view normal_tex = mat.Metallic.Images.Normal != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Normal].TexView
                             : state.placeholders.normal;
-                        sg_view occlusion_tex = mat->metallic.images.occlusion != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.occlusion].tex_view
+                        sg_view occlusion_tex = mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Occlusion].TexView
                             : state.placeholders.white;
-                        sg_view emissive_tex = mat->metallic.images.emissive != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.emissive].tex_view
+                        sg_view emissive_tex = mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Emissive].TexView
                             : state.placeholders.black;
-                        
-                        sg_sampler base_color_smp = mat->metallic.images.base_color != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.base_color].smp
+
+                        sg_sampler base_color_smp = mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.BaseColor].Sampler
                             : state.placeholders.smp;
-                        sg_sampler metallic_roughness_smp = mat->metallic.images.metallic_roughness != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.metallic_roughness].smp
+                        sg_sampler metallic_roughness_smp = mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.MetallicRoughness].Sampler
                             : state.placeholders.smp;
-                        sg_sampler normal_smp = mat->metallic.images.normal != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.normal].smp
+                        sg_sampler normal_smp = mat.Metallic.Images.Normal != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Normal].Sampler
                             : state.placeholders.smp;
-                        sg_sampler occlusion_smp = mat->metallic.images.occlusion != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.occlusion].smp
+                        sg_sampler occlusion_smp = mat.Metallic.Images.Occlusion != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Occlusion].Sampler
                             : state.placeholders.smp;
-                        sg_sampler emissive_smp = mat->metallic.images.emissive != SCENE_INVALID_INDEX
-                            ? state.scene.images[mat->metallic.images.emissive].smp
+                        sg_sampler emissive_smp = mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX
+                            ? state.scene.Images[mat.Metallic.Images.Emissive].Sampler
                             : state.placeholders.smp;
 
                         if (base_color_tex.id == 0)
@@ -739,7 +383,7 @@ public static unsafe class CGLTFSceneApp
                         bind.samplers[2] = normal_smp;              // slot 2
                         bind.samplers[3] = occlusion_smp;           // slot 3
                         bind.samplers[4] = emissive_smp;            // slot 4
-                        sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat->metallic.fs_params), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
+                        sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
                     }
                     else
                     {
@@ -751,7 +395,7 @@ public static unsafe class CGLTFSceneApp
                         */
                     }
                     sg_apply_bindings(bind);
-                    sg_draw((uint)prim->base_element, (uint)prim->num_elements, 1);
+                    sg_draw((uint)prim.BaseElement, (uint)prim.NumElements, 1);
                 }
             }
             sdtx_draw();
@@ -760,12 +404,12 @@ public static unsafe class CGLTFSceneApp
         }
         sg_commit();
 
-        var deltaTime =stm_ms(stm_now() - startTime);
+        var deltaTime = stm_ms(stm_now() - startTime);
         frames++;
         if (deltaTime >= 1000)
         {
             frameRate = frames;
-            averageFrameTimeMilliseconds = deltaTime/ frameRate;
+            averageFrameTimeMilliseconds = deltaTime / frameRate;
             frameRate = (int)(1000 / averageFrameTimeMilliseconds);
 
             frames = 0;
@@ -776,8 +420,7 @@ public static unsafe class CGLTFSceneApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
-        SharedBuffer.DisposeAll();
-        sfetch_shutdown();
+        FileSystem.Instance.Shutdown();
         // __dbgui_shutdown();
         sbasisu_shutdown();
 

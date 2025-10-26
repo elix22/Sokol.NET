@@ -237,6 +237,7 @@ namespace Sokol
         private string _basePath = "";
         private string _filePath = "";
         private CGltfScene _scene;
+        private CGltfScene? _externalScene;  // Reference to external scene (if provided)
         private sg_shader _metallicShader;
         private sg_shader _specularShader;
         
@@ -259,7 +260,9 @@ namespace Sokol
         private int _pendingTextureLoads = 0;
         private int _pendingBufferLoads = 0;
 
-        public CGltfScene? Scene => _scene;
+        public CGltfScene? Scene => _externalScene ?? _scene;
+        
+        private CGltfScene ActiveScene => _externalScene ?? _scene;
 
         public CGltfParser()
         {
@@ -396,6 +399,7 @@ namespace Sokol
         /// </summary>
         public void LoadFromFileAsync(string filePath, Action<CGltfScene> onComplete, Action<string>? onFailed = null)
         {
+            _externalScene = null;  // Use internal scene
             _filePath = filePath;
             _basePath = Path.GetDirectoryName(filePath) ?? "";
             _onLoadComplete = onComplete;
@@ -403,6 +407,23 @@ namespace Sokol
             _pendingTextureLoads = 0;
 
             Info($"CGltfParser: Starting async load of '{filePath}'");
+            FileSystem.Instance.LoadFile(filePath, OnFileLoaded);
+        }
+
+        /// <summary>
+        /// Load a GLTF/GLB file asynchronously using FileSystem, filling the provided external scene directly
+        /// This avoids the overhead of copying data from internal scene to external scene
+        /// </summary>
+        public void LoadFromFileAsync(string filePath, CGltfScene externalScene, Action onComplete, Action<string>? onFailed = null)
+        {
+            _externalScene = externalScene;  // Use external scene
+            _filePath = filePath;
+            _basePath = Path.GetDirectoryName(filePath) ?? "";
+            _onLoadComplete = _ => onComplete();  // Wrap void callback
+            _onLoadFailed = onFailed;
+            _pendingTextureLoads = 0;
+
+            Info($"CGltfParser: Starting async load of '{filePath}' (direct to external scene)");
             FileSystem.Instance.LoadFile(filePath, OnFileLoaded);
         }
 
@@ -434,7 +455,10 @@ namespace Sokol
             if (_pendingBufferLoads == 0 && _pendingTextureLoads == 0)
             {
                 Info($"CGltfParser: Scene fully loaded (buffers AND textures complete)");
-                _onLoadComplete?.Invoke(_scene);
+                if (Scene != null)
+                {
+                    _onLoadComplete?.Invoke(Scene);
+                }
             }
             else
             {
@@ -520,7 +544,7 @@ namespace Sokol
             ParseMeshes(gltf);
             ParseNodes(gltf);
             
-            Info($"CGltfParser: Scene parsing complete - {_scene.NumNodes} nodes, {_scene.NumMeshes} meshes, {_scene.NumPrimitives} primitives");
+            Info($"CGltfParser: Scene parsing complete - {ActiveScene.NumNodes} nodes, {ActiveScene.NumMeshes} meshes, {ActiveScene.NumPrimitives} primitives");
         }
 
         #region Buffer Parsing
@@ -532,9 +556,9 @@ namespace Sokol
                 throw new Exception($"Too many buffer views: {gltf->buffer_views_count} > {CGltfSceneLimits.MAX_BUFFERS}");
             }
 
-            _scene.NumBuffers = (int)gltf->buffer_views_count;
+            ActiveScene.NumBuffers = (int)gltf->buffer_views_count;
             
-            for (int i = 0; i < _scene.NumBuffers; i++)
+            for (int i = 0; i < ActiveScene.NumBuffers; i++)
             {
                 cgltf_buffer_view* bufView = &gltf->buffer_views[i];
                 
@@ -547,7 +571,7 @@ namespace Sokol
                 else
                     _bufferParams[i].Usage.vertex_buffer = true;
 
-                _scene.Buffers[i] = sg_alloc_buffer();
+                ActiveScene.Buffers[i] = sg_alloc_buffer();
             }
 
             // Create buffers from GLTF buffer data
@@ -568,7 +592,7 @@ namespace Sokol
 
         private void CreateBuffersForGltfBuffer(int gltfBufferIndex, sg_range data)
         {
-            for (int i = 0; i < _scene.NumBuffers; i++)
+            for (int i = 0; i < ActiveScene.NumBuffers; i++)
             {
                 if (_bufferParams[i].GltfBufferIndex == gltfBufferIndex)
                 {
@@ -588,7 +612,7 @@ namespace Sokol
                         Info($"  First 9 floats: {vertices[0]:F3}, {vertices[1]:F3}, {vertices[2]:F3}, {vertices[3]:F3}, {vertices[4]:F3}, {vertices[5]:F3}, {vertices[6]:F3}, {vertices[7]:F3}, {vertices[8]:F3}");
                     }
                     
-                    sg_init_buffer(_scene.Buffers[i], new sg_buffer_desc
+                    sg_init_buffer(ActiveScene.Buffers[i], new sg_buffer_desc
                     {
                         usage = _bufferParams[i].Usage,
                         data = new sg_range
@@ -597,7 +621,7 @@ namespace Sokol
                             size = (nuint)_bufferParams[i].Size,
                         }
                     });
-                    Info($"CGltfParser: Buffer {i} created with id={_scene.Buffers[i].id}, state={sg_query_buffer_state(_scene.Buffers[i])}");
+                    Info($"CGltfParser: Buffer {i} created with id={ActiveScene.Buffers[i].id}, state={sg_query_buffer_state(ActiveScene.Buffers[i])}");
                 }
             }
         }
@@ -613,9 +637,9 @@ namespace Sokol
                 throw new Exception($"Too many textures: {gltf->textures_count} > {CGltfSceneLimits.MAX_IMAGES}");
             }
 
-            _scene.NumImages = (int)gltf->textures_count;
+            ActiveScene.NumImages = (int)gltf->textures_count;
 
-            for (int i = 0; i < _scene.NumImages; i++)
+            for (int i = 0; i < ActiveScene.NumImages; i++)
             {
                 cgltf_texture* gltfTex = &gltf->textures[i];
                 
@@ -626,9 +650,9 @@ namespace Sokol
                 _imageParams[i].WrapS = GltfToSgWrap(gltfTex->sampler->wrap_s);
                 _imageParams[i].WrapT = GltfToSgWrap(gltfTex->sampler->wrap_t);
 
-                _scene.Images[i].Image.id = SG_INVALID_ID;
-                _scene.Images[i].Sampler.id = SG_INVALID_ID;
-                _scene.Images[i].TexView.id = SG_INVALID_ID;
+                ActiveScene.Images[i].Image.id = SG_INVALID_ID;
+                ActiveScene.Images[i].Sampler.id = SG_INVALID_ID;
+                ActiveScene.Images[i].TexView.id = SG_INVALID_ID;
             }
 
             // Load images from GLTF image data
@@ -729,7 +753,7 @@ namespace Sokol
                 Info($"CGltfParser: First 8 bytes: {ptr[0]:X2} {ptr[1]:X2} {ptr[2]:X2} {ptr[3]:X2} {ptr[4]:X2} {ptr[5]:X2} {ptr[6]:X2} {ptr[7]:X2}");
             }
             
-            for (int i = 0; i < _scene.NumImages; i++)
+            for (int i = 0; i < ActiveScene.NumImages; i++)
             {
                 if (_imageParams[i].GltfImageIndex == gltfImageIndex)
                 {
@@ -750,16 +774,16 @@ namespace Sokol
                     
                     Info($"CGltfParser: Image {i} created with id={image.id}");
                     
-                    _scene.Images[i].Image = image;
-                    _scene.Images[i].TexView = sg_make_view(new sg_view_desc
+                    ActiveScene.Images[i].Image = image;
+                    ActiveScene.Images[i].TexView = sg_make_view(new sg_view_desc
                     {
                         texture = new sg_texture_view_desc { image = image },
                         label = $"cgltf-image-{i}-view"
                     });
                     
-                    Info($"CGltfParser: TexView {i} created with id={_scene.Images[i].TexView.id}, from image.id={image.id}");
+                    Info($"CGltfParser: TexView {i} created with id={ActiveScene.Images[i].TexView.id}, from image.id={image.id}");
                     
-                    _scene.Images[i].Sampler = sg_make_sampler(new sg_sampler_desc
+                    ActiveScene.Images[i].Sampler = sg_make_sampler(new sg_sampler_desc
                     {
                         min_filter = _imageParams[i].MinFilter,
                         mag_filter = _imageParams[i].MagFilter,
@@ -884,39 +908,39 @@ namespace Sokol
                 throw new Exception($"Too many materials: {gltf->materials_count} > {CGltfSceneLimits.MAX_MATERIALS}");
             }
 
-            _scene.NumMaterials = (int)gltf->materials_count;
+            ActiveScene.NumMaterials = (int)gltf->materials_count;
 
-            for (int i = 0; i < _scene.NumMaterials; i++)
+            for (int i = 0; i < ActiveScene.NumMaterials; i++)
             {
                 cgltf_material* gltfMat = &gltf->materials[i];
                 
-                _scene.Materials[i].IsMetallic = gltfMat->has_pbr_metallic_roughness != 0;
+                ActiveScene.Materials[i].IsMetallic = gltfMat->has_pbr_metallic_roughness != 0;
 
-                if (_scene.Materials[i].IsMetallic)
+                if (ActiveScene.Materials[i].IsMetallic)
                 {
                     cgltf_pbr_metallic_roughness* src = &gltfMat->pbr_metallic_roughness;
                     
-                    _scene.Materials[i].Metallic.FsParams.base_color_factor = new Vector4(
+                    ActiveScene.Materials[i].Metallic.FsParams.base_color_factor = new Vector4(
                         src->base_color_factor[0],
                         src->base_color_factor[1],
                         src->base_color_factor[2],
                         src->base_color_factor[3]
                     );
                     
-                    _scene.Materials[i].Metallic.FsParams.emissive_factor = new Vector3(
+                    ActiveScene.Materials[i].Metallic.FsParams.emissive_factor = new Vector3(
                         gltfMat->emissive_factor[0],
                         gltfMat->emissive_factor[1],
                         gltfMat->emissive_factor[2]
                     );
                     
-                    _scene.Materials[i].Metallic.FsParams.metallic_factor = src->metallic_factor;
-                    _scene.Materials[i].Metallic.FsParams.roughness_factor = src->roughness_factor;
+                    ActiveScene.Materials[i].Metallic.FsParams.metallic_factor = src->metallic_factor;
+                    ActiveScene.Materials[i].Metallic.FsParams.roughness_factor = src->roughness_factor;
 
-                    _scene.Materials[i].Metallic.Images.BaseColor = GetTextureIndex(gltf, src->base_color_texture.texture);
-                    _scene.Materials[i].Metallic.Images.MetallicRoughness = GetTextureIndex(gltf, src->metallic_roughness_texture.texture);
-                    _scene.Materials[i].Metallic.Images.Normal = GetTextureIndex(gltf, gltfMat->normal_texture.texture);
-                    _scene.Materials[i].Metallic.Images.Occlusion = GetTextureIndex(gltf, gltfMat->occlusion_texture.texture);
-                    _scene.Materials[i].Metallic.Images.Emissive = GetTextureIndex(gltf, gltfMat->emissive_texture.texture);
+                    ActiveScene.Materials[i].Metallic.Images.BaseColor = GetTextureIndex(gltf, src->base_color_texture.texture);
+                    ActiveScene.Materials[i].Metallic.Images.MetallicRoughness = GetTextureIndex(gltf, src->metallic_roughness_texture.texture);
+                    ActiveScene.Materials[i].Metallic.Images.Normal = GetTextureIndex(gltf, gltfMat->normal_texture.texture);
+                    ActiveScene.Materials[i].Metallic.Images.Occlusion = GetTextureIndex(gltf, gltfMat->occlusion_texture.texture);
+                    ActiveScene.Materials[i].Metallic.Images.Emissive = GetTextureIndex(gltf, gltfMat->emissive_texture.texture);
                 }
             }
         }
@@ -932,40 +956,40 @@ namespace Sokol
                 throw new Exception($"Too many meshes: {gltf->meshes_count} > {CGltfSceneLimits.MAX_MESHES}");
             }
 
-            _scene.NumMeshes = (int)gltf->meshes_count;
+            ActiveScene.NumMeshes = (int)gltf->meshes_count;
 
-            for (int meshIdx = 0; meshIdx < _scene.NumMeshes; meshIdx++)
+            for (int meshIdx = 0; meshIdx < ActiveScene.NumMeshes; meshIdx++)
             {
                 cgltf_mesh* gltfMesh = &gltf->meshes[meshIdx];
 
-                if (_scene.NumPrimitives + (int)gltfMesh->primitives_count > CGltfSceneLimits.MAX_PRIMITIVES)
+                if (ActiveScene.NumPrimitives + (int)gltfMesh->primitives_count > CGltfSceneLimits.MAX_PRIMITIVES)
                 {
                     throw new Exception($"Too many primitives");
                 }
 
-                _scene.Meshes[meshIdx].FirstPrimitive = _scene.NumPrimitives;
-                _scene.Meshes[meshIdx].NumPrimitives = (int)gltfMesh->primitives_count;
+                ActiveScene.Meshes[meshIdx].FirstPrimitive = ActiveScene.NumPrimitives;
+                ActiveScene.Meshes[meshIdx].NumPrimitives = (int)gltfMesh->primitives_count;
 
                 for (nuint primIdx = 0; primIdx < gltfMesh->primitives_count; primIdx++)
                 {
                     cgltf_primitive* gltfPrim = &gltfMesh->primitives[primIdx];
-                    int scenePrivIdx = _scene.NumPrimitives++;
+                    int scenePrivIdx = ActiveScene.NumPrimitives++;
 
-                    _scene.Primitives[scenePrivIdx].MaterialIndex = GetMaterialIndex(gltf, gltfPrim->material);
-                    _scene.Primitives[scenePrivIdx].VertexBuffers = CreateVertexBufferMapping(gltf, gltfPrim);
-                    _scene.Primitives[scenePrivIdx].PipelineIndex = CreatePipelineForPrimitive(gltf, gltfPrim, ref _scene.Primitives[scenePrivIdx].VertexBuffers);
+                    ActiveScene.Primitives[scenePrivIdx].MaterialIndex = GetMaterialIndex(gltf, gltfPrim->material);
+                    ActiveScene.Primitives[scenePrivIdx].VertexBuffers = CreateVertexBufferMapping(gltf, gltfPrim);
+                    ActiveScene.Primitives[scenePrivIdx].PipelineIndex = CreatePipelineForPrimitive(gltf, gltfPrim, ref ActiveScene.Primitives[scenePrivIdx].VertexBuffers);
 
                     if (gltfPrim->indices != null)
                     {
-                        _scene.Primitives[scenePrivIdx].IndexBuffer = GetBufferViewIndex(gltf, gltfPrim->indices->buffer_view);
-                        _scene.Primitives[scenePrivIdx].BaseElement = (int)gltfPrim->indices->offset;
-                        _scene.Primitives[scenePrivIdx].NumElements = (int)gltfPrim->indices->count;
+                        ActiveScene.Primitives[scenePrivIdx].IndexBuffer = GetBufferViewIndex(gltf, gltfPrim->indices->buffer_view);
+                        ActiveScene.Primitives[scenePrivIdx].BaseElement = (int)gltfPrim->indices->offset;
+                        ActiveScene.Primitives[scenePrivIdx].NumElements = (int)gltfPrim->indices->count;
                     }
                     else
                     {
-                        _scene.Primitives[scenePrivIdx].IndexBuffer = CGltfSceneLimits.INVALID_INDEX;
-                        _scene.Primitives[scenePrivIdx].BaseElement = 0;
-                        _scene.Primitives[scenePrivIdx].NumElements = (int)gltfPrim->attributes[0].data->count;
+                        ActiveScene.Primitives[scenePrivIdx].IndexBuffer = CGltfSceneLimits.INVALID_INDEX;
+                        ActiveScene.Primitives[scenePrivIdx].BaseElement = 0;
+                        ActiveScene.Primitives[scenePrivIdx].NumElements = (int)gltfPrim->attributes[0].data->count;
                     }
                 }
             }
@@ -1008,19 +1032,19 @@ namespace Sokol
             };
 
             // Check if pipeline already exists in cache
-            for (int i = 0; i < _scene.NumPipelines; i++)
+            for (int i = 0; i < ActiveScene.NumPipelines; i++)
             {
                 if (PipelinesEqual(ref _pipelineCache[i], ref pipParams))
                     return i;
             }
 
             // Create new pipeline
-            if (_scene.NumPipelines >= CGltfSceneLimits.MAX_PIPELINES)
+            if (ActiveScene.NumPipelines >= CGltfSceneLimits.MAX_PIPELINES)
             {
                 throw new Exception($"Too many pipelines");
             }
 
-            int pipIdx = _scene.NumPipelines++;
+            int pipIdx = ActiveScene.NumPipelines++;
             _pipelineCache[pipIdx] = pipParams;
 
             bool isMetallic = prim->material->has_pbr_metallic_roughness != 0;
@@ -1045,8 +1069,8 @@ namespace Sokol
             desc.colors[0].blend.src_factor_rgb = pipParams.Alpha ? sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA : 0;
             desc.colors[0].blend.dst_factor_rgb = pipParams.Alpha ? sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA : 0;
 
-            _scene.Pipelines[pipIdx] = sg_make_pipeline(desc);
-            Info($"CGltfParser: Pipeline created idx={pipIdx}, id={_scene.Pipelines[pipIdx].id}, state={sg_query_pipeline_state(_scene.Pipelines[pipIdx])}, primType={pipParams.PrimType}, indexType={pipParams.IndexType}");
+            ActiveScene.Pipelines[pipIdx] = sg_make_pipeline(desc);
+            Info($"CGltfParser: Pipeline created idx={pipIdx}, id={ActiveScene.Pipelines[pipIdx].id}, state={sg_query_pipeline_state(ActiveScene.Pipelines[pipIdx])}, primType={pipParams.PrimType}, indexType={pipParams.IndexType}");
 
             return pipIdx;
         }
@@ -1100,9 +1124,9 @@ namespace Sokol
                 // Only process nodes with meshes
                 if (gltfNode->mesh != null)
                 {
-                    int sceneNodeIdx = _scene.NumNodes++;
-                    _scene.Nodes[sceneNodeIdx].MeshIndex = GetMeshIndex(gltf, gltfNode->mesh);
-                    _scene.Nodes[sceneNodeIdx].Transform = BuildTransformForNode(gltf, gltfNode);
+                    int sceneNodeIdx = ActiveScene.NumNodes++;
+                    ActiveScene.Nodes[sceneNodeIdx].MeshIndex = GetMeshIndex(gltf, gltfNode->mesh);
+                    ActiveScene.Nodes[sceneNodeIdx].Transform = BuildTransformForNode(gltf, gltfNode);
                 }
             }
         }
