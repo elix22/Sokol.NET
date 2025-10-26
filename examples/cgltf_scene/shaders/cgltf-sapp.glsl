@@ -305,6 +305,11 @@ void main() {
     // Apply PBR lighting
     vec3 view = normalize(v_eye_pos - v_pos);
     vec3 color = apply_point_light(material_info, normal, view);
+    
+    // Add ambient light to prevent pure black
+    vec3 ambient = base_color.rgb * 0.3; // 30% ambient light
+    color += ambient;
+    
     color *= occlusion; // Apply ambient occlusion
     color += emissive;  // Add emissive glow
     
