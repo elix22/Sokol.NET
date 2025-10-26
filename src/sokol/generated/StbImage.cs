@@ -16,6 +16,13 @@ public static unsafe partial class StbImage
 public static extern byte* stbi_load_csharp(in byte buffer, int len, ref int x, ref int y, ref int channels_in_file, int desired_channels);
 
 #if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "stbi_load_flipped_csharp", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "stbi_load_flipped_csharp", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern byte* stbi_load_flipped_csharp(in byte buffer, int len, ref int x, ref int y, ref int channels_in_file, int desired_channels);
+
+#if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "stbi_image_free_csharp", CallingConvention = CallingConvention.Cdecl)]
 #else
 [DllImport("sokol", EntryPoint = "stbi_image_free_csharp", CallingConvention = CallingConvention.Cdecl)]

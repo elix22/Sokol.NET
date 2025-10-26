@@ -89,7 +89,7 @@ public unsafe class Texture
             Console.WriteLine($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
             // Further processing of the texture data would go here
             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
-            byte* pixels = stbi_load_csharp(
+            byte* pixels = stbi_load_flipped_csharp(
                 in buffer[0],
                 (int)buffer.Length,
                 ref png_width,
@@ -148,7 +148,7 @@ public unsafe class Texture
                             Console.WriteLine($"Assimp: Embedded texture is compressed, size: {embeddedTexture.CompressedData.Length} bytes");
                             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
 
-                            byte* pixels = stbi_load_csharp(
+                            byte* pixels = stbi_load_flipped_csharp(
                                 embeddedTexture.CompressedData[0],
                                 embeddedTexture.CompressedData.Length,
                                 ref png_width,

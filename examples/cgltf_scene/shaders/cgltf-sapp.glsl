@@ -239,44 +239,8 @@ vec3 tone_map(vec3 color) {
 }
 
 void main() {
-
-    const vec3 f0 = vec3(0.04);
-
-    // Roughness is stored in the 'a' channel, metallic is stored in the 'r' channel.
-    // This layout intentionally reserves the 'r' channel for (optional) occlusion map data
-    vec4 mr_sample = texture(sampler2D(metallic_roughness_tex, metallic_roughness_smp), v_uv);
-    float perceptual_roughness = clamp(mr_sample.w * roughness_factor, 0.0, 1.0);
-    float metallic = clamp(mr_sample.x * metallic_factor, 0.0, 1.0);
-
-    vec4 base_color = srgb_to_linear(texture(sampler2D(base_color_tex, base_color_smp), v_uv)) * base_color_factor;
-    vec3 diffuse_color = base_color.rgb * (vec3(1.0)-f0) * (1.0 - metallic);
-    vec3 specular_color = mix(f0, base_color.rgb, metallic);
-
-    // Roughness is authored as perceptual roughness; as is convention,
-    // convert to material roughness by squaring the perceptual roughness [2].
-    float alpha_roughness = perceptual_roughness * perceptual_roughness;
-    float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
-    vec3 specular_environment_r0 = specular_color;
-    // Anything less than 2% is physically impossible and is instead considered to be shadowing.
-    // Compare to "Real-Time-Rendering" 4th editon on page 325.
-    vec3 specular_environment_r90 = vec3(clamp(reflectance * 50.0, 0.0, 1.0));
-
-    material_info_t material_info = material_info_t(
-        perceptual_roughness,
-        specular_environment_r0,
-        alpha_roughness,
-        diffuse_color,
-        specular_environment_r90,
-        specular_color
-    );
-
-    // lighting
-    vec3 normal = get_normal();
-    vec3 view = normalize(v_eye_pos - v_pos);
-    vec3 color = apply_point_light(material_info, normal, view);
-    color *= texture(sampler2D(occlusion_tex, occlusion_smp), v_uv).r;
-    color += srgb_to_linear(texture(sampler2D(emissive_tex, emissive_smp), v_uv)).rgb * emissive_factor;
-    frag_color = vec4(tone_map(color), 1.0);
+    vec4 tex_sample = texture(sampler2D(base_color_tex, base_color_smp), v_uv);
+    frag_color = tex_sample * base_color_factor;
 }
 @end
 

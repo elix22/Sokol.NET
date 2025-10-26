@@ -24,11 +24,11 @@ using static Sokol.SImgui;
 using Imgui;
 using static Imgui.ImguiNative;
 using System.Diagnostics.Metrics;
+using static Sokol.SBasisu;
 
 public static unsafe class AssimpSceneApp
 {
     static string modelPath = "assimpScene.glb";
-
     class _state
     {
         public sg_pass_action pass_action;
@@ -82,7 +82,7 @@ public static unsafe class AssimpSceneApp
     private static unsafe void Init()
     {
         Log("assimp-scene-app: Init()");
-        
+
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
@@ -93,6 +93,8 @@ public static unsafe class AssimpSceneApp
                 func = &slog_func,
             }
         });
+        
+            sbasisu_setup();
 
         // duck center = new Vector3(0.0f, 150, 0.0f);
         // Distance = 400.0f,
@@ -836,8 +838,9 @@ public static unsafe class AssimpSceneApp
         // Print texture cache statistics before cleanup
         TextureCache.Instance.PrintStats();
         TextureCache.Instance.Clear();
-        
+
         FileSystem.Instance.Shutdown();
+        sbasisu_shutdown();
         simgui_shutdown();
         sg_shutdown();
 

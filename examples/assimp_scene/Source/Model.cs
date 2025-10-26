@@ -166,6 +166,7 @@ namespace Sokol
         {
             // Get material diffuse color for meshes without vertex colors
             Vector4 materialColor = new Vector4(1.0f, 1.0f, 1.0f, 1.0f); // default white
+            
             if (mesh.MaterialIndex >= 0 && mesh.MaterialIndex < assimpScene.MaterialCount)
             {
                 var material = assimpScene.Materials[mesh.MaterialIndex];

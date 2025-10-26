@@ -20,13 +20,13 @@ namespace Sokol
     public static class CGltfSceneLimits
     {
         public const int INVALID_INDEX = -1;
-        public const int MAX_BUFFERS = 32;
-        public const int MAX_IMAGES = 32;
-        public const int MAX_MATERIALS = 32;
-        public const int MAX_PIPELINES = 32;
-        public const int MAX_PRIMITIVES = 64;
-        public const int MAX_MESHES = 32;
-        public const int MAX_NODES = 64;
+        public const int MAX_BUFFERS = 128;      // Increased from 32 to support more complex models
+        public const int MAX_IMAGES = 64;        // Increased from 32
+        public const int MAX_MATERIALS = 64;     // Increased from 32
+        public const int MAX_PIPELINES = 64;     // Increased from 32
+        public const int MAX_PRIMITIVES = 256;   // Increased from 64
+        public const int MAX_MESHES = 128;       // Increased from 32
+        public const int MAX_NODES = 256;        // Increased from 64
     }
 
     /// <summary>
@@ -304,10 +304,78 @@ namespace Sokol
                 {
                     Info($"CGltfParser: Successfully parsed GLTF - {gltfData->meshes_count} meshes, {gltfData->materials_count} materials");
                     
+                    // For GLB files, the binary buffer data is embedded in the file we just loaded
+                    // We need to manually parse the GLB structure and set buffer->data pointer
+                    if (gltfData->file_type == cgltf_file_type.cgltf_file_type_glb && gltfData->buffers_count > 0)
+                    {
+                        cgltf_buffer* firstBuffer = gltfData->buffers;
+                        
+                        // Check if this buffer needs to be loaded (no URI = embedded in GLB)
+                        if (firstBuffer->uri == IntPtr.Zero && firstBuffer->data == null)
+                        {
+                            // GLB structure (from cgltf.h):
+                            // [Header: 12 bytes] [JSON chunk: 8 bytes header + N bytes data]
+                            // [BIN chunk: 8 bytes header + M bytes data]
+                            
+                            byte* glbData = dataPtr;
+                            
+                            // Read GLB header (12 bytes)
+                            uint* header = (uint*)glbData;
+                            uint magic = header[0];           // Should be 0x46546C67 ("glTF")
+                            uint version = header[1];         // Should be 2
+                            uint totalLength = header[2];     // Total file length
+                            
+                            Info($"CGltfParser: GLB header - magic=0x{magic:X}, version={version}, length={totalLength}");
+                            
+                            if (magic != 0x46546C67)
+                            {
+                                Error($"CGltfParser: Invalid GLB magic number: 0x{magic:X}");
+                            }
+                            else
+                            {
+                                // Read JSON chunk header (at offset 12)
+                                uint jsonChunkLength = header[3];
+                                uint jsonChunkType = header[4];   // Should be 0x4E4F534A ("JSON")
+                                
+                                Info($"CGltfParser: JSON chunk - type=0x{jsonChunkType:X}, length={jsonChunkLength}");
+                                
+                                // BIN chunk starts after: header(12) + json_chunk_header(8) + json_data(jsonChunkLength)
+                                int binChunkOffset = 12 + 8 + (int)jsonChunkLength;
+                                
+                                if (binChunkOffset + 8 <= data.Length)
+                                {
+                                    // Read BIN chunk header
+                                    uint* binHeader = (uint*)(glbData + binChunkOffset);
+                                    uint binChunkLength = binHeader[0];
+                                    uint binChunkType = binHeader[1];   // Should be 0x004E4942 ("BIN\0")
+                                    
+                                    Info($"CGltfParser: BIN chunk - type=0x{binChunkType:X}, length={binChunkLength}, offset={binChunkOffset}");
+                                    
+                                    if (binChunkType == 0x004E4942)
+                                    {
+                                        // BIN data starts 8 bytes after the BIN chunk header
+                                        byte* binData = glbData + binChunkOffset + 8;
+                                        firstBuffer->data = binData;
+                                        
+                                        Info($"CGltfParser: Set GLB embedded buffer data pointer (ptr=0x{(long)binData:X}, size={binChunkLength})");
+                                    }
+                                    else
+                                    {
+                                        Error($"CGltfParser: Invalid BIN chunk type: 0x{binChunkType:X}");
+                                    }
+                                }
+                                else
+                                {
+                                    Error($"CGltfParser: GLB file too small for BIN chunk at offset {binChunkOffset} (file size: {data.Length})");
+                                }
+                            }
+                        }
+                    }
+                    
                     // Parse scene structure (allocates buffers but doesn't fill them yet)
                     ParseScene(gltfData);
                     
-                    // Start async loading of .bin buffer files using FileSystem.cs
+                    // Start async loading of external .bin buffer files using FileSystem.cs
                     LoadBuffersAsync(gltfData);
                     
                     cgltf_free(gltfData);
@@ -571,8 +639,18 @@ namespace Sokol
                 if (gltfImg->buffer_view != null)
                 {
                     // Embedded image data
+                    Info($"CGltfParser: Image {i} is EMBEDDED in buffer view");
                     cgltf_buffer_view* bufView = gltfImg->buffer_view;
+                    
+                    // Check if buffer data is valid
+                    if (bufView->buffer->data == null)
+                    {
+                        Error($"CGltfParser: Image {i}: buffer->data is NULL! Buffer might not be loaded yet.");
+                        continue;
+                    }
+                    
                     byte* imageData = (byte*)bufView->buffer->data + bufView->offset;
+                    Info($"CGltfParser: Image {i}: Creating from embedded data (ptr=0x{(long)imageData:X}, size={bufView->size})");
                     
                     CreateImageSamplersForGltfImage((int)i, new sg_range 
                     { 
@@ -635,10 +713,27 @@ namespace Sokol
 
         private void CreateImageSamplersForGltfImage(int gltfImageIndex, sg_range data)
         {
+            // Safety check
+            if (data.ptr == null || data.size == 0)
+            {
+                Error($"CGltfParser: CreateImageSamplersForGltfImage called with invalid data for image {gltfImageIndex} (ptr=0x{(long)data.ptr:X}, size={data.size})");
+                return;
+            }
+            
+            Info($"CGltfParser: CreateImageSamplersForGltfImage - gltfImageIndex={gltfImageIndex}, data.size={data.size}");
+            
+            // Log first few bytes for debugging
+            byte* ptr = (byte*)data.ptr;
+            if (data.size >= 8)
+            {
+                Info($"CGltfParser: First 8 bytes: {ptr[0]:X2} {ptr[1]:X2} {ptr[2]:X2} {ptr[3]:X2} {ptr[4]:X2} {ptr[5]:X2} {ptr[6]:X2} {ptr[7]:X2}");
+            }
+            
             for (int i = 0; i < _scene.NumImages; i++)
             {
                 if (_imageParams[i].GltfImageIndex == gltfImageIndex)
                 {
+                    Info($"CGltfParser: Processing image {i} (matches gltfImageIndex {gltfImageIndex})");
                     sg_image image;
                     
                     // Detect image format and use appropriate decoder
@@ -653,11 +748,17 @@ namespace Sokol
                         image = LoadImageWithStbi(data);
                     }
                     
+                    Info($"CGltfParser: Image {i} created with id={image.id}");
+                    
                     _scene.Images[i].Image = image;
                     _scene.Images[i].TexView = sg_make_view(new sg_view_desc
                     {
-                        texture = { image = _scene.Images[i].Image }
+                        texture = new sg_texture_view_desc { image = image },
+                        label = $"cgltf-image-{i}-view"
                     });
+                    
+                    Info($"CGltfParser: TexView {i} created with id={_scene.Images[i].TexView.id}, from image.id={image.id}");
+                    
                     _scene.Images[i].Sampler = sg_make_sampler(new sg_sampler_desc
                     {
                         min_filter = _imageParams[i].MinFilter,
@@ -672,6 +773,13 @@ namespace Sokol
         
         private bool IsBasisuFormat(sg_range data)
         {
+            // Safety check
+            if (data.ptr == null || data.size == 0)
+            {
+                Error($"CGltfParser: Invalid data range for image format detection");
+                return false;
+            }
+            
             // Basis Universal files start with specific magic bytes
             // Check for ".basis" or ".ktx2" file signatures
             byte* ptr = (byte*)data.ptr;
@@ -706,6 +814,19 @@ namespace Sokol
         
         private sg_image LoadImageWithStbi(sg_range data)
         {
+            // Safety check
+            if (data.ptr == null || data.size == 0)
+            {
+                Error($"CGltfParser: Invalid data range for stbi image loading");
+                // Return a placeholder white texture
+                return sg_make_image(new sg_image_desc
+                {
+                    width = 1,
+                    height = 1,
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                });
+            }
+            
             int width = 0, height = 0, channels = 0;
             int desired_channels = 4; // RGBA
             
@@ -731,9 +852,6 @@ namespace Sokol
                 });
             }
             
-            Info($"CGltfParser: Image decoded successfully - {width}x{height}, channels={channels}");
-            
-            // Create sokol image from decoded pixel data
             sg_image_desc desc = new sg_image_desc
             {
                 width = width,
@@ -947,15 +1065,16 @@ namespace Sokol
                     layout.attrs[attrSlot].format = GltfToVertexFormat(attr->data);
                     // DO NOT set offset here - it should be 0 for separate buffers (tightly packed)
                     // The accessor->offset is the offset in the file buffer, not the vertex struct offset!
-                }
-
-                int bufferViewIndex = GetBufferViewIndex(gltf, attr->data->buffer_view);
-                for (int vbSlot = 0; vbSlot < vbufMap.Num; vbSlot++)
-                {
-                    if (vbufMap.BufferIndices[vbSlot] == bufferViewIndex)
+                    
+                    // Set buffer index for this attribute
+                    int bufferViewIndex = GetBufferViewIndex(gltf, attr->data->buffer_view);
+                    for (int vbSlot = 0; vbSlot < vbufMap.Num; vbSlot++)
                     {
-                        layout.attrs[attrSlot].buffer_index = vbSlot;
-                        break;
+                        if (vbufMap.BufferIndices[vbSlot] == bufferViewIndex)
+                        {
+                            layout.attrs[attrSlot].buffer_index = vbSlot;
+                            break;
+                        }
                     }
                 }
             }
@@ -990,16 +1109,11 @@ namespace Sokol
 
         private Matrix4x4 BuildTransformForNode(cgltf_data* gltf, cgltf_node* node)
         {
-            Matrix4x4 parentTransform = Matrix4x4.Identity;
-
-            if (node->parent != null)
-            {
-                parentTransform = BuildTransformForNode(gltf, node->parent);
-            }
+            Matrix4x4 localTransform;
 
             if (node->has_matrix != 0)
             {
-                return parentTransform * FromGltfMatrix(node->matrix);
+                localTransform = FromGltfMatrix(node->matrix);
             }
             else
             {
@@ -1035,8 +1149,18 @@ namespace Sokol
                     ));
                 }
 
-                return parentTransform * translate * rotate * scale;
+                // Correct order for row-major matrices: scale * rotate * translate
+                localTransform = scale * rotate * translate;
             }
+
+            // Apply parent transform: local * parent (row-major order)
+            if (node->parent != null)
+            {
+                Matrix4x4 parentTransform = BuildTransformForNode(gltf, node->parent);
+                return localTransform * parentTransform;
+            }
+
+            return localTransform;
         }
 
         #endregion

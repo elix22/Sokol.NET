@@ -11,6 +11,7 @@ using static Sokol.StbImage;
 using static Sokol.SG;
 using static Sokol.SG.sg_filter;
 using static Sokol.SG.sg_wrap;
+using static Sokol.SBasisu;
 using Sokol;
 using Assimp;
 
@@ -61,6 +62,24 @@ public unsafe class Texture : IDisposable
         FileSystem.Instance.LoadFile(filePath, OnTextureLoaded);
     }
 
+
+    private void SetSBasisuImage(byte[] data)
+    {
+        Image = sbasisu_make_image(SG_RANGE(data));
+        View = sg_make_view(new sg_view_desc()
+        {
+            texture = new sg_texture_view_desc { image = Image },
+            label = "sokol-texture-view",
+        });
+
+        Sampler = sg_make_sampler(new sg_sampler_desc()
+        {
+            min_filter = SG_FILTER_LINEAR,
+            mag_filter = SG_FILTER_LINEAR,
+            // wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+            // wrap_v = SG_WRAP_CLAMP_TO_EDGE,
+        });
+    }
     private void Set(byte* data, int width, int height)
     {
         Image = sg_make_image(new sg_image_desc()
@@ -92,9 +111,15 @@ public unsafe class Texture : IDisposable
         if (status == FileLoadStatus.Success && buffer != null)
         {
             Info($"Assimp: Texture file '{filePath}' loaded successfully, size: {buffer.Length} bytes");
+
+            if (Path.GetExtension(filePath).ToLower() == ".basisu" || Path.GetExtension(filePath).ToLower() == ".basis")
+            {
+                SetSBasisuImage(buffer);
+                return;
+            }
             // Further processing of the texture data would go here
             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
-            byte* pixels = stbi_load_csharp(
+            byte* pixels = stbi_load_flipped_csharp(
                 in buffer[0],
                 (int)buffer.Length,
                 ref png_width,
@@ -153,10 +178,9 @@ public unsafe class Texture : IDisposable
                         EmbeddedTexture embeddedTexture = scene.Textures[textureIndex];
                         if (embeddedTexture.IsCompressed)
                         {
-                            // Info($"Assimp: Embedded texture is compressed, size: {embeddedTexture.CompressedData.Length} bytes");
                             int png_width = 0, png_height = 0, channels = 0, desired_channels = 4;
 
-                            byte* pixels = stbi_load_csharp(
+                            byte* pixels = stbi_load_flipped_csharp(
                                 embeddedTexture.CompressedData[0],
                                 embeddedTexture.CompressedData.Length,
                                 ref png_width,
