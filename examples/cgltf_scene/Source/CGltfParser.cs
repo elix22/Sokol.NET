@@ -639,7 +639,21 @@ namespace Sokol
             {
                 if (_imageParams[i].GltfImageIndex == gltfImageIndex)
                 {
-                    _scene.Images[i].Image = sbasisu_make_image(data);
+                    sg_image image;
+                    
+                    // Detect image format and use appropriate decoder
+                    if (IsBasisuFormat(data))
+                    {
+                        Info($"CGltfParser: Image {i} is Basis Universal format, using sbasisu_make_image");
+                        image = sbasisu_make_image(data);
+                    }
+                    else
+                    {
+                        Info($"CGltfParser: Image {i} is standard format (PNG/JPG), using stbi_load_csharp");
+                        image = LoadImageWithStbi(data);
+                    }
+                    
+                    _scene.Images[i].Image = image;
                     _scene.Images[i].TexView = sg_make_view(new sg_view_desc
                     {
                         texture = { image = _scene.Images[i].Image }
@@ -654,6 +668,91 @@ namespace Sokol
                     });
                 }
             }
+        }
+        
+        private bool IsBasisuFormat(sg_range data)
+        {
+            // Basis Universal files start with specific magic bytes
+            // Check for ".basis" or ".ktx2" file signatures
+            byte* ptr = (byte*)data.ptr;
+            if (data.size < 4) return false;
+            
+            // Check for KTX 2.0 signature (used by Basis Universal)
+            // KTX 2.0: 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB...
+            if (ptr[0] == 0xAB && ptr[1] == 0x4B && ptr[2] == 0x54 && ptr[3] == 0x58)
+            {
+                return true;
+            }
+            
+            // Check for .basis signature
+            // Basis files typically start with specific header
+            if (data.size >= 12)
+            {
+                // Simple heuristic: if it's not PNG/JPG/etc, assume it might be basis
+                // PNG signature: 0x89, 0x50, 0x4E, 0x47
+                if (ptr[0] == 0x89 && ptr[1] == 0x50 && ptr[2] == 0x4E && ptr[3] == 0x47)
+                    return false;
+                
+                // JPEG signature: 0xFF, 0xD8, 0xFF
+                if (ptr[0] == 0xFF && ptr[1] == 0xD8 && ptr[2] == 0xFF)
+                    return false;
+                
+                // If we have KTX or unknown format that's not PNG/JPEG, assume basis
+                return true;
+            }
+            
+            return false;
+        }
+        
+        private sg_image LoadImageWithStbi(sg_range data)
+        {
+            int width = 0, height = 0, channels = 0;
+            int desired_channels = 4; // RGBA
+            
+            byte* dataPtr = (byte*)data.ptr;
+            byte* pixels = stbi_load_csharp(
+                in dataPtr[0],
+                (int)data.size,
+                ref width,
+                ref height,
+                ref channels,
+                desired_channels
+            );
+            
+            if (pixels == null)
+            {
+                Error($"CGltfParser: Failed to decode image with stbi_load_csharp");
+                // Return a placeholder white texture
+                return sg_make_image(new sg_image_desc
+                {
+                    width = 1,
+                    height = 1,
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                });
+            }
+            
+            Info($"CGltfParser: Image decoded successfully - {width}x{height}, channels={channels}");
+            
+            // Create sokol image from decoded pixel data
+            sg_image_desc desc = new sg_image_desc
+            {
+                width = width,
+                height = height,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            };
+            
+            desc.data.mip_levels[0] = new sg_range
+            {
+                ptr = pixels,
+                size = (nuint)(width * height * desired_channels)
+            };
+            
+            sg_image image = sg_make_image(desc);
+            
+            // Free the STB image data
+            stbi_image_free_csharp(pixels);
+            
+            return image;
         }
 
         #endregion
