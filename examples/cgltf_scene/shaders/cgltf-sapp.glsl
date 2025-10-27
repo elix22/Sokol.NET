@@ -207,8 +207,8 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
 
         // Calculation of analytical lighting contribution
         vec3 diffuse_contrib = (1.0 - F) * diffuse(material_info);
-        // BOOST specular contribution by 3x for dramatic metallic shine
-        vec3 spec_contrib = F * Vis * D * 3.0;
+        // Use standard PBR specular (removed 3x boost for more realistic lighting)
+        vec3 spec_contrib = F * Vis * D;
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
         return angular_info.n_dot_l * (diffuse_contrib + spec_contrib);
@@ -326,9 +326,8 @@ void main() {
         metallic *= mr_sample.b;              // BLUE channel = metallic (glTF 2.0 spec)
     }
     
-    // Make surfaces MUCH shinier by drastically reducing roughness
-    // This overrides the "damaged/worn" look from the texture
-    perceptual_roughness *= 0.3; // Reduce roughness by 70% for shiny metal look
+    // Use the material's actual roughness values for realistic PBR
+    // (removed the 0.3x reduction that was making everything too shiny)
     
     // Step 3: Get normal using proper tangent-space transformation
     vec3 normal = get_normal();

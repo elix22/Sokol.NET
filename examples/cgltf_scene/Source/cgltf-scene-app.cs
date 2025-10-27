@@ -39,8 +39,8 @@ public static unsafe class CGLTFSceneApp
     //  const string filename = "glb/DamagedHelmet.glb";
     const string filename = "glb/assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
-     
-   
+
+
 
     const int SCENE_INVALID_INDEX = -1;
 
@@ -97,29 +97,46 @@ public static unsafe class CGLTFSceneApp
     {
         state.light_params = default;
         state.light_params.num_lights = Math.Min(state.lights.Count, 4);
-        
+
         for (int i = 0; i < state.light_params.num_lights; i++)
         {
             Light light = state.lights[i];
             if (!light.Enabled) continue;
-            
-            // Position + light type in w component
-            state.light_params.light_positions[i] = new Vector4(
-                light.Position.X, light.Position.Y, light.Position.Z, (float)light.Type);
-            
-            // Direction + spot inner cutoff in w component
-            float innerCutoff = MathF.Cos(light.SpotInnerAngle * MathF.PI / 180.0f);
-            state.light_params.light_directions[i] = new Vector4(
-                light.Direction.X, light.Direction.Y, light.Direction.Z, innerCutoff);
-            
-            // Color + intensity in w component  
+
+            // All lights: Color + intensity in w component  
             state.light_params.light_colors[i] = new Vector4(
                 light.Color.X, light.Color.Y, light.Color.Z, light.Intensity);
-            
-            // Range + spot outer cutoff in y component
-            float outerCutoff = MathF.Cos(light.SpotOuterAngle * MathF.PI / 180.0f);
-            state.light_params.light_params_data[i] = new Vector4(
-                light.Range, outerCutoff, 0, 0);
+
+            switch (light.Type)
+            {
+                case LightType.Directional:
+                    // Direction only (type will be in directions.w)
+                    state.light_params.light_directions[i] = new Vector4(
+                        light.Direction.X, light.Direction.Y, light.Direction.Z, (float)light.Type);
+                    break;
+
+                case LightType.Point:
+                    // Position + type
+                    state.light_params.light_positions[i] = new Vector4(
+                        light.Position.X, light.Position.Y, light.Position.Z, (float)light.Type);
+                    // Range in params
+                    state.light_params.light_params_data[i] = new Vector4(light.Range, 0, 0, 0);
+                    break;
+
+                case LightType.Spot:
+                    // Position + type
+                    state.light_params.light_positions[i] = new Vector4(
+                        light.Position.X, light.Position.Y, light.Position.Z, (float)light.Type);
+                    // Direction + inner cutoff
+                    float innerCutoff = MathF.Cos(light.SpotInnerAngle * MathF.PI / 180.0f);
+                    state.light_params.light_directions[i] = new Vector4(
+                        light.Direction.X, light.Direction.Y, light.Direction.Z, innerCutoff);
+                    // Range + outer cutoff
+                    float outerCutoff = MathF.Cos(light.SpotOuterAngle * MathF.PI / 180.0f);
+                    state.light_params.light_params_data[i] = new Vector4(
+                        light.Range, outerCutoff, 0, 0);
+                    break;
+            }
         }
     }
 
@@ -180,7 +197,7 @@ public static unsafe class CGLTFSceneApp
             new Vector3(1.0f, 0.98f, 0.95f),   // Warm white light
             2.5f                                // Intensity
         ));
-        
+
         // Key point light - creates primary specular highlights
         state.lights.Add(Light.CreatePointLight(
             new Vector3(5.0f, 8.0f, 5.0f),
@@ -188,7 +205,7 @@ public static unsafe class CGLTFSceneApp
             500.0f,                             // Range
             25.0f                               // Intensity
         ));
-        
+
         // Fill light - softer, from opposite side
         state.lights.Add(Light.CreatePointLight(
             new Vector3(-5.0f, 3.0f, -3.0f),
@@ -341,23 +358,23 @@ public static unsafe class CGLTFSceneApp
                     {
                         bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
                     }
-                    
+
                     // Lights are static (no animation) - directional light + fixed point lights
                     // This provides consistent, professional studio-style lighting
-                    
+
                     // Update light uniforms
                     UpdateLightUniforms();
-                    
+
                     // Apply uniforms
                     sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
                     sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
-                    
+
                     if (mat.IsMetallic)
                     {
                         // Read textures from scene (match working cgltf sample pattern)
                         // But first check if indices are valid to avoid array access errors
-                        sg_view base_color_tex = (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX) 
-                            ? state.scene.Images[mat.Metallic.Images.BaseColor].TexView 
+                        sg_view base_color_tex = (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX)
+                            ? state.scene.Images[mat.Metallic.Images.BaseColor].TexView
                             : new sg_view();
                         sg_view metallic_roughness_tex = (mat.Metallic.Images.MetallicRoughness != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.MetallicRoughness].TexView
@@ -371,7 +388,7 @@ public static unsafe class CGLTFSceneApp
                         sg_view emissive_tex = (mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Emissive].TexView
                             : new sg_view();
-                        
+
                         sg_sampler base_color_smp = (mat.Metallic.Images.BaseColor != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.BaseColor].Sampler
                             : new sg_sampler();
@@ -387,7 +404,7 @@ public static unsafe class CGLTFSceneApp
                         sg_sampler emissive_smp = (mat.Metallic.Images.Emissive != SCENE_INVALID_INDEX)
                             ? state.scene.Images[mat.Metallic.Images.Emissive].Sampler
                             : new sg_sampler();
-                        
+
                         // Check if textures are valid and use placeholders if not
                         if (base_color_tex.id == 0)
                         {
@@ -421,7 +438,7 @@ public static unsafe class CGLTFSceneApp
                         bind.views[VIEW_cgltf_normal_tex] = normal_tex;
                         bind.views[VIEW_cgltf_occlusion_tex] = occlusion_tex;
                         bind.views[VIEW_cgltf_emissive_tex] = emissive_tex;
-                        
+
                         bind.samplers[SMP_cgltf_base_color_smp] = base_color_smp;
                         bind.samplers[SMP_cgltf_metallic_roughness_smp] = metallic_roughness_smp;
                         bind.samplers[SMP_cgltf_normal_smp] = normal_smp;
@@ -429,7 +446,7 @@ public static unsafe class CGLTFSceneApp
                         bind.samplers[SMP_cgltf_emissive_smp] = emissive_smp;
                         sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
                     }
-                    
+
                     sg_apply_bindings(bind);
                     sg_draw((uint)prim.BaseElement, (uint)prim.NumElements, 1);
                 }
