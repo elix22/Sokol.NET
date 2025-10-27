@@ -773,10 +773,10 @@ namespace Sokol
         
         private void LoadExternalTexture(int gltfImageIndex, string filePath)
         {
-            string resolvedPath = util_get_file_path(filePath);
-            Info($"CGltfParser: Loading external texture {gltfImageIndex}: {resolvedPath}");
+            // filePath already contains the full path (basePath + uri), don't call util_get_file_path
+            Info($"CGltfParser: Loading external texture {gltfImageIndex}: {filePath}");
             
-            FileSystem.Instance.LoadFile(resolvedPath, (path, buffer, status) =>
+            FileSystem.Instance.LoadFile(filePath, (path, buffer, status) =>
             {
                 if (status == FileLoadStatus.Success && buffer != null)
                 {
