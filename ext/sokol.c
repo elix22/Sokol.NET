@@ -93,6 +93,8 @@ extern "C"
 #endif
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define IMGUI_VERSION       "1.92.2b" // TBD ELI , currently manual setup
+#define IMGUI_VERSION_NUM   19222
 #include "cimgui/cimgui.h"
 #ifndef ImTextureID_Invalid
 #define ImTextureID_Invalid     ((ImTextureID)0)
