@@ -36,8 +36,8 @@ public static unsafe class CGLTFSceneApp
 
     static bool PauseUpdate = false;
 
-     const string filename = "glb/DamagedHelmet.glb";
-    // const string filename = "glb/assimpScene.glb";
+    //  const string filename = "glb/DamagedHelmet.glb";
+    const string filename = "glb/assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
      
    
@@ -76,7 +76,8 @@ public static unsafe class CGLTFSceneApp
         public Shaders shaders;
         public CGltfScene scene = new CGltfScene();
         public Camera camera = new Camera();
-        public cgltf_light_params_t point_light;
+        public cgltf_light_params_t light_params;  // Changed from point_light to light_params
+        public List<Light> lights = new List<Light>();  // Active lights
         public Matrix4x4 root_transform;
         public float rx;
         public float ry;
@@ -90,6 +91,37 @@ public static unsafe class CGLTFSceneApp
     static double frameRate = 30;
     static double averageFrameTimeMilliseconds = 33.333;
     static ulong startTime = 0;
+
+    // Helper function to update light uniforms from Light objects
+    static void UpdateLightUniforms()
+    {
+        state.light_params = default;
+        state.light_params.num_lights = Math.Min(state.lights.Count, 4);
+        
+        for (int i = 0; i < state.light_params.num_lights; i++)
+        {
+            Light light = state.lights[i];
+            if (!light.Enabled) continue;
+            
+            // Position + light type in w component
+            state.light_params.light_positions[i] = new Vector4(
+                light.Position.X, light.Position.Y, light.Position.Z, (float)light.Type);
+            
+            // Direction + spot inner cutoff in w component
+            float innerCutoff = MathF.Cos(light.SpotInnerAngle * MathF.PI / 180.0f);
+            state.light_params.light_directions[i] = new Vector4(
+                light.Direction.X, light.Direction.Y, light.Direction.Z, innerCutoff);
+            
+            // Color + intensity in w component  
+            state.light_params.light_colors[i] = new Vector4(
+                light.Color.X, light.Color.Y, light.Color.Z, light.Intensity);
+            
+            // Range + spot outer cutoff in y component
+            float outerCutoff = MathF.Cos(light.SpotOuterAngle * MathF.PI / 180.0f);
+            state.light_params.light_params_data[i] = new Vector4(
+                light.Range, outerCutoff, 0, 0);
+        }
+    }
 
     [UnmanagedCallersOnly]
     private static unsafe void Init()
@@ -141,12 +173,29 @@ public static unsafe class CGLTFSceneApp
         _parser = new CGltfParser();
         _parser.Init(state.shaders.metallic, state.shaders.metallic); // Using metallic shader for both for now
 
-        // Setup light with moderate intensity for shader with ambient
-        state.point_light = default;
-        state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
-        state.point_light.light_range = 500.0f;
-        state.point_light.light_color = new Vector3(1.0f, 1.0f, 1.0f);
-        state.point_light.light_intensity = 20.0f;  // Lower due to 10% ambient in shader
+        // Setup lights - mix of directional and point lights for best PBR results
+        // Main directional light (like sun) - provides consistent lighting from one direction
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(-0.3f, -0.8f, -0.5f),  // Direction (from upper-right)
+            new Vector3(1.0f, 0.98f, 0.95f),   // Warm white light
+            2.5f                                // Intensity
+        ));
+        
+        // Key point light - creates primary specular highlights
+        state.lights.Add(Light.CreatePointLight(
+            new Vector3(5.0f, 8.0f, 5.0f),
+            new Vector3(1.0f, 1.0f, 1.0f),     // White light
+            500.0f,                             // Range
+            25.0f                               // Intensity
+        ));
+        
+        // Fill light - softer, from opposite side
+        state.lights.Add(Light.CreatePointLight(
+            new Vector3(-5.0f, 3.0f, -3.0f),
+            new Vector3(0.7f, 0.8f, 1.0f),     // Cool blue-white light
+            500.0f,
+            10.0f
+        ));
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
@@ -293,12 +342,15 @@ public static unsafe class CGLTFSceneApp
                         bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
                     }
                     
-                    // Update light to follow camera
-                    state.point_light.light_pos = state.camera.EyePos;
+                    // Lights are static (no animation) - directional light + fixed point lights
+                    // This provides consistent, professional studio-style lighting
+                    
+                    // Update light uniforms
+                    UpdateLightUniforms();
                     
                     // Apply uniforms
                     sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
-                    sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.point_light), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
                     
                     if (mat.IsMetallic)
                     {

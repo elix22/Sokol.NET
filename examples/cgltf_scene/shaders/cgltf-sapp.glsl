@@ -70,11 +70,18 @@ layout(binding=1) uniform metallic_params {
     float has_emissive_tex;
 };
 
+const int MAX_LIGHTS = 4;
+const int LIGHT_TYPE_DIRECTIONAL = 0;
+const int LIGHT_TYPE_POINT = 1;
+const int LIGHT_TYPE_SPOT = 2;
+
 layout(binding=2) uniform light_params {
-    vec3 light_pos;
-    float light_range;
-    vec3 light_color;
-    float light_intensity;
+    int num_lights;
+    float _pad1, _pad2, _pad3;  // Padding to align to vec4
+    vec4 light_positions[MAX_LIGHTS];   // w component: light type
+    vec4 light_directions[MAX_LIGHTS];  // w component: spot inner cutoff (cosine)
+    vec4 light_colors[MAX_LIGHTS];      // w component: intensity
+    vec4 light_params_data[MAX_LIGHTS]; // x: range, y: spot outer cutoff, z/w: unused
 };
 
 layout(binding=0) uniform texture2D base_color_tex;
@@ -200,7 +207,8 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
 
         // Calculation of analytical lighting contribution
         vec3 diffuse_contrib = (1.0 - F) * diffuse(material_info);
-        vec3 spec_contrib = F * Vis * D;
+        // BOOST specular contribution by 3x for dramatic metallic shine
+        vec3 spec_contrib = F * Vis * D * 3.0;
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
         return angular_info.n_dot_l * (diffuse_contrib + spec_contrib);
@@ -215,12 +223,64 @@ float get_range_attenuation(float range, float distance) {
     return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
 }
 
-vec3 apply_point_light(material_info_t material_info, vec3 normal, vec3 view) {
-    vec3 point_to_light = light_pos - v_pos;
-    float distance = length(point_to_light);
-    float attenuation = get_range_attenuation(light_range, distance);
+// Calculate PBR lighting for a single light source
+vec3 apply_single_light(int light_idx, material_info_t material_info, vec3 normal, vec3 view) {
+    int light_type = int(light_positions[light_idx].w);
+    vec3 light_pos = light_positions[light_idx].xyz;
+    vec3 light_dir = light_directions[light_idx].xyz;
+    vec3 light_color = light_colors[light_idx].rgb;
+    float light_intensity = light_colors[light_idx].w;
+    float light_range = light_params_data[light_idx].x;
+    
+    vec3 point_to_light;
+    float attenuation = 1.0;
+    
+    if (light_type == LIGHT_TYPE_DIRECTIONAL) {
+        // Directional light
+        point_to_light = normalize(-light_dir);
+        attenuation = 1.0;
+    }
+    else if (light_type == LIGHT_TYPE_POINT) {
+        // Point light
+        point_to_light = light_pos - v_pos;
+        float distance = length(point_to_light);
+        attenuation = get_range_attenuation(light_range, distance);
+        point_to_light = normalize(point_to_light);
+    }
+    else if (light_type == LIGHT_TYPE_SPOT) {
+        // Spot light
+        point_to_light = light_pos - v_pos;
+        float distance = length(point_to_light);
+        point_to_light = normalize(point_to_light);
+        
+        // Spot cone calculation
+        vec3 spot_dir = normalize(-light_dir);
+        float theta = dot(-point_to_light, spot_dir);
+        float inner_cutoff = light_directions[light_idx].w;  // cosine of inner angle
+        float outer_cutoff = light_params_data[light_idx].y; // cosine of outer angle
+        float epsilon = inner_cutoff - outer_cutoff;
+        float spot_intensity = clamp((theta - outer_cutoff) / epsilon, 0.0, 1.0);
+        
+        attenuation = get_range_attenuation(light_range, distance) * spot_intensity;
+    }
+    else {
+        return vec3(0.0); // Unknown light type
+    }
+    
+    // Calculate PBR shading
     vec3 shade = get_point_shade(point_to_light, material_info, normal, view);
     return attenuation * light_intensity * light_color * shade;
+}
+
+// Apply all active lights
+vec3 apply_all_lights(material_info_t material_info, vec3 normal, vec3 view) {
+    vec3 total_light = vec3(0.0);
+    
+    for (int i = 0; i < num_lights && i < MAX_LIGHTS; i++) {
+        total_light += apply_single_light(i, material_info, normal, view);
+    }
+    
+    return total_light;
 }
 
 // Uncharted 2 tone map
@@ -266,6 +326,10 @@ void main() {
         metallic *= mr_sample.b;              // BLUE channel = metallic (glTF 2.0 spec)
     }
     
+    // Make surfaces MUCH shinier by drastically reducing roughness
+    // This overrides the "damaged/worn" look from the texture
+    perceptual_roughness *= 0.3; // Reduce roughness by 70% for shiny metal look
+    
     // Step 3: Get normal using proper tangent-space transformation
     vec3 normal = get_normal();
     
@@ -282,19 +346,20 @@ void main() {
         emissive *= emissive_sample;
     }
     
-    // Clamp roughness to avoid artifacts
-    perceptual_roughness = clamp(perceptual_roughness, 0.04, 1.0);
+    // Clamp roughness to avoid artifacts (lower minimum for shinier surfaces)
+    perceptual_roughness = clamp(perceptual_roughness, 0.01, 1.0);
     metallic = clamp(metallic, 0.0, 1.0);
     float alpha_roughness = perceptual_roughness * perceptual_roughness;
     
-    // Calculate reflectance
+    // Calculate reflectance with enhanced metallic response
     vec3 f0 = vec3(0.04);
     vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0) * (1.0 - metallic);
     vec3 specular_color = mix(f0, base_color.rgb, metallic);
     
     float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
     vec3 specular_environment_r0 = specular_color.rgb;
-    vec3 specular_environment_r90 = vec3(clamp(reflectance * 50.0, 0.0, 1.0));
+    // Boost specular for metals (increased from 50.0 to 100.0)
+    vec3 specular_environment_r90 = vec3(clamp(reflectance * 100.0, 0.0, 1.0));
     
     material_info_t material_info = material_info_t(
         perceptual_roughness,
@@ -305,12 +370,16 @@ void main() {
         specular_color
     );
     
-    // Apply PBR lighting
+    // Apply PBR lighting from all lights
     vec3 view = normalize(v_eye_pos - v_pos);
-    vec3 color = apply_point_light(material_info, normal, view);
+    vec3 color = apply_all_lights(material_info, normal, view);
     
-    // Add ambient light to prevent pure black
-    vec3 ambient = base_color.rgb * 0.3; // 10% ambient light
+    // Enhanced ambient with metallic reflection
+    vec3 ambient = base_color.rgb * 0.15; // Base ambient
+    // Add extra specular reflection for metallic surfaces
+    float fresnel = pow(1.0 - max(dot(normal, view), 0.0), 5.0);
+    vec3 metallic_ambient = specular_color * metallic * (0.3 + fresnel * 0.4);
+    ambient += metallic_ambient;
     color += ambient;
     
     color *= occlusion; // Apply ambient occlusion
