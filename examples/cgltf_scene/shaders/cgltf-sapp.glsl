@@ -309,8 +309,8 @@ void main() {
     vec3 color = apply_point_light(material_info, normal, view);
     
     // Add ambient light to prevent pure black
-    //vec3 ambient = base_color.rgb * 0.3; // 30% ambient light
-    //color += ambient;
+    vec3 ambient = base_color.rgb * 0.1; // 10% ambient light
+    color += ambient;
     
     color *= occlusion; // Apply ambient occlusion
     color += emissive;  // Add emissive glow

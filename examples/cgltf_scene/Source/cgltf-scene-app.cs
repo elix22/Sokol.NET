@@ -36,8 +36,11 @@ public static unsafe class CGLTFSceneApp
 
     static bool PauseUpdate = false;
 
-    // const string filename = "assimpScene.glb";
-     const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
+     const string filename = "glb/DamagedHelmet.glb";
+    // const string filename = "glb/assimpScene.glb";
+    // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
+     
+   
 
     const int SCENE_INVALID_INDEX = -1;
 
@@ -142,8 +145,8 @@ public static unsafe class CGLTFSceneApp
         state.point_light = default;
         state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
         state.point_light.light_range = 200.0f;
-        state.point_light.light_color = new Vector3(1.0f, 1.5f, 2.0f);
-        state.point_light.light_intensity = 10.0f;  // Lower due to 30% ambient in shader
+        state.point_light.light_color = new Vector3(1.0f, 1.0f, 1.0f);
+        state.point_light.light_intensity = 5.0f;  // Lower due to 10% ambient in shader
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
