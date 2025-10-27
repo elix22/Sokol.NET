@@ -144,9 +144,9 @@ public static unsafe class CGLTFSceneApp
         // Setup light with moderate intensity for shader with ambient
         state.point_light = default;
         state.point_light.light_pos = new Vector3(10.0f, 10.0f, 10.0f);
-        state.point_light.light_range = 200.0f;
+        state.point_light.light_range = 500.0f;
         state.point_light.light_color = new Vector3(1.0f, 1.0f, 1.0f);
-        state.point_light.light_intensity = 5.0f;  // Lower due to 10% ambient in shader
+        state.point_light.light_intensity = 20.0f;  // Lower due to 10% ambient in shader
 
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);

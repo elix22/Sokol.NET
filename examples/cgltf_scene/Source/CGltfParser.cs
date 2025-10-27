@@ -836,6 +836,10 @@ namespace Sokol
                     Info($"CGltfParser: Processing image {i} (matches gltfImageIndex {gltfImageIndex})");
                     sg_image image;
                     
+                    // Determine if this texture needs linear color space (not sRGB)
+                    // In glTF 2.0: metallic-roughness, normal, and occlusion maps are LINEAR
+                    bool needsLinearColorSpace = IsLinearColorSpaceTexture(i);
+                    
                     // Detect image format and use appropriate decoder
                     if (IsBasisuFormat(data))
                     {
@@ -844,8 +848,8 @@ namespace Sokol
                     }
                     else
                     {
-                        Info($"CGltfParser: Image {i} is standard format (PNG/JPG), using stbi_load_csharp");
-                        image = LoadImageWithStbi(data);
+                        Info($"CGltfParser: Image {i} is standard format (PNG/JPG), using stbi_load_csharp, linear={needsLinearColorSpace}");
+                        image = LoadImageWithStbi(data, needsLinearColorSpace);
                     }
                     
                     Info($"CGltfParser: Image {i} created with id={image.id}");
@@ -869,6 +873,30 @@ namespace Sokol
                     });
                 }
             }
+        }
+        
+        private bool IsLinearColorSpaceTexture(int textureIndex)
+        {
+            // Check all materials to see if this texture is used as:
+            // - metallic-roughness (LINEAR)
+            // - normal map (LINEAR)  
+            // - occlusion map (LINEAR)
+            // If it's ONLY used for base color or emissive, it should be sRGB
+            
+            for (int i = 0; i < ActiveScene.NumMaterials; i++)
+            {
+                if (ActiveScene.Materials[i].IsMetallic)
+                {
+                    var images = ActiveScene.Materials[i].Metallic.Images;
+                    
+                    // These textures MUST be linear (not sRGB)
+                    if (images.MetallicRoughness == textureIndex) return true;
+                    if (images.Normal == textureIndex) return true;
+                    if (images.Occlusion == textureIndex) return true;
+                }
+            }
+            
+            return false; // Base color and emissive use sRGB
         }
         
         private bool IsBasisuFormat(sg_range data)
@@ -912,7 +940,7 @@ namespace Sokol
             return false;
         }
         
-        private sg_image LoadImageWithStbi(sg_range data)
+        private sg_image LoadImageWithStbi(sg_range data, bool linearColorSpace = false)
         {
             // Safety check
             if (data.ptr == null || data.size == 0)
@@ -923,7 +951,7 @@ namespace Sokol
                 {
                     width = 1,
                     height = 1,
-                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                    pixel_format = linearColorSpace ? sg_pixel_format.SG_PIXELFORMAT_RGBA8 : sg_pixel_format.SG_PIXELFORMAT_SRGB8A8,
                 });
             }
             
@@ -948,15 +976,17 @@ namespace Sokol
                 {
                     width = 1,
                     height = 1,
-                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                    pixel_format = linearColorSpace ? sg_pixel_format.SG_PIXELFORMAT_RGBA8 : sg_pixel_format.SG_PIXELFORMAT_SRGB8A8,
                 });
             }
             
+            // CRITICAL: Use linear pixel format (RGBA8) for metallic-roughness, normal, and occlusion maps
+            // Use sRGB pixel format (SRGB8A8) for base color and emissive maps
             sg_image_desc desc = new sg_image_desc
             {
                 width = width,
                 height = height,
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                pixel_format = linearColorSpace ? sg_pixel_format.SG_PIXELFORMAT_RGBA8 : sg_pixel_format.SG_PIXELFORMAT_SRGB8A8,
             };
             
             desc.data.mip_levels[0] = new sg_range

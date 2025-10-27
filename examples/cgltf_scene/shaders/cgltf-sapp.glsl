@@ -255,14 +255,15 @@ void main() {
     base_color *= base_color_factor;
     
     // Step 2: Get metallic/roughness
-    // Roughness is stored in the 'a' (alpha/w) channel, metallic is stored in the 'r' (red/x) channel
-    // This layout intentionally reserves the 'r' channel for (optional) occlusion map data
+    // glTF 2.0 Specification for metallicRoughnessTexture:
+    // - Blue channel (.b) = metallic
+    // - Green channel (.g) = roughness
     float metallic = metallic_factor;
     float perceptual_roughness = roughness_factor;
     if (has_metallic_roughness_tex > 0.5) {
         vec4 mr_sample = texture(sampler2D(metallic_roughness_tex, metallic_roughness_smp), v_uv);
-        perceptual_roughness *= mr_sample.a; // Alpha channel = roughness
-        metallic *= mr_sample.r;              // Red channel = metallic
+        perceptual_roughness *= mr_sample.g; // GREEN channel = roughness (glTF 2.0 spec)
+        metallic *= mr_sample.b;              // BLUE channel = metallic (glTF 2.0 spec)
     }
     
     // Step 3: Get normal using proper tangent-space transformation
@@ -309,7 +310,7 @@ void main() {
     vec3 color = apply_point_light(material_info, normal, view);
     
     // Add ambient light to prevent pure black
-    vec3 ambient = base_color.rgb * 0.1; // 10% ambient light
+    vec3 ambient = base_color.rgb * 0.3; // 10% ambient light
     color += ambient;
     
     color *= occlusion; // Apply ambient occlusion
