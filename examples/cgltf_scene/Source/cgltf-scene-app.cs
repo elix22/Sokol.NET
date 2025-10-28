@@ -38,10 +38,10 @@ public static unsafe class CGLTFSceneApp
     static bool PauseUpdate = false;
 
     //  const string filename = "glb/DamagedHelmet.glb";
-    const string filename = "glb/assimpScene.glb";
+    // const string filename = "glb/assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    // const string filename = "glb/DancingGangster.glb";
+    const string filename = "glb/DancingGangster.glb";
     // const string filename = "glb/Gangster.glb";
      
     //
@@ -512,6 +512,13 @@ public static unsafe class CGLTFSceneApp
 
         state.root_transform = Matrix4x4.CreateRotationY(state.rx);
 
+        // Update animation
+        if (state.animator != null)
+        {
+            float animDeltaTime = (float)sapp_frame_duration();
+            state.animator.UpdateAnimation(animDeltaTime);
+        }
+
         // Update camera (already updated in auto-positioning if it was just initialized)
         if (state.cameraInitialized)
         {
@@ -592,7 +599,24 @@ public static unsafe class CGLTFSceneApp
                             view_proj = vs_params.view_proj,
                             eye_pos = vs_params.eye_pos
                         };
-                        // TODO: Fill finalBonesMatrices array with animation data
+                        
+                        // Fill bone matrices from animator
+                        if (state.animator != null)
+                        {
+                            Matrix4x4[] boneMatrices = state.animator.GetFinalBoneMatrices();
+                            for (int boneIdx = 0; boneIdx < 100 && boneIdx < boneMatrices.Length; boneIdx++)
+                            {
+                                skinning_vs_params.finalBonesMatrices[boneIdx] = boneMatrices[boneIdx];
+                            }
+                        }
+                        else
+                        {
+                            // No animator - use identity matrices (bind pose)
+                            for (int boneIdx = 0; boneIdx < 100; boneIdx++)
+                            {
+                                skinning_vs_params.finalBonesMatrices[boneIdx] = Matrix4x4.Identity;
+                            }
+                        }
                         
                         sg_apply_uniforms(UB_skinning_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref skinning_vs_params), size = (uint)Marshal.SizeOf<skinning_vs_params_t>() });
                         sg_apply_uniforms(UB_skinning_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });

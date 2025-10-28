@@ -50,18 +50,20 @@ void main() {
         // Apply skinning if bones are present
         for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
         {
-            if(boneIds[i] == -1) 
+            // Skip if weight is zero or bone ID is invalid
+            if(weights[i] <= 0.0) 
                 continue;
-            if(boneIds[i] >= MAX_BONES) 
+            uint boneId = boneIds[i];
+            if(boneId >= uint(MAX_BONES)) 
             {
                 totalPosition = position;
                 totalNormal = normal;
                 hasValidBone = true;
                 break;
             }
-            vec4 localPosition = finalBonesMatrices[boneIds[i]] * position;
+            vec4 localPosition = finalBonesMatrices[boneId] * position;
             totalPosition += localPosition * weights[i];
-            vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * normal;
+            vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
             totalNormal += localNormal * weights[i];
             hasValidBone = true;
         }
