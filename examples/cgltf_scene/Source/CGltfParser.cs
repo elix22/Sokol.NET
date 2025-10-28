@@ -95,6 +95,7 @@ namespace Sokol
         public int IndexBuffer;
         public int BaseElement;
         public int NumElements;
+        public bool HasSkinning; // Whether this primitive has bone data
     }
 
     /// <summary>
@@ -145,6 +146,9 @@ namespace Sokol
         public Vector3 SceneBoundsMin;
         public Vector3 SceneBoundsMax;
 
+        // Animation support
+        public Dictionary<string, BoneInfo> BoneInfoMap = new Dictionary<string, BoneInfo>();
+        public int BoneCount = 0;
 
         public sg_buffer[] Buffers;
         public CGltfImage[] Images;
@@ -153,6 +157,11 @@ namespace Sokol
         public CGltfPrimitive[] Primitives;
         public CGltfMesh[] Meshes;
         public CGltfNode[] Nodes;
+
+        // Animation support methods
+        public Dictionary<string, BoneInfo> GetBoneInfoMap() => BoneInfoMap;
+        public int GetBoneCount() => BoneCount;
+        public void SetBoneCount(int count) => BoneCount = count;
 
         public CGltfScene()
         {
@@ -245,6 +254,8 @@ namespace Sokol
         private CGltfScene? _externalScene;  // Reference to external scene (if provided)
         private sg_shader _metallicShader;
         private sg_shader _specularShader;
+        private sg_shader _metallicShaderSkinning;  // Skinning variant
+        private sg_shader _specularShaderSkinning; // Skinning variant (for future use)
         
         // Placeholder textures
         private sg_view _whiteTex;
@@ -291,10 +302,12 @@ namespace Sokol
         /// <summary>
         /// Initialize the parser with shaders and placeholder textures
         /// </summary>
-        public void Init(sg_shader metallicShader, sg_shader specularShader)
+        public void Init(sg_shader metallicShader, sg_shader specularShader, sg_shader metallicShaderSkinning, sg_shader specularShaderSkinning)
         {
             _metallicShader = metallicShader;
             _specularShader = specularShader;
+            _metallicShaderSkinning = metallicShaderSkinning;
+            _specularShaderSkinning = specularShaderSkinning;
 
             CreatePlaceholderTextures();
         }
@@ -433,6 +446,7 @@ namespace Sokol
         public void LoadFromFileAsync(string filePath, CGltfScene externalScene, Action onComplete, Action<string>? onFailed = null)
         {
             _externalScene = externalScene;  // Use external scene
+            
             _filePath = filePath;
             _basePath = Path.GetDirectoryName(filePath) ?? "";
             _onLoadComplete = _ => onComplete();  // Wrap void callback
@@ -631,6 +645,8 @@ namespace Sokol
             ParseImages(gltf);
             ParseMaterials(gltf);
             ParseMeshes(gltf);
+            ParseSkins(gltf);
+            ParseAnimations(gltf);
             ParseNodes(gltf);
 
                        // Calculate actual scene bounds from GLTF accessor min/max
@@ -1074,6 +1090,257 @@ namespace Sokol
 
         #endregion
 
+        #region Skin Parsing
+
+        private void ParseSkins(cgltf_data* gltf)
+        {
+            if (gltf->skins_count == 0)
+            {
+                Info("CGltfParser: No skins found in GLTF");
+                return;
+            }
+
+            Info($"CGltfParser: Parsing {gltf->skins_count} skin(s)...");
+
+            // For now, we only support the first skin
+            cgltf_skin* skin = &gltf->skins[0];
+            
+            if (skin->inverse_bind_matrices == null)
+            {
+                Info("CGltfParser: Skin has no inverse bind matrices");
+                return;
+            }
+
+            // Read inverse bind matrices
+            cgltf_accessor* accessor = skin->inverse_bind_matrices;
+            if (accessor->count != skin->joints_count)
+            {
+                throw new Exception($"Inverse bind matrix count mismatch: {accessor->count} vs {skin->joints_count}");
+            }
+
+            Info($"CGltfParser: Processing {skin->joints_count} joints");
+
+            // Allocate buffer for matrix data outside the loop
+            float* matrixData = stackalloc float[16];
+
+            // Read all inverse bind matrices
+            for (nuint i = 0; i < skin->joints_count; i++)
+            {
+                cgltf_node* joint = skin->joints[i];
+                string jointName = Marshal.PtrToStringUTF8((IntPtr)joint->name) ?? $"Joint_{i}";
+
+                // Read inverse bind matrix
+                Matrix4x4 inverseBindMatrix = Matrix4x4.Identity;
+                if (cgltf_accessor_read_float(*accessor, i, matrixData, 16) != 0)
+                {
+                    // Copy matrix data (GLTF uses column-major, so transpose)
+                    inverseBindMatrix = new Matrix4x4(
+                        matrixData[0], matrixData[1], matrixData[2], matrixData[3],
+                        matrixData[4], matrixData[5], matrixData[6], matrixData[7],
+                        matrixData[8], matrixData[9], matrixData[10], matrixData[11],
+                        matrixData[12], matrixData[13], matrixData[14], matrixData[15]
+                    );
+                }
+
+                // Store bone info
+                if (!ActiveScene.BoneInfoMap.ContainsKey(jointName))
+                {
+                    ActiveScene.BoneInfoMap[jointName] = new BoneInfo
+                    {
+                        Id = (int)i,
+                        Offset = inverseBindMatrix
+                    };
+                    ActiveScene.BoneCount++;
+                }
+
+                Info($"CGltfParser:   Joint {i}: {jointName}");
+            }
+
+            Info($"CGltfParser: Skin parsing complete. Total bones: {ActiveScene.BoneCount}");
+        }
+
+        #endregion
+
+        #region Animation Parsing
+
+        public List<CGltfAnimation> Animations { get; private set; } = new List<CGltfAnimation>();
+
+        private void ParseAnimations(cgltf_data* gltf)
+        {
+            if (gltf->animations_count == 0)
+            {
+                Info("CGltfParser: No animations found in GLTF");
+                return;
+            }
+
+            Info($"CGltfParser: Parsing {gltf->animations_count} animation(s)...");
+
+            // Allocate time buffer outside loop (reuse for all channels)
+            const int MAX_KEYFRAMES = 1000;
+            float* times = stackalloc float[MAX_KEYFRAMES];
+
+            for (nuint animIdx = 0; animIdx < gltf->animations_count; animIdx++)
+            {
+                cgltf_animation* gltfAnim = &gltf->animations[animIdx];
+                string animName = Marshal.PtrToStringUTF8((IntPtr)gltfAnim->name) ?? $"Animation_{animIdx}";
+
+                Info($"CGltfParser: Processing animation '{animName}' with {gltfAnim->channels_count} channels");
+
+                var animation = new CGltfAnimation();
+                var bones = new List<CGltfBone>();
+
+                // Find animation duration
+                float maxTime = 0.0f;
+                for (nuint channelIdx = 0; channelIdx < gltfAnim->channels_count; channelIdx++)
+                {
+                    cgltf_animation_channel* channel = &gltfAnim->channels[channelIdx];
+                    cgltf_animation_sampler* sampler = channel->sampler;
+                    
+                    if (sampler->input != null && sampler->input->count > 0)
+                    {
+                        float time = 0.0f;
+                        cgltf_accessor_read_float(*sampler->input, sampler->input->count - 1, &time, 1);
+                        if (time > maxTime) maxTime = time;
+                    }
+                }
+
+                // Default ticks per second (GLTF animations are in seconds)
+                float ticksPerSecond = 1.0f;
+
+                // Process each animation channel (one channel per animated property of a node)
+                Dictionary<string, (List<KeyPosition> positions, List<KeyRotation> rotations, List<KeyScale> scales)> nodeAnimations 
+                    = new Dictionary<string, (List<KeyPosition>, List<KeyRotation>, List<KeyScale>)>();
+
+                for (nuint channelIdx = 0; channelIdx < gltfAnim->channels_count; channelIdx++)
+                {
+                    cgltf_animation_channel* channel = &gltfAnim->channels[channelIdx];
+                    cgltf_animation_sampler* sampler = channel->sampler;
+                    cgltf_node* targetNode = channel->target_node;
+
+                    if (targetNode == null) continue;
+
+                    string nodeName = Marshal.PtrToStringUTF8((IntPtr)targetNode->name) ?? $"Node_{channelIdx}";
+
+                    if (!nodeAnimations.ContainsKey(nodeName))
+                    {
+                        nodeAnimations[nodeName] = (new List<KeyPosition>(), new List<KeyRotation>(), new List<KeyScale>());
+                    }
+
+                    var nodeAnim = nodeAnimations[nodeName];
+
+                    // Read time stamps
+                    cgltf_accessor* timeAccessor = sampler->input;
+                    int keyframeCount = Math.Min((int)timeAccessor->count, MAX_KEYFRAMES);
+                    cgltf_accessor_read_float(*timeAccessor, 0, times, (nuint)keyframeCount);
+
+                    // Read output data based on path type
+                    cgltf_accessor* outputAccessor = sampler->output;
+
+                    switch (channel->target_path)
+                    {
+                        case cgltf_animation_path_type.cgltf_animation_path_type_translation:
+                        {
+                            for (int i = 0; i < keyframeCount; i++)
+                            {
+                                Vector3 position = Vector3.Zero;
+                                cgltf_accessor_read_float(*outputAccessor, (nuint)i, (float*)&position, 3);
+                                nodeAnim.positions.Add(new KeyPosition { Position = position, TimeStamp = times[i] });
+                            }
+                            break;
+                        }
+                        case cgltf_animation_path_type.cgltf_animation_path_type_rotation:
+                        {
+                            for (int i = 0; i < keyframeCount; i++)
+                            {
+                                Quaternion rotation = Quaternion.Identity;
+                                cgltf_accessor_read_float(*outputAccessor, (nuint)i, (float*)&rotation, 4);
+                                nodeAnim.rotations.Add(new KeyRotation { Orientation = rotation, TimeStamp = times[i] });
+                            }
+                            break;
+                        }
+                        case cgltf_animation_path_type.cgltf_animation_path_type_scale:
+                        {
+                            for (int i = 0; i < keyframeCount; i++)
+                            {
+                                Vector3 scale = Vector3.One;
+                                cgltf_accessor_read_float(*outputAccessor, (nuint)i, (float*)&scale, 3);
+                                nodeAnim.scales.Add(new KeyScale { Scale = scale, TimeStamp = times[i] });
+                            }
+                            break;
+                        }
+                    }
+
+                    nodeAnimations[nodeName] = nodeAnim;
+                }
+
+                // Create bones from collected animation data
+                int boneId = 0;
+                foreach (var kvp in nodeAnimations)
+                {
+                    string nodeName = kvp.Key;
+                    var animData = kvp.Value;
+
+                    // Only create bone if it has animation data
+                    if (animData.positions.Count > 0 || animData.rotations.Count > 0 || animData.scales.Count > 0)
+                    {
+                        int id = ActiveScene.BoneInfoMap.ContainsKey(nodeName) ? ActiveScene.BoneInfoMap[nodeName].Id : boneId++;
+                        var bone = new CGltfBone(nodeName, id, animData.positions, animData.rotations, animData.scales);
+                        bones.Add(bone);
+                    }
+                }
+
+                // Build node hierarchy
+                CGltfNodeData rootNode = BuildAnimationNodeHierarchy(gltf->scene->nodes[0]);
+
+                // Initialize animation
+                animation.Initialize(animName, maxTime, ticksPerSecond, rootNode, bones, ActiveScene.BoneInfoMap);
+                Animations.Add(animation);
+
+                Info($"CGltfParser: Animation '{animName}' parsed successfully. Duration: {maxTime}s, Bones: {bones.Count}");
+            }
+        }
+
+        private CGltfNodeData BuildAnimationNodeHierarchy(cgltf_node* node)
+        {
+            CGltfNodeData nodeData = new CGltfNodeData();
+            nodeData.Name = Marshal.PtrToStringUTF8((IntPtr)node->name) ?? "UnnamedNode";
+            nodeData.Children = new List<CGltfNodeData>();
+
+            // Get node transform
+            if (node->has_matrix != 0)
+            {
+                // Access matrix using indexer
+                nodeData.Transformation = new Matrix4x4(
+                    node->matrix[0], node->matrix[1], node->matrix[2], node->matrix[3],
+                    node->matrix[4], node->matrix[5], node->matrix[6], node->matrix[7],
+                    node->matrix[8], node->matrix[9], node->matrix[10], node->matrix[11],
+                    node->matrix[12], node->matrix[13], node->matrix[14], node->matrix[15]
+                );
+            }
+            else
+            {
+                // Compose from TRS
+                Vector3 translation = new Vector3(node->translation[0], node->translation[1], node->translation[2]);
+                Quaternion rotation = new Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
+                Vector3 scale = new Vector3(node->scale[0], node->scale[1], node->scale[2]);
+
+                nodeData.Transformation = Matrix4x4.CreateScale(scale) * 
+                                         Matrix4x4.CreateFromQuaternion(rotation) * 
+                                         Matrix4x4.CreateTranslation(translation);
+            }
+
+            // Recursively build children
+            nodeData.ChildrenCount = (int)node->children_count;
+            for (nuint i = 0; i < node->children_count; i++)
+            {
+                nodeData.Children.Add(BuildAnimationNodeHierarchy(node->children[i]));
+            }
+
+            return nodeData;
+        }
+
+        #endregion
+
         #region Mesh Parsing
 
         private void ParseMeshes(cgltf_data* gltf)
@@ -1102,9 +1369,13 @@ namespace Sokol
                     cgltf_primitive* gltfPrim = &gltfMesh->primitives[primIdx];
                     int scenePrivIdx = ActiveScene.NumPrimitives++;
 
+                    // Detect if this primitive has bone attributes (skinning)
+                    bool hasSkinning = HasBoneAttributes(gltfPrim);
+                    ActiveScene.Primitives[scenePrivIdx].HasSkinning = hasSkinning;
+
                     ActiveScene.Primitives[scenePrivIdx].MaterialIndex = GetMaterialIndex(gltf, gltfPrim->material);
                     ActiveScene.Primitives[scenePrivIdx].VertexBuffers = CreateVertexBufferMapping(gltf, gltfPrim);
-                    ActiveScene.Primitives[scenePrivIdx].PipelineIndex = CreatePipelineForPrimitive(gltf, gltfPrim, ref ActiveScene.Primitives[scenePrivIdx].VertexBuffers);
+                    ActiveScene.Primitives[scenePrivIdx].PipelineIndex = CreatePipelineForPrimitive(gltf, gltfPrim, ref ActiveScene.Primitives[scenePrivIdx].VertexBuffers, hasSkinning);
 
                     if (gltfPrim->indices != null)
                     {
@@ -1126,12 +1397,15 @@ namespace Sokol
         {
             CGltfVertexBufferMapping map = new CGltfVertexBufferMapping();
 
+            // Simple approach: just map all buffers that exist
+            // Bone attributes are optional - if missing, shader won't use them
             for (nuint attrIdx = 0; attrIdx < prim->attributes_count; attrIdx++)
             {
                 cgltf_attribute* attr = &prim->attributes[attrIdx];
                 cgltf_accessor* acc = attr->data;
                 int bufferViewIndex = GetBufferViewIndex(gltf, acc->buffer_view);
 
+                // Check if this buffer is already mapped
                 int i = 0;
                 for (; i < map.Num; i++)
                 {
@@ -1139,6 +1413,7 @@ namespace Sokol
                         break;
                 }
 
+                // Add buffer if not already mapped and we have room
                 if (i == map.Num && map.Num < SG_MAX_VERTEXBUFFER_BINDSLOTS)
                 {
                     map.BufferIndices[map.Num++] = bufferViewIndex;
@@ -1148,7 +1423,21 @@ namespace Sokol
             return map;
         }
 
-        private int CreatePipelineForPrimitive(cgltf_data* gltf, cgltf_primitive* prim, ref CGltfVertexBufferMapping vbufMap)
+        private bool HasBoneAttributes(cgltf_primitive* prim)
+        {
+            for (nuint attrIdx = 0; attrIdx < prim->attributes_count; attrIdx++)
+            {
+                cgltf_attribute* attr = &prim->attributes[attrIdx];
+                if (attr->type == cgltf_attribute_type.cgltf_attribute_type_joints ||
+                    attr->type == cgltf_attribute_type.cgltf_attribute_type_weights)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private int CreatePipelineForPrimitive(cgltf_data* gltf, cgltf_primitive* prim, ref CGltfVertexBufferMapping vbufMap, bool hasSkinning)
         {
             PipelineCacheParams pipParams = new PipelineCacheParams
             {
@@ -1176,10 +1465,23 @@ namespace Sokol
 
             bool isMetallic = prim->material->has_pbr_metallic_roughness != 0;
 
+            // Select shader based on material type AND skinning support
+            sg_shader shader;
+            if (hasSkinning)
+            {
+                shader = isMetallic ? _metallicShaderSkinning : _specularShaderSkinning;
+                Info($"CGltfParser: Creating pipeline with SKINNING shader (metallic={isMetallic})");
+            }
+            else
+            {
+                shader = isMetallic ? _metallicShader : _specularShader;
+                Info($"CGltfParser: Creating pipeline with REGULAR shader (metallic={isMetallic})");
+            }
+
             sg_pipeline_desc desc = new sg_pipeline_desc
             {
                 layout = pipParams.Layout,
-                shader = isMetallic ? _metallicShader : _specularShader,
+                shader = shader,
                 primitive_type = pipParams.PrimType,
                 index_type = pipParams.IndexType,
                 cull_mode = sg_cull_mode.SG_CULLMODE_BACK,
@@ -1214,8 +1516,6 @@ namespace Sokol
                 if (attrSlot != CGltfSceneLimits.INVALID_INDEX)
                 {
                     layout.attrs[attrSlot].format = GltfToVertexFormat(attr->data);
-                    // DO NOT set offset here - it should be 0 for separate buffers (tightly packed)
-                    // The accessor->offset is the offset in the file buffer, not the vertex struct offset!
                     
                     // Set buffer index for this attribute
                     int bufferViewIndex = GetBufferViewIndex(gltf, attr->data->buffer_view);
@@ -1542,6 +1842,8 @@ namespace Sokol
                 cgltf_attribute_type.cgltf_attribute_type_position => 0,
                 cgltf_attribute_type.cgltf_attribute_type_normal => 1,
                 cgltf_attribute_type.cgltf_attribute_type_texcoord => 2,
+                cgltf_attribute_type.cgltf_attribute_type_joints => 3,     // JOINTS_0 -> boneIds
+                cgltf_attribute_type.cgltf_attribute_type_weights => 4,    // WEIGHTS_0 -> weights
                 _ => CGltfSceneLimits.INVALID_INDEX
             };
         }

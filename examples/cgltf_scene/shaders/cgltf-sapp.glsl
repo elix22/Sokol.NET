@@ -13,15 +13,23 @@
 @ctype vec3 hmm_vec3
 
 @vs vs
+const int MAX_BONES = 100;
+const int MAX_BONE_INFLUENCE = 4;
+
 layout(binding=0) uniform vs_params {
     mat4 model;
     mat4 view_proj;
     vec3 eye_pos;
+#ifdef SKINNING
+    mat4 finalBonesMatrices[MAX_BONES];
+#endif
 };
 
 layout(location=0) in vec4 position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
+layout(location=3) in vec4 boneIds;
+layout(location=4) in vec4 weights;
 
 
 out vec3 v_pos;
@@ -30,9 +38,44 @@ out vec2 v_uv;
 out vec3 v_eye_pos;
 
 void main() {
-    vec4 pos = model * position;
+    vec4 finalPosition = position;
+    vec3 finalNormal = normal;
+    
+    // Apply skinning only if animation is available
+#ifdef SKINNING
+        bool hasValidBone = false;
+        vec4 totalPosition = vec4(0.0);
+        vec3 totalNormal = vec3(0.0);
+        
+        // Apply skinning if bones are present
+        for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
+        {
+            if(int(boneIds[i]) == -1) 
+                continue;
+            if(int(boneIds[i]) >= MAX_BONES) 
+            {
+                totalPosition = position;
+                totalNormal = normal;
+                hasValidBone = true;
+                break;
+            }
+            vec4 localPosition = finalBonesMatrices[int(boneIds[i])] * position;
+            totalPosition += localPosition * weights[i];
+            vec3 localNormal = mat3(finalBonesMatrices[int(boneIds[i])]) * normal;
+            totalNormal += localNormal * weights[i];
+            hasValidBone = true;
+        }
+        
+        // If valid bone influences found, use them
+        if (hasValidBone) {
+            finalPosition = totalPosition;
+            finalNormal = totalNormal;
+        }
+#endif
+    
+    vec4 pos = model * finalPosition;
     v_pos = pos.xyz / pos.w;
-    v_nrm = (model * vec4(normal, 0.0)).xyz;
+    v_nrm = (model * vec4(finalNormal, 0.0)).xyz;
     v_uv = texcoord;
     v_eye_pos = eye_pos;
     gl_Position = view_proj * pos;

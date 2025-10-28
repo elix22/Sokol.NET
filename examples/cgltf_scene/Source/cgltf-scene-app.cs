@@ -23,6 +23,7 @@ using static Sokol.SDebugText;
 using static Sokol.CGltf;
 using static Sokol.STM;
 using static cgltf_sapp_shader_cs_cgltf.Shaders;
+using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 
 using static Sokol.SLog;
 using static Sokol.SDebugUI;
@@ -88,6 +89,10 @@ public static unsafe class CGLTFSceneApp
         public float ry;
         public Placeholders placeholders = new Placeholders();
         public bool cameraInitialized = false;  // Track if camera has been auto-positioned
+        
+        // Animation support
+        public CGltfAnimator? animator;
+        public bool animationsLoaded = false;
     }
 
 
@@ -97,7 +102,7 @@ public static unsafe class CGLTFSceneApp
     static double frameRate = 30;
     static double averageFrameTimeMilliseconds = 33.333;
     static ulong startTime = 0;
-    static bool debugPrinted = true;  // Debug flag
+    static bool debugPrinted = true;  // Temporarily false to see debug output  // Debug flag
 
     // Helper function to update light uniforms from Light objects
     static void UpdateLightUniforms()
@@ -196,12 +201,14 @@ public static unsafe class CGLTFSceneApp
         state.pass_actions.failed.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         state.pass_actions.failed.colors[0].clear_value = new sg_color() { r = 1.0f, g = 0.0f, b = 0.0f, a = 1.0f };
 
-        // create shaders
-        state.shaders.metallic = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+        // create shaders - regular and skinning variants
+        sg_shader metallicShader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_metallic_shader_desc(sg_query_backend()));
+        sg_shader metallicShaderSkinning = sg_make_shader(cgltf_sapp_shader_skinning_cs_skinning.Shaders.skinning_metallic_shader_desc(sg_query_backend()));
+        state.shaders.metallic = metallicShader;
 
-        // Initialize CGltfParser (for future migration)
+        // Initialize CGltfParser with both regular and skinning shader variants
         _parser = new CGltfParser();
-        _parser.Init(state.shaders.metallic, state.shaders.metallic); // Using metallic shader for both for now
+        _parser.Init(metallicShader, metallicShader, metallicShaderSkinning, metallicShaderSkinning);
 
         // Setup lights - mix of directional and point lights for best PBR results
         // Main directional light (like sun) - provides consistent lighting from one direction
@@ -259,6 +266,23 @@ public static unsafe class CGLTFSceneApp
         }
         
         Console.WriteLine($"=======================================");
+        
+        // Initialize animation if available
+        if (_parser.Animations.Count > 0)
+        {
+            Console.WriteLine($"Found {_parser.Animations.Count} animation(s)");
+            var firstAnimation = _parser.Animations[0];
+            if (firstAnimation.IsLoaded)
+            {
+                state.animator = new CGltfAnimator(firstAnimation);
+                state.animationsLoaded = true;
+                Console.WriteLine($"Animation '{firstAnimation.Name}' initialized successfully");
+            }
+        }
+        else
+        {
+            Console.WriteLine("No animations found in GLTF file");
+        }
     },
     onFailed: (error) =>
     {
@@ -334,7 +358,7 @@ public static unsafe class CGLTFSceneApp
         {
             model = modelMatrix,
             view_proj = state.camera.ViewProj,
-            eye_pos = state.camera.EyePos
+            eye_pos = state.camera.EyePos,
         };
     }
 
@@ -528,17 +552,25 @@ public static unsafe class CGLTFSceneApp
                     if (!debugPrinted)
                     {
                         Console.WriteLine($"  Node {node_index}, Mesh {node.MeshIndex}, Prim {i}: BaseElement={prim.BaseElement}, NumElements={prim.NumElements}, Pipeline={prim.PipelineIndex}, VBufs={prim.VertexBuffers.Num}, IndexBuf={prim.IndexBuffer}");
+                        Console.WriteLine($"    Buffer indices: [{string.Join(", ", prim.VertexBuffers.BufferIndices.Take(prim.VertexBuffers.Num))}]");
                     }
 
                     sg_apply_pipeline(state.scene.Pipelines[prim.PipelineIndex]);
                     sg_bindings bind = default;
                     
+                    if (!debugPrinted)
+                        Console.WriteLine($"    Starting vertex buffer binding loop, Num={prim.VertexBuffers.Num}");
+                    
+                    // Bind vertex buffers
                     for (int vb_slot = 0; vb_slot < prim.VertexBuffers.Num; vb_slot++)
                     {
                         int bufferIndex = prim.VertexBuffers.BufferIndices[vb_slot];
                         sg_buffer buf = state.scene.Buffers[bufferIndex];
                         bind.vertex_buffers[vb_slot] = buf;
+                        if (!debugPrinted)
+                            Console.WriteLine($"    VB slot {vb_slot}: Using buffer index {bufferIndex} (id={buf.id})");
                     }
+                    
                     if (prim.IndexBuffer != SCENE_INVALID_INDEX)
                     {
                         bind.index_buffer = state.scene.Buffers[prim.IndexBuffer];
