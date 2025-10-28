@@ -40,6 +40,11 @@ public static unsafe class CGLTFSceneApp
     const string filename = "glb/assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
+    // const string filename = "glb/DancingGangster.glb";
+    // const string filename = "glb/Gangster.glb";
+     
+    //
+
 
 
     const int SCENE_INVALID_INDEX = -1;
@@ -82,6 +87,7 @@ public static unsafe class CGLTFSceneApp
         public float rx;
         public float ry;
         public Placeholders placeholders = new Placeholders();
+        public bool cameraInitialized = false;  // Track if camera has been auto-positioned
     }
 
 
@@ -91,6 +97,7 @@ public static unsafe class CGLTFSceneApp
     static double frameRate = 30;
     static double averageFrameTimeMilliseconds = 33.333;
     static ulong startTime = 0;
+    static bool debugPrinted = true;  // Debug flag
 
     // Helper function to update light uniforms from Light objects
     static void UpdateLightUniforms()
@@ -146,6 +153,10 @@ public static unsafe class CGLTFSceneApp
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
+            // Increase buffer pool for complex models with many meshes
+            buffer_pool_size = 4096,  // Default is 128, DancingGangster needs ~2900
+            image_pool_size = 256,    // Default is 128
+            sampler_pool_size = 128,  // Default is 64
             logger = {
                 func = &slog_func,
             }
@@ -158,9 +169,11 @@ public static unsafe class CGLTFSceneApp
         {
             Aspect = 60.0f,
             NearZ = 0.01f,
-            FarZ = 100.0f,
-            Center = Vector3.Zero,
-            Distance = 2.5f,
+            FarZ = 1000.0f,  // Model is small, don't need huge far plane
+            Center = new Vector3(0.0f, 0.0f, 0.0f),  // Model center at Y=1.0 (bounds: -0.002 to 1.993)
+            Distance = 3.0f,  // Closer - model size is ~2 units tall
+            Latitude = 10.0f,  // Look down slightly 
+            Longitude = 0.0f,  // Front view
         });
 
         // initialize Basis Universal
@@ -217,10 +230,35 @@ public static unsafe class CGLTFSceneApp
         // Load GLTF file using CGltfParser (async)
         string gltfFilePath = util_get_file_path(filename);
 
+        // Set model scale (adjust this value as needed for different models)
+        float modelScale = 1f; // Scale down for this model - model is ~200 units tall originally
+        _parser.SetModelScale(modelScale);
+
         _parser.LoadFromFileAsync(gltfFilePath, state.scene,
     onComplete: () =>
     {
-
+        // Print scene bounds for debugging
+        Vector3 sceneMin = state.scene.SceneBoundsMin;
+        Vector3 sceneMax = state.scene.SceneBoundsMax;
+        Vector3 sceneSize = sceneMax - sceneMin;
+        Vector3 sceneCenter = (sceneMax + sceneMin) * 0.5f;
+        
+        Console.WriteLine($"=== SCENE INFO (after scale {modelScale}) ===");
+        Console.WriteLine($"Scene Bounds Min: ({sceneMin.X:F3}, {sceneMin.Y:F3}, {sceneMin.Z:F3})");
+        Console.WriteLine($"Scene Bounds Max: ({sceneMax.X:F3}, {sceneMax.Y:F3}, {sceneMax.Z:F3})");
+        Console.WriteLine($"Scene Size: ({sceneSize.X:F3}, {sceneSize.Y:F3}, {sceneSize.Z:F3})");
+        Console.WriteLine($"Scene Center: ({sceneCenter.X:F3}, {sceneCenter.Y:F3}, {sceneCenter.Z:F3})");
+        Console.WriteLine($"Number of nodes: {state.scene.NumNodes}");
+        
+        // Print first few node positions
+        for (int i = 0; i < Math.Min(5, state.scene.NumNodes); i++)
+        {
+            Matrix4x4 transform = state.scene.Nodes[i].Transform;
+            Vector3 pos = new Vector3(transform.M41, transform.M42, transform.M43);
+            Console.WriteLine($"  Node {i} position: ({pos.X:F3}, {pos.Y:F3}, {pos.Z:F3})");
+        }
+        
+        Console.WriteLine($"=======================================");
     },
     onFailed: (error) =>
     {
@@ -290,12 +328,32 @@ public static unsafe class CGLTFSceneApp
 
     static cgltf_vs_params_t vs_params_for_node(int node_index)
     {
+        Matrix4x4 modelMatrix = state.root_transform * state.scene.Nodes[node_index].Transform;
+        
         return new cgltf_vs_params_t
         {
-            model = state.root_transform * state.scene.Nodes[node_index].Transform,
+            model = modelMatrix,
             view_proj = state.camera.ViewProj,
             eye_pos = state.camera.EyePos
         };
+    }
+
+    /// <summary>
+    /// Calculates a bounding sphere that contains the entire axis-aligned bounding box.
+    /// </summary>
+    /// <param name="min">Minimum corner of the bounding box</param>
+    /// <param name="max">Maximum corner of the bounding box</param>
+    /// <returns>Tuple of (center, radius) for the bounding sphere</returns>
+    static (Vector3 center, float radius) CalculateBoundingSphere(Vector3 min, Vector3 max)
+    {
+        // Center of the bounding box
+        Vector3 center = (min + max) * 0.5f;
+        
+        // Radius is the distance from center to any corner (they're all equidistant)
+        // Using the maximum corner for convenience
+        float radius = Vector3.Distance(center, max);
+        
+        return (center, radius);
     }
 
     [UnmanagedCallersOnly]
@@ -309,6 +367,116 @@ public static unsafe class CGLTFSceneApp
 
         var begin_frame = stm_now();
 
+        // Get framebuffer dimensions early for auto-positioning
+        int fb_width = sapp_width();
+        int fb_height = sapp_height();
+
+        // Auto-position camera using REAL scene bounds from GLTF accessor data
+        if (!state.cameraInitialized && state.scene.NumNodes > 0)
+        {
+            // Use the actual scene bounds calculated from GLTF accessor min/max
+            Vector3 sceneMin = state.scene.SceneBoundsMin;
+            Vector3 sceneMax = state.scene.SceneBoundsMax;
+            Vector3 sceneSize = sceneMax - sceneMin;
+
+            var (sphereCenter, sphereRadius) = CalculateBoundingSphere(sceneMin, sceneMax);
+            Vector3 sceneCenter = sphereCenter + Vector3.UnitY * (sphereRadius / 2.0f);
+            
+            // Get all 8 corners of the bounding box
+            Vector3[] corners = new Vector3[8]
+            {
+                new Vector3(sceneMin.X, sceneMin.Y, sceneMin.Z),
+                new Vector3(sceneMin.X, sceneMin.Y, sceneMax.Z),
+                new Vector3(sceneMin.X, sceneMax.Y, sceneMin.Z),
+                new Vector3(sceneMin.X, sceneMax.Y, sceneMax.Z),
+                new Vector3(sceneMax.X, sceneMin.Y, sceneMin.Z),
+                new Vector3(sceneMax.X, sceneMin.Y, sceneMax.Z),
+                new Vector3(sceneMax.X, sceneMax.Y, sceneMin.Z),
+                new Vector3(sceneMax.X, sceneMax.Y, sceneMax.Z)
+            };
+            
+            // Binary search for the minimum distance where all corners fit in view
+            float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
+            float aspectRatio = (float)fb_width / (float)fb_height;
+            
+            // Start with a reasonable distance estimate
+            float minDistance = 0.01f;
+            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 10000.0f;
+            float bestDistance = maxDistance;
+            
+            // Binary search for optimal distance
+            for (int iteration = 0; iteration < 40; iteration++)
+            {
+                float testDistance = (minDistance + maxDistance) * 0.5f;
+                
+                // Position camera at test distance looking at center
+                Vector3 cameraPos = sceneCenter + new Vector3(0, 0, testDistance);
+                
+                // Create view and projection matrices for this camera position
+                Matrix4x4 view = Matrix4x4.CreateLookAt(cameraPos, sceneCenter, Vector3.UnitY);
+                Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspectRatio, 0.01f, 10000.0f);
+                Matrix4x4 viewProj = view * proj;
+
+                // Project all corners and check if they fit in NDC space [-1, 1]
+                bool allFit = true;
+                float testMarging = 0.95f; // Margin to ensure some padding
+                foreach (var corner in corners)
+                {
+                    Vector4 clipSpace = Vector4.Transform(corner, viewProj);
+                    if (clipSpace.W > 0)  // In front of camera
+                    {
+                        Vector3 ndc = new Vector3(clipSpace.X / clipSpace.W, clipSpace.Y / clipSpace.W, clipSpace.Z / clipSpace.W);
+                        // Check if within NDC bounds with some margin
+                        if (Math.Abs(ndc.X) > testMarging || Math.Abs(ndc.Y) > testMarging/1.2f)
+                        {
+                            allFit = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        allFit = false;
+                        break;
+                    }
+                }
+                
+                if (allFit)
+                {
+                    // All corners fit, try closer
+                    bestDistance = testDistance;
+                    maxDistance = testDistance;
+                }
+                else
+                {
+                    // Doesn't fit, need more distance
+                    minDistance = testDistance;
+                }
+            }
+            
+            Console.WriteLine($"=== AUTO-POSITIONING CAMERA ===");
+            Console.WriteLine($"Scene bounds: Min={sceneMin}, Max={sceneMax}");
+            Console.WriteLine($"Scene size: {sceneSize}");
+            Console.WriteLine($"Scene center: {sceneCenter}");
+            Console.WriteLine($"Final distance: {bestDistance:F3}");
+            
+            state.camera.Center = sceneCenter;
+            state.camera.Distance = bestDistance;
+            
+            // Set camera angles for a straight-on view
+            // Binary search ensures entire bounding box fits
+            state.camera.Latitude = 0.0f;   // Look straight ahead (0 = level)
+            state.camera.Longitude = 0.0f;  // Front view
+            
+            // Force camera update immediately to apply new position
+            state.camera.Update(fb_width, fb_height);
+            
+            Console.WriteLine($"Camera EyePos after update: {state.camera.EyePos}");
+            Console.WriteLine($"===============================");
+            
+            state.cameraInitialized = true;
+        }
+
+
         // print help text
         sdtx_canvas(sapp_width() * 0.5f, sapp_height() * 0.5f);
         sdtx_color1i(0xFFFFFFFF);
@@ -320,9 +488,11 @@ public static unsafe class CGLTFSceneApp
 
         state.root_transform = Matrix4x4.CreateRotationY(state.rx);
 
-        int fb_width = sapp_width();
-        int fb_height = sapp_height();
-        state.camera.Update(fb_width, fb_height);
+        // Update camera (already updated in auto-positioning if it was just initialized)
+        if (state.cameraInitialized)
+        {
+            state.camera.Update(fb_width, fb_height);
+        }
 
         // render the scene
         if (state.failed)
@@ -336,6 +506,12 @@ public static unsafe class CGLTFSceneApp
         {
             sg_begin_pass(new sg_pass { action = state.pass_actions.ok, swapchain = sglue_swapchain() });
 
+            // Debug: Print draw info for first frame
+            if (!debugPrinted && state.scene.NumNodes > 0)
+            {
+                Console.WriteLine($"=== DRAW DEBUG (First Frame) ===");
+                Console.WriteLine($"NumNodes: {state.scene.NumNodes}");
+            }
 
             for (int node_index = 0; node_index < state.scene.NumNodes; node_index++)
             {
@@ -348,11 +524,20 @@ public static unsafe class CGLTFSceneApp
                     ref CGltfPrimitive prim = ref state.scene.Primitives[i + mesh.FirstPrimitive];
                     ref CGltfMaterial mat = ref state.scene.Materials[prim.MaterialIndex];
 
+                    // Debug for first frame
+                    if (!debugPrinted)
+                    {
+                        Console.WriteLine($"  Node {node_index}, Mesh {node.MeshIndex}, Prim {i}: BaseElement={prim.BaseElement}, NumElements={prim.NumElements}, Pipeline={prim.PipelineIndex}, VBufs={prim.VertexBuffers.Num}, IndexBuf={prim.IndexBuffer}");
+                    }
+
                     sg_apply_pipeline(state.scene.Pipelines[prim.PipelineIndex]);
                     sg_bindings bind = default;
+                    
                     for (int vb_slot = 0; vb_slot < prim.VertexBuffers.Num; vb_slot++)
                     {
-                        bind.vertex_buffers[vb_slot] = state.scene.Buffers[prim.VertexBuffers.BufferIndices[vb_slot]];
+                        int bufferIndex = prim.VertexBuffers.BufferIndices[vb_slot];
+                        sg_buffer buf = state.scene.Buffers[bufferIndex];
+                        bind.vertex_buffers[vb_slot] = buf;
                     }
                     if (prim.IndexBuffer != SCENE_INVALID_INDEX)
                     {
@@ -448,6 +633,7 @@ public static unsafe class CGLTFSceneApp
                     }
 
                     sg_apply_bindings(bind);
+                    
                     sg_draw((uint)prim.BaseElement, (uint)prim.NumElements, 1);
                 }
             }

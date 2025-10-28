@@ -140,6 +140,11 @@ namespace Sokol
         public int NumPrimitives;
         public int NumMeshes;
         public int NumNodes;
+        
+        // Scene bounding box (in local space, before any transforms)
+        public Vector3 SceneBoundsMin;
+        public Vector3 SceneBoundsMax;
+
 
         public sg_buffer[] Buffers;
         public CGltfImage[] Images;
@@ -260,6 +265,9 @@ namespace Sokol
         private int _pendingTextureLoads = 0;
         private int _pendingBufferLoads = 0;
 
+        // Scaling
+        private float _modelScale = 1.0f;
+        
         public CGltfScene? Scene => _externalScene ?? _scene;
         
         private CGltfScene ActiveScene => _externalScene ?? _scene;
@@ -270,6 +278,14 @@ namespace Sokol
             _bufferParams = new BufferCreationParams[CGltfSceneLimits.MAX_BUFFERS];
             _imageParams = new ImageSamplerCreationParams[CGltfSceneLimits.MAX_IMAGES];
             _pipelineCache = new PipelineCacheParams[CGltfSceneLimits.MAX_PIPELINES];
+        }
+
+        /// <summary>
+        /// Set the scale factor for the model (applies during parsing)
+        /// </summary>
+        public void SetModelScale(float scale)
+        {
+            _modelScale = scale;
         }
 
         /// <summary>
@@ -616,7 +632,12 @@ namespace Sokol
             ParseMaterials(gltf);
             ParseMeshes(gltf);
             ParseNodes(gltf);
-            
+
+                       // Calculate actual scene bounds from GLTF accessor min/max
+            var bounds = CalculateActualSceneBounds(gltf);
+            ActiveScene.SceneBoundsMin = bounds.Min;
+            ActiveScene.SceneBoundsMax = bounds.Max;
+
             Info($"CGltfParser: Scene parsing complete - {ActiveScene.NumNodes} nodes, {ActiveScene.NumMeshes} meshes, {ActiveScene.NumPrimitives} primitives");
             
             // Note: UpdateMaterialTextureFlags() is now called in CheckSceneLoadComplete() 
@@ -1216,6 +1237,67 @@ namespace Sokol
 
         #region Node Parsing
 
+        // Calculate actual scene bounds from GLTF accessor min/max data
+        public (Vector3 Min, Vector3 Max) CalculateActualSceneBounds(cgltf_data* gltf)
+        {
+            Vector3 sceneMin = new Vector3(float.MaxValue);
+            Vector3 sceneMax = new Vector3(float.MinValue);
+            bool foundBounds = false;
+
+            // Iterate through all meshes and their primitives
+            for (nuint meshIdx = 0; meshIdx < gltf->meshes_count; meshIdx++)
+            {
+                cgltf_mesh* mesh = &gltf->meshes[meshIdx];
+
+                for (nuint primIdx = 0; primIdx < mesh->primitives_count; primIdx++)
+                {
+                    cgltf_primitive* prim = &mesh->primitives[primIdx];
+
+                    // Find the POSITION accessor
+                    cgltf_accessor* posAccessor = null;
+                    for (nuint attrIdx = 0; attrIdx < prim->attributes_count; attrIdx++)
+                    {
+                        cgltf_attribute* attr = &prim->attributes[attrIdx];
+                        if (attr->type == cgltf_attribute_type.cgltf_attribute_type_position)
+                        {
+                            posAccessor = attr->data;
+                            break;
+                        }
+                    }
+
+                    // If we found position data with min/max bounds
+                    if (posAccessor != null && posAccessor->has_min != 0 && posAccessor->has_max != 0)
+                    {
+                        Vector3 meshMin = new Vector3(posAccessor->min[0], posAccessor->min[1], posAccessor->min[2]);
+                        Vector3 meshMax = new Vector3(posAccessor->max[0], posAccessor->max[1], posAccessor->max[2]);
+
+                        sceneMin = Vector3.Min(sceneMin, meshMin);
+                        sceneMax = Vector3.Max(sceneMax, meshMax);
+                        foundBounds = true;
+
+                        Info($"Mesh {meshIdx} prim {primIdx}: Min=({meshMin.X:F3}, {meshMin.Y:F3}, {meshMin.Z:F3}), Max=({meshMax.X:F3}, {meshMax.Y:F3}, {meshMax.Z:F3})");
+                    }
+                }
+            }
+
+            if (!foundBounds)
+            {
+                Warning("No POSITION accessor bounds found in GLTF file, using defaults");
+                sceneMin = new Vector3(-1, -1, -1);
+                sceneMax = new Vector3(1, 1, 1);
+            }
+            else
+            {
+                Vector3 size = sceneMax - sceneMin;
+                Vector3 center = (sceneMax + sceneMin) * 0.5f;
+
+                Info($"Scene bounds (local space): Min=({sceneMin.X:F3}, {sceneMin.Y:F3}, {sceneMin.Z:F3}), Max=({sceneMax.X:F3}, {sceneMax.Y:F3}, {sceneMax.Z:F3})");
+                Info($"Scene size: ({size.X:F3}, {size.Y:F3}, {size.Z:F3}), Center: ({center.X:F3}, {center.Y:F3}, {center.Z:F3})");
+            }
+
+            return (sceneMin * _modelScale, sceneMax * _modelScale);
+        }
+        
         private void ParseNodes(cgltf_data* gltf)
         {
             if (gltf->nodes_count > CGltfSceneLimits.MAX_NODES)
@@ -1288,6 +1370,13 @@ namespace Sokol
             {
                 Matrix4x4 parentTransform = BuildTransformForNode(gltf, node->parent);
                 return localTransform * parentTransform;
+            }
+
+            // Apply model scale at root level (no parent)
+            if (_modelScale != 1.0f)
+            {
+                Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(_modelScale);
+                return localTransform * scaleMatrix;
             }
 
             return localTransform;
