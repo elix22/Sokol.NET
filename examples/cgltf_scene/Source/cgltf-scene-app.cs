@@ -582,9 +582,27 @@ public static unsafe class CGLTFSceneApp
                     // Update light uniforms
                     UpdateLightUniforms();
 
-                    // Apply uniforms
-                    sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
-                    sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    // Apply uniforms based on whether this primitive has skinning
+                    if (prim.HasSkinning)
+                    {
+                        // For skinned meshes, use the skinning shader's uniform structure
+                        skinning_vs_params_t skinning_vs_params = new skinning_vs_params_t
+                        {
+                            model = vs_params.model,
+                            view_proj = vs_params.view_proj,
+                            eye_pos = vs_params.eye_pos
+                        };
+                        // TODO: Fill finalBonesMatrices array with animation data
+                        
+                        sg_apply_uniforms(UB_skinning_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref skinning_vs_params), size = (uint)Marshal.SizeOf<skinning_vs_params_t>() });
+                        sg_apply_uniforms(UB_skinning_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    }
+                    else
+                    {
+                        // For non-skinned meshes, use the regular shader
+                        sg_apply_uniforms(UB_cgltf_vs_params, new sg_range { ptr = Unsafe.AsPointer(ref vs_params), size = (uint)Marshal.SizeOf<cgltf_vs_params_t>() });
+                        sg_apply_uniforms(UB_cgltf_light_params, new sg_range { ptr = Unsafe.AsPointer(ref state.light_params), size = (uint)Marshal.SizeOf<cgltf_light_params_t>() });
+                    }
 
                     if (mat.IsMetallic)
                     {
@@ -649,19 +667,37 @@ public static unsafe class CGLTFSceneApp
                             emissive_smp = state.placeholders.smp;
                         }
 
-                        // Bind all textures
-                        bind.views[VIEW_cgltf_base_color_tex] = base_color_tex;
-                        bind.views[VIEW_cgltf_metallic_roughness_tex] = metallic_roughness_tex;
-                        bind.views[VIEW_cgltf_normal_tex] = normal_tex;
-                        bind.views[VIEW_cgltf_occlusion_tex] = occlusion_tex;
-                        bind.views[VIEW_cgltf_emissive_tex] = emissive_tex;
+                        // Bind all textures using the correct shader constants
+                        if (prim.HasSkinning)
+                        {
+                            bind.views[VIEW_skinning_base_color_tex] = base_color_tex;
+                            bind.views[VIEW_skinning_metallic_roughness_tex] = metallic_roughness_tex;
+                            bind.views[VIEW_skinning_normal_tex] = normal_tex;
+                            bind.views[VIEW_skinning_occlusion_tex] = occlusion_tex;
+                            bind.views[VIEW_skinning_emissive_tex] = emissive_tex;
 
-                        bind.samplers[SMP_cgltf_base_color_smp] = base_color_smp;
-                        bind.samplers[SMP_cgltf_metallic_roughness_smp] = metallic_roughness_smp;
-                        bind.samplers[SMP_cgltf_normal_smp] = normal_smp;
-                        bind.samplers[SMP_cgltf_occlusion_smp] = occlusion_smp;
-                        bind.samplers[SMP_cgltf_emissive_smp] = emissive_smp;
-                        sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
+                            bind.samplers[SMP_skinning_base_color_smp] = base_color_smp;
+                            bind.samplers[SMP_skinning_metallic_roughness_smp] = metallic_roughness_smp;
+                            bind.samplers[SMP_skinning_normal_smp] = normal_smp;
+                            bind.samplers[SMP_skinning_occlusion_smp] = occlusion_smp;
+                            bind.samplers[SMP_skinning_emissive_smp] = emissive_smp;
+                            sg_apply_uniforms(UB_skinning_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
+                        }
+                        else
+                        {
+                            bind.views[VIEW_cgltf_base_color_tex] = base_color_tex;
+                            bind.views[VIEW_cgltf_metallic_roughness_tex] = metallic_roughness_tex;
+                            bind.views[VIEW_cgltf_normal_tex] = normal_tex;
+                            bind.views[VIEW_cgltf_occlusion_tex] = occlusion_tex;
+                            bind.views[VIEW_cgltf_emissive_tex] = emissive_tex;
+
+                            bind.samplers[SMP_cgltf_base_color_smp] = base_color_smp;
+                            bind.samplers[SMP_cgltf_metallic_roughness_smp] = metallic_roughness_smp;
+                            bind.samplers[SMP_cgltf_normal_smp] = normal_smp;
+                            bind.samplers[SMP_cgltf_occlusion_smp] = occlusion_smp;
+                            bind.samplers[SMP_cgltf_emissive_smp] = emissive_smp;
+                            sg_apply_uniforms(UB_cgltf_metallic_params, new sg_range { ptr = Unsafe.AsPointer(ref mat.Metallic.FsParams), size = (uint)Marshal.SizeOf<cgltf_metallic_params_t>() });
+                        }
                     }
 
                     sg_apply_bindings(bind);

@@ -28,7 +28,7 @@ layout(binding=0) uniform vs_params {
 layout(location=0) in vec4 position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
-layout(location=3) in vec4 boneIds;
+layout(location=3) in uvec4 boneIds;
 layout(location=4) in vec4 weights;
 
 
@@ -50,18 +50,18 @@ void main() {
         // Apply skinning if bones are present
         for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
         {
-            if(int(boneIds[i]) == -1) 
+            if(boneIds[i] == -1) 
                 continue;
-            if(int(boneIds[i]) >= MAX_BONES) 
+            if(boneIds[i] >= MAX_BONES) 
             {
                 totalPosition = position;
                 totalNormal = normal;
                 hasValidBone = true;
                 break;
             }
-            vec4 localPosition = finalBonesMatrices[int(boneIds[i])] * position;
+            vec4 localPosition = finalBonesMatrices[boneIds[i]] * position;
             totalPosition += localPosition * weights[i];
-            vec3 localNormal = mat3(finalBonesMatrices[int(boneIds[i])]) * normal;
+            vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * normal;
             totalNormal += localNormal * weights[i];
             hasValidBone = true;
         }

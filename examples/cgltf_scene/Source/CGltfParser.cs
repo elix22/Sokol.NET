@@ -20,7 +20,7 @@ namespace Sokol
     public static class CGltfSceneLimits
     {
         public const int INVALID_INDEX = -1;
-        public const int MAX_BUFFERS = 128;      // Increased from 32 to support more complex models
+        public const int MAX_BUFFERS = 4096;      // Increased to support complex animated models (was 128)
         public const int MAX_IMAGES = 64;        // Increased from 32
         public const int MAX_MATERIALS = 64;     // Increased from 32
         public const int MAX_PIPELINES = 64;     // Increased from 32
