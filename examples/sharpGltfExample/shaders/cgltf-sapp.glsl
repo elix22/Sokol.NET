@@ -279,27 +279,41 @@ vec3 diffuse(material_info_t material_info) {
     return material_info.diffuse_color / M_PI;
 }
 
+// Smith Joint GGX - proper visibility term
+float visibility_occlusion(material_info_t material_info, angular_info_t angular_info) {
+    float n_dot_l = angular_info.n_dot_l;
+    float n_dot_v = angular_info.n_dot_v;
+    float alpha_roughness_sq = material_info.alpha_roughness * material_info.alpha_roughness;
+
+    float GGXV = n_dot_l * sqrt(n_dot_v * n_dot_v * (1.0 - alpha_roughness_sq) + alpha_roughness_sq);
+    float GGXL = n_dot_v * sqrt(n_dot_l * n_dot_l * (1.0 - alpha_roughness_sq) + alpha_roughness_sq);
+    float GGX = GGXV + GGXL;
+    if (GGX > 0.0) {
+        return 0.5 / GGX;
+    }
+    return 0.0;
+}
+
 vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 normal, vec3 view) {
-    // Simple Lambert diffuse + Blinn-Phong specular
-    float n_dot_l = max(dot(normal, point_to_light), 0.0);
-    
-    // Diffuse (attenuated by n_dot_l)
-    vec3 diffuse_contrib = material_info.diffuse_color * n_dot_l / M_PI;
-    
-    // Specular (Blinn-Phong) - Normal strength
-    vec3 half_vec = normalize(point_to_light + view);
-    float n_dot_h = max(dot(normal, half_vec), 0.0);
-    
-    // Use material roughness for specular power
-    float roughness = material_info.perceptual_roughness;
-    float spec_power = mix(64.0, 4.0, roughness);  // Sharper to wider based on roughness
-    float spec_intensity = pow(n_dot_h, spec_power);
-    
-    // Use material's specular color
-    vec3 specular = material_info.specular_color * spec_intensity;
-    
-    // Return diffuse and specular separately (no n_dot_l on specular!)
-    return diffuse_contrib + specular;
+    angular_info_t angular_info = get_angular_info(point_to_light, normal, view);
+    if ((angular_info.n_dot_l > 0.0) || (angular_info.n_dot_v > 0.0)) {
+        // Calculate the shading terms for the microfacet specular shading model
+        vec3 F = specular_reflection(material_info, angular_info);
+        float Vis = visibility_occlusion(material_info, angular_info);
+        float D = microfacet_distribution(material_info, angular_info);
+
+        // Calculation of analytical lighting contribution
+        vec3 diffuse_contrib = (1.0 - F) * diffuse(material_info);
+        
+        // Boost specular for metals to make them more visible and shiny
+        float metallic = material_info.metallic;
+        float spec_boost = mix(1.0, 2.0, metallic);  // 2x boost for metals
+        vec3 spec_contrib = F * Vis * D * spec_boost;
+
+        // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
+        return angular_info.n_dot_l * (diffuse_contrib + spec_contrib);
+    }
+    return vec3(0.0, 0.0, 0.0);
 }
 
 float get_range_attenuation(float range, float distance) {
@@ -369,12 +383,27 @@ vec3 apply_all_lights(material_info_t material_info, vec3 normal, vec3 view) {
     return total_light;
 }
 
+// Uncharted 2 tone map
+// see: http://filmicworlds.com/blog/filmic-tonemapping-operators/
+vec3 toneMapUncharted2Impl(vec3 color) {
+    const float A = 0.15;
+    const float B = 0.50;
+    const float C = 0.10;
+    const float D = 0.20;
+    const float E = 0.02;
+    const float F = 0.30;
+    return ((color*(A*color+C*B)+D*E)/(color*(A*color+B)+D*F))-E/F;
+}
+
+vec3 toneMapUncharted(vec3 color) {
+    const float W = 11.2;
+    color = toneMapUncharted2Impl(color * 2.0);
+    vec3 whiteScale = 1.0 / toneMapUncharted2Impl(vec3(W));
+    return linear_to_srgb(color * whiteScale);
+}
+
 vec3 tone_map(vec3 color) {
-    // Simple Reinhard tone mapping (LearnOpenGL style)
-    color = color / (color + vec3(1.0));
-    // Gamma correction
-    color = pow(color, vec3(1.0/2.2));
-    return color;
+    return toneMapUncharted(color);
 }
 
 void main() {
@@ -447,18 +476,22 @@ void main() {
     vec3 view = normalize(v_eye_pos - v_pos);
     vec3 color = apply_all_lights(material_info, normal, view);
     
-    // Add ambient lighting (reduced for proper PBR balance)
-    vec3 ambient = vec3(0.15) * base_color.rgb * occlusion;
+    // Minimal ambient - just enough to prevent pure black
+    // Metals need to stay dark to look shiny and reflective
+    float ambient_strength = 0.03;
+    vec3 ambient_diffuse = (1.0 - metallic) * diffuse_color * ambient_strength;
+    vec3 ambient_specular = metallic * specular_color * ambient_strength * 0.5;  // Even less for metals
+    vec3 ambient = ambient_diffuse + ambient_specular;
     color += ambient;
     
-    // Don't apply occlusion again - it's already applied to ambient
-    // color *= occlusion; // REMOVED: This was causing double-application of AO
-    color += emissive;  // Add emissive glow
+    // Apply ambient occlusion
+    color *= occlusion;
     
-    // DEBUG: Skip tone mapping entirely - just apply gamma correction
-    color = pow(color, vec3(1.0/2.2));
+    // Add emissive
+    color += emissive;
     
-    frag_color = vec4(color, base_color.a);
+    // Apply tone mapping (Uncharted 2) and gamma correction
+    frag_color = vec4(tone_map(color), base_color.a);
 }
 @end
 
