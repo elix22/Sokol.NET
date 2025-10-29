@@ -245,7 +245,7 @@ public static unsafe class SharpGLTFApp
             width = fb_width,
             height = fb_height,
             delta_time = sapp_frame_duration(),
-            dpi_scale = sapp_dpi_scale()
+            dpi_scale = 1// TBD ELI , looks very samll on Android sapp_dpi_scale()
         });
 
         // Auto-position camera using scene bounds after model is loaded
