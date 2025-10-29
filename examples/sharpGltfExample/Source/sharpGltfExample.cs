@@ -116,27 +116,27 @@ public static unsafe class SharpGLTFApp
             Longitude = 0.0f,
         });
 
-        // Initialize lighting system (Godot-style dramatic lighting)
+        // Initialize lighting system (Bright sunlight simulation)
         
-        // Sun - Strong directional light from above (midday sun position)
+        // Sun - Intense directional light simulating harsh midday sun
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.3f, -0.8f, -0.2f),   // Direction (slightly from side, mostly from above)
-            new Vector3(1.0f, 0.98f, 0.95f),   // Bright warm white (sunlight color)
-            1.8f                                // Strong intensity for dramatic shadows
+            new Vector3(1.0f, 0.95f, 0.85f),   // Warm yellow-white sunlight
+            2.5f                                // Very strong intensity for bright sunlight
         ));
         
         // Sky light - Soft fill from above (simulates blue sky dome)
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.0f, -1.0f, 0.0f),    // Direction (straight down from sky)
-            new Vector3(0.6f, 0.7f, 1.0f),     // Sky blue color
-            0.3f                                // Subtle fill intensity
+            new Vector3(0.5f, 0.65f, 1.0f),    // Clear blue sky color
+            0.2f                                // Reduced for stronger contrast
         ));
         
         // Atmospheric scatter - Very soft bounce light (simulates light bouncing off ground/buildings)
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.0f, 0.5f, 0.0f),     // Direction (from below - ground bounce)
-            new Vector3(0.9f, 0.85f, 0.8f),    // Warm ground reflection color
-            0.15f                               // Very subtle
+            new Vector3(1.0f, 0.9f, 0.75f),    // Bright warm ground reflection
+            0.1f                                // Very subtle to maintain strong shadows
         ));
 
         state.pass_action = default;
