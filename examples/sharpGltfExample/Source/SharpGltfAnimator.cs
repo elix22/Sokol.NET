@@ -28,6 +28,22 @@ namespace Sokol
             }
         }
 
+        public void SetAnimation(SharpGltfAnimation? animation)
+        {
+            _currentAnimation = animation;
+            _currentTime = 0.0f;
+
+            // Reset to initial pose
+            Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
+
+            if (_currentAnimation != null)
+            {
+                ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
+                CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                Console.WriteLine($"[SharpGltfAnimator] Switched to animation '{_currentAnimation.Name}' with {_currentAnimation.GetBoneIDMap().Count} bones");
+            }
+        }
+
         public void UpdateAnimation(float dt)
         {
             if (_currentAnimation != null)

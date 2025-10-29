@@ -21,9 +21,43 @@ namespace Sokol
         public List<SharpGltfNode> Nodes = new List<SharpGltfNode>();
         public Dictionary<string, BoneInfo> BoneInfoMap = new Dictionary<string, BoneInfo>();
         public int BoneCounter = 0;
-        public SharpGltfAnimation? Animation;
-        public bool HasAnimations => Animation != null;
+        public List<SharpGltfAnimation> Animations = new List<SharpGltfAnimation>();
+        public int CurrentAnimationIndex = 0;
+        public SharpGltfAnimation? Animation => Animations.Count > 0 ? Animations[CurrentAnimationIndex] : null;
+        public bool HasAnimations => Animations.Count > 0;
         public bool AnimationsReady { get; private set; } = false;
+
+        public int GetAnimationCount() => Animations.Count;
+        
+        public string GetCurrentAnimationName() => 
+            HasAnimations ? Animations[CurrentAnimationIndex].Name : "None";
+        
+        public void SetCurrentAnimation(int index)
+        {
+            if (index >= 0 && index < Animations.Count)
+            {
+                CurrentAnimationIndex = index;
+                Console.WriteLine($"[SharpGLTF] Switched to animation '{GetCurrentAnimationName()}' (index {index})");
+            }
+        }
+
+        public void NextAnimation()
+        {
+            if (Animations.Count > 0)
+            {
+                CurrentAnimationIndex = (CurrentAnimationIndex + 1) % Animations.Count;
+                Console.WriteLine($"[SharpGLTF] Next animation: '{GetCurrentAnimationName()}'");
+            }
+        }
+
+        public void PreviousAnimation()
+        {
+            if (Animations.Count > 0)
+            {
+                CurrentAnimationIndex = (CurrentAnimationIndex - 1 + Animations.Count) % Animations.Count;
+                Console.WriteLine($"[SharpGLTF] Previous animation: '{GetCurrentAnimationName()}'");
+            }
+        }
 
         private ModelRoot _model;
         private List<AnimationChannel> _pendingChannels = new List<AnimationChannel>();
@@ -285,35 +319,42 @@ namespace Sokol
             
             Console.WriteLine($"[SharpGLTF] Built node hierarchy with {rootNode.ChildrenCount} root children");
 
-            // Create animation
-            float duration = (float)gltfAnim.Duration;
-            int ticksPerSecond = 1; // SharpGLTF uses seconds, we'll convert
-            Animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
-
-            // Process animation channels - store samplers WITHOUT pre-sampling
-            foreach (var channel in gltfAnim.Channels)
+            // Process ALL animations from the model
+            foreach (var gltfAnimation in _model.LogicalAnimations)
             {
-                var targetNode = channel.TargetNode;
-                string boneName = targetNode.Name ?? "Unnamed";
+                float duration = (float)gltfAnimation.Duration;
+                int ticksPerSecond = 1; // SharpGLTF uses seconds, we'll convert
+                var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
+                animation.Name = gltfAnimation.Name ?? $"Animation{Animations.Count}";
 
-                // Find or create bone
-                var bone = Animation.FindBone(boneName);
-                if (bone == null)
+                // Process animation channels - store samplers WITHOUT pre-sampling
+                foreach (var channel in gltfAnimation.Channels)
                 {
-                    bone = new SharpGltfBone(boneName, BoneInfoMap.ContainsKey(boneName) ? BoneInfoMap[boneName].Id : -1, targetNode);
-                    Animation.AddBone(bone);
+                    var targetNode = channel.TargetNode;
+                    string boneName = targetNode.Name ?? "Unnamed";
+
+                    // Find or create bone
+                    var bone = animation.FindBone(boneName);
+                    if (bone == null)
+                    {
+                        bone = new SharpGltfBone(boneName, BoneInfoMap.ContainsKey(boneName) ? BoneInfoMap[boneName].Id : -1, targetNode);
+                        animation.AddBone(bone);
+                    }
+
+                    // Store samplers for runtime evaluation (NO extraction)
+                    bone.SetSamplers(
+                        channel.GetTranslationSampler(),
+                        channel.GetRotationSampler(),
+                        channel.GetScaleSampler()
+                    );
                 }
 
-                // Store samplers for runtime evaluation (NO extraction)
-                bone.SetSamplers(
-                    channel.GetTranslationSampler(),
-                    channel.GetRotationSampler(),
-                    channel.GetScaleSampler()
-                );
+                Animations.Add(animation);
+                Console.WriteLine($"[SharpGLTF] Loaded animation '{animation.Name}' with {animation.GetBoneIDMap().Count} bones, duration: {duration:F2}s");
             }
 
             stopwatch.Stop();
-            Console.WriteLine($"[SharpGLTF] Animation processed with {Animation.GetBoneIDMap().Count} animated bones");
+            Console.WriteLine($"[SharpGLTF] Processed {Animations.Count} animation(s)");
             Console.WriteLine($"[SharpGLTF PROFILE] ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)");
         }
 

@@ -14,6 +14,9 @@ using static Sokol.Utils;
 using System.Diagnostics;
 using static Sokol.SLog;
 using static Sokol.SDebugUI;
+using static Sokol.SImgui;
+using Imgui;
+using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
 using static cgltf_sapp_shader_cs_cgltf.Shaders;
 using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
@@ -21,10 +24,10 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 public static unsafe class SharpGLTFApp
 {
     // const string filename = "DamagedHelmet.glb";
-    const string filename = "assimpScene.glb";
+    // const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    // const string filename = "DancingGangster.glb";
+    const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     class _state
@@ -80,6 +83,12 @@ public static unsafe class SharpGLTFApp
             logger = {
                 func = &slog_func,
             }
+        });
+
+        // Setup sokol-imgui
+        simgui_setup(new simgui_desc_t
+        {
+            logger = { func = &slog_func }
         });
 
         // Setup camera
@@ -229,6 +238,15 @@ public static unsafe class SharpGLTFApp
 
         int fb_width = sapp_width();
         int fb_height = sapp_height();
+
+        // Start new imgui frame
+        simgui_new_frame(new simgui_frame_desc_t
+        {
+            width = fb_width,
+            height = fb_height,
+            delta_time = sapp_frame_duration(),
+            dpi_scale = sapp_dpi_scale()
+        });
 
         // Auto-position camera using scene bounds after model is loaded
         if (!state.cameraInitialized && state.modelLoaded && state.model != null)
@@ -539,16 +557,110 @@ public static unsafe class SharpGLTFApp
                 _loggedMeshInfoOnce = true;
         }
 
+        // Draw UI (builds ImGui commands)
+        DrawUI();
+
+        // Render ImGui (submits draw commands to sokol-gfx)
+        simgui_render();
+
         sg_end_pass();
         sg_commit();
         
         _frameCount++;  // Increment frame counter
     }
 
+    static void DrawUI()
+    {
+        igSetNextWindowPos(new Vector2(30, 30), ImGuiCond.Once, Vector2.Zero);
+        igSetNextWindowBgAlpha(0.85f);
+        byte open = 1;
+        if (igBegin("Animation Controls", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            igText("SharpGLTF Animation Viewer");
+            igSeparator();
+
+            if (state.model != null)
+            {
+                igText($"Model: {filename}");
+                igText($"Meshes: {state.model.Meshes.Count}");
+                igText($"Nodes: {state.model.Nodes.Count}");
+                igText($"Bones: {state.model.BoneCounter}");
+                igSeparator();
+
+                if (state.animator != null && state.model.HasAnimations)
+                {
+                    // Animation info
+                    int animCount = state.model.GetAnimationCount();
+                    string currentAnimName = state.model.GetCurrentAnimationName();
+                    int currentAnimIndex = state.model.CurrentAnimationIndex;
+
+                    igText($"Animations: {animCount}");
+                    igText($"Current: {currentAnimName} ({currentAnimIndex + 1}/{animCount})");
+                    
+                    // Animation switching buttons (only if multiple animations)
+                    if (animCount > 1)
+                    {
+                        igSeparator();
+                        if (igButton("<- Previous", Vector2.Zero))
+                        {
+                            state.model.PreviousAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
+                        igSameLine(0, 10);
+                        if (igButton("Next ->", Vector2.Zero))
+                        {
+                            state.model.NextAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
+                    }
+
+                    igSeparator();
+
+                    var currentAnim = state.animator.GetCurrentAnimation();
+                    if (currentAnim != null)
+                    {
+                        float duration = currentAnim.GetDuration();
+                        float currentTime = state.animator.GetCurrentTime();
+                        float ticksPerSecond = currentAnim.GetTicksPerSecond();
+
+                        // Convert to seconds for display
+                        float durationInSeconds = duration / ticksPerSecond;
+                        float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                        igText("Animation: Playing");
+                        igText($"Duration: {durationInSeconds:F2}s");
+                        igText($"Current Time: {currentTimeInSeconds:F2}s");
+                        igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                    }
+                }
+                else
+                {
+                    igText("No animations in model");
+                }
+
+                igSeparator();
+                igText($"Camera Distance: {state.camera.Distance:F2}");
+                igText($"Camera Latitude: {state.camera.Latitude:F2}");
+                igText($"Camera Longitude: {state.camera.Longitude:F2}");
+            }
+            else
+            {
+                igText("Loading model...");
+            }
+        }
+        igEnd();
+    }
+
 
     [UnmanagedCallersOnly]
     private static unsafe void Event(sapp_event* e)
     {
+        // Handle ImGui events first
+        if (simgui_handle_event(in *e))
+        {
+            return; // ImGui consumed the event
+        }
+
         state.camera.HandleEvent(e);
         
         // Handle keyboard input for WASD camera movement
@@ -591,6 +703,7 @@ public static unsafe class SharpGLTFApp
     {
         state.model?.Dispose();
         FileSystem.Instance.Shutdown();
+        simgui_shutdown();
         sg_shutdown();
 
         // Force a complete shutdown if debugging
@@ -611,7 +724,7 @@ public static unsafe class SharpGLTFApp
             width = 0,
             height = 0,
             sample_count = 4,
-            window_title = "Clear (sokol-app)",
+            window_title = "SharpGLTF  (sokol-app)",
             icon = { sokol_default = true },
             logger = {
                 func = &slog_func,

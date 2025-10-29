@@ -14,6 +14,7 @@ namespace Sokol
 
     public class SharpGltfAnimation
     {
+        public string Name { get; set; } = "";
         private float _duration;
         private int _ticksPerSecond;
         private List<SharpGltfBone> _bones = new List<SharpGltfBone>();
