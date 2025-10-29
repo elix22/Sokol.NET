@@ -4,15 +4,20 @@ using static Sokol.StbImage;
 
 namespace Sokol
 {
-    public class Texture
+    public class Texture : IDisposable
     {
-        public sg_image Image;
-        public sg_view View;
-        public sg_sampler Sampler;
+        public sg_image Image { get; private set; }
+        public sg_view View { get; private set; }
+        public sg_sampler Sampler { get; private set; }
         public bool IsValid => Image.id != 0;
+        
+        private bool disposed;
+        private string? _cacheKey; // Track the cache key for removal on dispose
 
         public unsafe Texture(byte* pixels, int width, int height, string label)
         {
+            _cacheKey = label; // Use label as cache key
+            
             // Create image
             var img_desc = new sg_image_desc
             {
@@ -64,15 +69,38 @@ namespace Sokol
 
         public void Dispose()
         {
-            if (Image.id != 0)
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposed)
             {
-                sg_destroy_sampler(Sampler);
-                sg_destroy_view(View);
-                sg_destroy_image(Image);
-                Image = default;
-                View = default;
-                Sampler = default;
+                // Remove from cache if we have a cache key
+                if (_cacheKey != null)
+                {
+                    TextureCache.Instance.Remove(_cacheKey);
+                }
+                
+                // Destroy sokol graphics resources
+                if (Image.id != 0)
+                {
+                    sg_destroy_sampler(Sampler);
+                    sg_destroy_view(View);
+                    sg_destroy_image(Image);
+                    Image = default;
+                    View = default;
+                    Sampler = default;
+                }
+                
+                disposed = true;
             }
+        }
+
+        ~Texture()
+        {
+            Dispose(false);
         }
     }
 }

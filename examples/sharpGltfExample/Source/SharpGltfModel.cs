@@ -282,9 +282,13 @@ namespace Sokol
                 return;
             }
 
-            // Load texture from memory
+            // Create unique identifier for texture to enable caching
+            // Using texture's logical index as identifier (unique within a model)
+            string textureId = $"texture_{textureImage.LogicalIndex}_{channelName}";
+
+            // Load texture from memory using cache
             var imageData = textureImage.Content.Content.ToArray();
-            var texture = Texture.LoadFromMemory(imageData, $"{channelName}-texture");
+            var texture = TextureCache.Instance.GetOrCreate(textureId, imageData);
             mesh.Textures.Add(texture);
         }
 

@@ -642,6 +642,15 @@ public static unsafe class SharpGLTFApp
                 igText($"Camera Distance: {state.camera.Distance:F2}");
                 igText($"Camera Latitude: {state.camera.Latitude:F2}");
                 igText($"Camera Longitude: {state.camera.Longitude:F2}");
+                
+                // Texture cache statistics
+                igSeparator();
+                var (hits, misses, total) = TextureCache.Instance.GetStats();
+                var hitRate = hits + misses > 0 ? (hits * 100.0 / (hits + misses)) : 0.0;
+                igText($"Texture Cache:");
+                igText($"  Unique: {total}");
+                igText($"  Hits: {hits}, Misses: {misses}");
+                igText($"  Hit Rate: {hitRate:F1}%%");
             }
             else
             {
@@ -701,7 +710,15 @@ public static unsafe class SharpGLTFApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
+        // Print texture cache statistics before cleanup
+        Console.WriteLine("[SharpGLTF] Cleanup - Texture Cache Statistics:");
+        TextureCache.Instance.PrintStats();
+        
         state.model?.Dispose();
+        
+        // Clear texture cache (will dispose all cached textures)
+        TextureCache.Instance.Clear();
+        
         FileSystem.Instance.Shutdown();
         simgui_shutdown();
         sg_shutdown();
