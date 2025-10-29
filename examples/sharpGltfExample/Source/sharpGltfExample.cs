@@ -21,10 +21,10 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 public static unsafe class SharpGLTFApp
 {
     // const string filename = "DamagedHelmet.glb";
-    // const string filename = "assimpScene.glb";
+    const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    const string filename = "DancingGangster.glb";
+    // const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     class _state
@@ -37,6 +37,7 @@ public static unsafe class SharpGLTFApp
         public SharpGltfAnimator? animator;
         public bool modelLoaded = false;
         public bool cameraInitialized = false;  // Track if camera has been auto-positioned
+        public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
         
@@ -86,7 +87,7 @@ public static unsafe class SharpGLTFApp
         {
             Aspect = 60.0f,
             NearZ = 0.01f,
-            FarZ = 500.0f,
+            FarZ = 1500.0f,
             Center = new Vector3(0.0f, 1.0f, 0.0f),
             Distance = 3.0f,
             Latitude = 10.0f,
@@ -173,9 +174,20 @@ public static unsafe class SharpGLTFApp
                         state.modelBoundsMin = new Vector3(-1, 0, -1);
                         state.modelBoundsMax = new Vector3(1, 2, 1);
                     }
-                    
+
                     // Create our model wrapper
                     state.model = new SharpGltfModel(modelRoot);
+                    
+                    // TBD ELI , this is an hack to detect Mixamo models
+                    // Detect if this is a Mixamo model by checking node names
+                    state.isMixamoModel = modelRoot.LogicalNodes.Any(n => 
+                        n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
+                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase));
+                    
+                    if (state.isMixamoModel)
+                    {
+                        Console.WriteLine("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
+                    }
                     
                     Console.WriteLine($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
                     Console.WriteLine($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
@@ -409,13 +421,20 @@ public static unsafe class SharpGLTFApp
                 
     
                 
-                // IMPORTANT: Compensate for 0.01 scale in parent nodes (Mixamo export from Blender often has this)
-                // The model has "mixamorig:Meshes" and "Armature.015" nodes with 0.01 scale
-                // We multiply by 100 to counter the 0.01 scale
-                // Also rotate -90 degrees on X axis to orient the model correctly (Mixamo models often need this)
-                var scaleMatrix = Matrix4x4.CreateScale(100.0f);
-                var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f); // -90 degrees
-                Matrix4x4 modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                // Apply Mixamo-specific transforms if needed
+                Matrix4x4 modelMatrix;
+                if (state.isMixamoModel)
+                {
+                    // Mixamo models exported from Blender have 0.01 scale and need rotation correction
+                    var scaleMatrix = Matrix4x4.CreateScale(100.0f);
+                    var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
+                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                }
+                else
+                {
+                    // Use the node's original transform from the GLTF file
+                    modelMatrix = node.Transform;
+                }
                 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
