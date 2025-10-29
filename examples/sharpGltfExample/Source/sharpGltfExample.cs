@@ -224,15 +224,6 @@ public static unsafe class SharpGLTFApp
             Vector3 sceneMin = state.modelBoundsMin;
             Vector3 sceneMax = state.modelBoundsMax;
             
-            // Apply the same transformations we apply to the model (100x scale + -90° X rotation)
-            var scaleMatrix = Matrix4x4.CreateScale(100.0f);
-            var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
-            var transformMatrix = scaleMatrix * rotationMatrix;
-            
-            // Transform the bounds to match the actual rendered model
-            sceneMin = Vector3.Transform(sceneMin, transformMatrix);
-            sceneMax = Vector3.Transform(sceneMax, transformMatrix);
-            
             // After rotation, min/max might be swapped, so recalculate
             Vector3 actualMin = Vector3.Min(sceneMin, sceneMax);
             Vector3 actualMax = Vector3.Max(sceneMin, sceneMax);
@@ -262,7 +253,7 @@ public static unsafe class SharpGLTFApp
             float aspectRatio = (float)fb_width / (float)fb_height;
             
             float minDistance = 0.01f;
-            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 10.0f;
+            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 10000.0f;
             float bestDistance = maxDistance;
             
             // Binary search for optimal distance
@@ -380,7 +371,7 @@ public static unsafe class SharpGLTFApp
         // Render model if loaded
         if (state.modelLoaded && state.model != null)
         {
-            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
+            // Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
             
             // Prepare vertex shader uniforms (common for both pipelines)
             Matrix4x4 model = Matrix4x4.Identity;
