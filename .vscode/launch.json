@@ -83,7 +83,8 @@
                 "assimp_simple",
                 "assimp_animation",
                 "assimp_scene",
-                "cgltf_scene"
+                "cgltf_scene",
+                "sharpGltfExample"
             ],
             "default": "cube"
         },

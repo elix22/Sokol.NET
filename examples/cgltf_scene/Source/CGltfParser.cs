@@ -149,6 +149,7 @@ namespace Sokol
         // Animation support
         public Dictionary<string, BoneInfo> BoneInfoMap = new Dictionary<string, BoneInfo>();
         public int BoneCount = 0;
+        public unsafe cgltf_node* SkeletonRootNode = null;  // Root joint of the skeleton
 
         public sg_buffer[] Buffers;
         public CGltfImage[] Images;
@@ -1105,6 +1106,14 @@ namespace Sokol
             // For now, we only support the first skin
             cgltf_skin* skin = &gltf->skins[0];
             
+            // Store the skeleton root node (first joint)
+            if (skin->joints_count > 0)
+            {
+                ActiveScene.SkeletonRootNode = skin->joints[0];
+                string rootName = Marshal.PtrToStringUTF8((IntPtr)skin->joints[0]->name) ?? "UnknownRoot";
+                Info($"CGltfParser: Skeleton root node: {rootName}");
+            }
+            
             if (skin->inverse_bind_matrices == null)
             {
                 Info("CGltfParser: Skin has no inverse bind matrices");
@@ -1133,7 +1142,7 @@ namespace Sokol
                 Matrix4x4 inverseBindMatrix = Matrix4x4.Identity;
                 if (cgltf_accessor_read_float(*accessor, i, matrixData, 16) != 0)
                 {
-                    // Copy matrix data (GLTF uses column-major, so transpose)
+                    // Read matrix directly without transpose
                     inverseBindMatrix = new Matrix4x4(
                         matrixData[0], matrixData[1], matrixData[2], matrixData[3],
                         matrixData[4], matrixData[5], matrixData[6], matrixData[7],
@@ -1289,8 +1298,11 @@ namespace Sokol
                     }
                 }
 
-                // Build node hierarchy
-                CGltfNodeData rootNode = BuildAnimationNodeHierarchy(gltf->scene->nodes[0]);
+                // Build node hierarchy - use skeleton root if available, otherwise use scene root
+                cgltf_node* rootForHierarchy = ActiveScene.SkeletonRootNode != null ? 
+                    ActiveScene.SkeletonRootNode : gltf->scene->nodes[0];
+                
+                CGltfNodeData rootNode = BuildAnimationNodeHierarchy(rootForHierarchy);
 
                 // Initialize animation
                 animation.Initialize(animName, maxTime, ticksPerSecond, rootNode, bones, ActiveScene.BoneInfoMap);
@@ -1309,7 +1321,7 @@ namespace Sokol
             // Get node transform
             if (node->has_matrix != 0)
             {
-                // Access matrix using indexer
+                // Read matrix directly without transpose
                 nodeData.Transformation = new Matrix4x4(
                     node->matrix[0], node->matrix[1], node->matrix[2], node->matrix[3],
                     node->matrix[4], node->matrix[5], node->matrix[6], node->matrix[7],
@@ -1320,6 +1332,7 @@ namespace Sokol
             else
             {
                 // Compose from TRS
+                // Standard order: Translation * Rotation * Scale
                 Vector3 translation = new Vector3(node->translation[0], node->translation[1], node->translation[2]);
                 Quaternion rotation = new Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
                 Vector3 scale = new Vector3(node->scale[0], node->scale[1], node->scale[2]);
@@ -1781,11 +1794,13 @@ namespace Sokol
         // Conversion helpers
         private static Matrix4x4 FromGltfMatrix(cgltf_node.matrixCollection mat)
         {
+            // GLTF uses column-major (OpenGL style), System.Numerics uses row-major (DirectX style)
+            // Need to transpose: convert columns to rows
             return new Matrix4x4(
-                mat[0], mat[1], mat[2], mat[3],
-                mat[4], mat[5], mat[6], mat[7],
-                mat[8], mat[9], mat[10], mat[11],
-                mat[12], mat[13], mat[14], mat[15]
+                mat[0], mat[4], mat[8],  mat[12],  // Row 0 (was column 0)
+                mat[1], mat[5], mat[9],  mat[13],  // Row 1 (was column 1)
+                mat[2], mat[6], mat[10], mat[14],  // Row 2 (was column 2)
+                mat[3], mat[7], mat[11], mat[15]   // Row 3 (was column 3)
             );
         }
 

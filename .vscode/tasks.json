@@ -492,6 +492,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-sharpGltfExample",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/sharpGltfExample"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-sharpGltfExample-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/sharpGltfExample"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Android: List Devices",
 			"type": "shell",
 			"group": "build",
@@ -728,7 +742,8 @@
 				"ozz_shdfeatures",
 				"vertextexture",
 				"mrt",
-				"cgltf_scene"
+				"cgltf_scene",
+				"sharpGltfExample"
 			],
 			"default": "cube"
 		},
@@ -771,7 +786,8 @@
 				"examples/ozz_shdfeatures",
 				"examples/vertextexture",
 				"examples/mrt",
-				"examples/cgltf_scene"
+				"examples/cgltf_scene",
+				"examples/sharpGltfExample"
 			]
 		},
 		{
