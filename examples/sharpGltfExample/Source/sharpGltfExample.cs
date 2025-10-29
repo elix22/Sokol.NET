@@ -707,6 +707,49 @@ public static unsafe class SharpGLTFApp
                 {
                     state.enableFrustumCulling = frustumEnabled != 0;
                 }
+                
+                igSeparator();
+                igText("=== Lighting ===");
+                
+                int activeCount = state.lights.Count(l => l.Enabled);
+                igText($"Active Lights: {activeCount}/{state.lights.Count}");
+                
+                // Individual light controls
+                igText("Individual Lights:");
+                igIndent(20);
+                for (int i = 0; i < state.lights.Count; i++)
+                {
+                    var light = state.lights[i];
+                    
+                    // Light enable/disable checkbox with unique ID
+                    igPushID_Int(i);
+                    byte lightEnabled = light.Enabled ? (byte)1 : (byte)0;
+                    if (igCheckbox($"Light {i + 1}", ref lightEnabled))
+                    {
+                        light.Enabled = lightEnabled != 0;
+                    }
+                    
+                    // Show light details
+                    igSameLine(0, 10);
+                    if (light.Enabled)
+                    {
+                        string lightTypeName = light.Type switch
+                        {
+                            LightType.Directional => "Directional",
+                            LightType.Point => "Point",
+                            LightType.Spot => "Spot",
+                            _ => "Unknown"
+                        };
+                        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1), $"({lightTypeName})");
+                    }
+                    else
+                    {
+                        igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "(disabled)");
+                    }
+                    
+                    igPopID();
+                }
+                igUnindent(20);
             }
             else
             {
