@@ -370,7 +370,28 @@ namespace Sokol
                 mesh.RoughnessFactor = 0.5f; // Moderately rough
             }
             
-            mesh.EmissiveFactor = Vector3.Zero;
+            // Extract emissive factor from material
+            var emissiveChannel = material.FindChannel("Emissive");
+            if (emissiveChannel.HasValue)
+            {
+                try
+                {
+                    // Emissive is RGB color
+                    var emissiveColor = emissiveChannel.Value.Color;
+                    mesh.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
+                    Console.WriteLine($"[SharpGLTF] Material has Emissive: {mesh.EmissiveFactor}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SharpGLTF] Failed to extract emissive: {ex.Message}");
+                    mesh.EmissiveFactor = Vector3.Zero;
+                }
+            }
+            else
+            {
+                Console.WriteLine("[SharpGLTF] Material has NO Emissive channel");
+                mesh.EmissiveFactor = Vector3.Zero;
+            }
 
             // Load textures
             LoadTexture(material, "BaseColor", mesh, 0);

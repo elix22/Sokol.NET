@@ -307,7 +307,7 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
         
         // Boost specular for metals to make them more visible and shiny
         float metallic = material_info.metallic;
-        float spec_boost = mix(1.0, 2.0, metallic);  // 2x boost for metals
+        float spec_boost = mix(1.0, 2.5, metallic);  // 2.5x boost for metals (increased)
         vec3 spec_contrib = F * Vis * D * spec_boost;
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
@@ -447,6 +447,8 @@ void main() {
         vec3 emissive_sample = srgb_to_linear(texture(sampler2D(emissive_tex, emissive_smp), v_uv)).rgb;
         emissive *= emissive_sample;
     }
+    // Boost emissive to make glowing details more visible
+    emissive *= 3.0;
     
     // Clamp roughness to avoid artifacts
     perceptual_roughness = clamp(perceptual_roughness, 0.04, 1.0);
