@@ -8,12 +8,24 @@ namespace Sokol
         private Matrix4x4[] _finalBoneMatrices = new Matrix4x4[AnimationConstants.MAX_BONES];
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
+        private int _debugBoneCount = 0;  // Debug counter
 
         public SharpGltfAnimator(SharpGltfAnimation? animation)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
+            
+            // Initialize with identity matrices
             Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
+            
+            // Update once to get the initial pose at time 0
+            if (_currentAnimation != null)
+            {
+                ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
+                Console.WriteLine($"[SharpGltfAnimator] Root node: '{rootNode.Name}' with {rootNode.ChildrenCount} children");
+                CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                Console.WriteLine($"[SharpGltfAnimator] Initialized with {_currentAnimation.GetBoneIDMap().Count} bones");
+            }
         }
 
         public void UpdateAnimation(float dt)
@@ -55,6 +67,13 @@ namespace Sokol
                 int index = boneInfoMap[nodeName].Id;
                 Matrix4x4 offset = boneInfoMap[nodeName].Offset;
                 _finalBoneMatrices[index] = offset * globalTransformation;
+                
+                // Debug: Print first bone calculation
+                if (_debugBoneCount < 2 && index == 0)
+                {
+                    Console.WriteLine($"[Bone {index}] '{nodeName}': offset.M44={offset.M44:F3}, global.M44={globalTransformation.M44:F3}, final.M44={_finalBoneMatrices[index].M44:F3}");
+                    _debugBoneCount++;
+                }
             }
 
             for (int i = 0; i < node.ChildrenCount; i++)

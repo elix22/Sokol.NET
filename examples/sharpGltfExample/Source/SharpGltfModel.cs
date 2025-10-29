@@ -258,8 +258,22 @@ namespace Sokol
             var gltfAnim = _model.LogicalAnimations[0];
             Console.WriteLine($"[SharpGLTF] Processing animation: {gltfAnim.Name ?? "Unnamed"}, duration: {gltfAnim.Duration}");
 
-            // Build node hierarchy
-            var rootNode = BuildNodeHierarchy(_model.DefaultScene.VisualChildren.First());
+            // Build complete node hierarchy - create a virtual root that contains all scene nodes
+            SharpGltfNodeData rootNode = new SharpGltfNodeData
+            {
+                Name = "SceneRoot",
+                Transformation = Matrix4x4.Identity,
+                Children = new List<SharpGltfNodeData>(),
+                ChildrenCount = 0
+            };
+            
+            foreach (var sceneNode in _model.DefaultScene.VisualChildren)
+            {
+                rootNode.Children.Add(BuildNodeHierarchy(sceneNode));
+                rootNode.ChildrenCount++;
+            }
+            
+            Console.WriteLine($"[SharpGLTF] Built node hierarchy with {rootNode.ChildrenCount} root children");
 
             // Create animation
             float duration = (float)gltfAnim.Duration;

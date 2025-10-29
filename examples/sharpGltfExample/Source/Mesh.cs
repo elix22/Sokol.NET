@@ -24,6 +24,7 @@ namespace Sokol
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;
+        private static bool _firstDrawCall = true;  // Debug flag
 
         public Mesh(Vertex[] vertices, ushort[] indices, bool hasSkinning = false)
         {
@@ -81,7 +82,18 @@ namespace Sokol
         public void Draw(sg_pipeline pipeline)
         {
             if (IndexCount == 0)
+            {
+                Console.WriteLine("[Mesh] Draw() called but IndexCount is 0, skipping");
                 return;
+            }
+            
+            // Debug output on first call
+            if (_firstDrawCall)
+            {
+                Console.WriteLine($"[Mesh] Draw() called: VertexCount={VertexCount}, IndexCount={IndexCount}");
+                Console.WriteLine($"[Mesh] VertexBuffer.id={VertexBuffer.id}, IndexBuffer.id={IndexBuffer.id}");
+                _firstDrawCall = false;
+            }
 
             // Note: sg_apply_pipeline() should be called by the caller before this method
             // Don't call it here as it would invalidate uniforms applied before Draw()

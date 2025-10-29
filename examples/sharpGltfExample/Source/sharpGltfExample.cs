@@ -20,11 +20,11 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 
 public static unsafe class SharpGLTFApp
 {
-    const string filename = "DamagedHelmet.glb";
+    // const string filename = "DamagedHelmet.glb";
     // const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    // const string filename = "DancingGangster.glb";
+    const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     class _state
@@ -39,9 +39,22 @@ public static unsafe class SharpGLTFApp
         public bool cameraInitialized = false;  // Track if camera has been auto-positioned
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
+        
+        // Keyboard state for WASD movement
+        public bool keyW = false;
+        public bool keyA = false;
+        public bool keyS = false;
+        public bool keyD = false;
+        public bool keyQ = false;  // Up
+        public bool keyE = false;  // Down
+        public bool keyUp = false;    // Arrow up
+        public bool keyDown = false;  // Arrow down
     }
 
     static _state state = new _state();
+    static bool _loggedPipelineOnce = false;  // Debug flag
+    static bool _loggedMeshInfoOnce = false;  // Debug flag for mesh info
+    static int _frameCount = 0;  // Frame counter for debugging
 
     /// <summary>
     /// Calculates a bounding sphere that contains the entire axis-aligned bounding box.
@@ -153,14 +166,29 @@ public static unsafe class SharpGLTFApp
                     Console.WriteLine($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
                     Console.WriteLine($"[SharpGLTF] Model size: {size}, Center: {center}");
                     
+                    // Safety check: if bounds are invalid or too small, use defaults
+                    if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
+                    {
+                        Console.WriteLine("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
+                        state.modelBoundsMin = new Vector3(-1, 0, -1);
+                        state.modelBoundsMax = new Vector3(1, 2, 1);
+                    }
+                    
                     // Create our model wrapper
                     state.model = new SharpGltfModel(modelRoot);
+                    
+                    Console.WriteLine($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
+                    Console.WriteLine($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
                     
                     // Create animator if model has animations
                     if (state.model.HasAnimations)
                     {
                         state.animator = new SharpGltfAnimator(state.model.Animation);
-                        Console.WriteLine("[SharpGLTF] Animator created");
+                        Console.WriteLine("[SharpGLTF] Animator created for animated model");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[SharpGLTF] No animations found in model");
                     }
                     
                     state.modelLoaded = true;
@@ -195,6 +223,22 @@ public static unsafe class SharpGLTFApp
         {
             Vector3 sceneMin = state.modelBoundsMin;
             Vector3 sceneMax = state.modelBoundsMax;
+            
+            // Apply the same transformations we apply to the model (100x scale + -90° X rotation)
+            var scaleMatrix = Matrix4x4.CreateScale(100.0f);
+            var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
+            var transformMatrix = scaleMatrix * rotationMatrix;
+            
+            // Transform the bounds to match the actual rendered model
+            sceneMin = Vector3.Transform(sceneMin, transformMatrix);
+            sceneMax = Vector3.Transform(sceneMax, transformMatrix);
+            
+            // After rotation, min/max might be swapped, so recalculate
+            Vector3 actualMin = Vector3.Min(sceneMin, sceneMax);
+            Vector3 actualMax = Vector3.Max(sceneMin, sceneMax);
+            sceneMin = actualMin;
+            sceneMax = actualMax;
+            
             Vector3 sceneSize = sceneMax - sceneMin;
 
             var (sphereCenter, sphereRadius) = CalculateBoundingSphere(sceneMin, sceneMax);
@@ -281,6 +325,46 @@ public static unsafe class SharpGLTFApp
             state.cameraInitialized = true;
         }
 
+        // Handle WASD camera movement
+        if (state.cameraInitialized)
+        {
+            float moveSpeed = 50.0f; // Units per second (increased from 5.0f)
+            float deltaTime = (float)sapp_frame_duration();
+            float moveAmount = moveSpeed * deltaTime;
+            
+            // Get camera forward, right, and up vectors
+            Vector3 cameraPos = state.camera.EyePos;
+            Vector3 forward = Vector3.Normalize(state.camera.Center - cameraPos);
+            Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+            Vector3 up = Vector3.UnitY;
+            
+            Vector3 moveDir = Vector3.Zero;
+            
+            // WASD for forward/back/left/right movement
+            if (state.keyW) moveDir += forward;
+            if (state.keyS) moveDir -= forward;
+            if (state.keyD) moveDir += right;
+            if (state.keyA) moveDir -= right;
+            
+            // Q/E for up/down movement
+            if (state.keyQ) moveDir += up;
+            if (state.keyE) moveDir -= up;
+            
+            // Arrow keys for up/down movement (alternative to Q/E)
+            if (state.keyUp) moveDir += up;
+            if (state.keyDown) moveDir -= up;
+            
+            // Normalize and apply movement
+            if (moveDir.LengthSquared() > 0)
+            {
+                moveDir = Vector3.Normalize(moveDir);
+                Vector3 movement = moveDir * moveAmount;
+                
+                // Move both camera position and look-at center to maintain view direction
+                state.camera.Center += movement;
+            }
+        }
+
         // Update camera
         state.camera.Update(fb_width, fb_height);
 
@@ -296,6 +380,8 @@ public static unsafe class SharpGLTFApp
         // Render model if loaded
         if (state.modelLoaded && state.model != null)
         {
+            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
+            
             // Prepare vertex shader uniforms (common for both pipelines)
             Matrix4x4 model = Matrix4x4.Identity;
 
@@ -318,18 +404,62 @@ public static unsafe class SharpGLTFApp
             lightParams.light_colors[2] = new Vector4(0.7f, 0.8f, 1.0f, 10.0f);
             lightParams.light_params_data[2] = new Vector4(500.0f, 0, 0, 0);
 
+            // Debug output on first render when model exists
+            bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
+            if (shouldLogMeshInfo)
+            {
+                int validMeshCount = 0;
+                List<int> meshIndices = new List<int>();
+                foreach (var n in state.model.Nodes)
+                {
+                    if (n.MeshIndex >= 0 && n.MeshIndex < state.model.Meshes.Count)
+                    {
+                        validMeshCount++;
+                        meshIndices.Add(n.MeshIndex);
+                    }
+                }
+                Console.WriteLine($"[SharpGLTF Mesh Info] Total nodes: {state.model.Nodes.Count}, Nodes with valid meshes: {validMeshCount}");
+                Console.WriteLine($"[SharpGLTF Mesh Info] Mesh indices in nodes: [{string.Join(", ", meshIndices)}]");
+            }
+            
             // Draw each node (which references a mesh with its transform)
             foreach (var node in state.model.Nodes)
             {
+                // Skip nodes without meshes (e.g., bone nodes, empty transforms)
+                if (node.MeshIndex < 0 || node.MeshIndex >= state.model.Meshes.Count)
+                    continue;
+                
                 var mesh = state.model.Meshes[node.MeshIndex];
                 
-                // Use the node's transform for this mesh instance
-                Matrix4x4 modelMatrix = node.Transform;
+                // Debug: Print mesh info on first render
+                if (shouldLogMeshInfo)
+                {
+                    Console.WriteLine($"[SharpGLTF Mesh Info] Rendering mesh {node.MeshIndex}: VertexCount={mesh.VertexCount}, IndexCount={mesh.IndexCount}, HasSkinning={mesh.HasSkinning}");
+                }
+                
+                // IMPORTANT: Compensate for 0.01 scale in parent nodes (Mixamo export from Blender often has this)
+                // The model has "mixamorig:Meshes" and "Armature.015" nodes with 0.01 scale
+                // We multiply by 100 to counter the 0.01 scale
+                // Also rotate -90 degrees on X axis to orient the model correctly (Mixamo models often need this)
+                var scaleMatrix = Matrix4x4.CreateScale(100.0f);
+                var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f); // -90 degrees
+                Matrix4x4 modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                
+                // Use skinning if mesh has it and animator exists
+                bool useSkinning = mesh.HasSkinning && state.animator != null;
                 
                 // Choose pipeline based on whether mesh has skinning
-                sg_pipeline pipeline = mesh.HasSkinning ? state.pipeline_skinned : state.pipeline_static;
+                sg_pipeline pipeline = useSkinning ? state.pipeline_skinned : state.pipeline_static;
 
-                if (mesh.HasSkinning && state.animator != null)
+                // Debug: Log which pipeline we're using (only once)
+                if (!_loggedPipelineOnce)
+                {
+                    Console.WriteLine($"[SharpGLTF] Rendering mesh with {(mesh.HasSkinning ? "SKINNED" : "STATIC")} pipeline");
+                    Console.WriteLine($"[SharpGLTF] Animator is {(state.animator != null ? "ACTIVE" : "NULL")}");
+                    _loggedPipelineOnce = true;
+                }
+
+                if (useSkinning)
                 {
                     // Use skinned pipeline with bone matrices
                     skinning_vs_params_t vsParams = new skinning_vs_params_t();
@@ -339,6 +469,18 @@ public static unsafe class SharpGLTFApp
 
                     // Copy bone matrices
                     var boneMatrices = state.animator.GetFinalBoneMatrices();
+                    
+                    // Debug: Check if bone matrices are valid (on frame 5)
+                    if (_frameCount == 5)
+                    {
+                        Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone count: {boneMatrices.Length}");
+                        Console.WriteLine($"[SharpGLTF Frame {_frameCount}] First bone matrix [0]: M11={boneMatrices[0].M11:F3}, M22={boneMatrices[0].M22:F3}, M33={boneMatrices[0].M33:F3}, M44={boneMatrices[0].M44:F3}");
+                        if (boneMatrices.Length > 6)
+                            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone matrix [6]: M11={boneMatrices[6].M11:F3}, M22={boneMatrices[6].M22:F3}, M33={boneMatrices[6].M33:F3}, M44={boneMatrices[6].M44:F3}");
+                        if (boneMatrices.Length > 35)
+                            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone matrix [35]: M11={boneMatrices[35].M11:F3}, M22={boneMatrices[35].M22:F3}, M33={boneMatrices[35].M33:F3}, M44={boneMatrices[35].M44:F3}");
+                    }
+                    
                     var destSpan = MemoryMarshal.CreateSpan(ref vsParams.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
                     boneMatrices.AsSpan().CopyTo(destSpan);
 
@@ -410,10 +552,16 @@ public static unsafe class SharpGLTFApp
                 // Draw the mesh
                 mesh.Draw(pipeline);
             }
+            
+            // Mark that we've logged mesh info
+            if (shouldLogMeshInfo)
+                _loggedMeshInfoOnce = true;
         }
 
         sg_end_pass();
         sg_commit();
+        
+        _frameCount++;  // Increment frame counter
     }
 
 
@@ -421,6 +569,40 @@ public static unsafe class SharpGLTFApp
     private static unsafe void Event(sapp_event* e)
     {
         state.camera.HandleEvent(e);
+        
+        // Handle keyboard input for WASD camera movement
+        if (e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN || e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_UP)
+        {
+            bool isDown = e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN;
+            
+            switch (e->key_code)
+            {
+                case sapp_keycode.SAPP_KEYCODE_W:
+                    state.keyW = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_A:
+                    state.keyA = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_S:
+                    state.keyS = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_D:
+                    state.keyD = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_Q:
+                    state.keyQ = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_E:
+                    state.keyE = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_UP:
+                    state.keyUp = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_DOWN:
+                    state.keyDown = isDown;
+                    break;
+            }
+        }
     }
 
     [UnmanagedCallersOnly]
