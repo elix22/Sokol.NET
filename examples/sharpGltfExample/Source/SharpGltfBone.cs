@@ -25,16 +25,38 @@ namespace Sokol
         }
 
         // Store samplers - called once during load (fast)
+        // FastCurveSampler uses array indexing instead of LINQ - much faster on WebAssembly!
         public void SetSamplers(IAnimationSampler<Vector3>? translationSampler,
                                 IAnimationSampler<Quaternion>? rotationSampler,
                                 IAnimationSampler<Vector3>? scaleSampler)
         {
             if (translationSampler != null)
-                _translationSampler = translationSampler.CreateCurveSampler();
+            {
+                var sampler = translationSampler.CreateCurveSampler();
+                // LinearSampler has ToFastSampler() method that optimizes LINQ away
+                if (sampler is LinearSampler<Vector3> linear)
+                    _translationSampler = linear.ToFastSampler() ?? sampler;
+                else
+                    _translationSampler = sampler;
+            }
+            
             if (rotationSampler != null)
-                _rotationSampler = rotationSampler.CreateCurveSampler();
+            {
+                var sampler = rotationSampler.CreateCurveSampler();
+                if (sampler is LinearSampler<Quaternion> linear)
+                    _rotationSampler = linear.ToFastSampler() ?? sampler;
+                else
+                    _rotationSampler = sampler;
+            }
+            
             if (scaleSampler != null)
-                _scaleSampler = scaleSampler.CreateCurveSampler();
+            {
+                var sampler = scaleSampler.CreateCurveSampler();
+                if (sampler is LinearSampler<Vector3> linear)
+                    _scaleSampler = linear.ToFastSampler() ?? sampler;
+                else
+                    _scaleSampler = sampler;
+            }
         }
 
         // Runtime update - sample curves directly

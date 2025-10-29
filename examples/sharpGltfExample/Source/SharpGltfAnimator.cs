@@ -9,23 +9,15 @@ namespace Sokol
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
         private int _debugBoneCount = 0;  // Debug counter
-        private int _frameCounter = 0;    // For bone update throttling
-        
-        // Update bones less frequently on WebAssembly (GetPoint() is very slow)
-#if WEB
-        private const int BONE_UPDATE_INTERVAL = 10;  // 6fps bone updates on web
-#else
-        private const int BONE_UPDATE_INTERVAL = 1;   // 60fps bone updates on desktop
-#endif
 
         public SharpGltfAnimator(SharpGltfAnimation? animation)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
-            
+
             // Initialize with identity matrices
             Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
-            
+
             // Update once to get the initial pose at time 0
             if (_currentAnimation != null)
             {
@@ -43,23 +35,17 @@ namespace Sokol
                 _currentTime += _currentAnimation.GetTicksPerSecond() * dt;
                 _currentTime = _currentTime % _currentAnimation.GetDuration();
 
-                // Frame skipping for WebAssembly performance
-                _frameCounter++;
-                if (_frameCounter >= BONE_UPDATE_INTERVAL)
-                {
-                    _frameCounter = 0;
-                    
-                    // Batch update all bones at once before hierarchy traversal (optimization for WebAssembly)
-                    var bones = _currentAnimation.GetBones();
-                    foreach (var bone in bones)
-                    {
-                        bone.Update(_currentTime);
-                    }
 
-                    // Only recalculate bone transforms when we update the bone data
-                    ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
-                    CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                // Batch update all bones at once before hierarchy traversal (optimization for WebAssembly)
+                var bones = _currentAnimation.GetBones();
+                foreach (var bone in bones)
+                {
+                    bone.Update(_currentTime);
                 }
+
+                // Only recalculate bone transforms when we update the bone data
+                ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
+                CalculateBoneTransform(rootNode, Matrix4x4.Identity);
             }
         }
 
@@ -90,7 +76,7 @@ namespace Sokol
                 int index = boneInfoMap[nodeName].Id;
                 Matrix4x4 offset = boneInfoMap[nodeName].Offset;
                 _finalBoneMatrices[index] = offset * globalTransformation;
-                
+
                 // Debug: Print first bone calculation
                 if (_debugBoneCount < 2 && index == 0)
                 {
