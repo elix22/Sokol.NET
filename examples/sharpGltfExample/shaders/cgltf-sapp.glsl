@@ -27,13 +27,15 @@ layout(binding=0) uniform vs_params {
 
 layout(location=0) in vec4 position;
 layout(location=1) in vec3 normal;
-layout(location=2) in vec2 texcoord;
-layout(location=3) in vec4 boneIds;  // Changed from uvec4 for WebGL compatibility
-layout(location=4) in vec4 weights;
+layout(location=2) in vec4 color;
+layout(location=3) in vec2 texcoord;
+layout(location=4) in vec4 boneIds;  // Changed from uvec4 for WebGL compatibility
+layout(location=5) in vec4 weights;
 
 
 out vec3 v_pos;
 out vec3 v_nrm;
+out vec4 v_color;
 out vec2 v_uv;
 out vec3 v_eye_pos;
 
@@ -78,6 +80,7 @@ void main() {
     vec4 pos = model * finalPosition;
     v_pos = pos.xyz / pos.w;
     v_nrm = (model * vec4(finalNormal, 0.0)).xyz;
+    v_color = color;
     v_uv = texcoord;
     v_eye_pos = eye_pos;
     gl_Position = view_proj * pos;
@@ -88,6 +91,7 @@ void main() {
 
 in vec3 v_pos;
 in vec3 v_nrm;
+in vec4 v_color;
 in vec2 v_uv;
 in vec3 v_eye_pos;
 
@@ -358,6 +362,9 @@ void main() {
         ? srgb_to_linear(texture(sampler2D(base_color_tex, base_color_smp), v_uv))
         : base_color_factor;
     base_color *= base_color_factor;
+    
+    // Multiply with vertex color (for GLTF vertex colors or material colors)
+    base_color *= v_color;
     
     // Step 2: Get metallic/roughness
     // glTF 2.0 Specification for metallicRoughnessTexture:

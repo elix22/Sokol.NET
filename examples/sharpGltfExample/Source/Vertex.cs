@@ -8,6 +8,7 @@ namespace Sokol
     {
         public Vector3 Position;
         public Vector3 Normal;
+        public Vector4 Color;        // Vertex color (RGBA)
         public Vector2 TexCoord;
         public float BoneID0;        // Bone IDs stored as floats for WebGL compatibility
         public float BoneID1;
@@ -15,10 +16,11 @@ namespace Sokol
         public float BoneID3;
         public Vector4 BoneWeights; // Corresponding weights
 
-        public Vertex(Vector3 position, Vector3 normal, Vector2 texCoord)
+        public Vertex(Vector3 position, Vector3 normal, Vector2 texCoord, Vector4 color = default)
         {
             Position = position;
             Normal = normal;
+            Color = color == default ? Vector4.One : color; // Default to white if not specified
             TexCoord = texCoord;
             BoneID0 = 0;
             BoneID1 = 0;

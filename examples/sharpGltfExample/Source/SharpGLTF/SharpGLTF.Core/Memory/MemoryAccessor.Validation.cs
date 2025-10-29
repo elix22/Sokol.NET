@@ -318,7 +318,13 @@ namespace SharpGLTF.Memory
                     var axisMin = minimum[j];
                     var axisMax = maximum[j];
 
-                    if (v < axisMin || v > axisMax) throw new ArgumentOutOfRangeException(nameof(memory), $"Value[{i}] is out of bounds. {axisMin} <= {v} <= {axisMax}");
+                    // Add small epsilon tolerance for floating-point precision issues
+                    const float epsilon = 1e-6f;
+                    if (v < (axisMin - epsilon) || v > (axisMax + epsilon))
+                    {
+                        // Only throw if the value is significantly out of bounds
+                        throw new ArgumentOutOfRangeException(nameof(memory), $"Value[{i}] is out of bounds. {axisMin} <= {v} <= {axisMax}");
+                    }
 
                     // if (v < min || v > max) result.AddError(this, $"Item[{j}][{i}] is out of bounds. {min} <= {v} <= {max}");
                 }

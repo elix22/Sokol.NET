@@ -9,6 +9,47 @@ using static Sokol.SLog;
 
 namespace Sokol
 {
+    public struct BoundingBox
+    {
+        public Vector3 Min;
+        public Vector3 Max;
+        
+        public BoundingBox(Vector3 min, Vector3 max)
+        {
+            Min = min;
+            Max = max;
+        }
+        
+        // Transform bounding box by a matrix
+        public BoundingBox Transform(Matrix4x4 matrix)
+        {
+            // Transform all 8 corners of the box
+            Vector3[] corners = new Vector3[8]
+            {
+                new Vector3(Min.X, Min.Y, Min.Z),
+                new Vector3(Max.X, Min.Y, Min.Z),
+                new Vector3(Min.X, Max.Y, Min.Z),
+                new Vector3(Max.X, Max.Y, Min.Z),
+                new Vector3(Min.X, Min.Y, Max.Z),
+                new Vector3(Max.X, Min.Y, Max.Z),
+                new Vector3(Min.X, Max.Y, Max.Z),
+                new Vector3(Max.X, Max.Y, Max.Z)
+            };
+            
+            Vector3 newMin = new Vector3(float.MaxValue);
+            Vector3 newMax = new Vector3(float.MinValue);
+            
+            foreach (var corner in corners)
+            {
+                Vector3 transformed = Vector3.Transform(corner, matrix);
+                newMin = Vector3.Min(newMin, transformed);
+                newMax = Vector3.Max(newMax, transformed);
+            }
+            
+            return new BoundingBox(newMin, newMax);
+        }
+    }
+
     public class SharpGltfNode
     {
         public Matrix4x4 Transform;
@@ -178,6 +219,7 @@ namespace Sokol
             var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
             var normals = primitive.GetVertexAccessor("NORMAL")?.AsVector3Array();
             var texCoords = primitive.GetVertexAccessor("TEXCOORD_0")?.AsVector2Array();
+            var colors = primitive.GetVertexAccessor("COLOR_0")?.AsColorArray();
             var joints = primitive.GetVertexAccessor("JOINTS_0")?.AsVector4Array();
             var weights = primitive.GetVertexAccessor("WEIGHTS_0")?.AsVector4Array();
 
@@ -189,6 +231,20 @@ namespace Sokol
                 return;
             }
 
+            // Get material color as fallback if no vertex colors
+            // We'll use white as default and let the material processing handle the actual color
+            Vector4 materialColor = Vector4.One; // Default white
+            
+            // Debug: Check if we have vertex colors
+            if (colors != null)
+            {
+                Console.WriteLine($"[SharpGLTF] Mesh has {colors.Count} vertex colors");
+            }
+            else
+            {
+                Console.WriteLine($"[SharpGLTF] Mesh has NO vertex colors - using material color");
+            }
+
             int vertexCount = positions.Count;
 
             // Build vertices
@@ -198,6 +254,16 @@ namespace Sokol
                 vertex.Position = positions[i];
                 vertex.Normal = normals != null && i < normals.Count ? normals[i] : Vector3.UnitY;
                 vertex.TexCoord = texCoords != null && i < texCoords.Count ? texCoords[i] : Vector2.Zero;
+                
+                // Use vertex color if available, otherwise use material color
+                if (colors != null && i < colors.Count)
+                {
+                    vertex.Color = colors[i];
+                }
+                else
+                {
+                    vertex.Color = materialColor;
+                }
 
                 if (hasSkinning)
                 {
@@ -251,9 +317,27 @@ namespace Sokol
 
         private void ProcessMaterial(Material material, Mesh mesh)
         {
-            // Simple approach: force alpha to 1.0 to fix transparency issues
-            // The shader will use textures if available
-            mesh.BaseColorFactor = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+            // Extract base color from material
+            var baseColorChannel = material.FindChannel("BaseColor");
+            if (baseColorChannel.HasValue)
+            {
+                try
+                {
+                    mesh.BaseColorFactor = baseColorChannel.Value.Color;
+                    Console.WriteLine($"[SharpGLTF] Material has BaseColor: {mesh.BaseColorFactor}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SharpGLTF] Failed to extract color: {ex.Message}");
+                    mesh.BaseColorFactor = Vector4.One; // Fallback to white
+                }
+            }
+            else
+            {
+                Console.WriteLine("[SharpGLTF] Material has NO BaseColor channel - using white");
+                mesh.BaseColorFactor = Vector4.One;
+            }
+            
             mesh.MetallicFactor = 1.0f;
             mesh.RoughnessFactor = 1.0f;
             mesh.EmissiveFactor = Vector3.Zero;

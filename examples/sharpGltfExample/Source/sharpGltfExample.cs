@@ -27,8 +27,11 @@ public static unsafe class SharpGLTFApp
     // const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    const string filename = "DancingGangster.glb";
+    // const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
+
+    //race_track
+    const string filename = "race_track.glb";
 
     class _state
     {
@@ -53,6 +56,12 @@ public static unsafe class SharpGLTFApp
         public bool keyE = false;  // Down
         public bool keyUp = false;    // Arrow up
         public bool keyDown = false;  // Arrow down
+        
+        // Culling statistics
+        public int totalMeshes = 0;
+        public int visibleMeshes = 0;
+        public int culledMeshes = 0;
+        public bool enableFrustumCulling = true;
     }
 
     static _state state = new _state();
@@ -77,9 +86,9 @@ public static unsafe class SharpGLTFApp
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
-            buffer_pool_size = 4096,
-            image_pool_size = 256,
-            sampler_pool_size = 128,
+            buffer_pool_size = 4096*2,//increased to handle very large scene graphs
+            sampler_pool_size = 512, // Reduced from 2048 - texture cache prevents duplicate samplers
+            uniform_buffer_size = 64 * 1024 * 1024, // 64 MB - increased to handle very large scene graphs (2500+ nodes)
             logger = {
                 func = &slog_func,
             }
@@ -95,8 +104,8 @@ public static unsafe class SharpGLTFApp
         state.camera.Init(new CameraDesc()
         {
             Aspect = 60.0f,
-            NearZ = 0.01f,
-            FarZ = 1500.0f,
+            NearZ = 0.1f,
+            FarZ = 2000.0f,
             Center = new Vector3(0.0f, 1.0f, 0.0f),
             Distance = 3.0f,
             Latitude = 10.0f,
@@ -114,6 +123,7 @@ public static unsafe class SharpGLTFApp
         var pipeline_desc = default(sg_pipeline_desc);
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_position].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_normal].format = SG_VERTEXFORMAT_FLOAT3;
+        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_color].format = SG_VERTEXFORMAT_FLOAT4;
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_texcoord].format = SG_VERTEXFORMAT_FLOAT2;
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_boneIds].format = SG_VERTEXFORMAT_FLOAT4;  // Changed from UINT4 for WebGL compatibility
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_weights].format = SG_VERTEXFORMAT_FLOAT4;
@@ -283,7 +293,7 @@ public static unsafe class SharpGLTFApp
             float aspectRatio = (float)fb_width / (float)fb_height;
             
             float minDistance = 0.01f;
-            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 10000.0f;
+            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 20000.0f;
             float bestDistance = maxDistance;
             
             // Binary search for optimal distance
@@ -428,6 +438,14 @@ public static unsafe class SharpGLTFApp
             // Debug output on first render when model exists
             bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
             
+            // Reset culling statistics
+            state.totalMeshes = 0;
+            state.visibleMeshes = 0;
+            state.culledMeshes = 0;
+            
+            // Calculate view-projection matrix for frustum culling
+            Matrix4x4 viewProjection = state.camera.ViewProj;
+            
             // Draw each node (which references a mesh with its transform)
             foreach (var node in state.model.Nodes)
             {
@@ -436,8 +454,7 @@ public static unsafe class SharpGLTFApp
                     continue;
                 
                 var mesh = state.model.Meshes[node.MeshIndex];
-                
-    
+                state.totalMeshes++;
                 
                 // Apply Mixamo-specific transforms if needed
                 Matrix4x4 modelMatrix;
@@ -453,6 +470,16 @@ public static unsafe class SharpGLTFApp
                     // Use the node's original transform from the GLTF file
                     modelMatrix = node.Transform;
                 }
+                
+                // FRUSTUM CULLING: Check if mesh is visible
+                if (state.enableFrustumCulling && !mesh.IsVisible(modelMatrix, viewProjection))
+                {
+                    state.culledMeshes++;
+                    continue;  // Skip this mesh
+                }
+                
+                state.visibleMeshes++;
+    
                 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
@@ -642,6 +669,23 @@ public static unsafe class SharpGLTFApp
                 igText($"Camera Distance: {state.camera.Distance:F2}");
                 igText($"Camera Latitude: {state.camera.Latitude:F2}");
                 igText($"Camera Longitude: {state.camera.Longitude:F2}");
+                
+                // Frustum culling statistics
+                igSeparator();
+                igText("Frustum Culling:");
+                byte frustumEnabled = (byte)(state.enableFrustumCulling ? 1 : 0);
+                if (igCheckbox("Enabled", ref frustumEnabled))
+                {
+                    state.enableFrustumCulling = frustumEnabled != 0;
+                }
+                igText($"  Total Meshes: {state.totalMeshes}");
+                igText($"  Visible: {state.visibleMeshes}");
+                igText($"  Culled: {state.culledMeshes}");
+                if (state.totalMeshes > 0)
+                {
+                    float cullRate = (state.culledMeshes * 100.0f) / state.totalMeshes;
+                    igText($"  Cull Rate: {cullRate:F1}%%");
+                }
                 
                 // Texture cache statistics
                 igSeparator();

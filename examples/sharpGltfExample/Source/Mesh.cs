@@ -14,6 +14,7 @@ namespace Sokol
         public int IndexCount;
         public List<Texture?> Textures = new List<Texture?>();
         public bool HasSkinning;
+        public BoundingBox Bounds;
 
         // Material properties
         public Vector4 BaseColorFactor = Vector4.One;
@@ -31,6 +32,25 @@ namespace Sokol
             HasSkinning = hasSkinning;
             VertexCount = vertices.Length;
             IndexCount = indices.Length;
+
+            // Calculate bounding box from vertices
+            if (vertices.Length > 0)
+            {
+                Vector3 min = vertices[0].Position;
+                Vector3 max = vertices[0].Position;
+                
+                foreach (var vertex in vertices)
+                {
+                    min = Vector3.Min(min, vertex.Position);
+                    max = Vector3.Max(max, vertex.Position);
+                }
+                
+                Bounds = new BoundingBox(min, max);
+            }
+            else
+            {
+                Bounds = new BoundingBox(Vector3.Zero, Vector3.Zero);
+            }
 
             // Create vertex buffer
             VertexBuffer = sg_make_buffer(new sg_buffer_desc
@@ -131,6 +151,77 @@ namespace Sokol
 
             sg_apply_bindings(bind);
             sg_draw(0, (uint)IndexCount, 1);
+        }
+
+        // Check if bounding box is visible in camera frustum
+        public bool IsVisible(Matrix4x4 worldTransform, Matrix4x4 viewProjection)
+        {
+            // Transform bounding box to world space
+            BoundingBox worldBounds = Bounds.Transform(worldTransform);
+            
+            // Extract frustum planes from view-projection matrix
+            Matrix4x4 vp = viewProjection;
+            
+            // Left plane
+            Vector4 left = new Vector4(vp.M14 + vp.M11, vp.M24 + vp.M21, vp.M34 + vp.M31, vp.M44 + vp.M41);
+            // Right plane  
+            Vector4 right = new Vector4(vp.M14 - vp.M11, vp.M24 - vp.M21, vp.M34 - vp.M31, vp.M44 - vp.M41);
+            // Bottom plane
+            Vector4 bottom = new Vector4(vp.M14 + vp.M12, vp.M24 + vp.M22, vp.M34 + vp.M32, vp.M44 + vp.M42);
+            // Top plane
+            Vector4 top = new Vector4(vp.M14 - vp.M12, vp.M24 - vp.M22, vp.M34 - vp.M32, vp.M44 - vp.M42);
+            // Near plane
+            Vector4 near = new Vector4(vp.M14 + vp.M13, vp.M24 + vp.M23, vp.M34 + vp.M33, vp.M44 + vp.M43);
+            // Far plane
+            Vector4 far = new Vector4(vp.M14 - vp.M13, vp.M24 - vp.M23, vp.M34 - vp.M33, vp.M44 - vp.M43);
+            
+            // Normalize planes
+            left = NormalizePlane(left);
+            right = NormalizePlane(right);
+            bottom = NormalizePlane(bottom);
+            top = NormalizePlane(top);
+            near = NormalizePlane(near);
+            far = NormalizePlane(far);
+            
+            Vector4[] planes = { left, right, bottom, top, near, far };
+            
+            // Test bounding box against each plane
+            foreach (var plane in planes)
+            {
+                Vector3 planeNormal = new Vector3(plane.X, plane.Y, plane.Z);
+                float planeDistance = plane.W;
+                
+                // Find the positive vertex (furthest in the direction of the plane normal)
+                Vector3 positiveVertex = new Vector3(
+                    planeNormal.X >= 0 ? worldBounds.Max.X : worldBounds.Min.X,
+                    planeNormal.Y >= 0 ? worldBounds.Max.Y : worldBounds.Min.Y,
+                    planeNormal.Z >= 0 ? worldBounds.Max.Z : worldBounds.Min.Z
+                );
+                
+                float distance = Vector3.Dot(planeNormal, positiveVertex) + planeDistance;
+                
+                // If positive vertex is outside this plane, box is completely outside frustum
+                if (distance < 0)
+                    return false;
+            }
+            
+            return true;
+        }
+        
+        private static Vector4 NormalizePlane(Vector4 plane)
+        {
+            Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
+            float length = normal.Length();
+            if (length > 0.0001f)
+            {
+                return new Vector4(
+                    plane.X / length,
+                    plane.Y / length,
+                    plane.Z / length,
+                    plane.W / length
+                );
+            }
+            return plane;
         }
 
         public void Dispose()
