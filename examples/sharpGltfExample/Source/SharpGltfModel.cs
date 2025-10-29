@@ -247,6 +247,13 @@ namespace Sokol
 
             int vertexCount = positions.Count;
 
+            // DEBUG: Check if we have normals
+            Console.WriteLine($"[SharpGLTF] Normals: {(normals != null ? $"{normals.Count} normals loaded" : "NO NORMALS")}");
+            if (normals != null && normals.Count > 0)
+            {
+                Console.WriteLine($"[SharpGLTF] First normal: {normals[0]}");
+            }
+
             // Build vertices
             for (int i = 0; i < vertexCount; i++)
             {
@@ -393,9 +400,12 @@ namespace Sokol
             // Using texture's logical index as identifier (unique within a model)
             string textureId = $"texture_{textureImage.LogicalIndex}_{channelName}";
 
+            // All textures use RGBA8 format - manual srgb_to_linear() conversion in shader
+            sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
+
             // Load texture from memory using cache
             var imageData = textureImage.Content.Content.ToArray();
-            var texture = TextureCache.Instance.GetOrCreate(textureId, imageData);
+            var texture = TextureCache.Instance.GetOrCreate(textureId, imageData, format);
             mesh.Textures.Add(texture);
         }
 

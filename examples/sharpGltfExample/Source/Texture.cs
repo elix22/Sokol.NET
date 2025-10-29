@@ -14,7 +14,7 @@ namespace Sokol
         private bool disposed;
         private string? _cacheKey; // Track the cache key for removal on dispose
 
-        public unsafe Texture(byte* pixels, int width, int height, string label)
+        public unsafe Texture(byte* pixels, int width, int height, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
         {
             _cacheKey = label; // Use label as cache key
             
@@ -23,7 +23,7 @@ namespace Sokol
             {
                 width = width,
                 height = height,
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                pixel_format = format,
                 data = { mip_levels = { [0] = new sg_range { ptr = pixels, size = (nuint)(width * height * 4) } } },
                 label = label
             };
@@ -47,7 +47,7 @@ namespace Sokol
             });
         }
 
-        public static unsafe Texture? LoadFromMemory(byte[] data, string label)
+        public static unsafe Texture? LoadFromMemory(byte[] data, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
         {
             int width = 0, height = 0, channels = 0;
             byte* pixels = stbi_load_csharp(
@@ -62,7 +62,7 @@ namespace Sokol
             if (pixels == null)
                 return null;
 
-            var texture = new Texture(pixels, width, height, label);
+            var texture = new Texture(pixels, width, height, label, format);
             stbi_image_free_csharp(pixels);
             return texture;
         }

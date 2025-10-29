@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using static Sokol.SG;
 
 namespace Sokol
 {
@@ -21,47 +22,51 @@ namespace Sokol
         /// <summary>
         /// Get or create a texture from raw data.
         /// </summary>
-        public unsafe Texture GetOrCreate(string identifier, byte* data, int width, int height)
+        public unsafe Texture GetOrCreate(string identifier, byte* data, int width, int height, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
         {
-            if (_cache.TryGetValue(identifier, out var existingTexture))
+            // Include format in cache key to handle different formats of same texture
+            string cacheKey = $"{identifier}_{format}";
+            
+            if (_cache.TryGetValue(cacheKey, out var existingTexture))
             {
                 _cacheHits++;
-                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})");
                 return existingTexture;
             }
 
             _cacheMisses++;
-            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
             
-            var texture = new Texture(data, width, height, identifier);
-            _cache[identifier] = texture;
+            var texture = new Texture(data, width, height, identifier, format);
+            _cache[cacheKey] = texture;
             return texture;
         }
 
         /// <summary>
         /// Get or create a texture from memory data.
         /// </summary>
-        public Texture? GetOrCreate(string identifier, byte[] data)
+        public Texture? GetOrCreate(string identifier, byte[] data, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
         {
-            if (_cache.TryGetValue(identifier, out var existingTexture))
+            // Include format in cache key to handle different formats of same texture
+            string cacheKey = $"{identifier}_{format}";
+            
+            if (_cache.TryGetValue(cacheKey, out var existingTexture))
             {
                 _cacheHits++;
-                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})");
                 return existingTexture;
             }
 
             _cacheMisses++;
-            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
-            
-            var texture = Texture.LoadFromMemory(data, identifier);
+            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+
+            var texture = Texture.LoadFromMemory(data, identifier, format);
             if (texture != null)
             {
-                _cache[identifier] = texture;
+                _cache[cacheKey] = texture;
             }
             return texture;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Check if a texture is already cached.
         /// </summary>
         public bool Contains(string key)

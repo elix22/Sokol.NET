@@ -29,7 +29,7 @@ using static Sokol.SBasisu;
 public static unsafe class AssimpSceneApp
 {
     // static string modelPath = "assimpScene.glb";
-    const string modelPath = "race_track.glb";
+     const string modelPath = "race_track.glb";
     class _state
     {
         public sg_pass_action pass_action;

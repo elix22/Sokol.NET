@@ -23,7 +23,7 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 
 public static unsafe class SharpGLTFApp
 {
-    // const string filename = "DamagedHelmet.glb";
+    const string filename = "DamagedHelmet.glb";
     // const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
@@ -31,7 +31,7 @@ public static unsafe class SharpGLTFApp
     // const string filename = "Gangster.glb";
 
     //race_track
-    const string filename = "race_track.glb";
+    // const string filename = "race_track.glb";
 
     class _state
     {
@@ -116,27 +116,12 @@ public static unsafe class SharpGLTFApp
             Longitude = 0.0f,
         });
 
-        // Initialize lighting system (Bright sunlight simulation)
-        
-        // Sun - Intense directional light simulating harsh midday sun
-        state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(0.3f, -0.8f, -0.2f),   // Direction (slightly from side, mostly from above)
-            new Vector3(1.0f, 0.95f, 0.85f),   // Warm yellow-white sunlight
-            2.5f                                // Very strong intensity for bright sunlight
-        ));
-        
-        // Sky light - Soft fill from above (simulates blue sky dome)
-        state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(0.0f, -1.0f, 0.0f),    // Direction (straight down from sky)
-            new Vector3(0.5f, 0.65f, 1.0f),    // Clear blue sky color
-            0.2f                                // Reduced for stronger contrast
-        ));
-        
-        // Atmospheric scatter - Very soft bounce light (simulates light bouncing off ground/buildings)
-        state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(0.0f, 0.5f, 0.0f),     // Direction (from below - ground bounce)
-            new Vector3(1.0f, 0.9f, 0.75f),    // Bright warm ground reflection
-            0.1f                                // Very subtle to maintain strong shadows
+        // Initialize lighting system - Single point light like cgltf example
+        state.lights.Add(Light.CreatePointLight(
+            new Vector3(10.0f, 10.0f, 10.0f),  // Position - above and to side
+            new Vector3(1.0f, 1.5f, 2.0f),      // Slightly blue-tinted white
+            700.0f,                              // Very high intensity for point light
+            200.0f                               // Range
         ));
 
         state.pass_action = default;
