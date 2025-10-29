@@ -62,11 +62,15 @@ public static unsafe class SharpGLTFApp
         public int visibleMeshes = 0;
         public int culledMeshes = 0;
         public bool enableFrustumCulling = true;
+        
+        // Lighting system
+        public List<Light> lights = new List<Light>();
     }
 
     static _state state = new _state();
     static bool _loggedPipelineOnce = false;  // Debug flag
     static bool _loggedMeshInfoOnce = false;  // Debug flag for mesh info
+    static bool _loggedLightingOnce = false;  // Debug flag for lighting
     static int _frameCount = 0;  // Frame counter for debugging
 
     /// <summary>
@@ -111,6 +115,29 @@ public static unsafe class SharpGLTFApp
             Latitude = 10.0f,
             Longitude = 0.0f,
         });
+
+        // Initialize lighting system (Godot-style dramatic lighting)
+        
+        // Sun - Strong directional light from above (midday sun position)
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.3f, -0.8f, -0.2f),   // Direction (slightly from side, mostly from above)
+            new Vector3(1.0f, 0.98f, 0.95f),   // Bright warm white (sunlight color)
+            1.8f                                // Strong intensity for dramatic shadows
+        ));
+        
+        // Sky light - Soft fill from above (simulates blue sky dome)
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.0f, -1.0f, 0.0f),    // Direction (straight down from sky)
+            new Vector3(0.6f, 0.7f, 1.0f),     // Sky blue color
+            0.3f                                // Subtle fill intensity
+        ));
+        
+        // Atmospheric scatter - Very soft bounce light (simulates light bouncing off ground/buildings)
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.0f, 0.5f, 0.0f),     // Direction (from below - ground bounce)
+            new Vector3(0.9f, 0.85f, 0.8f),    // Warm ground reflection color
+            0.15f                               // Very subtle
+        ));
 
         state.pass_action = default;
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
@@ -417,23 +444,53 @@ public static unsafe class SharpGLTFApp
             Matrix4x4 model = Matrix4x4.Identity;
 
             // Prepare fragment shader uniforms (lighting)
-            // Use multiple lights for better PBR results (matching cgltf_scene)
+            // Build light parameters from the lights list
             cgltf_light_params_t lightParams = new cgltf_light_params_t();
-            lightParams.num_lights = 3;
             
-            // Main directional light (like sun)
-            lightParams.light_directions[0] = new Vector4(-0.3f, -0.8f, -0.5f, 0); // w=0 for directional
-            lightParams.light_colors[0] = new Vector4(1.0f, 0.98f, 0.95f, 2.5f); // w=intensity
+            // Count enabled lights (max 4 supported by shader)
+            int enabledLightCount = 0;
+            foreach (var light in state.lights)
+            {
+                if (!light.Enabled || enabledLightCount >= 4)
+                    continue;
+                
+                int idx = enabledLightCount;
+                
+                // Set light type in position.w
+                lightParams.light_positions[idx] = new Vector4(light.Position, (float)light.Type);
+                
+                // Set direction (and spot inner cutoff in w for spot lights)
+                float spotInnerCutoff = light.Type == LightType.Spot 
+                    ? (float)Math.Cos(light.SpotInnerAngle * Math.PI / 180.0) 
+                    : 0;
+                lightParams.light_directions[idx] = new Vector4(light.Direction, spotInnerCutoff);
+                
+                // Set color and intensity
+                lightParams.light_colors[idx] = new Vector4(light.Color, light.Intensity);
+                
+                // Set range and spot outer cutoff
+                float spotOuterCutoff = light.Type == LightType.Spot 
+                    ? (float)Math.Cos(light.SpotOuterAngle * Math.PI / 180.0) 
+                    : 0;
+                lightParams.light_params_data[idx] = new Vector4(light.Range, spotOuterCutoff, 0, 0);
+                
+                enabledLightCount++;
+            }
             
-            // Key point light
-            lightParams.light_positions[1] = new Vector4(5.0f, 8.0f, 5.0f, 1); // w=1 for point
-            lightParams.light_colors[1] = new Vector4(1.0f, 1.0f, 1.0f, 25.0f);
-            lightParams.light_params_data[1] = new Vector4(500.0f, 0, 0, 0); // range
-            
-            // Fill light
-            lightParams.light_positions[2] = new Vector4(-5.0f, 3.0f, -3.0f, 1);
-            lightParams.light_colors[2] = new Vector4(0.7f, 0.8f, 1.0f, 10.0f);
-            lightParams.light_params_data[2] = new Vector4(500.0f, 0, 0, 0);
+            lightParams.num_lights = enabledLightCount;
+
+            // Debug: Log lighting setup on first frame
+            if (!_loggedLightingOnce)
+            {
+                _loggedLightingOnce = true;
+                Console.WriteLine($"[SharpGLTF] ===== LIGHTING SETUP =====");
+                Console.WriteLine($"  num_lights: {lightParams.num_lights}");
+                Console.WriteLine($"  Light 0 - pos.w (type): {lightParams.light_positions[0].W}, dir: {lightParams.light_directions[0]}, color: {lightParams.light_colors[0]}");
+                Console.WriteLine($"  Light 1 - pos.w (type): {lightParams.light_positions[1].W}, dir: {lightParams.light_directions[1]}, color: {lightParams.light_colors[1]}");
+                Console.WriteLine($"  Light 2 - pos.w (type): {lightParams.light_positions[2].W}, dir: {lightParams.light_directions[2]}, color: {lightParams.light_colors[2]}");
+                Console.WriteLine($"  Camera eye_pos: {state.camera.EyePos}");
+                Console.WriteLine($"==============================");
+            }
 
             // Debug output on first render when model exists
             bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
@@ -598,51 +655,86 @@ public static unsafe class SharpGLTFApp
 
     static void DrawUI()
     {
+        // Window 1: Controls (Model Info, Animation)
         igSetNextWindowPos(new Vector2(30, 30), ImGuiCond.Once, Vector2.Zero);
         igSetNextWindowBgAlpha(0.85f);
-        byte open = 1;
-        if (igBegin("Animation Controls", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+        byte open1 = 1;
+        if (igBegin("Controls", ref open1, ImGuiWindowFlags.AlwaysAutoResize))
         {
             igText("SharpGLTF Animation Viewer");
             igSeparator();
-
+            
             if (state.model != null)
             {
                 igText($"Model: {filename}");
                 igText($"Meshes: {state.model.Meshes.Count}");
                 igText($"Nodes: {state.model.Nodes.Count}");
                 igText($"Bones: {state.model.BoneCounter}");
-                igSeparator();
-
+                
                 if (state.animator != null && state.model.HasAnimations)
                 {
-                    // Animation info
+                    igSeparator();
+                    igText("=== Animation ===");
                     int animCount = state.model.GetAnimationCount();
                     string currentAnimName = state.model.GetCurrentAnimationName();
                     int currentAnimIndex = state.model.CurrentAnimationIndex;
 
-                    igText($"Animations: {animCount}");
-                    igText($"Current: {currentAnimName} ({currentAnimIndex + 1}/{animCount})");
-                    
-                    // Animation switching buttons (only if multiple animations)
+                    igText($"Current: {currentAnimName}");
+                    igText($"Total: {animCount}");
+
                     if (animCount > 1)
                     {
-                        igSeparator();
                         if (igButton("<- Previous", Vector2.Zero))
                         {
                             state.model.PreviousAnimation();
                             state.animator.SetAnimation(state.model.Animation);
                         }
+
                         igSameLine(0, 10);
+
                         if (igButton("Next ->", Vector2.Zero))
                         {
                             state.model.NextAnimation();
                             state.animator.SetAnimation(state.model.Animation);
                         }
                     }
-
-                    igSeparator();
-
+                }
+                
+                igSeparator();
+                igText("=== Frustum Culling ===");
+                byte frustumEnabled = (byte)(state.enableFrustumCulling ? 1 : 0);
+                if (igCheckbox("Enable Culling", ref frustumEnabled))
+                {
+                    state.enableFrustumCulling = frustumEnabled != 0;
+                }
+            }
+            else
+            {
+                igText("Loading model...");
+            }
+        }
+        igEnd();
+        
+        // Window 2: Statistics (FPS, Animation Time, Culling Stats, Camera Info)
+        int screenWidth = sapp_width();
+        igSetNextWindowPos(new Vector2(screenWidth - 30, 30), ImGuiCond.Once, new Vector2(1.0f, 0.0f));  // Anchor to top-right
+        igSetNextWindowBgAlpha(0.85f);
+        byte open2 = 1;
+        if (igBegin("Statistics", ref open2, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            // Display FPS (calculated from frame duration)
+            double frameDuration = sapp_frame_duration();
+            float fps = frameDuration > 0 ? (float)(1.0 / frameDuration) : 0.0f;
+            igText($"FPS: {fps:F1}");
+            igText($"Frame Time: {frameDuration * 1000.0:F2} ms");
+            
+            if (state.model != null)
+            {
+                igSeparator();
+                
+                // Animation timing info
+                if (state.animator != null)
+                {
                     var currentAnim = state.animator.GetCurrentAnimation();
                     if (currentAnim != null)
                     {
@@ -654,52 +746,87 @@ public static unsafe class SharpGLTFApp
                         float durationInSeconds = duration / ticksPerSecond;
                         float currentTimeInSeconds = currentTime / ticksPerSecond;
 
-                        igText("Animation: Playing");
-                        igText($"Duration: {durationInSeconds:F2}s");
-                        igText($"Current Time: {currentTimeInSeconds:F2}s");
+                        igText($"Anim Duration: {durationInSeconds:F2}s");
+                        igText($"Anim Time: {currentTimeInSeconds:F2}s");
                         igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                        igSeparator();
                     }
                 }
-                else
-                {
-                    igText("No animations in model");
-                }
-
-                igSeparator();
-                igText($"Camera Distance: {state.camera.Distance:F2}");
-                igText($"Camera Latitude: {state.camera.Latitude:F2}");
-                igText($"Camera Longitude: {state.camera.Longitude:F2}");
                 
-                // Frustum culling statistics
-                igSeparator();
-                igText("Frustum Culling:");
-                byte frustumEnabled = (byte)(state.enableFrustumCulling ? 1 : 0);
-                if (igCheckbox("Enabled", ref frustumEnabled))
-                {
-                    state.enableFrustumCulling = frustumEnabled != 0;
-                }
-                igText($"  Total Meshes: {state.totalMeshes}");
-                igText($"  Visible: {state.visibleMeshes}");
-                igText($"  Culled: {state.culledMeshes}");
+                // Display frustum culling statistics
+                igText("=== Culling Statistics ===");
+                igText($"Total Meshes: {state.totalMeshes}");
+                igText($"Visible: {state.visibleMeshes}");
+                igText($"Culled: {state.culledMeshes}");
                 if (state.totalMeshes > 0)
                 {
-                    float cullRate = (state.culledMeshes * 100.0f) / state.totalMeshes;
-                    igText($"  Cull Rate: {cullRate:F1}%%");
+                    float cullPercent = state.totalMeshes > 0 ? (state.culledMeshes * 100.0f / state.totalMeshes) : 0;
+                    igText($"Culled: {cullPercent:F1}%%");
                 }
                 
-                // Texture cache statistics
                 igSeparator();
+                
+                // Texture cache statistics
                 var (hits, misses, total) = TextureCache.Instance.GetStats();
                 var hitRate = hits + misses > 0 ? (hits * 100.0 / (hits + misses)) : 0.0;
-                igText($"Texture Cache:");
-                igText($"  Unique: {total}");
-                igText($"  Hits: {hits}, Misses: {misses}");
-                igText($"  Hit Rate: {hitRate:F1}%%");
+                igText("=== Texture Cache ===");
+                igText($"Unique: {total}");
+                igText($"Hits: {hits}, Misses: {misses}");
+                igText($"Hit Rate: {hitRate:F1}%%");
+                
+                igSeparator();
+                igText("=== Camera ===");
+                igText($"Distance: {state.camera.Distance:F2}");
+                igText($"Latitude: {state.camera.Latitude:F2}");
+                igText($"Longitude: {state.camera.Longitude:F2}");
             }
-            else
+        }
+        igEnd();
+        
+        // Window 3: Mobile Camera Controls
+        int screenHeight = sapp_height();
+        igSetNextWindowPos(new Vector2(30, screenHeight - 30), ImGuiCond.Once, new Vector2(0.0f, 1.0f));  // Anchor to bottom-left
+        igSetNextWindowBgAlpha(0.85f);
+        byte open3 = 1;
+        if (igBegin("Camera Controls", ref open3, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            // Calculate forward and right vectors for camera movement
+            Vector3 forward = Vector3.Normalize(state.camera.Center - state.camera.EyePos);
+            Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+            
+            // Movement speed (scaled by frame time for smooth continuous movement)
+            float moveSpeed = 50.0f * (float)sapp_frame_duration();
+            
+            // Forward button (centered)
+            igIndent(50);
+            igButton("Forward", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
             {
-                igText("Loading model...");
+                state.camera.Center = state.camera.Center + forward * moveSpeed;
             }
+            igUnindent(50);
+            
+            // Left and Right buttons (side by side)
+            igButton("Left", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center - right * moveSpeed;
+            }
+            igSameLine(0, 10);
+            igButton("Right", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center + right * moveSpeed;
+            }
+            
+            // Backward button (centered)
+            igIndent(50);
+            igButton("Back", new Vector2(80, 40));
+            if (igIsItemActive())  // Check if button is being held down
+            {
+                state.camera.Center = state.camera.Center - forward * moveSpeed;
+            }
+            igUnindent(50);
         }
         igEnd();
     }

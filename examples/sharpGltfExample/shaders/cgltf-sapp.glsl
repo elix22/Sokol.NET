@@ -256,11 +256,12 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
 
         // Calculation of analytical lighting contribution
         vec3 diffuse_contrib = (1.0 - F) * diffuse(material_info);
-        // Use standard PBR specular (removed 3x boost for more realistic lighting)
         vec3 spec_contrib = F * Vis * D;
 
-        // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-        return angular_info.n_dot_l * (diffuse_contrib + spec_contrib);
+        // Boost lighting significantly for Godot-like dramatic lighting
+        // PBR is physically accurate but too subtle for game/architectural visualization
+        // Apply 3.5x boost for strong directional lighting effect
+        return angular_info.n_dot_l * (diffuse_contrib + spec_contrib) * 3.5;
     }
     return vec3(0.0, 0.0, 0.0);
 }
@@ -425,11 +426,15 @@ void main() {
     vec3 view = normalize(v_eye_pos - v_pos);
     vec3 color = apply_all_lights(material_info, normal, view);
     
-    // Enhanced ambient with metallic reflection
-    vec3 ambient = base_color.rgb * 0.15; // Base ambient
-    // Add extra specular reflection for metallic surfaces
+    // Lower ambient to create more dramatic shadows (Godot-style lighting)
+    // Using a neutral to slightly cool ambient for outdoor daylight feel
+    vec3 ambient_color = vec3(0.5, 0.55, 0.65);  // Slightly blue-tinted (sky influence)
+    float ambient_intensity = 0.25;  // 25% ambient for stronger contrast and visible shadows
+    vec3 ambient = base_color.rgb * ambient_color * ambient_intensity;
+    
+    // Add environment reflection for metallic surfaces
     float fresnel = pow(1.0 - max(dot(normal, view), 0.0), 5.0);
-    vec3 metallic_ambient = specular_color * metallic * (0.3 + fresnel * 0.4);
+    vec3 metallic_ambient = specular_color * metallic * (0.2 + fresnel * 0.3);
     ambient += metallic_ambient;
     color += ambient;
     

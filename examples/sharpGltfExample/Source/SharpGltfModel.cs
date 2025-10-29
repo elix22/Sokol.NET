@@ -338,8 +338,31 @@ namespace Sokol
                 mesh.BaseColorFactor = Vector4.One;
             }
             
-            mesh.MetallicFactor = 1.0f;
-            mesh.RoughnessFactor = 1.0f;
+            // Extract metallic and roughness values from MetallicRoughness channel
+            var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
+            if (metallicRoughnessChannel.HasValue)
+            {
+                try
+                {
+                    // GetFactor extracts the scalar value by parameter name
+                    mesh.MetallicFactor = metallicRoughnessChannel.Value.GetFactor("MetallicFactor");
+                    mesh.RoughnessFactor = metallicRoughnessChannel.Value.GetFactor("RoughnessFactor");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SharpGLTF] Failed to extract metallic/roughness: {ex.Message}");
+                    // Default to non-metallic, moderately rough for better shading visibility
+                    mesh.MetallicFactor = 0.0f;
+                    mesh.RoughnessFactor = 0.5f;
+                }
+            }
+            else
+            {
+                // No metallic-roughness channel - use sensible defaults for better shading
+                mesh.MetallicFactor = 0.0f;  // Non-metallic (better for showing diffuse lighting)
+                mesh.RoughnessFactor = 0.5f; // Moderately rough
+            }
+            
             mesh.EmissiveFactor = Vector3.Zero;
 
             // Load textures
