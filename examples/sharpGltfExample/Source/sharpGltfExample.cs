@@ -105,7 +105,7 @@ public static unsafe class SharpGLTFApp
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_position].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_normal].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_texcoord].format = SG_VERTEXFORMAT_FLOAT2;
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_boneIds].format = SG_VERTEXFORMAT_UINT4;
+        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_boneIds].format = SG_VERTEXFORMAT_FLOAT4;  // Changed from UINT4 for WebGL compatibility
         pipeline_desc.layout.attrs[ATTR_cgltf_metallic_weights].format = SG_VERTEXFORMAT_FLOAT4;
         pipeline_desc.shader = shader_static;
         pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
@@ -397,21 +397,6 @@ public static unsafe class SharpGLTFApp
 
             // Debug output on first render when model exists
             bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
-            if (shouldLogMeshInfo)
-            {
-                int validMeshCount = 0;
-                List<int> meshIndices = new List<int>();
-                foreach (var n in state.model.Nodes)
-                {
-                    if (n.MeshIndex >= 0 && n.MeshIndex < state.model.Meshes.Count)
-                    {
-                        validMeshCount++;
-                        meshIndices.Add(n.MeshIndex);
-                    }
-                }
-                Console.WriteLine($"[SharpGLTF Mesh Info] Total nodes: {state.model.Nodes.Count}, Nodes with valid meshes: {validMeshCount}");
-                Console.WriteLine($"[SharpGLTF Mesh Info] Mesh indices in nodes: [{string.Join(", ", meshIndices)}]");
-            }
             
             // Draw each node (which references a mesh with its transform)
             foreach (var node in state.model.Nodes)
@@ -422,11 +407,7 @@ public static unsafe class SharpGLTFApp
                 
                 var mesh = state.model.Meshes[node.MeshIndex];
                 
-                // Debug: Print mesh info on first render
-                if (shouldLogMeshInfo)
-                {
-                    Console.WriteLine($"[SharpGLTF Mesh Info] Rendering mesh {node.MeshIndex}: VertexCount={mesh.VertexCount}, IndexCount={mesh.IndexCount}, HasSkinning={mesh.HasSkinning}");
-                }
+    
                 
                 // IMPORTANT: Compensate for 0.01 scale in parent nodes (Mixamo export from Blender often has this)
                 // The model has "mixamorig:Meshes" and "Armature.015" nodes with 0.01 scale
@@ -461,16 +442,6 @@ public static unsafe class SharpGLTFApp
                     // Copy bone matrices
                     var boneMatrices = state.animator.GetFinalBoneMatrices();
                     
-                    // Debug: Check if bone matrices are valid (on frame 5)
-                    if (_frameCount == 5)
-                    {
-                        Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone count: {boneMatrices.Length}");
-                        Console.WriteLine($"[SharpGLTF Frame {_frameCount}] First bone matrix [0]: M11={boneMatrices[0].M11:F3}, M22={boneMatrices[0].M22:F3}, M33={boneMatrices[0].M33:F3}, M44={boneMatrices[0].M44:F3}");
-                        if (boneMatrices.Length > 6)
-                            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone matrix [6]: M11={boneMatrices[6].M11:F3}, M22={boneMatrices[6].M22:F3}, M33={boneMatrices[6].M33:F3}, M44={boneMatrices[6].M44:F3}");
-                        if (boneMatrices.Length > 35)
-                            Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Bone matrix [35]: M11={boneMatrices[35].M11:F3}, M22={boneMatrices[35].M22:F3}, M33={boneMatrices[35].M33:F3}, M44={boneMatrices[35].M44:F3}");
-                    }
                     
                     var destSpan = MemoryMarshal.CreateSpan(ref vsParams.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
                     boneMatrices.AsSpan().CopyTo(destSpan);

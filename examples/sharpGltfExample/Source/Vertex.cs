@@ -9,10 +9,10 @@ namespace Sokol
         public Vector3 Position;
         public Vector3 Normal;
         public Vector2 TexCoord;
-        public uint BoneID0;        // Bone IDs stored as unsigned integers (matching shader uvec4)
-        public uint BoneID1;
-        public uint BoneID2;
-        public uint BoneID3;
+        public float BoneID0;        // Bone IDs stored as floats for WebGL compatibility
+        public float BoneID1;
+        public float BoneID2;
+        public float BoneID3;
         public Vector4 BoneWeights; // Corresponding weights
 
         public Vertex(Vector3 position, Vector3 normal, Vector2 texCoord)
@@ -30,10 +30,10 @@ namespace Sokol
         // Helper to set bone IDs from array
         public void SetBoneIDs(int[] boneIds)
         {
-            BoneID0 = boneIds.Length > 0 ? (uint)boneIds[0] : 0;
-            BoneID1 = boneIds.Length > 1 ? (uint)boneIds[1] : 0;
-            BoneID2 = boneIds.Length > 2 ? (uint)boneIds[2] : 0;
-            BoneID3 = boneIds.Length > 3 ? (uint)boneIds[3] : 0;
+            BoneID0 = boneIds.Length > 0 ? (float)boneIds[0] : 0;
+            BoneID1 = boneIds.Length > 1 ? (float)boneIds[1] : 0;
+            BoneID2 = boneIds.Length > 2 ? (float)boneIds[2] : 0;
+            BoneID3 = boneIds.Length > 3 ? (float)boneIds[3] : 0;
         }
     }
 }

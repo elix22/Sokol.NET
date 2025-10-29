@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using SharpGLTF.Schema2;
@@ -251,8 +252,13 @@ namespace Sokol
 
         private void ProcessAnimations()
         {
+            var stopwatch = Stopwatch.StartNew();
+            
             if (_model.LogicalAnimations.Count == 0)
+            {
+                Console.WriteLine($"[SharpGLTF PROFILE] ProcessAnimations: No animations (0.000ms)");
                 return;
+            }
 
             // Use first animation for now
             var gltfAnim = _model.LogicalAnimations[0];
@@ -281,6 +287,8 @@ namespace Sokol
             Animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
 
             // Process animation channels
+            // Instead of pre-sampling, we'll store the curve samplers directly in the bones
+            // and sample at runtime (like assimp_animation does)
             foreach (var channel in gltfAnim.Channels)
             {
                 var targetNode = channel.TargetNode;
@@ -294,46 +302,29 @@ namespace Sokol
                     Animation.AddBone(bone);
                 }
 
-                // Add keyframes based on channel type
-                var sampler = channel.GetTranslationSampler();
-                if (sampler != null)
+                // Store the samplers in the bone instead of pre-sampling
+                var translationSampler = channel.GetTranslationSampler();
+                if (translationSampler != null)
                 {
-                    var curveSampler = sampler.CreateCurveSampler();
-                    // Sample at reasonable intervals
-                    float step = 1.0f / 30.0f; // 30 fps
-                    for (float time = 0; time < duration; time += step)
-                    {
-                        var translation = curveSampler.GetPoint(time);
-                        bone.AddPositionKey(time, translation);
-                    }
+                    bone.SetTranslationSampler(translationSampler);
                 }
 
-                var rotSampler = channel.GetRotationSampler();
-                if (rotSampler != null)
+                var rotationSampler = channel.GetRotationSampler();
+                if (rotationSampler != null)
                 {
-                    var curveSampler = rotSampler.CreateCurveSampler();
-                    float step = 1.0f / 30.0f;
-                    for (float time = 0; time < duration; time += step)
-                    {
-                        var rotation = curveSampler.GetPoint(time);
-                        bone.AddRotationKey(time, rotation);
-                    }
+                    bone.SetRotationSampler(rotationSampler);
                 }
 
                 var scaleSampler = channel.GetScaleSampler();
                 if (scaleSampler != null)
                 {
-                    var curveSampler = scaleSampler.CreateCurveSampler();
-                    float step = 1.0f / 30.0f;
-                    for (float time = 0; time < duration; time += step)
-                    {
-                        var scale = curveSampler.GetPoint(time);
-                        bone.AddScaleKey(time, scale);
-                    }
+                    bone.SetScaleSampler(scaleSampler);
                 }
             }
 
+            stopwatch.Stop();
             Console.WriteLine($"[SharpGLTF] Animation processed with {Animation.GetBoneIDMap().Count} animated bones");
+            Console.WriteLine($"[SharpGLTF PROFILE] ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)");
         }
 
         private SharpGltfNodeData BuildNodeHierarchy(Node node)

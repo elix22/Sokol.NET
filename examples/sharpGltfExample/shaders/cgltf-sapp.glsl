@@ -28,7 +28,7 @@ layout(binding=0) uniform vs_params {
 layout(location=0) in vec4 position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
-layout(location=3) in uvec4 boneIds;
+layout(location=3) in vec4 boneIds;  // Changed from uvec4 for WebGL compatibility
 layout(location=4) in vec4 weights;
 
 
@@ -53,8 +53,8 @@ void main() {
             // Skip if weight is zero or bone ID is invalid
             if(weights[i] <= 0.0) 
                 continue;
-            uint boneId = boneIds[i];
-            if(boneId >= uint(MAX_BONES)) 
+            int boneId = int(boneIds[i]);  // Convert float to int
+            if(boneId >= MAX_BONES) 
             {
                 totalPosition = position;
                 totalNormal = normal;

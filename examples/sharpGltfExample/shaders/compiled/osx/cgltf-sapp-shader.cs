@@ -1382,7 +1382,7 @@ public static unsafe class Shaders
             desc.attrs[0].base_type = SG_SHADERATTRBASETYPE_FLOAT;
             desc.attrs[1].base_type = SG_SHADERATTRBASETYPE_FLOAT;
             desc.attrs[2].base_type = SG_SHADERATTRBASETYPE_FLOAT;
-            desc.attrs[3].base_type = SG_SHADERATTRBASETYPE_UINT;
+            desc.attrs[3].base_type = SG_SHADERATTRBASETYPE_FLOAT;
             desc.attrs[4].base_type = SG_SHADERATTRBASETYPE_FLOAT;
             desc.uniform_blocks[0].stage = SG_SHADERSTAGE_VERTEX;
             desc.uniform_blocks[0].layout = SG_UNIFORMLAYOUT_STD140;
