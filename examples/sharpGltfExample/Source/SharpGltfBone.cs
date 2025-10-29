@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 using SharpGLTF.Schema2;
 using SharpGLTF.Transforms;
@@ -9,10 +8,10 @@ namespace Sokol
 {
     public class SharpGltfBone
     {
-        // Store curve samplers instead of pre-sampled keyframes (like assimp_animation)
-        private ICurveSampler<Vector3>? _translationCurveSampler;
-        private ICurveSampler<Quaternion>? _rotationCurveSampler;
-        private ICurveSampler<Vector3>? _scaleCurveSampler;
+        // Store curve samplers - NO pre-sampling, evaluate at runtime
+        private ICurveSampler<Vector3>? _translationSampler;
+        private ICurveSampler<Quaternion>? _rotationSampler;
+        private ICurveSampler<Vector3>? _scaleSampler;
 
         public Matrix4x4 LocalTransform { get; private set; }
         public string Name { get; private set; }
@@ -25,30 +24,26 @@ namespace Sokol
             LocalTransform = Matrix4x4.Identity;
         }
 
-        public void SetTranslationSampler(IAnimationSampler<Vector3> sampler)
+        // Store samplers - called once during load (fast)
+        public void SetSamplers(IAnimationSampler<Vector3>? translationSampler,
+                                IAnimationSampler<Quaternion>? rotationSampler,
+                                IAnimationSampler<Vector3>? scaleSampler)
         {
-            _translationCurveSampler = sampler.CreateCurveSampler();
+            if (translationSampler != null)
+                _translationSampler = translationSampler.CreateCurveSampler();
+            if (rotationSampler != null)
+                _rotationSampler = rotationSampler.CreateCurveSampler();
+            if (scaleSampler != null)
+                _scaleSampler = scaleSampler.CreateCurveSampler();
         }
 
-        public void SetRotationSampler(IAnimationSampler<Quaternion> sampler)
-        {
-            _rotationCurveSampler = sampler.CreateCurveSampler();
-        }
-
-        public void SetScaleSampler(IAnimationSampler<Vector3> sampler)
-        {
-            _scaleCurveSampler = sampler.CreateCurveSampler();
-        }
-
-        // Update bone transformation at runtime by sampling the curves (like assimp_animation)
+        // Runtime update - sample curves directly
         public void Update(float animationTime)
         {
-            // Sample from curve samplers at runtime instead of using pre-sampled keyframes
-            Vector3 translation = _translationCurveSampler?.GetPoint(animationTime) ?? Vector3.Zero;
-            Quaternion rotation = _rotationCurveSampler?.GetPoint(animationTime) ?? Quaternion.Identity;
-            Vector3 scale = _scaleCurveSampler?.GetPoint(animationTime) ?? Vector3.One;
+            Vector3 translation = _translationSampler?.GetPoint(animationTime) ?? Vector3.Zero;
+            Quaternion rotation = _rotationSampler?.GetPoint(animationTime) ?? Quaternion.Identity;
+            Vector3 scale = _scaleSampler?.GetPoint(animationTime) ?? Vector3.One;
 
-            // Build the local transform matrix
             Matrix4x4 translationMatrix = Matrix4x4.CreateTranslation(translation);
             Matrix4x4 rotationMatrix = Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(rotation));
             Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(scale);

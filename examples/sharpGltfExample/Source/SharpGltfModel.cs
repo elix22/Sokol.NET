@@ -23,8 +23,12 @@ namespace Sokol
         public int BoneCounter = 0;
         public SharpGltfAnimation? Animation;
         public bool HasAnimations => Animation != null;
+        public bool AnimationsReady { get; private set; } = false;
 
         private ModelRoot _model;
+        private List<AnimationChannel> _pendingChannels = new List<AnimationChannel>();
+        private float _animationDuration;
+        private int _currentChannelIndex = 0;
 
         public SharpGltfModel(ModelRoot model)
         {
@@ -286,9 +290,7 @@ namespace Sokol
             int ticksPerSecond = 1; // SharpGLTF uses seconds, we'll convert
             Animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
 
-            // Process animation channels
-            // Instead of pre-sampling, we'll store the curve samplers directly in the bones
-            // and sample at runtime (like assimp_animation does)
+            // Process animation channels - store samplers WITHOUT pre-sampling
             foreach (var channel in gltfAnim.Channels)
             {
                 var targetNode = channel.TargetNode;
@@ -302,24 +304,12 @@ namespace Sokol
                     Animation.AddBone(bone);
                 }
 
-                // Store the samplers in the bone instead of pre-sampling
-                var translationSampler = channel.GetTranslationSampler();
-                if (translationSampler != null)
-                {
-                    bone.SetTranslationSampler(translationSampler);
-                }
-
-                var rotationSampler = channel.GetRotationSampler();
-                if (rotationSampler != null)
-                {
-                    bone.SetRotationSampler(rotationSampler);
-                }
-
-                var scaleSampler = channel.GetScaleSampler();
-                if (scaleSampler != null)
-                {
-                    bone.SetScaleSampler(scaleSampler);
-                }
+                // Store samplers for runtime evaluation (NO extraction)
+                bone.SetSamplers(
+                    channel.GetTranslationSampler(),
+                    channel.GetRotationSampler(),
+                    channel.GetScaleSampler()
+                );
             }
 
             stopwatch.Stop();

@@ -9,6 +9,14 @@ namespace Sokol
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
         private int _debugBoneCount = 0;  // Debug counter
+        private int _frameCounter = 0;    // For bone update throttling
+        
+        // Update bones less frequently on WebAssembly (GetPoint() is very slow)
+#if WEB
+        private const int BONE_UPDATE_INTERVAL = 10;  // 6fps bone updates on web
+#else
+        private const int BONE_UPDATE_INTERVAL = 1;   // 60fps bone updates on desktop
+#endif
 
         public SharpGltfAnimator(SharpGltfAnimation? animation)
         {
@@ -35,8 +43,23 @@ namespace Sokol
                 _currentTime += _currentAnimation.GetTicksPerSecond() * dt;
                 _currentTime = _currentTime % _currentAnimation.GetDuration();
 
-                ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
-                CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                // Frame skipping for WebAssembly performance
+                _frameCounter++;
+                if (_frameCounter >= BONE_UPDATE_INTERVAL)
+                {
+                    _frameCounter = 0;
+                    
+                    // Batch update all bones at once before hierarchy traversal (optimization for WebAssembly)
+                    var bones = _currentAnimation.GetBones();
+                    foreach (var bone in bones)
+                    {
+                        bone.Update(_currentTime);
+                    }
+
+                    // Only recalculate bone transforms when we update the bone data
+                    ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
+                    CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                }
             }
         }
 
@@ -53,9 +76,9 @@ namespace Sokol
 
             SharpGltfBone? bone = _currentAnimation?.FindBone(nodeName);
 
+            // Bone was already updated in batch, just get the transform
             if (bone != null)
             {
-                bone.Update(_currentTime);
                 nodeTransform = bone.GetLocalTransform();
             }
 

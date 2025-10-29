@@ -43,5 +43,6 @@ namespace Sokol
         public float GetDuration() => _duration;
         public ref SharpGltfNodeData GetRootNode() => ref _rootNode;
         public Dictionary<string, BoneInfo> GetBoneIDMap() => _boneInfoMap;
+        public List<SharpGltfBone> GetBones() => _bones;
     }
 }
