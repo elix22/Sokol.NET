@@ -43,7 +43,11 @@ public static unsafe class SharpGLTFApp
     // const string filename = "AttenuationTest/glTF-Binary/AttenuationTest.glb";
 
     //BoomBox.glb
-    const string filename = "glb/BoomBox.glb";
+    // const string filename = "glb/BoomBox.glb";
+
+    // const string filename = "glb/ClearCoatCarPaint.glb";
+
+     const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
 
     class _state
     {
@@ -58,7 +62,8 @@ public static unsafe class SharpGLTFApp
         public Vector3 modelBoundsMax;
         
         // Model rotation (middle mouse button)
-        public float modelRotationY = 0.0f;     // Rotation around Y-axis
+        public float modelRotationX = 0.0f;     // Rotation around X-axis (vertical mouse movement)
+        public float modelRotationY = 0.0f;     // Rotation around Y-axis (horizontal mouse movement)
         public bool middleMouseDown = false;    // Track middle mouse button state
         
         // Culling statistics
@@ -329,7 +334,7 @@ public static unsafe class SharpGLTFApp
             float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
             float aspectRatio = (float)fb_width / (float)fb_height;
             
-            float minDistance = 0.01f;
+            float minDistance = 0.02f;
             float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 20000.0f;
             float bestDistance = maxDistance;
             
@@ -411,8 +416,10 @@ public static unsafe class SharpGLTFApp
         {
             
             // Prepare vertex shader uniforms (common for both pipelines)
-            // Apply model rotation around Y-axis (controlled by middle mouse button)
-            Matrix4x4 modelRotation = Matrix4x4.CreateRotationY(state.modelRotationY);
+            // Apply model rotation on X and Y axes (controlled by middle mouse button)
+            // Order: Y rotation (horizontal mouse) then X rotation (vertical mouse)
+            Matrix4x4 modelRotation = Matrix4x4.CreateRotationY(state.modelRotationY) * 
+                                     Matrix4x4.CreateRotationX(state.modelRotationX);
             
             // Calculate the model center for rotation
             Vector3 modelCenter = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
@@ -723,13 +730,16 @@ public static unsafe class SharpGLTFApp
                 igSeparator();
                 igText("=== Model Rotation ===");
                 igText("Middle Mouse: Rotate Model");
-                float rotationDegrees = state.modelRotationY * 180.0f / MathF.PI;
-                igText($"Rotation: {rotationDegrees:F1}°");
+                float rotationYDegrees = state.modelRotationY * 180.0f / MathF.PI;
+                float rotationXDegrees = state.modelRotationX * 180.0f / MathF.PI;
+                igText($"Y-axis: {rotationYDegrees:F1}° (horizontal)");
+                igText($"X-axis: {rotationXDegrees:F1}° (vertical)");
                 
                 // Reset button
                 if (igButton("Reset Rotation", Vector2.Zero))
                 {
                     state.modelRotationY = 0.0f;
+                    state.modelRotationX = 0.0f;
                 }
                 
                 igSeparator();
@@ -929,8 +939,9 @@ public static unsafe class SharpGLTFApp
         }
         else if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE && state.middleMouseDown)
         {
-            // Rotate model around Y-axis based on horizontal mouse movement
-            state.modelRotationY += e->mouse_dx * 0.01f;
+            // Rotate model: horizontal mouse movement rotates around Y-axis, vertical around X-axis
+            state.modelRotationY += e->mouse_dx * 0.01f;  // Horizontal movement -> Y-axis rotation
+            state.modelRotationX += e->mouse_dy * 0.01f;  // Vertical movement -> X-axis rotation
             return; // Don't pass to camera
         }
 
