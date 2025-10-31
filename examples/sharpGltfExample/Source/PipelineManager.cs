@@ -27,6 +27,10 @@ public enum PipelineType
 {
     Standard,
     Skinned,
+    StandardBlend,        // For alpha blending
+    SkinnedBlend,         // For alpha blending with skinning
+    StandardMask,         // For alpha masking
+    SkinnedMask,          // For alpha masking with skinning
 }
 
 public static class PipeLineManager
@@ -78,6 +82,94 @@ public static class PipeLineManager
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
                 pipeline_desc.label = "skinned-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.StandardBlend:
+                sg_shader shader_static_blend = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                // Create pipeline for static meshes with alpha blending
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static_blend;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_NONE; // Disable culling for transparent objects
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                // Enable alpha blending
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.label = "static-blend-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.SkinnedBlend:
+                sg_shader shader_skinned_blend = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                // Create pipeline for skinned meshes with alpha blending
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned_blend;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_NONE; // Disable culling for transparent objects
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                // Enable alpha blending
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.label = "skinned-blend-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.StandardMask:
+                sg_shader shader_static_mask = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                // Create pipeline for static meshes with alpha masking (cutout)
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static_mask;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.label = "static-mask-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.SkinnedMask:
+                sg_shader shader_skinned_mask = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                // Create pipeline for skinned meshes with alpha masking (cutout)
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned_mask;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.label = "skinned-mask-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
 
@@ -274,6 +366,25 @@ public static class PipeLineManager
         return result;
     }
 
-
+    /// <summary>
+    /// Get the appropriate pipeline type based on alpha mode and skinning
+    /// </summary>
+    public static PipelineType GetPipelineTypeForMaterial(SharpGLTF.Schema2.AlphaMode alphaMode, bool hasSkinning)
+    {
+        switch (alphaMode)
+        {
+            case SharpGLTF.Schema2.AlphaMode.OPAQUE:
+                return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
+                
+            case SharpGLTF.Schema2.AlphaMode.BLEND:
+                return hasSkinning ? PipelineType.SkinnedBlend : PipelineType.StandardBlend;
+                
+            case SharpGLTF.Schema2.AlphaMode.MASK:
+                return hasSkinning ? PipelineType.SkinnedMask : PipelineType.StandardMask;
+                
+            default:
+                return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
+        }
+    }
 
 }

@@ -31,8 +31,13 @@ public static unsafe class SharpGLTFApp
     // const string filename = "Gangster.glb";
 
     //race_track
-    const string filename = "race_track.glb";
+    // const string filename = "race_track.glb";
     // const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
+
+    // const string filename = "glb/2CylinderEngine.glb";
+
+    // const string filename = "ABeautifulGame/glTF/ABeautifulGame.gltf";
+    const string filename = "glb/AlphaBlendModeTest.glb";
 
     class _state
     {
@@ -59,9 +64,7 @@ public static unsafe class SharpGLTFApp
     }
 
     static _state state = new _state();
-    static bool _loggedPipelineOnce = false;  // Debug flag
     static bool _loggedMeshInfoOnce = false;  // Debug flag for mesh info
-    static bool _loggedLightingOnce = false;  // Debug flag for lighting
     static int _frameCount = 0;  // Frame counter for debugging
 
     /// <summary>
@@ -226,8 +229,8 @@ public static unsafe class SharpGLTFApp
                     // TBD ELI , this is an hack to detect Mixamo models
                     // Detect if this is a Mixamo model by checking node names
                     state.isMixamoModel = modelRoot.LogicalNodes.Any(n => 
-                        n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
-                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase));
+                        n.Name != null && (n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
+                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase)));
                     
                     if (state.isMixamoModel)
                     {
@@ -398,7 +401,6 @@ public static unsafe class SharpGLTFApp
         // Render model if loaded
         if (state.modelLoaded && state.model != null)
         {
-            // Info($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
             
             // Prepare vertex shader uniforms (common for both pipelines)
             Matrix4x4 model = Matrix4x4.Identity;
@@ -439,18 +441,6 @@ public static unsafe class SharpGLTFApp
             
             lightParams.num_lights = enabledLightCount;
 
-            // Debug: Log lighting setup on first frame
-            if (!_loggedLightingOnce)
-            {
-                _loggedLightingOnce = true;
-                Info($"[SharpGLTF] ===== LIGHTING SETUP =====");
-                Info($"  num_lights: {lightParams.num_lights}");
-                Info($"  Light 0 - pos.w (type): {lightParams.light_positions[0].W}, dir: {lightParams.light_directions[0]}, color: {lightParams.light_colors[0]}");
-                Info($"  Light 1 - pos.w (type): {lightParams.light_positions[1].W}, dir: {lightParams.light_directions[1]}, color: {lightParams.light_colors[1]}");
-                Info($"  Light 2 - pos.w (type): {lightParams.light_positions[2].W}, dir: {lightParams.light_directions[2]}, color: {lightParams.light_colors[2]}");
-                Info($"  Camera eye_pos: {state.camera.EyePos}");
-                Info($"==============================");
-            }
 
             // Debug output on first render when model exists
             bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
@@ -463,7 +453,11 @@ public static unsafe class SharpGLTFApp
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = state.camera.ViewProj;
             
-            // Draw each node (which references a mesh with its transform)
+            // Separate nodes into opaque and transparent lists
+            List<(SharpGltfNode node, float distance)> opaqueNodes = new List<(SharpGltfNode, float)>();
+            List<(SharpGltfNode node, float distance)> transparentNodes = new List<(SharpGltfNode, float)>();
+            
+            // Collect and categorize all visible nodes
             foreach (var node in state.model.Nodes)
             {
                 // Skip nodes without meshes (e.g., bone nodes, empty transforms)
@@ -496,21 +490,51 @@ public static unsafe class SharpGLTFApp
                 }
                 
                 state.visibleMeshes++;
-    
+                
+                // Calculate distance to camera for sorting
+                // Use the center of the mesh's bounding box
+                BoundingBox worldBounds = mesh.Bounds.Transform(modelMatrix);
+                Vector3 meshCenter = (worldBounds.Min + worldBounds.Max) * 0.5f;
+                float distanceToCamera = Vector3.Distance(meshCenter, state.camera.EyePos);
+                
+                // Categorize as opaque or transparent
+                if (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND)
+                {
+                    transparentNodes.Add((node, distanceToCamera));
+                }
+                else
+                {
+                    opaqueNodes.Add((node, distanceToCamera));
+                }
+            }
+            
+            // Sort transparent nodes back-to-front (furthest first)
+            transparentNodes.Sort((a, b) => b.distance.CompareTo(a.distance));
+            
+            // Helper function to render a node
+            void RenderNode(SharpGltfNode node)
+            {
+                var mesh = state.model.Meshes[node.MeshIndex];
+                
+                // Apply Mixamo-specific transforms if needed
+                Matrix4x4 modelMatrix;
+                if (state.isMixamoModel)
+                {
+                    var scaleMatrix = Matrix4x4.CreateScale(100.0f);
+                    var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
+                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                }
+                else
+                {
+                    modelMatrix = node.Transform;
+                }
                 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
                 
-                // Choose pipeline based on whether mesh has skinning
-                sg_pipeline pipeline = useSkinning ? state.pipeline_skinned : state.pipeline_static;
-
-                // Debug: Log which pipeline we're using (only once)
-                if (!_loggedPipelineOnce)
-                {
-                    Info($"[SharpGLTF] Rendering mesh with {(mesh.HasSkinning ? "SKINNED" : "STATIC")} pipeline");
-                    Info($"[SharpGLTF] Animator is {(state.animator != null ? "ACTIVE" : "NULL")}");
-                    _loggedPipelineOnce = true;
-                }
+                // Choose pipeline based on alpha mode and skinning
+                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning);
+                sg_pipeline pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType);
 
                 if (useSkinning)
                 {
@@ -543,6 +567,9 @@ public static unsafe class SharpGLTFApp
                     metallicParams.has_normal_tex = mesh.Textures.Count > 2 && mesh.Textures[2] != null ? 1.0f : 0.0f;
                     metallicParams.has_occlusion_tex = mesh.Textures.Count > 3 && mesh.Textures[3] != null ? 1.0f : 0.0f;
                     metallicParams.has_emissive_tex = mesh.Textures.Count > 4 && mesh.Textures[4] != null ? 1.0f : 0.0f;
+                    
+                    // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
+                    metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
 
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
@@ -585,6 +612,9 @@ public static unsafe class SharpGLTFApp
                     metallicParams.has_normal_tex = mesh.Textures.Count > 2 && mesh.Textures[2] != null ? 1.0f : 0.0f;
                     metallicParams.has_occlusion_tex = mesh.Textures.Count > 3 && mesh.Textures[3] != null ? 1.0f : 0.0f;
                     metallicParams.has_emissive_tex = mesh.Textures.Count > 4 && mesh.Textures[4] != null ? 1.0f : 0.0f;
+                    
+                    // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
+                    metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
 
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 
@@ -594,6 +624,18 @@ public static unsafe class SharpGLTFApp
 
                 // Draw the mesh
                 mesh.Draw(pipeline);
+            }
+            
+            // PASS 1: Render all opaque objects (no specific order needed)
+            foreach (var (node, _) in opaqueNodes)
+            {
+                RenderNode(node);
+            }
+            
+            // PASS 2: Render all transparent objects (back-to-front order)
+            foreach (var (node, _) in transparentNodes)
+            {
+                RenderNode(node);
             }
             
             // Mark that we've logged mesh info

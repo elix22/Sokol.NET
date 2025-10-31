@@ -124,6 +124,9 @@ layout(binding=1) uniform metallic_params {
     float has_normal_tex;
     float has_occlusion_tex;
     float has_emissive_tex;
+    // Alpha parameters
+    float alpha_cutoff;
+    float _pad_alpha1, _pad_alpha2;  // Padding to align to vec4
 };
 
 const int MAX_LIGHTS = 4;
@@ -419,6 +422,11 @@ void main() {
     
     // Multiply with vertex color (for GLTF vertex colors or material colors)
     base_color *= v_color;
+    
+    // Alpha testing for MASK mode (alpha_cutoff > 0.0 indicates MASK mode)
+    if (alpha_cutoff > 0.0 && base_color.a < alpha_cutoff) {
+        discard;
+    }
     
     // Step 2: Get metallic/roughness from texture
     float metallic = metallic_factor;

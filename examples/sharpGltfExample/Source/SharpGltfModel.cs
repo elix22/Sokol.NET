@@ -393,6 +393,11 @@ namespace Sokol
                 mesh.EmissiveFactor = Vector3.Zero;
             }
 
+            // Extract alpha mode and cutoff
+            mesh.AlphaMode = material.Alpha;
+            mesh.AlphaCutoff = material.AlphaCutoff;
+            Console.WriteLine($"[SharpGLTF] Material alpha mode: {mesh.AlphaMode}, cutoff: {mesh.AlphaCutoff}");
+
             // Load textures
             LoadTexture(material, "BaseColor", mesh, 0);
             LoadTexture(material, "MetallicRoughness", mesh, 1);

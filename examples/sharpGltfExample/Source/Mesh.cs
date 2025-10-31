@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using static Sokol.SG;
 using static Sokol.Utils;
+using SharpGLTF.Schema2;
 
 namespace Sokol
 {
@@ -21,6 +22,10 @@ namespace Sokol
         public float MetallicFactor = 1.0f;
         public float RoughnessFactor = 1.0f;
         public Vector3 EmissiveFactor = Vector3.Zero;
+        
+        // Alpha properties
+        public AlphaMode AlphaMode = AlphaMode.OPAQUE;
+        public float AlphaCutoff = 0.5f;
 
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
