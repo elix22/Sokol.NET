@@ -24,14 +24,14 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 public static unsafe class SharpGLTFApp
 {
     // const string filename = "DamagedHelmet.glb";
-     const string filename = "assimpScene.glb";
+    //   const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
     // const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     //race_track
-    //const string filename = "race_track.glb";
+    const string filename = "race_track.glb";
     // const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
 
     class _state

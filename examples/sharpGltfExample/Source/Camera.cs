@@ -44,6 +44,7 @@ namespace Sokol
         private bool _keyE = false;  // Down
         private bool _keyUp = false;    // Arrow up
         private bool _keyDown = false;  // Arrow down
+        private bool _keyShift = false;  // Speed boost
         
         public float MoveSpeed { get; set; } = 10.0f;  // Units per second
 
@@ -103,7 +104,8 @@ namespace Sokol
                 // Handle WASD camera movement
                 if (deltaTime > 0.0f)
                 {
-                    float moveAmount = MoveSpeed * deltaTime;
+                    float speedMultiplier = _keyShift ? 2.0f : 1.0f;
+                    float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
                     Vector3 moveDir = Vector3.Zero;
                     
                     // WASD for forward/back/left/right movement
@@ -142,7 +144,8 @@ namespace Sokol
                 // Handle WASD camera movement
                 if (deltaTime > 0.0f)
                 {
-                    float moveAmount = MoveSpeed * deltaTime;
+                    float speedMultiplier = _keyShift ? 2.0f : 1.0f;
+                    float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
                     
                     // Get camera forward, right, and up vectors
                     Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
@@ -237,31 +240,6 @@ namespace Sokol
                         _useLocalRotation = true;
                         sapp_lock_mouse(true);
                     }
-                    else if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_RIGHT)
-                    {
-                        // Right click: Toggle free mouse movement mode
-                        _mouseMovementEnabled = !_mouseMovementEnabled;
-                        if (_mouseMovementEnabled)
-                        {
-                            // Calculate the forward direction (where camera is looking)
-                            // In orbit mode, we look from EyePos toward Center
-                            Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
-                            
-                            // Calculate yaw and pitch from forward direction
-                            _yaw = (float)Math.Atan2(forward.X, forward.Z);
-                            _pitch = (float)Math.Asin(forward.Y);
-                            
-                            // Move center to current eye position to prevent position jump
-                            _desc.Center = EyePos;
-                        }
-                        else
-                        {
-                            // When returning to orbit mode, yaw/pitch already have the correct values
-                            // No conversion needed since we use the same coordinate system now
-                        }
-                        _useLocalRotation = _mouseMovementEnabled;
-                        sapp_lock_mouse(_mouseMovementEnabled);
-                    }
                     break;
 
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
@@ -305,7 +283,7 @@ namespace Sokol
                         if (_useLocalRotation)
                         {
                             // Rotate around world axis (first-person style)
-                            RotateWorld(ev->mouse_dx * 0.25f, ev->mouse_dy * 0.25f);
+                            RotateWorld(ev->mouse_dx * 0.25f, -ev->mouse_dy * 0.25f);
                         }
                         else
                         {
@@ -363,6 +341,10 @@ namespace Sokol
                     break;
                 case sapp_keycode.SAPP_KEYCODE_DOWN:
                     _keyDown = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_LEFT_SHIFT:
+                case sapp_keycode.SAPP_KEYCODE_RIGHT_SHIFT:
+                    _keyShift = isDown;
                     break;
             }
         }

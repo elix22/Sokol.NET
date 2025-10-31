@@ -255,7 +255,7 @@ namespace Sokol
                 Update();
                 
                 // Small delay to prevent busy-waiting from consuming too much CPU
-                System.Threading.Thread.Sleep(1);
+                System.Threading.Thread.Sleep(5);
             }
 
             if (!completed)
