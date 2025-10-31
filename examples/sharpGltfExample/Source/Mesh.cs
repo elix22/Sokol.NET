@@ -22,6 +22,7 @@ namespace Sokol
         public float MetallicFactor = 1.0f;
         public float RoughnessFactor = 1.0f;
         public Vector3 EmissiveFactor = Vector3.Zero;
+        public float EmissiveStrength = 1.0f;  // KHR_materials_emissive_strength extension
         
         // Alpha properties
         public AlphaMode AlphaMode = AlphaMode.OPAQUE;

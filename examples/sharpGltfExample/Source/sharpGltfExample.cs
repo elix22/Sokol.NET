@@ -47,7 +47,11 @@ public static unsafe class SharpGLTFApp
 
     // const string filename = "glb/ClearCoatCarPaint.glb";
 
-     const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
+    // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
+
+    // const string filename = "glb/DragonAttenuation.glb";
+
+    const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
     class _state
     {
@@ -237,8 +241,8 @@ public static unsafe class SharpGLTFApp
                         state.modelBoundsMax = new Vector3(1, 2, 1);
                     }
 
-                    // Create our model wrapper
-                    state.model = new SharpGltfModel(modelRoot);
+                    // Create our model wrapper (pass file path for extension extraction)
+                    state.model = new SharpGltfModel(modelRoot, path);
                     
                     // TBD ELI , this is an hack to detect Mixamo models
                     // Detect if this is a Mixamo model by checking node names
@@ -597,6 +601,9 @@ public static unsafe class SharpGLTFApp
                     
                     // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
                     metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
+                    
+                    // Set emissive strength (KHR_materials_emissive_strength extension)
+                    metallicParams.emissive_strength = mesh.EmissiveStrength;
 
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
@@ -640,6 +647,9 @@ public static unsafe class SharpGLTFApp
                     
                     // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
                     metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
+                    
+                    // Set emissive strength (KHR_materials_emissive_strength extension)
+                    metallicParams.emissive_strength = mesh.EmissiveStrength;
 
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 

@@ -105,7 +105,7 @@ namespace Sokol
         private float _animationDuration;
         private int _currentChannelIndex = 0;
 
-        public SharpGltfModel(ModelRoot model)
+        public SharpGltfModel(ModelRoot model, string? filePath = null)
         {
             _model = model;
             ProcessModel();
@@ -391,6 +391,19 @@ namespace Sokol
             {
                 Console.WriteLine("[SharpGLTF] Material has NO Emissive channel");
                 mesh.EmissiveFactor = Vector3.Zero;
+            }
+            
+            // Extract emissive strength from KHR_materials_emissive_strength extension
+            // SharpGLTF has built-in support for this extension
+            var emissiveStrengthExt = material.GetExtension<SharpGLTF.Schema2.MaterialEmissiveStrength>();
+            if (emissiveStrengthExt != null)
+            {
+                mesh.EmissiveStrength = emissiveStrengthExt.EmissiveStrength;
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: emissiveStrength = {mesh.EmissiveStrength}");
+            }
+            else
+            {
+                mesh.EmissiveStrength = 1.0f; // Default value
             }
 
             // Extract alpha mode and cutoff

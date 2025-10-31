@@ -126,6 +126,8 @@ layout(binding=1) uniform metallic_params {
     float has_emissive_tex;
     // Alpha parameters
     float alpha_cutoff;
+    // Emissive strength (KHR_materials_emissive_strength extension)
+    float emissive_strength;
 };
 
 const int MAX_LIGHTS = 4;
@@ -454,6 +456,8 @@ void main() {
         vec3 emissive_sample = srgb_to_linear(texture(sampler2D(emissive_tex, emissive_smp), v_uv)).rgb;
         emissive *= emissive_sample;
     }
+    // Apply emissive strength (KHR_materials_emissive_strength extension)
+    emissive *= emissive_strength;
     // Boost emissive to make glowing details more visible
     emissive *= 3.0;
     
