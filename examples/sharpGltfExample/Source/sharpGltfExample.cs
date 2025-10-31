@@ -27,11 +27,12 @@ public static unsafe class SharpGLTFApp
     // const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    const string filename = "DancingGangster.glb";
+    // const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     //race_track
-    // const string filename = "race_track.glb";
+    //const string filename = "race_track.glb";
+    const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
 
     class _state
     {
@@ -142,8 +143,34 @@ public static unsafe class SharpGLTFApp
                 try
                 {
                     var memoryStream = new MemoryStream(buffer);
-                    var context = SharpGLTF.Schema2.ReadContext
-                        .Create(f => throw new NotSupportedException());
+                    
+                    // Get the directory of the main GLTF file for resolving relative paths
+                    string? baseDirectory = Path.GetDirectoryName(path);
+                    
+                    // Create a FileReaderCallback that uses LoadFileSync for dependent files
+                    SharpGLTF.Schema2.FileReaderCallback fileReader = (assetName) =>
+                    {
+                        // Construct full path by combining base directory with asset name
+                        string fullAssetPath = string.IsNullOrEmpty(baseDirectory) 
+                            ? assetName 
+                            : Path.Combine(baseDirectory, assetName);
+                        
+                        Info($"[SharpGLTF] Loading dependent asset: {assetName} -> {fullAssetPath}");
+                        var (data, loadStatus) = FileSystem.Instance.LoadFileSync(fullAssetPath);
+                        
+                        if (loadStatus == FileLoadStatus.Success && data != null)
+                        {
+                            Info($"[SharpGLTF] Successfully loaded {fullAssetPath} ({data.Length} bytes)");
+                            return new ArraySegment<byte>(data);
+                        }
+                        else
+                        {
+                            Error($"[SharpGLTF] Failed to load {fullAssetPath}: {loadStatus}");
+                            throw new FileNotFoundException($"Failed to load asset: {fullAssetPath}");
+                        }
+                    };
+                    
+                    var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
                         
                     ModelRoot modelRoot = context.ReadSchema2(memoryStream);
                     

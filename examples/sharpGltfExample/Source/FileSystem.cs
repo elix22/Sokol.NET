@@ -211,6 +211,63 @@ namespace Sokol
         }
 
         /// <summary>
+        /// Load a file synchronously by blocking until the async operation completes
+        /// This uses the async mechanism internally but blocks the calling thread
+        /// WARNING: This will block the thread until the file is loaded. Use sparingly.
+        /// NOTE: On WebAssembly/browser platforms, this may not work as expected due to threading limitations
+        /// </summary>
+        /// <param name="filePath">Path to the file to load</param>
+        /// <param name="bufferSize">Optional custom buffer size (uses default if not specified)</param>
+        /// <param name="timeoutMs">Timeout in milliseconds (default: 10000ms)</param>
+        /// <returns>Tuple of (data buffer, load status)</returns>
+        public (byte[]? data, FileLoadStatus status) LoadFileSync(string filePath, int bufferSize = DEFAULT_BUFFER_SIZE, int timeoutMs = 10000)
+        {
+            if (!_isInitialized)
+            {
+                throw new InvalidOperationException("FileSystem must be initialized before use. Call Initialize() first.");
+            }
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return (null, FileLoadStatus.Failed);
+            }
+
+            byte[]? resultData = null;
+            FileLoadStatus resultStatus = FileLoadStatus.Failed;
+            bool completed = false;
+
+            // Create callback that signals completion
+            FileLoadCallback syncCallback = (path, data, status) =>
+            {
+                resultData = data;
+                resultStatus = status;
+                completed = true;
+            };
+
+            // Start the async load
+            LoadFile(filePath, syncCallback, bufferSize);
+
+            // Spin-wait with updates until completion or timeout
+            var startTime = System.Diagnostics.Stopwatch.StartNew();
+            while (!completed && startTime.ElapsedMilliseconds < timeoutMs)
+            {
+                // Process file system updates - this is critical for the async operation to complete
+                Update();
+                
+                // Small delay to prevent busy-waiting from consuming too much CPU
+                System.Threading.Thread.Sleep(1);
+            }
+
+            if (!completed)
+            {
+                Info($"FileSystem: Sync load timeout for {filePath} after {timeoutMs}ms");
+                return (null, FileLoadStatus.Failed);
+            }
+
+            return (resultData, resultStatus);
+        }
+
+        /// <summary>
         /// Update the FileSystem - must be called each frame to process sokol-fetch work
         /// </summary>
         public void Update()

@@ -84,10 +84,11 @@ namespace Sokol
 
         /// <summary>
         /// Remove a texture from the cache (typically called when the texture is disposed).
+        /// returns true if the texture was found and removed, false otherwise.
         /// </summary>
-        public void Remove(string key)
+        public bool Remove(string key)
         {
-            _cache.Remove(key);
+            return _cache.Remove(key);
         }
 
         /// <summary>
