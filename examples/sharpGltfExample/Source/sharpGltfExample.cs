@@ -24,7 +24,7 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 public static unsafe class SharpGLTFApp
 {
     // const string filename = "DamagedHelmet.glb";
-    // const string filename = "assimpScene.glb";
+     const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
     // const string filename = "DancingGangster.glb";
@@ -32,7 +32,7 @@ public static unsafe class SharpGLTFApp
 
     //race_track
     //const string filename = "race_track.glb";
-    const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
+    // const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
 
     class _state
     {
@@ -47,16 +47,6 @@ public static unsafe class SharpGLTFApp
         public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
-        
-        // Keyboard state for WASD movement
-        public bool keyW = false;
-        public bool keyA = false;
-        public bool keyS = false;
-        public bool keyD = false;
-        public bool keyQ = false;  // Up
-        public bool keyE = false;  // Down
-        public bool keyUp = false;    // Arrow up
-        public bool keyDown = false;  // Arrow down
         
         // Culling statistics
         public int totalMeshes = 0;
@@ -117,12 +107,34 @@ public static unsafe class SharpGLTFApp
             Longitude = 0.0f,
         });
 
-        // Initialize lighting system - Single point light like cgltf example
+        // Initialize lighting system - Multi-light setup for both indoor and outdoor scenes
+        // Light 1: Main directional light (sun) - provides broad coverage for outdoor/large indoor spaces
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(-0.3f, -0.7f, -0.5f),   // Direction (from upper right, angled down)
+            new Vector3(1.0f, 0.95f, 0.85f),    // Warm white (sun color)
+            1.5f                                 // Intensity
+        ));
+        
+        // Light 2: Fill directional light - softens shadows and provides ambient-like fill
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.5f, -0.3f, 0.3f),     // Direction (from opposite side, shallower angle)
+            new Vector3(0.6f, 0.7f, 0.9f),      // Cool blue-tinted (sky light)
+            0.4f                                 // Lower intensity for fill
+        ));
+        
+        // Light 3: Point light - for localized indoor lighting or accent
         state.lights.Add(Light.CreatePointLight(
-            new Vector3(10.0f, 10.0f, 10.0f),  // Position - above and to side
-            new Vector3(1.0f, 1.5f, 2.0f),      // Slightly blue-tinted white
-            700.0f,                              // Very high intensity for point light
-            200.0f                               // Range
+            new Vector3(0.0f, 15.0f, 0.0f),     // Position - overhead
+            new Vector3(1.0f, 0.9f, 0.8f),      // Warm white
+            300.0f,                              // High intensity for large areas
+            100.0f                               // Large range
+        ));
+        
+        // Light 4: Back/rim light - adds depth and separation
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.2f, 0.1f, 0.8f),      // Direction (from behind)
+            new Vector3(0.8f, 0.85f, 1.0f),     // Slightly blue
+            0.3f                                 // Subtle intensity
         ));
 
         state.pass_action = default;
@@ -249,7 +261,7 @@ public static unsafe class SharpGLTFApp
             {
                 Error($"[SharpGLTF] Failed to load file '{path}': {status}");
             }
-        });
+        }); // 3 GB max size
 
     }
 
@@ -370,48 +382,9 @@ public static unsafe class SharpGLTFApp
             state.cameraInitialized = true;
         }
 
-        // Handle WASD camera movement
-        if (state.cameraInitialized)
-        {
-            float moveSpeed = 50.0f; // Units per second (increased from 5.0f)
-            float deltaTime = (float)sapp_frame_duration();
-            float moveAmount = moveSpeed * deltaTime;
-            
-            // Get camera forward, right, and up vectors
-            Vector3 cameraPos = state.camera.EyePos;
-            Vector3 forward = Vector3.Normalize(state.camera.Center - cameraPos);
-            Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-            Vector3 up = Vector3.UnitY;
-            
-            Vector3 moveDir = Vector3.Zero;
-            
-            // WASD for forward/back/left/right movement
-            if (state.keyW) moveDir += forward;
-            if (state.keyS) moveDir -= forward;
-            if (state.keyD) moveDir += right;
-            if (state.keyA) moveDir -= right;
-            
-            // Q/E for up/down movement
-            if (state.keyQ) moveDir += up;
-            if (state.keyE) moveDir -= up;
-            
-            // Arrow keys for up/down movement (alternative to Q/E)
-            if (state.keyUp) moveDir += up;
-            if (state.keyDown) moveDir -= up;
-            
-            // Normalize and apply movement
-            if (moveDir.LengthSquared() > 0)
-            {
-                moveDir = Vector3.Normalize(moveDir);
-                Vector3 movement = moveDir * moveAmount;
-                
-                // Move both camera position and look-at center to maintain view direction
-                state.camera.Center += movement;
-            }
-        }
-
-        // Update camera
-        state.camera.Update(fb_width, fb_height);
+        // Update camera (handles WASD movement internally)
+        float deltaTime = (float)sapp_frame_duration();
+        state.camera.Update(fb_width, fb_height, state.cameraInitialized ? deltaTime : 0.0f);
 
         // Update animation if available
         if (state.animator != null)
@@ -871,41 +844,8 @@ public static unsafe class SharpGLTFApp
             return; // ImGui consumed the event
         }
 
+        // Camera handles all input events including keyboard
         state.camera.HandleEvent(e);
-        
-        // Handle keyboard input for WASD camera movement
-        if (e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN || e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_UP)
-        {
-            bool isDown = e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN;
-            
-            switch (e->key_code)
-            {
-                case sapp_keycode.SAPP_KEYCODE_W:
-                    state.keyW = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_A:
-                    state.keyA = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_S:
-                    state.keyS = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_D:
-                    state.keyD = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_Q:
-                    state.keyQ = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_E:
-                    state.keyE = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_UP:
-                    state.keyUp = isDown;
-                    break;
-                case sapp_keycode.SAPP_KEYCODE_DOWN:
-                    state.keyDown = isDown;
-                    break;
-            }
-        }
     }
 
     [UnmanagedCallersOnly]

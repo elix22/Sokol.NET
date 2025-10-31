@@ -14,7 +14,7 @@ namespace Sokol
 
         private static List<SharedBuffer> _sharedBuffers = new List<SharedBuffer>();
 
-        public static SharedBuffer Create(int bufferSize)
+        public static SharedBuffer Create(uint bufferSize)
         {
             try
             {
@@ -48,7 +48,7 @@ namespace Sokol
         }
 
         // private Constructor , use SharedBuffer.Create() instead
-        private SharedBuffer(int bufferSize)
+        private SharedBuffer(uint bufferSize)
         {
             Buffer = new byte[bufferSize];
             PinBuffer();
@@ -67,7 +67,7 @@ namespace Sokol
             return bufferHandle.AddrOfPinnedObject();
         }
 
-        public int Size => Buffer.Length;
+        public uint Size => (uint)Buffer.Length;
 
         public void UnpinBuffer()
         {

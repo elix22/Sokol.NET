@@ -38,7 +38,7 @@ namespace Sokol
         public SharedBuffer Buffer;
         public sfetch_handle_t Handle;
         public bool IsActive;
-        public int OriginalBufferSize;  // Track original requested buffer size
+        public uint OriginalBufferSize;  // Track original requested buffer size
         public bool IsRetry;           // Track if this is a retry attempt
         public int RetryCount;         // Number of retry attempts
     }
@@ -165,7 +165,7 @@ namespace Sokol
         /// <param name="filePath">Path to the file to load</param>
         /// <param name="callback">Callback to invoke when loading completes</param>
         /// <param name="bufferSize">Optional custom buffer size (uses default if not specified)</param>
-        public void LoadFile(string filePath, FileLoadCallback callback, int bufferSize = DEFAULT_BUFFER_SIZE)
+        public void LoadFile(string filePath, FileLoadCallback callback, uint bufferSize = DEFAULT_BUFFER_SIZE)
         {
             if (!_isInitialized)
             {
@@ -220,7 +220,7 @@ namespace Sokol
         /// <param name="bufferSize">Optional custom buffer size (uses default if not specified)</param>
         /// <param name="timeoutMs">Timeout in milliseconds (default: 10000ms)</param>
         /// <returns>Tuple of (data buffer, load status)</returns>
-        public (byte[]? data, FileLoadStatus status) LoadFileSync(string filePath, int bufferSize = DEFAULT_BUFFER_SIZE, int timeoutMs = 10000)
+        public (byte[]? data, FileLoadStatus status) LoadFileSync(string filePath, uint bufferSize = DEFAULT_BUFFER_SIZE, int timeoutMs = 10000)
         {
             if (!_isInitialized)
             {
@@ -323,7 +323,7 @@ namespace Sokol
 
         private void ReturnPooledBuffer(SharedBuffer buffer)
         {
-            if (buffer.Size == DEFAULT_BUFFER_SIZE && _bufferPool.Count < MAX_CONCURRENT_REQUESTS)
+            if (buffer.Size == (uint)DEFAULT_BUFFER_SIZE && _bufferPool.Count < MAX_CONCURRENT_REQUESTS)
             {
                 _bufferPool.Add(buffer);
             }
@@ -458,7 +458,7 @@ namespace Sokol
         private void RetryWithLargerBuffer(FileLoadRequest originalRequest)
         {
             // Calculate new buffer size (4x the current buffer size, not original)
-            int newBufferSize = originalRequest.Buffer.Size * RETRY_BUFFER_MULTIPLIER;
+            uint newBufferSize = (uint)(originalRequest.Buffer.Size * RETRY_BUFFER_MULTIPLIER);
 
             Info($"FileSystem: Retrying {originalRequest.FilePath} with larger buffer ({newBufferSize} bytes, attempt {originalRequest.RetryCount + 1})");
 

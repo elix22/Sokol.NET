@@ -23,24 +23,59 @@ namespace Sokol
         public Matrix4x4 ViewProj => View * Proj;
 
         private CameraDesc _desc;
-        private float _latitude;
-        private float _longitude;
+        private bool _mouseMovementEnabled = false;  // Toggle for mouse movement mode
+        private float _mouseSensitivity = 0.15f;     // Mouse sensitivity for look around
+        
+        // Single coordinate system: yaw/pitch for rotation
+        private float _yaw = 0.0f;      // Rotation around Y axis (left/right)
+        private float _pitch = 0.0f;    // Rotation around X axis (up/down)
+        private bool _useLocalRotation = false;  // Track if using local axis rotation (first-person vs orbit)
+        
+        // Store state when switching modes to restore smoothly
+        private Vector3 _savedCenter;
+        private float _savedDistance;
+        
+        // Keyboard state for WASD movement
+        private bool _keyW = false;
+        private bool _keyA = false;
+        private bool _keyS = false;
+        private bool _keyD = false;
+        private bool _keyQ = false;  // Up
+        private bool _keyE = false;  // Down
+        private bool _keyUp = false;    // Arrow up
+        private bool _keyDown = false;  // Arrow down
+        
+        public float MoveSpeed { get; set; } = 10.0f;  // Units per second
 
         // Public properties for camera modification
         public Vector3 Center { get => _desc.Center; set => _desc.Center = value; }
         public float Distance { get => _desc.Distance; set => _desc.Distance = value; }
-        public float Latitude { get => _latitude; set => _latitude = value; }
-        public float Longitude { get => _longitude; set => _longitude = value; }
         public float Aspect => _desc.Aspect;
+        public bool MouseMovementEnabled { get => _mouseMovementEnabled; set => _mouseMovementEnabled = value; }
+        public float MouseSensitivity { get => _mouseSensitivity; set => _mouseSensitivity = value; }
+        
+        // Properties for compatibility (convert to/from yaw/pitch)
+        public float Latitude 
+        { 
+            get => _pitch * 180.0f / (float)Math.PI; 
+            set => _pitch = value * (float)Math.PI / 180.0f; 
+        }
+        public float Longitude 
+        { 
+            get => -_yaw * 180.0f / (float)Math.PI; 
+            set => _yaw = -value * (float)Math.PI / 180.0f; 
+        }
 
         public void Init(CameraDesc desc)
         {
             _desc = desc;
-            _latitude = desc.Latitude;
-            _longitude = desc.Longitude;
+            
+            // Initialize yaw and pitch from latitude/longitude in desc
+            _yaw = -desc.Longitude * (float)Math.PI / 180.0f;
+            _pitch = desc.Latitude * (float)Math.PI / 180.0f;
         }
 
-        public void Update(int width, int height)
+        public void Update(int width, int height, float deltaTime = 0.0f)
         {
             float aspect = (float)width / (float)height;
             Proj = Matrix4x4.CreatePerspectiveFieldOfView(
@@ -50,27 +85,127 @@ namespace Sokol
                 _desc.FarZ
             );
 
-            // Calculate eye position from spherical coordinates
-            float latRad = _latitude * (float)Math.PI / 180.0f;
-            float lonRad = _longitude * (float)Math.PI / 180.0f;
+            if (_useLocalRotation)
+            {
+                // First-person camera: rotate around local axis
+                // Calculate forward direction from yaw and pitch
+                Vector3 forward = new Vector3(
+                    (float)(Math.Cos(_pitch) * Math.Sin(_yaw)),
+                    (float)Math.Sin(_pitch),
+                    (float)(Math.Cos(_pitch) * Math.Cos(_yaw))
+                );
+                forward = Vector3.Normalize(forward);
+                
+                // Calculate right and up vectors
+                Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+                Vector3 up = Vector3.Cross(right, forward);
+                
+                // Handle WASD camera movement
+                if (deltaTime > 0.0f)
+                {
+                    float moveAmount = MoveSpeed * deltaTime;
+                    Vector3 moveDir = Vector3.Zero;
+                    
+                    // WASD for forward/back/left/right movement
+                    if (_keyW) moveDir += forward;
+                    if (_keyS) moveDir -= forward;
+                    if (_keyD) moveDir += right;
+                    if (_keyA) moveDir -= right;
+                    
+                    // Q/E for up/down movement
+                    if (_keyQ) moveDir += Vector3.UnitY;
+                    if (_keyE) moveDir -= Vector3.UnitY;
+                    
+                    // Arrow keys for up/down movement (alternative to Q/E)
+                    if (_keyUp) moveDir += Vector3.UnitY;
+                    if (_keyDown) moveDir -= Vector3.UnitY;
+                    
+                    // Normalize and apply movement
+                    if (moveDir.LengthSquared() > 0)
+                    {
+                        moveDir = Vector3.Normalize(moveDir);
+                        Vector3 movement = moveDir * moveAmount;
+                        _desc.Center += movement;
+                    }
+                }
+                
+                // Eye position is at the center (first-person)
+                EyePos = _desc.Center;
+                
+                // Look at position is center + forward direction
+                Vector3 lookAt = _desc.Center + forward;
+                View = Matrix4x4.CreateLookAt(EyePos, lookAt, up);
+            }
+            else
+            {
+                // Orbit camera: rotate around center point
+                // Handle WASD camera movement
+                if (deltaTime > 0.0f)
+                {
+                    float moveAmount = MoveSpeed * deltaTime;
+                    
+                    // Get camera forward, right, and up vectors
+                    Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
+                    Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+                    Vector3 up = Vector3.UnitY;
+                    
+                    Vector3 moveDir = Vector3.Zero;
+                    
+                    // WASD for forward/back/left/right movement
+                    if (_keyW) moveDir += forward;
+                    if (_keyS) moveDir -= forward;
+                    if (_keyD) moveDir += right;
+                    if (_keyA) moveDir -= right;
+                    
+                    // Q/E for up/down movement
+                    if (_keyQ) moveDir += up;
+                    if (_keyE) moveDir -= up;
+                    
+                    // Arrow keys for up/down movement (alternative to Q/E)
+                    if (_keyUp) moveDir += up;
+                    if (_keyDown) moveDir -= up;
+                    
+                    // Normalize and apply movement
+                    if (moveDir.LengthSquared() > 0)
+                    {
+                        moveDir = Vector3.Normalize(moveDir);
+                        Vector3 movement = moveDir * moveAmount;
+                        
+                        // Move both camera position and look-at center to maintain view direction
+                        _desc.Center += movement;
+                    }
+                }
+                
+                // Calculate camera position from yaw/pitch in orbit mode
+                // We position the camera at Distance away from Center, looking at it
+                Vector3 offset = new Vector3(
+                    (float)(Math.Cos(_pitch) * Math.Sin(_yaw)),
+                    (float)Math.Sin(_pitch),
+                    (float)(Math.Cos(_pitch) * Math.Cos(_yaw))
+                );
+                offset = Vector3.Normalize(offset);
+                
+                // Eye position orbits around center at Distance
+                EyePos = _desc.Center + offset * _desc.Distance;
 
-            EyePos = new Vector3(
-                _desc.Center.X + _desc.Distance * (float)Math.Cos(latRad) * (float)Math.Sin(lonRad),
-                _desc.Center.Y + _desc.Distance * (float)Math.Sin(latRad),
-                _desc.Center.Z + _desc.Distance * (float)Math.Cos(latRad) * (float)Math.Cos(lonRad)
-            );
-
-            View = Matrix4x4.CreateLookAt(EyePos, _desc.Center, Vector3.UnitY);
+                View = Matrix4x4.CreateLookAt(EyePos, _desc.Center, Vector3.UnitY);
+            }
         }
 
         public void Orbit(float dx, float dy)
         {
-            _longitude -= dx;
-            if (_longitude < 0.0f)
-                _longitude += 360.0f;
-            if (_longitude > 360.0f)
-                _longitude -= 360.0f;
-            _latitude = Math.Clamp(_latitude + dy, -85.0f, 85.0f);
+            // Same as RotateWorld - use yaw/pitch directly
+            _yaw += dx * (float)Math.PI / 180.0f;
+            _pitch = Math.Clamp(_pitch + dy * (float)Math.PI / 180.0f, -1.5f, 1.5f);  // Clamp pitch to ~±85 degrees
+        }
+        
+        public void RotateWorld(float dx, float dy)
+        {
+            // Rotate around world axis (first-person style)
+            // Yaw rotates around world Y-axis
+            _yaw -= dx * (float)Math.PI / 180.0f;
+            // Pitch rotates around world X-axis (clamped to prevent flipping)
+            _pitch = Math.Clamp(_pitch + dy * (float)Math.PI / 180.0f, -1.5f, 1.5f);  // Clamp pitch to ~±85 degrees
         }
 
         public void Zoom(float d)
@@ -87,14 +222,76 @@ namespace Sokol
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
                     {
+                        // Left click: Enable first-person rotation around world axis
+                        // Save orbit state
+                        _savedCenter = _desc.Center;
+                        _savedDistance = _desc.Distance;
+                        
+                        // Calculate forward direction for first-person mode
+                        Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
+                        _yaw = (float)Math.Atan2(forward.X, forward.Z);
+                        _pitch = (float)Math.Asin(forward.Y);
+                        
+                        // Move center to current eye position for first-person mode
+                        _desc.Center = EyePos;
+                        _useLocalRotation = true;
                         sapp_lock_mouse(true);
+                    }
+                    else if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_RIGHT)
+                    {
+                        // Right click: Toggle free mouse movement mode
+                        _mouseMovementEnabled = !_mouseMovementEnabled;
+                        if (_mouseMovementEnabled)
+                        {
+                            // Calculate the forward direction (where camera is looking)
+                            // In orbit mode, we look from EyePos toward Center
+                            Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
+                            
+                            // Calculate yaw and pitch from forward direction
+                            _yaw = (float)Math.Atan2(forward.X, forward.Z);
+                            _pitch = (float)Math.Asin(forward.Y);
+                            
+                            // Move center to current eye position to prevent position jump
+                            _desc.Center = EyePos;
+                        }
+                        else
+                        {
+                            // When returning to orbit mode, yaw/pitch already have the correct values
+                            // No conversion needed since we use the same coordinate system now
+                        }
+                        _useLocalRotation = _mouseMovementEnabled;
+                        sapp_lock_mouse(_mouseMovementEnabled);
                     }
                     break;
 
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
                     {
+                        // When returning to orbit mode from first-person:
+                        // Keep the camera looking in the same direction
+                        // Calculate where the Center should be based on current forward direction
+                        
+                        // Current yaw/pitch represents the FORWARD direction (first-person)
+                        Vector3 forward = new Vector3(
+                            (float)(Math.Cos(_pitch) * Math.Sin(_yaw)),
+                            (float)Math.Sin(_pitch),
+                            (float)(Math.Cos(_pitch) * Math.Cos(_yaw))
+                        );
+                        forward = Vector3.Normalize(forward);
+                        
+                        // In orbit mode, we want to look AT the center FROM the current position
+                        // So: Center = EyePos + forward * Distance
+                        _desc.Center = EyePos + forward * _savedDistance;
+                        _desc.Distance = _savedDistance;
+                        
+                        // Now yaw/pitch needs to represent the offset direction (opposite of forward)
+                        // offset = -forward, so we need to convert forward to offset angles
+                        Vector3 offset = -forward;
+                        _yaw = (float)Math.Atan2(offset.X, offset.Z);
+                        _pitch = (float)Math.Asin(offset.Y);
+                        
                         sapp_lock_mouse(false);
+                        _useLocalRotation = _mouseMovementEnabled;
                     }
                     break;
 
@@ -105,8 +302,67 @@ namespace Sokol
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE:
                     if (sapp_mouse_locked())
                     {
-                        Orbit(ev->mouse_dx * 0.25f, ev->mouse_dy * 0.25f);
+                        if (_useLocalRotation)
+                        {
+                            // Rotate around world axis (first-person style)
+                            RotateWorld(ev->mouse_dx * 0.25f, ev->mouse_dy * 0.25f);
+                        }
+                        else
+                        {
+                            // Orbit around center point
+                            Orbit(ev->mouse_dx * 0.25f, ev->mouse_dy * 0.25f);
+                        }
                     }
+                    else if (_mouseMovementEnabled)
+                    {
+                        // Free mouse movement mode
+                        if (_useLocalRotation)
+                        {
+                            RotateWorld(ev->mouse_dx * _mouseSensitivity, ev->mouse_dy * _mouseSensitivity);
+                        }
+                        else
+                        {
+                            Orbit(ev->mouse_dx * _mouseSensitivity, ev->mouse_dy * _mouseSensitivity);
+                        }
+                    }
+                    break;
+                    
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_UP:
+                    HandleKeyboardInput(ev);
+                    break;
+            }
+        }
+        
+        private unsafe void HandleKeyboardInput(sapp_event* ev)
+        {
+            bool isDown = ev->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN;
+            
+            switch (ev->key_code)
+            {
+                case sapp_keycode.SAPP_KEYCODE_W:
+                    _keyW = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_A:
+                    _keyA = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_S:
+                    _keyS = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_D:
+                    _keyD = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_Q:
+                    _keyQ = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_E:
+                    _keyE = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_UP:
+                    _keyUp = isDown;
+                    break;
+                case sapp_keycode.SAPP_KEYCODE_DOWN:
+                    _keyDown = isDown;
                     break;
             }
         }
