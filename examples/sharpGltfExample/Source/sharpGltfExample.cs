@@ -128,33 +128,8 @@ public static unsafe class SharpGLTFApp
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         state.pass_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
 
-        // Create shader for static meshes (no skinning)
-        sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
-
-        // Create pipeline for static meshes
-        var pipeline_desc = default(sg_pipeline_desc);
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_position].format = SG_VERTEXFORMAT_FLOAT3;
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_normal].format = SG_VERTEXFORMAT_FLOAT3;
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_color].format = SG_VERTEXFORMAT_FLOAT4;
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_texcoord].format = SG_VERTEXFORMAT_FLOAT2;
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_boneIds].format = SG_VERTEXFORMAT_FLOAT4;  // Changed from UINT4 for WebGL compatibility
-        pipeline_desc.layout.attrs[ATTR_cgltf_metallic_weights].format = SG_VERTEXFORMAT_FLOAT4;
-        pipeline_desc.shader = shader_static;
-        pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-        pipeline_desc.cull_mode = SG_CULLMODE_BACK;
-        pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
-        pipeline_desc.depth.write_enabled = true;
-        pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
-        pipeline_desc.label = "static-pipeline";
-        state.pipeline_static = sg_make_pipeline(pipeline_desc);
-
-        // Create shader for skinned meshes
-        sg_shader shader_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
-
-        // Create pipeline for skinned meshes
-        pipeline_desc.shader = shader_skinned;
-        pipeline_desc.label = "skinned-pipeline";
-        state.pipeline_skinned = sg_make_pipeline(pipeline_desc);
+        state.pipeline_static = PipeLineManager.GetOrCreatePipeline(PipelineType.Standard); // Ensure static pipeline is created in manager
+        state.pipeline_skinned = PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
 
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
@@ -195,13 +170,13 @@ public static unsafe class SharpGLTFApp
                     Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
                     Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
                     
-                    Console.WriteLine($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
-                    Console.WriteLine($"[SharpGLTF] Model size: {size}, Center: {center}");
+                    Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
+                    Info($"[SharpGLTF] Model size: {size}, Center: {center}");
                     
                     // Safety check: if bounds are invalid or too small, use defaults
                     if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
                     {
-                        Console.WriteLine("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
+                        Info("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
                         state.modelBoundsMin = new Vector3(-1, 0, -1);
                         state.modelBoundsMax = new Vector3(1, 2, 1);
                     }
@@ -217,30 +192,30 @@ public static unsafe class SharpGLTFApp
                     
                     if (state.isMixamoModel)
                     {
-                        Console.WriteLine("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
+                        Info("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
                     }
                     
-                    Console.WriteLine($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
-                    Console.WriteLine($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
+                    Info($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
+                    Info($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
                     
                     // Create animator if model has animations
                     if (state.model.HasAnimations)
                     {
                         state.animator = new SharpGltfAnimator(state.model.Animation);
-                        Console.WriteLine("[SharpGLTF] Animator created for animated model");
+                        Info("[SharpGLTF] Animator created for animated model");
                     }
                     else
                     {
-                        Console.WriteLine("[SharpGLTF] No animations found in model");
+                        Info("[SharpGLTF] No animations found in model");
                     }
                     
                     state.modelLoaded = true;
-                    Console.WriteLine($"[SharpGLTF] Model loaded successfully: {path}");
+                    Info($"[SharpGLTF] Model loaded successfully: {path}");
                 }
                 catch (Exception ex)
                 {
                     Error($"[SharpGLTF] Error processing model: {ex.Message}");
-                    Console.WriteLine($"[SharpGLTF] Stack trace: {ex.StackTrace}");
+                    Info($"[SharpGLTF] Stack trace: {ex.StackTrace}");
                 }
             }
             else
@@ -354,11 +329,11 @@ public static unsafe class SharpGLTFApp
                 }
             }
             
-            Console.WriteLine($"=== AUTO-POSITIONING CAMERA ===");
-            Console.WriteLine($"Scene bounds: Min={sceneMin}, Max={sceneMax}");
-            Console.WriteLine($"Scene size: {sceneSize}");
-            Console.WriteLine($"Scene center: {sceneCenter}");
-            Console.WriteLine($"Final distance: {bestDistance:F3}");
+            Info($"=== AUTO-POSITIONING CAMERA ===");
+            Info($"Scene bounds: Min={sceneMin}, Max={sceneMax}");
+            Info($"Scene size: {sceneSize}");
+            Info($"Scene center: {sceneCenter}");
+            Info($"Final distance: {bestDistance:F3}");
             
             state.camera.Center = sceneCenter;
             state.camera.Distance = bestDistance;
@@ -423,7 +398,7 @@ public static unsafe class SharpGLTFApp
         // Render model if loaded
         if (state.modelLoaded && state.model != null)
         {
-            // Console.WriteLine($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
+            // Info($"[SharpGLTF Frame {_frameCount}] Starting render, model has {state.model.Nodes.Count} nodes");
             
             // Prepare vertex shader uniforms (common for both pipelines)
             Matrix4x4 model = Matrix4x4.Identity;
@@ -468,13 +443,13 @@ public static unsafe class SharpGLTFApp
             if (!_loggedLightingOnce)
             {
                 _loggedLightingOnce = true;
-                Console.WriteLine($"[SharpGLTF] ===== LIGHTING SETUP =====");
-                Console.WriteLine($"  num_lights: {lightParams.num_lights}");
-                Console.WriteLine($"  Light 0 - pos.w (type): {lightParams.light_positions[0].W}, dir: {lightParams.light_directions[0]}, color: {lightParams.light_colors[0]}");
-                Console.WriteLine($"  Light 1 - pos.w (type): {lightParams.light_positions[1].W}, dir: {lightParams.light_directions[1]}, color: {lightParams.light_colors[1]}");
-                Console.WriteLine($"  Light 2 - pos.w (type): {lightParams.light_positions[2].W}, dir: {lightParams.light_directions[2]}, color: {lightParams.light_colors[2]}");
-                Console.WriteLine($"  Camera eye_pos: {state.camera.EyePos}");
-                Console.WriteLine($"==============================");
+                Info($"[SharpGLTF] ===== LIGHTING SETUP =====");
+                Info($"  num_lights: {lightParams.num_lights}");
+                Info($"  Light 0 - pos.w (type): {lightParams.light_positions[0].W}, dir: {lightParams.light_directions[0]}, color: {lightParams.light_colors[0]}");
+                Info($"  Light 1 - pos.w (type): {lightParams.light_positions[1].W}, dir: {lightParams.light_directions[1]}, color: {lightParams.light_colors[1]}");
+                Info($"  Light 2 - pos.w (type): {lightParams.light_positions[2].W}, dir: {lightParams.light_directions[2]}, color: {lightParams.light_colors[2]}");
+                Info($"  Camera eye_pos: {state.camera.EyePos}");
+                Info($"==============================");
             }
 
             // Debug output on first render when model exists
@@ -532,8 +507,8 @@ public static unsafe class SharpGLTFApp
                 // Debug: Log which pipeline we're using (only once)
                 if (!_loggedPipelineOnce)
                 {
-                    Console.WriteLine($"[SharpGLTF] Rendering mesh with {(mesh.HasSkinning ? "SKINNED" : "STATIC")} pipeline");
-                    Console.WriteLine($"[SharpGLTF] Animator is {(state.animator != null ? "ACTIVE" : "NULL")}");
+                    Info($"[SharpGLTF] Rendering mesh with {(mesh.HasSkinning ? "SKINNED" : "STATIC")} pipeline");
+                    Info($"[SharpGLTF] Animator is {(state.animator != null ? "ACTIVE" : "NULL")}");
                     _loggedPipelineOnce = true;
                 }
 
@@ -910,7 +885,7 @@ public static unsafe class SharpGLTFApp
     static void Cleanup()
     {
         // Print texture cache statistics before cleanup
-        Console.WriteLine("[SharpGLTF] Cleanup - Texture Cache Statistics:");
+        Info("[SharpGLTF] Cleanup - Texture Cache Statistics:");
         TextureCache.Instance.PrintStats();
         
         state.model?.Dispose();
