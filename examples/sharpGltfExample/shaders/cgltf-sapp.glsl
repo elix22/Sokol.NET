@@ -126,7 +126,6 @@ layout(binding=1) uniform metallic_params {
     float has_emissive_tex;
     // Alpha parameters
     float alpha_cutoff;
-    float _pad_alpha1, _pad_alpha2;  // Padding to align to vec4
 };
 
 const int MAX_LIGHTS = 4;
@@ -136,7 +135,7 @@ const int LIGHT_TYPE_SPOT = 2;
 
 layout(binding=2) uniform light_params {
     int num_lights;
-    float _pad1, _pad2, _pad3;  // Padding to align to vec4
+    float ambient_strength;  // Controllable ambient light strength
     vec4 light_positions[MAX_LIGHTS];   // w component: light type
     vec4 light_directions[MAX_LIGHTS];  // w component: spot inner cutoff (cosine)
     vec4 light_colors[MAX_LIGHTS];      // w component: intensity
@@ -486,9 +485,8 @@ void main() {
     vec3 view = normalize(v_eye_pos - v_pos);
     vec3 color = apply_all_lights(material_info, normal, view);
     
-    // Minimal ambient - just enough to prevent pure black
+    // Ambient lighting - controllable via uniform
     // Metals need to stay dark to look shiny and reflective
-    float ambient_strength = 0.03;
     vec3 ambient_diffuse = (1.0 - metallic) * diffuse_color * ambient_strength;
     vec3 ambient_specular = metallic * specular_color * ambient_strength * 0.5;  // Even less for metals
     vec3 ambient = ambient_diffuse + ambient_specular;

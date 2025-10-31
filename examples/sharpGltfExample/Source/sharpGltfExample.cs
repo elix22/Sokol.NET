@@ -74,6 +74,7 @@ public static unsafe class SharpGLTFApp
         
         // Lighting system
         public List<Light> lights = new List<Light>();
+        public float ambientStrength = 0.03f;   // Ambient light strength (0.0 to 1.0)
     }
 
     static _state state = new _state();
@@ -464,6 +465,7 @@ public static unsafe class SharpGLTFApp
             }
             
             lightParams.num_lights = enabledLightCount;
+            lightParams.ambient_strength = state.ambientStrength;
 
 
             // Debug output on first render when model exists
@@ -601,9 +603,7 @@ public static unsafe class SharpGLTFApp
                     // Light uniforms (cast to skinning version)
                     skinning_light_params_t skinningLightParams = new skinning_light_params_t();
                     skinningLightParams.num_lights = lightParams.num_lights;
-                    skinningLightParams._pad1 = lightParams._pad1;
-                    skinningLightParams._pad2 = lightParams._pad2;
-                    skinningLightParams._pad3 = lightParams._pad3;
+                    skinningLightParams.ambient_strength = lightParams.ambient_strength;
                     for (int i = 0; i < 4; i++)
                     {
                         skinningLightParams.light_positions[i] = lightParams.light_positions[i];
@@ -753,6 +753,15 @@ public static unsafe class SharpGLTFApp
                 igSeparator();
                 igText("=== Lighting ===");
                 
+                // Ambient light slider
+                igText("Ambient Light:");
+                float ambientStrength = state.ambientStrength;
+                if (igSliderFloat("##ambient", ref ambientStrength, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags.None))
+                {
+                    state.ambientStrength = ambientStrength;
+                }
+                
+                igSeparator();
                 int activeCount = state.lights.Count(l => l.Enabled);
                 igText($"Active Lights: {activeCount}/{state.lights.Count}");
                 
