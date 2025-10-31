@@ -42,8 +42,6 @@ public static unsafe class SharpGLTFApp
     class _state
     {
         public sg_pass_action pass_action;
-        public sg_pipeline pipeline_static;     // Pipeline without skinning
-        public sg_pipeline pipeline_skinned;    // Pipeline with skinning
         public Sokol.Camera camera = new Sokol.Camera();
         public SharpGltfModel? model;
         public SharpGltfAnimator? animator;
@@ -144,8 +142,8 @@ public static unsafe class SharpGLTFApp
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         state.pass_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
 
-        state.pipeline_static = PipeLineManager.GetOrCreatePipeline(PipelineType.Standard); // Ensure static pipeline is created in manager
-        state.pipeline_skinned = PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
+        PipeLineManager.GetOrCreatePipeline(PipelineType.Standard);
+        PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
 
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
