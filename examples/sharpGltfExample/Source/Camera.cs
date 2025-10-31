@@ -46,7 +46,7 @@ namespace Sokol
         private bool _keyDown = false;  // Arrow down
         private bool _keyShift = false;  // Speed boost
         
-        public float MoveSpeed { get; set; } = 10.0f;  // Units per second
+        public float MoveSpeed { get; set; } = 1.0f;  // Units per second
 
         // Public properties for camera modification
         public Vector3 Center { get => _desc.Center; set => _desc.Center = value; }

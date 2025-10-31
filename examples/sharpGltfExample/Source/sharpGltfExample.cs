@@ -37,7 +37,13 @@ public static unsafe class SharpGLTFApp
     // const string filename = "glb/2CylinderEngine.glb";
 
     // const string filename = "ABeautifulGame/glTF/ABeautifulGame.gltf";
-    const string filename = "glb/AlphaBlendModeTest.glb";
+    // const string filename = "glb/AlphaBlendModeTest.glb";
+    // const string filename = "glb/AntiqueCamera.glb";
+
+    // const string filename = "AttenuationTest/glTF-Binary/AttenuationTest.glb";
+
+    //BoomBox.glb
+    const string filename = "glb/BoomBox.glb";
 
     class _state
     {
@@ -50,6 +56,10 @@ public static unsafe class SharpGLTFApp
         public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
+        
+        // Model rotation (middle mouse button)
+        public float modelRotationY = 0.0f;     // Rotation around Y-axis
+        public bool middleMouseDown = false;    // Track middle mouse button state
         
         // Culling statistics
         public int totalMeshes = 0;
@@ -100,7 +110,7 @@ public static unsafe class SharpGLTFApp
         state.camera.Init(new CameraDesc()
         {
             Aspect = 60.0f,
-            NearZ = 0.1f,
+            NearZ = 0.01f,
             FarZ = 2000.0f,
             Center = new Vector3(0.0f, 1.0f, 0.0f),
             Distance = 3.0f,
@@ -401,7 +411,16 @@ public static unsafe class SharpGLTFApp
         {
             
             // Prepare vertex shader uniforms (common for both pipelines)
-            Matrix4x4 model = Matrix4x4.Identity;
+            // Apply model rotation around Y-axis (controlled by middle mouse button)
+            Matrix4x4 modelRotation = Matrix4x4.CreateRotationY(state.modelRotationY);
+            
+            // Calculate the model center for rotation
+            Vector3 modelCenter = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
+            
+            // Create transform: translate to origin -> rotate -> translate back
+            Matrix4x4 model = Matrix4x4.CreateTranslation(-modelCenter) * 
+                             modelRotation * 
+                             Matrix4x4.CreateTranslation(modelCenter);
 
             // Prepare fragment shader uniforms (lighting)
             // Build light parameters from the lights list
@@ -472,12 +491,12 @@ public static unsafe class SharpGLTFApp
                     // Mixamo models exported from Blender have 0.01 scale and need rotation correction
                     var scaleMatrix = Matrix4x4.CreateScale(100.0f);
                     var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
-                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix * model;
                 }
                 else
                 {
-                    // Use the node's original transform from the GLTF file
-                    modelMatrix = node.Transform;
+                    // Use the node's original transform from the GLTF file + global model rotation
+                    modelMatrix = node.Transform * model;
                 }
                 
                 // FRUSTUM CULLING: Check if mesh is visible
@@ -520,11 +539,12 @@ public static unsafe class SharpGLTFApp
                 {
                     var scaleMatrix = Matrix4x4.CreateScale(100.0f);
                     var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
-                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix;
+                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix * model;
                 }
                 else
                 {
-                    modelMatrix = node.Transform;
+                    // Apply global model rotation to node transform
+                    modelMatrix = node.Transform * model;
                 }
                 
                 // Use skinning if mesh has it and animator exists
@@ -698,6 +718,18 @@ public static unsafe class SharpGLTFApp
                             state.animator.SetAnimation(state.model.Animation);
                         }
                     }
+                }
+                
+                igSeparator();
+                igText("=== Model Rotation ===");
+                igText("Middle Mouse: Rotate Model");
+                float rotationDegrees = state.modelRotationY * 180.0f / MathF.PI;
+                igText($"Rotation: {rotationDegrees:F1}°");
+                
+                // Reset button
+                if (igButton("Reset Rotation", Vector2.Zero))
+                {
+                    state.modelRotationY = 0.0f;
                 }
                 
                 igSeparator();
@@ -884,7 +916,25 @@ public static unsafe class SharpGLTFApp
             return; // ImGui consumed the event
         }
 
-        // Camera handles all input events including keyboard
+        // Handle middle mouse button for model rotation
+        if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN && 
+            e->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_MIDDLE)
+        {
+            state.middleMouseDown = true;
+        }
+        else if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP && 
+                 e->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_MIDDLE)
+        {
+            state.middleMouseDown = false;
+        }
+        else if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE && state.middleMouseDown)
+        {
+            // Rotate model around Y-axis based on horizontal mouse movement
+            state.modelRotationY += e->mouse_dx * 0.01f;
+            return; // Don't pass to camera
+        }
+
+        // Camera handles all other input events including keyboard
         state.camera.HandleEvent(e);
     }
 
