@@ -120,7 +120,7 @@ public static unsafe partial class SharpGLTFApp
             // Simple formula: distance = radius / tan(fov/2)
             // For models with radius < 1.0, use tighter framing (likely miniature/detailed models)
             // For normal sized models (radius >= 1.0), use standard framing
-            float paddingFactor = (sphereRadius < 1.0f) ? 0.15f : 1.1f;
+            float paddingFactor = (sphereRadius < 1.0f) ? 0.8f : 1.1f;
             
             if (sphereRadius < 1.0f)
             {
@@ -162,7 +162,10 @@ public static unsafe partial class SharpGLTFApp
 
         // Begin rendering
         // Priority: Transmission > Bloom > Regular
-        bool useTransmission = state.enableTransmission && state.modelLoaded && state.model != null && state.transmission.screen_color_img.id != 0;
+        // Auto-detect if transmission is needed by checking if any mesh has transmission_factor > 0
+        bool modelHasTransmission = state.modelLoaded && state.model != null && 
+                                   state.model.Meshes.Any(m => m.TransmissionFactor > 0.0f);
+        bool useTransmission = modelHasTransmission && state.transmission.screen_color_img.id != 0;
         bool useBloom = !useTransmission && state.enableBloom && state.modelLoaded && state.model != null && state.bloom.scene_color_img.id != 0;
         
         if (useTransmission)
@@ -320,7 +323,8 @@ public static unsafe partial class SharpGLTFApp
 
             // Helper function to render a node
             // useScreenTexture: When true, bind the screen texture for refraction (transmission Pass 2)
-            void RenderNode(SharpGltfNode node, bool useScreenTexture = false)
+            // renderToOffscreen: When true, use offscreen pipelines (transmission Pass 1 or bloom)
+            void RenderNode(SharpGltfNode node, bool useScreenTexture = false, bool renderToOffscreen = false)
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
@@ -349,9 +353,9 @@ public static unsafe partial class SharpGLTFApp
                 
                 // Get appropriate pipeline based on rendering mode
                 sg_pipeline pipeline;
-                if (useTransmission && mesh.TransmissionFactor == 0.0f)
+                if (renderToOffscreen && useTransmission)
                 {
-                    // Rendering opaque object to transmission opaque pass
+                    // Rendering opaque object to transmission offscreen pass (Pass 1)
                     pipeline = useSkinning ? state.transmission.opaque_skinned_pipeline : state.transmission.opaque_standard_pipeline;
                 }
                 else if (useBloom)
@@ -506,21 +510,28 @@ public static unsafe partial class SharpGLTFApp
             {
                 // TRANSMISSION TWO-PASS RENDERING
                 // Pass 1: Render opaque objects to offscreen texture (already in transmission.opaque_pass)
+                // This captures the background for refraction sampling
                 foreach (var (node, _) in opaqueNodes)
                 {
-                    RenderNode(node, useScreenTexture: false);
+                    RenderNode(node, useScreenTexture: false, renderToOffscreen: true);
                 }
                 
                 // End opaque pass
                 sg_end_pass();
                 
-                // Pass 2: Render transparent objects to swapchain (with refraction from screen texture)
+                // Pass 2: Render scene to swapchain
                 sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+                
+                // Render opaque objects again to the actual screen (using regular swapchain pipelines)
+                foreach (var (node, _) in opaqueNodes)
+                {
+                    RenderNode(node, useScreenTexture: false, renderToOffscreen: false);
+                }
                 
                 // Render transparent objects with screen texture binding for refraction
                 foreach (var (node, _) in transparentNodes)
                 {
-                    RenderNode(node, useScreenTexture: true);
+                    RenderNode(node, useScreenTexture: true, renderToOffscreen: false);
                 }
             }
             else

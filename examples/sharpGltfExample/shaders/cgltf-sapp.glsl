@@ -543,22 +543,30 @@ void main() {
     // Add emissive
     color += emissive;
     
-    // Apply transmission (glass/refraction) if enabled
+    // Apply volume absorption (Beer's Law) - ALWAYS applies when thickness > 0
+    // This creates the colored tint effect (e.g., golden amber, orange dragon)
+    // This is separate from transmission/refraction
+    if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
+        // Beer's Law: Intensity = I0 * exp(-absorption_coefficient * distance)
+        // attenuation_color is the target color at attenuation_distance
+        vec3 absorption = -log(max(attenuation_color, vec3(0.001))) / max(attenuation_distance, 0.001);
+        vec3 volume_color = exp(-absorption * thickness_factor);
+        
+        // Apply volume color tint to the rendered surface
+        color *= volume_color;
+    }
+    
+    // Apply transmission (glass/refraction) if enabled AND transmission_factor > 0
+    // This adds refraction effect on top of the volume-tinted color
     if (transmission_factor > 0.0) {
         // Calculate refracted background color
         vec3 refracted_color = calculate_refraction(normal, view, ior, transmission_factor);
         
-        // Apply volume absorption (Beer's Law) if thickness is defined
-        // This creates the colored tint effect (e.g., golden amber, blue glass)
+        // Apply the same volume absorption to the refracted background
         if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
-            // Beer's Law: Intensity = I0 * exp(-absorption_coefficient * distance)
-            // attenuation_color is the target color at attenuation_distance
-            // We invert it to get absorption coefficients
-            vec3 absorption = -log(attenuation_color + vec3(0.001)) / attenuation_distance;
-            vec3 attenuation = exp(-absorption * thickness_factor);
-            
-            // Apply attenuation to refracted color
-            refracted_color *= attenuation;
+            vec3 absorption = -log(max(attenuation_color, vec3(0.001))) / max(attenuation_distance, 0.001);
+            vec3 volume_color = exp(-absorption * thickness_factor);
+            refracted_color *= volume_color;
         }
         
         // Mix between surface color and refracted background based on transmission factor

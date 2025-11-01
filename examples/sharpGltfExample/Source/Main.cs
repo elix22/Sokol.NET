@@ -21,11 +21,11 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
-    // const string filename = "DamagedHelmet.glb";
+  // const string filename = "DamagedHelmet.glb";
     //   const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    // const string filename = "DancingGangster.glb";
+    const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     //race_track
@@ -48,7 +48,7 @@ public static unsafe partial class SharpGLTFApp
     // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
 
    
-    const string filename = "DragonAttenuation/glTF-Binary/DragonAttenuation.glb";
+    // const string filename = "DragonAttenuation/glTF-Binary/DragonAttenuation.glb";
 
     // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
@@ -169,8 +169,8 @@ public static unsafe partial class SharpGLTFApp
         public float bloomThreshold = 0.8f;      // Brightness threshold (0.0 - 10.0)
 
         // Transmission (glass/refraction) rendering
+        // Automatically enabled when model contains meshes with transmission_factor > 0
         public TransmissionPass transmission;
-        public bool enableTransmission = false;
 
         // Glass material overrides (for testing/debugging)
         public bool overrideGlassMaterials = false;

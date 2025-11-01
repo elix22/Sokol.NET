@@ -389,18 +389,10 @@ public static unsafe partial class SharpGLTFApp
         {
             state.ui.glass_materials_open = open != 0;
 
-            // Main enable/disable
-            byte transmissionEnabled = (byte)(state.enableTransmission ? 1 : 0);
-            if (igCheckbox("Enable Transmission/Refraction", ref transmissionEnabled))
-            {
-                state.enableTransmission = transmissionEnabled != 0;
-            }
-
-            igSeparator();
-            igTextWrapped("Glass materials use screen-space refraction with Index of Refraction (IOR) for realistic light bending through transparent objects.");
+            igTextWrapped("Glass materials use screen-space refraction with Index of Refraction (IOR) for realistic light bending through transparent objects. Transmission is automatically enabled for meshes with transmission_factor > 0.");
 
             // Model info section
-            if (state.model != null && state.enableTransmission)
+            if (state.model != null)
             {
                 igSeparator();
                 if (igCollapsingHeader_TreeNodeFlags("Model Properties", ImGuiTreeNodeFlags.DefaultOpen))
