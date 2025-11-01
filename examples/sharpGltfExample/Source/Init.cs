@@ -222,6 +222,8 @@ public static unsafe partial class SharpGLTFApp
         int bloom_width = Math.Max(fb_width / 2, 256);
         int bloom_height = Math.Max(fb_height / 2, 256);
 
+        Info($"[Bloom] Initializing bloom: fb={fb_width}x{fb_height}, bloom={bloom_width}x{bloom_height}, backend={sg_query_backend()}");
+
         // Get swapchain info to match formats
         var swapchain = sglue_swapchain();
         
@@ -282,110 +284,56 @@ public static unsafe partial class SharpGLTFApp
 
         // Create render passes
         // Scene pass (renders main scene to offscreen buffer)
-        var scene_color_view = sg_make_view(new sg_view_desc
-        {
-            color_attachment = { image = state.bloom.scene_color_img },
-            label = "scene-color-view"
-        });
-        var scene_depth_view = sg_make_view(new sg_view_desc
-        {
-            depth_stencil_attachment = { image = state.bloom.scene_depth_img },
-            label = "scene-depth-view"
-        });
+        // Use same pattern as offscreen example for WebGL compatibility
+        sg_view_desc scene_color_view_desc = default;
+        scene_color_view_desc.color_attachment.image = state.bloom.scene_color_img;
+        scene_color_view_desc.label = "scene-color-view";
         
-        state.bloom.scene_pass = new sg_pass
-        {
-            attachments = new sg_attachments
-            {
-                colors = { [0] = scene_color_view },
-                depth_stencil = scene_depth_view
-            },
-            action = new sg_pass_action
-            {
-                colors = {
-                    [0] = new sg_color_attachment_action
-                    {
-                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
-                        clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f }
-                    }
-                },
-                depth = new sg_depth_attachment_action
-                {
-                    load_action = sg_load_action.SG_LOADACTION_CLEAR,
-                    clear_value = 1.0f
-                }
-            },
-            label = "bloom-scene-pass"
-        };
+        sg_view_desc scene_depth_view_desc = default;
+        scene_depth_view_desc.depth_stencil_attachment.image = state.bloom.scene_depth_img;
+        scene_depth_view_desc.label = "scene-depth-view";
+        
+        state.bloom.scene_pass = default;
+        state.bloom.scene_pass.attachments.colors[0] = sg_make_view(scene_color_view_desc);
+        state.bloom.scene_pass.attachments.depth_stencil = sg_make_view(scene_depth_view_desc);
+        state.bloom.scene_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        state.bloom.scene_pass.action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        state.bloom.scene_pass.action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        state.bloom.scene_pass.action.depth.clear_value = 1.0f;
+        state.bloom.scene_pass.label = "bloom-scene-pass";
 
         // Bright pass (extracts bright pixels)
-        var bright_view = sg_make_view(new sg_view_desc
-        {
-            color_attachment = { image = state.bloom.bright_img },
-            label = "bright-view"
-        });
+        sg_view_desc bright_view_desc = default;
+        bright_view_desc.color_attachment.image = state.bloom.bright_img;
+        bright_view_desc.label = "bright-view";
         
-        state.bloom.bright_pass = new sg_pass
-        {
-            attachments = new sg_attachments { colors = { [0] = bright_view } },
-            action = new sg_pass_action
-            {
-                colors = {
-                    [0] = new sg_color_attachment_action
-                    {
-                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
-                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
-                    }
-                }
-            },
-            label = "bloom-bright-pass"
-        };
+        state.bloom.bright_pass = default;
+        state.bloom.bright_pass.attachments.colors[0] = sg_make_view(bright_view_desc);
+        state.bloom.bright_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        state.bloom.bright_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        state.bloom.bright_pass.label = "bloom-bright-pass";
 
-        // Horizontal blur pass  
-        var blur_h_view = sg_make_view(new sg_view_desc
-        {
-            color_attachment = { image = state.bloom.blur_h_img },
-            label = "blur-h-view"
-        });
+        // Horizontal blur pass
+        sg_view_desc blur_h_view_desc = default;
+        blur_h_view_desc.color_attachment.image = state.bloom.blur_h_img;
+        blur_h_view_desc.label = "blur-h-view";
         
-        state.bloom.blur_h_pass = new sg_pass
-        {
-            attachments = new sg_attachments { colors = { [0] = blur_h_view } },
-            action = new sg_pass_action
-            {
-                colors = {
-                    [0] = new sg_color_attachment_action
-                    {
-                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
-                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
-                    }
-                }
-            },
-            label = "bloom-blur-h-pass"
-        };
+        state.bloom.blur_h_pass = default;
+        state.bloom.blur_h_pass.attachments.colors[0] = sg_make_view(blur_h_view_desc);
+        state.bloom.blur_h_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        state.bloom.blur_h_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        state.bloom.blur_h_pass.label = "bloom-blur-h-pass";
 
         // Vertical blur pass
-        var blur_v_view = sg_make_view(new sg_view_desc
-        {
-            color_attachment = { image = state.bloom.blur_v_img },
-            label = "blur-v-view"
-        });
+        sg_view_desc blur_v_view_desc = default;
+        blur_v_view_desc.color_attachment.image = state.bloom.blur_v_img;
+        blur_v_view_desc.label = "blur-v-view";
         
-        state.bloom.blur_v_pass = new sg_pass
-        {
-            attachments = new sg_attachments { colors = { [0] = blur_v_view } },
-            action = new sg_pass_action
-            {
-                colors = {
-                    [0] = new sg_color_attachment_action
-                    {
-                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
-                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
-                    }
-                }
-            },
-            label = "bloom-blur-v-pass"
-        };
+        state.bloom.blur_v_pass = default;
+        state.bloom.blur_v_pass.attachments.colors[0] = sg_make_view(blur_v_view_desc);
+        state.bloom.blur_v_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        state.bloom.blur_v_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        state.bloom.blur_v_pass.label = "bloom-blur-v-pass";
 
         // Note: Composite pass renders to swapchain and must be created each frame
         // with the current swapchain, so we don't create it here.

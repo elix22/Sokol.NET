@@ -515,13 +515,16 @@ void main() {
 
 // Fullscreen quad vertex shader for post-processing  
 @vs vs_fullscreen
+@msl_options flip_vert_y
+@hlsl_options flip_vert_y
+
 layout(location=0) in vec2 position;
 out vec2 uv;
 
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
-    // Convert from NDC [-1,1] to UV [0,1], flip Y for Metal/D3D
-    uv = vec2((position.x + 1.0) * 0.5, 1.0 - (position.y + 1.0) * 0.5);
+    // Convert from NDC [-1,1] to UV [0,1]
+    uv = (position + 1.0) * 0.5;
 }
 @end
 
