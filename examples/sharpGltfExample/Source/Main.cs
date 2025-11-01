@@ -21,11 +21,11 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
-  // const string filename = "DamagedHelmet.glb";
+    const string filename = "DamagedHelmet.glb";
     //   const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    const string filename = "DancingGangster.glb";
+    // const string filename = "DancingGangster.glb";
     // const string filename = "Gangster.glb";
 
     //race_track
@@ -57,6 +57,8 @@ public static unsafe partial class SharpGLTFApp
     // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
 
     //  const string filename = "Sponza/glTF/Sponza.gltf";
+
+    // const string filename = "IridescenceLamp/glTF-Binary/IridescenceLamp.glb";
 
     // Bloom post-processing structures
     struct BloomPass
