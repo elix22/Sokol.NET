@@ -95,6 +95,19 @@ public static unsafe partial class SharpGLTFApp
         public sg_sampler sampler;           // Linear sampler for all passes
     }
 
+    struct UIState
+    {
+        public bool model_info_open;
+        public bool animation_open;
+        public bool lighting_open;
+        public bool bloom_open;
+        public bool culling_open;
+        public bool statistics_open;
+        public bool camera_info_open;
+        public bool camera_controls_open;
+        public int theme;
+    }
+
     class _state
     {
         public sg_pass_action pass_action;
@@ -127,6 +140,9 @@ public static unsafe partial class SharpGLTFApp
         public bool enableBloom = false;
         public float bloomIntensity = 1.5f;      // Bloom intensity (0.0 - 2.0)
         public float bloomThreshold = 0.8f;      // Brightness threshold (0.0 - 10.0)
+
+        // UI state
+        public UIState ui;
     }
 
     static _state state = new _state();
