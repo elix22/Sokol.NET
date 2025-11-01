@@ -131,6 +131,11 @@ public static unsafe partial class SharpGLTFApp
         public int culledMeshes = 0;
         public bool enableFrustumCulling = true;
 
+        // Rendering statistics
+        public int totalVertices = 0;
+        public int totalIndices = 0;
+        public int totalFaces = 0;
+
         // Lighting system
         public List<Light> lights = new List<Light>();
         public float ambientStrength = 0.03f;   // Ambient light strength (0.0 to 1.0)

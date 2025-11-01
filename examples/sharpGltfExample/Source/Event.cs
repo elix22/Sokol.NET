@@ -50,8 +50,18 @@ public static unsafe partial class SharpGLTFApp
             return; // Don't pass to camera
         }
 
-        // Camera handles all other input events including keyboard
+        // Camera handles all input events including keyboard and touch
         state.camera.HandleEvent(e);
+
+        // After camera processes touch, check if 2-finger touch is active and handle model rotation
+        if (e->type == sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED && 
+            e->num_touches >= 2 && 
+            state.camera.IsTwoFingerTouchActive())
+        {
+            var (dx, dy) = state.camera.GetTwoFingerTouchDelta(e->touches[0].pos_x, e->touches[0].pos_y);
+            state.modelRotationY += dx * 0.01f;
+            state.modelRotationX += dy * 0.01f;
+        }
 
     }
 }

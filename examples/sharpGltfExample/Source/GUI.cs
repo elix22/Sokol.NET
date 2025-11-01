@@ -382,7 +382,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawStatisticsWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(220, 150), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(240, 250), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Statistics", ref open, ImGuiWindowFlags.None))
@@ -396,6 +396,12 @@ public static unsafe partial class SharpGLTFApp
 
             if (state.model != null)
             {
+                igSeparator();
+                igText("Rendering:");
+                igText($"  Vertices: {state.totalVertices:N0}");
+                igText($"  Indices: {state.totalIndices:N0}");
+                igText($"  Faces: {state.totalFaces:N0}");
+                
                 igSeparator();
                 var (hits, misses, total) = TextureCache.Instance.GetStats();
                 var hitRate = hits + misses > 0 ? (hits * 100.0 / (hits + misses)) : 0.0;

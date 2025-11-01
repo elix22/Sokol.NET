@@ -230,10 +230,13 @@ public static unsafe partial class SharpGLTFApp
             // Debug output on first render when model exists
             bool shouldLogMeshInfo = !_loggedMeshInfoOnce;
 
-            // Reset culling statistics
+            // Reset culling and rendering statistics
             state.totalMeshes = 0;
             state.visibleMeshes = 0;
             state.culledMeshes = 0;
+            state.totalVertices = 0;
+            state.totalIndices = 0;
+            state.totalFaces = 0;
 
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = state.camera.ViewProj;
@@ -275,6 +278,11 @@ public static unsafe partial class SharpGLTFApp
                 }
 
                 state.visibleMeshes++;
+                
+                // Track rendering statistics
+                state.totalVertices += mesh.VertexCount;
+                state.totalIndices += mesh.IndexCount;
+                state.totalFaces += mesh.IndexCount / 3;
 
                 // Calculate distance to camera for sorting
                 // Use the center of the mesh's bounding box

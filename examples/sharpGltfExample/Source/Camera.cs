@@ -46,6 +46,14 @@ namespace Sokol
         private bool _keyDown = false;  // Arrow down
         private bool _keyShift = false;  // Speed boost
         
+        // Touch state for mobile
+        private float _lastTouch1X = 0;  // 1-finger: camera orbit
+        private float _lastTouch1Y = 0;
+        private bool _touch1IsActive = false;
+        private float _lastTouch2X = 0;  // 2-finger: model rotation
+        private float _lastTouch2Y = 0;
+        private bool _touch2IsActive = false;
+        
         public float MoveSpeed { get; set; } = 1.0f;  // Units per second
 
         // Public properties for camera modification
@@ -309,6 +317,62 @@ namespace Sokol
                 case sapp_event_type.SAPP_EVENTTYPE_KEY_UP:
                     HandleKeyboardInput(ev);
                     break;
+                    
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN:
+                    if (ev->num_touches == 1)
+                    {
+                        // 1 finger: camera orbit
+                        _lastTouch1X = ev->touches[0].pos_x;
+                        _lastTouch1Y = ev->touches[0].pos_y;
+                        _touch1IsActive = true;
+                        _touch2IsActive = false;
+                    }
+                    else if (ev->num_touches >= 2)
+                    {
+                        // 2 fingers: model rotation
+                        _lastTouch2X = ev->touches[0].pos_x;
+                        _lastTouch2Y = ev->touches[0].pos_y;
+                        _touch1IsActive = false;
+                        _touch2IsActive = true;
+                    }
+                    break;
+
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED:
+                    _touch1IsActive = false;
+                    _touch2IsActive = false;
+                    break;
+
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED:
+                    if (ev->num_touches == 1 && _touch1IsActive)
+                    {
+                        // 1-finger: camera orbit
+                        float currentX = ev->touches[0].pos_x;
+                        float currentY = ev->touches[0].pos_y;
+                        
+                        float dx = currentX - _lastTouch1X;
+                        float dy = currentY - _lastTouch1Y;
+                        
+                        // Discontinuity detection
+                        float deltaMagnitude = (float)Math.Sqrt(dx * dx + dy * dy);
+                        if (deltaMagnitude > 50.0f)
+                        {
+                            _lastTouch1X = currentX;
+                            _lastTouch1Y = currentY;
+                            break;
+                        }
+
+                        // Orbit camera
+                        Orbit(dx * 0.25f, dy * 0.25f);
+
+                        _lastTouch1X = currentX;
+                        _lastTouch1Y = currentY;
+                    }
+                    else if (ev->num_touches >= 2 && _touch2IsActive)
+                    {
+                        // 2-finger: model rotation - handled in Event.cs
+                        // Don't update position here - Event.cs will call GetTwoFingerTouchDelta
+                    }
+                    break;
             }
         }
         
@@ -347,6 +411,29 @@ namespace Sokol
                     _keyShift = isDown;
                     break;
             }
+        }
+
+        // Check if 2-finger touch is active (for external model rotation handling)
+        public bool IsTwoFingerTouchActive() => _touch2IsActive;
+        
+        // Get 2-finger touch delta and update position (for external model rotation handling)
+        public (float dx, float dy) GetTwoFingerTouchDelta(float currentX, float currentY)
+        {
+            float dx = currentX - _lastTouch2X;
+            float dy = currentY - _lastTouch2Y;
+            
+            // Check for discontinuity
+            float deltaMagnitude = (float)Math.Sqrt(dx * dx + dy * dy);
+            if (deltaMagnitude > 50.0f)
+            {
+                _lastTouch2X = currentX;
+                _lastTouch2Y = currentY;
+                return (0, 0);  // No rotation on discontinuity
+            }
+            
+            _lastTouch2X = currentX;
+            _lastTouch2Y = currentY;
+            return (dx, dy);
         }
     }
 }
