@@ -108,65 +108,39 @@ public static unsafe partial class SharpGLTFApp
                 new Vector3(sceneMax.X, sceneMax.Y, sceneMax.Z)
             };
 
-            // Binary search for the minimum distance where all corners fit in view
-            float fovRadians = state.camera.Aspect * (float)Math.PI / 180.0f;
+            // Calculate camera distance using simple formula based on bounding sphere
+            // This is more reliable than binary search for small models
+            float fovDegrees = 60.0f;  // Standard FOV
+            float fovRadians = fovDegrees * (float)Math.PI / 180.0f;
             float aspectRatio = (float)fb_width / (float)fb_height;
 
-            float minDistance = 0.02f;
-            float maxDistance = Math.Max(sceneSize.X, Math.Max(sceneSize.Y, sceneSize.Z)) * 20000.0f;
-            float bestDistance = maxDistance;
-
-            // Binary search for optimal distance
-            for (int iteration = 0; iteration < 40; iteration++)
+            // Use vertical FOV for calculation (account for aspect ratio if needed)
+            float verticalFOV = fovRadians;
+            
+            // Simple formula: distance = radius / tan(fov/2)
+            // For models with radius < 1.0, use tighter framing (likely miniature/detailed models)
+            // For normal sized models (radius >= 1.0), use standard framing
+            float paddingFactor = (sphereRadius < 1.0f) ? 0.15f : 1.1f;
+            
+            if (sphereRadius < 1.0f)
             {
-                float testDistance = (minDistance + maxDistance) * 0.5f;
-
-                // Position camera at test distance looking at center
-                Vector3 cameraPos = sceneCenter + new Vector3(0, 0, testDistance);
-
-                // Create view and projection matrices for this camera position
-                Matrix4x4 view = Matrix4x4.CreateLookAt(cameraPos, sceneCenter, Vector3.UnitY);
-                Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspectRatio, 0.01f, 10000.0f);
-                Matrix4x4 viewProj = view * proj;
-
-                // Project all corners and check if they fit in NDC space [-1, 1]
-                bool allFit = true;
-                float margin = 0.95f;
-                foreach (var corner in corners)
-                {
-                    Vector4 clipSpace = Vector4.Transform(corner, viewProj);
-                    if (clipSpace.W > 0)
-                    {
-                        Vector3 ndc = new Vector3(clipSpace.X / clipSpace.W, clipSpace.Y / clipSpace.W, clipSpace.Z / clipSpace.W);
-                        if (Math.Abs(ndc.X) > margin || Math.Abs(ndc.Y) > margin / 1.2f)
-                        {
-                            allFit = false;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        allFit = false;
-                        break;
-                    }
-                }
-
-                if (allFit)
-                {
-                    bestDistance = testDistance;
-                    maxDistance = testDistance;
-                }
-                else
-                {
-                    minDistance = testDistance;
-                }
+                Info($"[Camera] Small model detected (radius={sphereRadius:F3}), using tight framing: padding={paddingFactor}");
             }
+            
+            float bestDistance = (sphereRadius * paddingFactor) / (float)Math.Tan(verticalFOV * 0.5f);
+            
+            // Clamp to reasonable range
+            float minDistance = sphereRadius * 0.5f;
+            float maxDistance = sphereRadius * 100.0f;
+            bestDistance = Math.Clamp(bestDistance, minDistance, maxDistance);
 
             Info($"=== AUTO-POSITIONING CAMERA ===");
             Info($"Scene bounds: Min={sceneMin}, Max={sceneMax}");
             Info($"Scene size: {sceneSize}");
             Info($"Scene center: {sceneCenter}");
+            Info($"Bounding sphere radius: {sphereRadius:F6}");
             Info($"Final distance: {bestDistance:F3}");
+            Info($"Distance / Sphere Radius ratio: {bestDistance / sphereRadius:F2}");
 
             state.camera.Center = sceneCenter;
             state.camera.Distance = bestDistance;

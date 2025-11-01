@@ -161,9 +161,25 @@ public static unsafe partial class SharpGLTFApp
 
                     Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
                     Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
+                    float boundingRadius = Vector3.Distance(state.modelBoundsMin, state.modelBoundsMax) * 0.5f;
 
                     Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
                     Info($"[SharpGLTF] Model size: {size}, Center: {center}");
+                    Info($"[SharpGLTF] Bounding sphere radius: {boundingRadius:F6}");
+                    
+                    // Log if bounds seem unusually large (might indicate bad model data)
+                    if (boundingRadius > 1000.0f)
+                    {
+                        Info($"[SharpGLTF] WARNING: Very large bounding radius detected!");
+                        Info($"[SharpGLTF] This model may have incorrect bounds or far-away vertices.");
+                        Info($"[SharpGLTF] Using clamped bounds for camera positioning.");
+                        
+                        // Clamp to reasonable size for camera positioning
+                        float clampedRadius = Math.Min(boundingRadius, 10.0f);
+                        state.modelBoundsMin = center - new Vector3(clampedRadius);
+                        state.modelBoundsMax = center + new Vector3(clampedRadius);
+                        Info($"[SharpGLTF] Clamped bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
+                    }
 
                     // Safety check: if bounds are invalid or too small, use defaults
                     if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
