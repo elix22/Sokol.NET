@@ -399,11 +399,12 @@ namespace Sokol
             if (emissiveStrengthExt != null)
             {
                 mesh.EmissiveStrength = emissiveStrengthExt.EmissiveStrength;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: emissiveStrength = {mesh.EmissiveStrength}");
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex} (with extension): emissiveStrength = {mesh.EmissiveStrength}");
             }
             else
             {
-                mesh.EmissiveStrength = 1.0f; // Default value
+                mesh.EmissiveStrength = 1.0f; // Default value (no extension present)
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex} (no extension): using default emissiveStrength = 1.0");
             }
 
             // Extract alpha mode and cutoff
