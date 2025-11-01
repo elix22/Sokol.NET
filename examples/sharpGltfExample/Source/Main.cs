@@ -90,6 +90,7 @@ public static unsafe partial class SharpGLTFApp
         public sg_image bright_img;          // Bright pass result
         public sg_image blur_h_img;          // Horizontal blur result
         public sg_image blur_v_img;          // Vertical blur result (final bloom)
+        public sg_image dummy_depth_img;     // 1x1 dummy depth for WebGL compatibility
         
         public sg_sampler sampler;           // Linear sampler for all passes
     }

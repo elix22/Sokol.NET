@@ -247,7 +247,7 @@ public static unsafe partial class SharpGLTFApp
             usage = { depth_stencil_attachment = true },
             width = fb_width,
             height = fb_height,
-            pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Explicit format matching offscreen example
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Same as offscreen example - works on all platforms
             sample_count = 1,  // Offscreen passes don't use MSAA
             label = "bloom-scene-depth"
         };
@@ -272,6 +272,22 @@ public static unsafe partial class SharpGLTFApp
         bloom_desc.label = "bloom-blur-v";
         state.bloom.blur_v_img = sg_make_image(bloom_desc);
 
+        // WebGL workaround: Create a dummy depth buffer matching bloom resolution
+        // WebGL requires consistent framebuffer attachments - we can't switch between
+        // passes with depth and without depth on the same FBO without explicitly unbinding.
+        // The workaround is to always have a depth attachment, even if unused.
+        // IMPORTANT: All attachments must have the same dimensions!
+        var dummy_depth_desc = new sg_image_desc()
+        {
+            usage = { depth_stencil_attachment = true },
+            width = bloom_width,
+            height = bloom_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+            sample_count = 1,
+            label = "bloom-dummy-depth"
+        };
+        state.bloom.dummy_depth_img = sg_make_image(dummy_depth_desc);
+
         // Create sampler for all bloom passes
         state.bloom.sampler = sg_make_sampler(new sg_sampler_desc()
         {
@@ -293,46 +309,91 @@ public static unsafe partial class SharpGLTFApp
         scene_depth_view_desc.depth_stencil_attachment.image = state.bloom.scene_depth_img;
         scene_depth_view_desc.label = "scene-depth-view";
         
+        var scene_color_view = sg_make_view(scene_color_view_desc);
+        var scene_depth_view = sg_make_view(scene_depth_view_desc);
+        Info($"[Bloom] Scene views created: color={scene_color_view.id}, depth={scene_depth_view.id}");
+        
+        // Create attachments struct explicitly (like offscreen example)
+        sg_attachments scene_attachments = default;
+        scene_attachments.colors[0] = scene_color_view;
+        scene_attachments.depth_stencil = scene_depth_view;
+        
+        // Create action
+        sg_pass_action scene_action = default;
+        scene_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        scene_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        scene_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        scene_action.depth.clear_value = 1.0f;
+        
+        // Assign to pass
         state.bloom.scene_pass = default;
-        state.bloom.scene_pass.attachments.colors[0] = sg_make_view(scene_color_view_desc);
-        state.bloom.scene_pass.attachments.depth_stencil = sg_make_view(scene_depth_view_desc);
-        state.bloom.scene_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.bloom.scene_pass.action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
-        state.bloom.scene_pass.action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.bloom.scene_pass.action.depth.clear_value = 1.0f;
+        state.bloom.scene_pass.attachments = scene_attachments;
+        state.bloom.scene_pass.action = scene_action;
         state.bloom.scene_pass.label = "bloom-scene-pass";
 
-        // Bright pass (extracts bright pixels)
+        // Bright pass - WebGL requires depth attachment for FBO consistency
         sg_view_desc bright_view_desc = default;
         bright_view_desc.color_attachment.image = state.bloom.bright_img;
         bright_view_desc.label = "bright-view";
+        sg_view bright_color_view = sg_make_view(bright_view_desc);
         
-        state.bloom.bright_pass = default;
-        state.bloom.bright_pass.attachments.colors[0] = sg_make_view(bright_view_desc);
-        state.bloom.bright_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.bloom.bright_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        sg_view_desc bright_depth_view_desc = default;
+        bright_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
+        bright_depth_view_desc.label = "bright-depth-view";
+        sg_view bright_depth_view = sg_make_view(bright_depth_view_desc);
+        
+        sg_attachments bright_attachments = default;
+        bright_attachments.colors[0] = bright_color_view;
+        bright_attachments.depth_stencil = bright_depth_view;
+        
+        sg_pass_action bright_action = default;
+        bright_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        bright_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        
+        state.bloom.bright_pass.attachments = bright_attachments;
+        state.bloom.bright_pass.action = bright_action;
         state.bloom.bright_pass.label = "bloom-bright-pass";
 
-        // Horizontal blur pass
+        // Horizontal blur pass - WebGL requires depth attachment for FBO consistency
         sg_view_desc blur_h_view_desc = default;
         blur_h_view_desc.color_attachment.image = state.bloom.blur_h_img;
         blur_h_view_desc.label = "blur-h-view";
         
-        state.bloom.blur_h_pass = default;
-        state.bloom.blur_h_pass.attachments.colors[0] = sg_make_view(blur_h_view_desc);
-        state.bloom.blur_h_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.bloom.blur_h_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        sg_view_desc blur_h_depth_view_desc = default;
+        blur_h_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
+        blur_h_depth_view_desc.label = "blur-h-depth-view";
+        
+        sg_attachments blur_h_attachments = default;
+        blur_h_attachments.colors[0] = sg_make_view(blur_h_view_desc);
+        blur_h_attachments.depth_stencil = sg_make_view(blur_h_depth_view_desc);
+        
+        sg_pass_action blur_h_action = default;
+        blur_h_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        blur_h_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        
+        state.bloom.blur_h_pass.attachments = blur_h_attachments;
+        state.bloom.blur_h_pass.action = blur_h_action;
         state.bloom.blur_h_pass.label = "bloom-blur-h-pass";
 
-        // Vertical blur pass
+        // Vertical blur pass - WebGL requires depth attachment for FBO consistency
         sg_view_desc blur_v_view_desc = default;
         blur_v_view_desc.color_attachment.image = state.bloom.blur_v_img;
         blur_v_view_desc.label = "blur-v-view";
         
-        state.bloom.blur_v_pass = default;
-        state.bloom.blur_v_pass.attachments.colors[0] = sg_make_view(blur_v_view_desc);
-        state.bloom.blur_v_pass.action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.bloom.blur_v_pass.action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        sg_view_desc blur_v_depth_view_desc = default;
+        blur_v_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
+        blur_v_depth_view_desc.label = "blur-v-depth-view";
+        
+        sg_attachments blur_v_attachments = default;
+        blur_v_attachments.colors[0] = sg_make_view(blur_v_view_desc);
+        blur_v_attachments.depth_stencil = sg_make_view(blur_v_depth_view_desc);
+        
+        sg_pass_action blur_v_action = default;
+        blur_v_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        blur_v_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        
+        state.bloom.blur_v_pass.attachments = blur_v_attachments;
+        state.bloom.blur_v_pass.action = blur_v_action;
         state.bloom.blur_v_pass.label = "bloom-blur-v-pass";
 
         // Note: Composite pass renders to swapchain and must be created each frame
@@ -386,7 +447,7 @@ public static unsafe partial class SharpGLTFApp
             sample_count = 1,
             depth = new sg_depth_state()
             {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
                 write_enabled = false,
                 compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
             },
@@ -416,7 +477,7 @@ public static unsafe partial class SharpGLTFApp
             sample_count = 1,
             depth = new sg_depth_state()
             {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
                 write_enabled = false,
                 compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
             },
@@ -446,7 +507,7 @@ public static unsafe partial class SharpGLTFApp
             sample_count = 1,
             depth = new sg_depth_state()
             {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
                 write_enabled = false,
                 compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
             },

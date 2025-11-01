@@ -109,16 +109,7 @@ namespace Sokol
         {
             if (IndexCount == 0)
             {
-                Console.WriteLine("[Mesh] Draw() called but IndexCount is 0, skipping");
                 return;
-            }
-            
-            // Debug output on first call
-            if (_firstDrawCall)
-            {
-                Console.WriteLine($"[Mesh] Draw() called: VertexCount={VertexCount}, IndexCount={IndexCount}");
-                Console.WriteLine($"[Mesh] VertexBuffer.id={VertexBuffer.id}, IndexBuffer.id={IndexBuffer.id}");
-                _firstDrawCall = false;
             }
 
             // Note: sg_apply_pipeline() should be called by the caller before this method
