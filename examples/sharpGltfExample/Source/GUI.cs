@@ -1,3 +1,4 @@
+#nullable disable
 using System;
 using Sokol;
 using System.Runtime.InteropServices;
@@ -98,6 +99,17 @@ public static unsafe partial class SharpGLTFApp
                 igEndMenu();
             }
 
+            if (igBeginMenu("Help", true))
+            {
+                byte help_open = state.ui.help_open ? (byte)1 : (byte)0;
+                if (igMenuItem_BoolPtr("Show Help...", null, ref help_open, true))
+                {
+                    state.ui.help_open = help_open != 0;
+                }
+
+                igEndMenu();
+            }
+
             igEndMainMenuBar();
         }
 
@@ -156,6 +168,12 @@ public static unsafe partial class SharpGLTFApp
         if (state.ui.camera_controls_open)
         {
             DrawCameraControlsWindow(ref pos);
+        }
+
+        // Help Window
+        if (state.ui.help_open)
+        {
+            DrawHelpWindow();
         }
     }
 
@@ -477,6 +495,64 @@ public static unsafe partial class SharpGLTFApp
                 state.camera.Center = state.camera.Center - forward * moveSpeed;
             }
             igUnindent(50);
+        }
+        igEnd();
+    }
+
+    static void DrawHelpWindow()
+    {
+        igSetNextWindowSize(new Vector2(600, 500), ImGuiCond.Once);
+        igSetNextWindowPos(new Vector2(100, 100), ImGuiCond.Once, Vector2.Zero);
+        
+        byte open = 1;
+        if (igBegin("Help", ref open, ImGuiWindowFlags.None))
+        {
+            if (open == 0)
+            {
+                state.ui.help_open = false;
+            }
+
+            igTextWrapped("Sharp GLTF Viewer - Help");
+            igSeparator();
+            igNewLine();
+
+            // Camera Controls
+            igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Camera Controls:");
+            igBulletText("Left Mouse: Orbit camera around model");
+            igBulletText("1 Finger Touch: Orbit camera (mobile)");
+            igBulletText("Mouse Wheel: Zoom in/out");
+            igBulletText("WASD/Arrow Keys: Move camera position");
+            igBulletText("Q/E: Move camera up/down");
+            igBulletText("Hold Shift: Faster camera movement");
+            igNewLine();
+
+            // Model Controls
+            igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Model Controls:");
+            igBulletText("Middle Mouse: Rotate model");
+            igBulletText("2 Finger Touch: Rotate model (mobile)");
+            igNewLine();
+
+            // Windows
+            igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Available Windows (Menu: Windows):");
+            igBulletText("Model Info: Display model statistics and rotation controls");
+            igBulletText("Animation: Control model animations (play/pause/select)");
+            igBulletText("Lighting: Adjust ambient light and toggle individual lights");
+            igBulletText("Bloom: Enable HDR bloom effect with intensity/threshold controls");
+            igBulletText("Culling: View frustum culling statistics");
+            igBulletText("Statistics: FPS, frame time, geometry and texture stats");
+            igBulletText("Camera Info: Current camera position and orientation");
+            igBulletText("Camera Controls: Touch-friendly movement buttons (mobile)");
+            igNewLine();
+
+            // Theme
+            igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Theme Options (Menu: Options):");
+            igBulletText("Dark: Dark color scheme (default)");
+            igBulletText("Light: Light color scheme");
+            igBulletText("Classic: ImGui classic color scheme");
+            igNewLine();
+
+            igSeparator();
+            igTextWrapped("Tip: All windows can be moved, resized, and closed. Use the Windows menu to reopen them.");
         }
         igEnd();
     }

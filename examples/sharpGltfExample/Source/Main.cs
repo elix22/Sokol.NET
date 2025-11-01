@@ -105,6 +105,7 @@ public static unsafe partial class SharpGLTFApp
         public bool statistics_open;
         public bool camera_info_open;
         public bool camera_controls_open;
+        public bool help_open;
         public int theme;
     }
 
