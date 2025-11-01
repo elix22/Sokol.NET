@@ -35,6 +35,14 @@ public enum PipelineType
     // Transmission (glass materials) pipelines - render opaque objects to screen texture
     TransmissionOpaque,        // Opaque pass for standard meshes
     TransmissionOpaqueSkinned, // Opaque pass for skinned meshes
+    
+    // 32-bit index variants (for meshes with >65535 vertices)
+    Standard32,
+    Skinned32,
+    StandardBlend32,
+    SkinnedBlend32,
+    StandardMask32,
+    SkinnedMask32,
 }
 
 public static class PipeLineManager
@@ -77,7 +85,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;  // Use 32-bit to support large meshes (>65535 vertices)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -215,6 +223,22 @@ public static class PipeLineManager
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
+            // 32-bit index variants (identical to 16-bit versions except index_type)
+            case PipelineType.Standard32:
+            case PipelineType.Skinned32:
+            case PipelineType.StandardBlend32:
+            case PipelineType.SkinnedBlend32:
+            case PipelineType.StandardMask32:
+            case PipelineType.SkinnedMask32:
+                // Create pipeline with same settings as base type, but with 32-bit indices
+                var baseType = GetBasePipelineType(type);
+                var basePipeline = GetOrCreatePipeline(baseType);
+                
+                // Copy the base pipeline descriptor but change index type
+                // Since we can't copy pipeline descriptors, we'll create a new one with 32-bit indices
+                pipeline = CreatePipeline32BitVariant(type);
+                break;
+                
             case PipelineType.TransmissionOpaque:
             case PipelineType.TransmissionOpaqueSkinned:
                 // These require custom render pass, use CreatePipelineForPass instead
@@ -226,6 +250,94 @@ public static class PipeLineManager
 
         _pipelines[type] = pipeline;
         return pipeline;
+    }
+    
+    /// <summary>
+    /// Create a 32-bit index variant of a pipeline
+    /// </summary>
+    private static sg_pipeline CreatePipeline32BitVariant(PipelineType type)
+    {
+        var baseType = GetBasePipelineType(type);
+        var pipeline_desc = default(sg_pipeline_desc);
+        var swapchain = sglue_swapchain();
+        
+        // Determine shader based on base type
+        sg_shader shader;
+        if (baseType == PipelineType.Skinned || baseType == PipelineType.SkinnedBlend || baseType == PipelineType.SkinnedMask)
+        {
+            shader = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+        }
+        else
+        {
+            shader = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+        }
+        
+        // Common setup for all variants
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.shader = shader;
+        pipeline_desc.index_type = SG_INDEXTYPE_UINT32;  // 32-bit indices for large meshes
+        pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+        pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+        pipeline_desc.sample_count = swapchain.sample_count;
+        pipeline_desc.colors[0].pixel_format = swapchain.color_format;
+        pipeline_desc.depth.pixel_format = swapchain.depth_format;
+        
+        // Type-specific settings
+        switch (baseType)
+        {
+            case PipelineType.Standard:
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.label = "static-32bit-pipeline";
+                break;
+                
+            case PipelineType.Skinned:
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.label = "skinned-32bit-pipeline";
+                break;
+                
+            case PipelineType.StandardBlend:
+                pipeline_desc.cull_mode = SG_CULLMODE_NONE;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.label = "static-blend-32bit-pipeline";
+                break;
+                
+            case PipelineType.SkinnedBlend:
+                pipeline_desc.cull_mode = SG_CULLMODE_NONE;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.label = "skinned-blend-32bit-pipeline";
+                break;
+                
+            case PipelineType.StandardMask:
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.label = "static-mask-32bit-pipeline";
+                break;
+                
+            case PipelineType.SkinnedMask:
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.label = "skinned-mask-32bit-pipeline";
+                break;
+        }
+        
+        return sg_make_pipeline(pipeline_desc);
     }
 
     /// <summary>
@@ -241,6 +353,11 @@ public static class PipeLineManager
             return _customPassPipelines[cache_key];
         }
         
+        // Determine if this is a 32-bit variant
+        var baseType = GetBasePipelineType(type);
+        bool is32Bit = (baseType != type);
+        sg_index_type indexType = is32Bit ? SG_INDEXTYPE_UINT32 : SG_INDEXTYPE_UINT16;
+        
         var pipeline_desc = default(sg_pipeline_desc);
         
         switch (type)
@@ -255,7 +372,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -276,7 +393,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -296,19 +413,42 @@ public static class PipeLineManager
         return pipeline;
     }
 
+    /// <summary>
+    /// Get the base pipeline type (maps 32-bit variants to their 16-bit base types for shader lookups)
+    /// </summary>
+    private static PipelineType GetBasePipelineType(PipelineType type)
+    {
+        return type switch
+        {
+            PipelineType.Standard32 => PipelineType.Standard,
+            PipelineType.Skinned32 => PipelineType.Skinned,
+            PipelineType.StandardBlend32 => PipelineType.StandardBlend,
+            PipelineType.SkinnedBlend32 => PipelineType.SkinnedBlend,
+            PipelineType.StandardMask32 => PipelineType.StandardMask,
+            PipelineType.SkinnedMask32 => PipelineType.SkinnedMask,
+            _ => type
+        };
+    }
+
     public static int GetAttrSlot(PipelineType type, string attr_name)
     {
+        // Map 32-bit variants to base type for shader lookups
+        var baseType = GetBasePipelineType(type);
+        
         int result = -1;
-        switch (type)
+        switch (baseType)
         {
             case PipelineType.Standard:
+            case PipelineType.StandardBlend:
+            case PipelineType.StandardMask:
                 result = cgltf_metallic_attr_slot(attr_name);
                 break;
 
             case PipelineType.Skinned:
+            case PipelineType.SkinnedBlend:
+            case PipelineType.SkinnedMask:
                 result = skinning_metallic_attr_slot(attr_name);
                 break;
-
         }
 
         if (result == -1)
@@ -482,23 +622,45 @@ public static class PipeLineManager
     }
 
     /// <summary>
-    /// Get the appropriate pipeline type based on alpha mode and skinning
+    /// Get the appropriate pipeline type based on alpha mode, skinning, and index type
     /// </summary>
-    public static PipelineType GetPipelineTypeForMaterial(SharpGLTF.Schema2.AlphaMode alphaMode, bool hasSkinning)
+    public static PipelineType GetPipelineTypeForMaterial(SharpGLTF.Schema2.AlphaMode alphaMode, bool hasSkinning, bool needs32BitIndices = false)
     {
-        switch (alphaMode)
+        if (needs32BitIndices)
         {
-            case SharpGLTF.Schema2.AlphaMode.OPAQUE:
-                return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
-                
-            case SharpGLTF.Schema2.AlphaMode.BLEND:
-                return hasSkinning ? PipelineType.SkinnedBlend : PipelineType.StandardBlend;
-                
-            case SharpGLTF.Schema2.AlphaMode.MASK:
-                return hasSkinning ? PipelineType.SkinnedMask : PipelineType.StandardMask;
-                
-            default:
-                return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
+            // Use 32-bit index pipeline variants for large meshes
+            switch (alphaMode)
+            {
+                case SharpGLTF.Schema2.AlphaMode.OPAQUE:
+                    return hasSkinning ? PipelineType.Skinned32 : PipelineType.Standard32;
+                    
+                case SharpGLTF.Schema2.AlphaMode.BLEND:
+                    return hasSkinning ? PipelineType.SkinnedBlend32 : PipelineType.StandardBlend32;
+                    
+                case SharpGLTF.Schema2.AlphaMode.MASK:
+                    return hasSkinning ? PipelineType.SkinnedMask32 : PipelineType.StandardMask32;
+                    
+                default:
+                    return hasSkinning ? PipelineType.Skinned32 : PipelineType.Standard32;
+            }
+        }
+        else
+        {
+            // Use 16-bit index pipelines for smaller meshes (more memory efficient)
+            switch (alphaMode)
+            {
+                case SharpGLTF.Schema2.AlphaMode.OPAQUE:
+                    return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
+                    
+                case SharpGLTF.Schema2.AlphaMode.BLEND:
+                    return hasSkinning ? PipelineType.SkinnedBlend : PipelineType.StandardBlend;
+                    
+                case SharpGLTF.Schema2.AlphaMode.MASK:
+                    return hasSkinning ? PipelineType.SkinnedMask : PipelineType.StandardMask;
+                    
+                default:
+                    return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
+            }
         }
     }
 
@@ -515,10 +677,15 @@ public static class PipeLineManager
             return _customPassPipelines[cache_key];
         }
         
+        // Determine if this is a 32-bit variant
+        var baseType = GetBasePipelineType(type);
+        bool is32Bit = (baseType != type);
+        sg_index_type indexType = is32Bit ? SG_INDEXTYPE_UINT32 : SG_INDEXTYPE_UINT16;
+        
         sg_pipeline pipeline;
         var pipeline_desc = default(sg_pipeline_desc);
         
-        switch (type)
+        switch (baseType)
         {
             case PipelineType.Standard:
                 sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
@@ -529,7 +696,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -549,7 +716,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -569,7 +736,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_blend;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -594,7 +761,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_blend;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -619,7 +786,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_mask;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
@@ -639,7 +806,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_mask;
-                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = SG_CULLMODE_BACK;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;

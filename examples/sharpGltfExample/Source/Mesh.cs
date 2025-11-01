@@ -13,6 +13,7 @@ namespace Sokol
         public sg_buffer IndexBuffer;
         public int VertexCount;
         public int IndexCount;
+        public sg_index_type IndexType;  // Track whether we're using 16-bit or 32-bit indices
         public List<Texture?> Textures = new List<Texture?>();
         public bool HasSkinning;
         public BoundingBox Bounds;
@@ -45,12 +46,60 @@ namespace Sokol
         private static Texture? _defaultBlackTexture;
         private static bool _firstDrawCall = true;  // Debug flag
 
+        // Constructor for 16-bit indices (up to 65535 vertices)
         public Mesh(Vertex[] vertices, ushort[] indices, bool hasSkinning = false)
         {
             HasSkinning = hasSkinning;
             VertexCount = vertices.Length;
             IndexCount = indices.Length;
+            IndexType = sg_index_type.SG_INDEXTYPE_UINT16;
 
+            CalculateBounds(vertices);
+
+            // Create vertex buffer
+            VertexBuffer = sg_make_buffer(new sg_buffer_desc
+            {
+                data = SG_RANGE(vertices),
+                label = "mesh-vertex-buffer"
+            });
+
+            // Create index buffer
+            IndexBuffer = sg_make_buffer(new sg_buffer_desc
+            {
+                usage = new sg_buffer_usage { index_buffer = true },
+                data = SG_RANGE(indices),
+                label = "mesh-index-buffer"
+            });
+        }
+
+        // Constructor for 32-bit indices (for meshes with > 65535 vertices)
+        public Mesh(Vertex[] vertices, uint[] indices, bool hasSkinning = false)
+        {
+            HasSkinning = hasSkinning;
+            VertexCount = vertices.Length;
+            IndexCount = indices.Length;
+            IndexType = sg_index_type.SG_INDEXTYPE_UINT32;
+
+            CalculateBounds(vertices);
+
+            // Create vertex buffer
+            VertexBuffer = sg_make_buffer(new sg_buffer_desc
+            {
+                data = SG_RANGE(vertices),
+                label = "mesh-vertex-buffer"
+            });
+
+            // Create index buffer (32-bit)
+            IndexBuffer = sg_make_buffer(new sg_buffer_desc
+            {
+                usage = new sg_buffer_usage { index_buffer = true },
+                data = SG_RANGE(indices),
+                label = "mesh-index-buffer"
+            });
+        }
+
+        private void CalculateBounds(Vertex[] vertices)
+        {
             // Calculate bounding box from vertices
             if (vertices.Length > 0)
             {
@@ -69,21 +118,6 @@ namespace Sokol
             {
                 Bounds = new BoundingBox(Vector3.Zero, Vector3.Zero);
             }
-
-            // Create vertex buffer
-            VertexBuffer = sg_make_buffer(new sg_buffer_desc
-            {
-                data = SG_RANGE(vertices),
-                label = "mesh-vertex-buffer"
-            });
-
-            // Create index buffer
-            IndexBuffer = sg_make_buffer(new sg_buffer_desc
-            {
-                usage = new sg_buffer_usage { index_buffer = true },
-                data = SG_RANGE(indices),
-                label = "mesh-index-buffer"
-            });
         }
 
         private static unsafe Texture GetDefaultWhiteTexture()

@@ -47,13 +47,14 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
 
-    // const string filename = "glb/DragonAttenuation.glb";
+   
+    const string filename = "DragonAttenuation/glTF-Binary/DragonAttenuation.glb";
 
     // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
     // const string filename = "glb/MetalRoughSpheres.glb";
 
-    const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
+    // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
 
     //  const string filename = "Sponza/glTF/Sponza.gltf";
 

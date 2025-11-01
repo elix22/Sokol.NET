@@ -212,8 +212,15 @@ namespace Sokol
         private void ProcessMesh(MeshPrimitive primitive)
         {
             List<Vertex> vertices = new List<Vertex>();
-            List<ushort> indices = new List<ushort>();
             List<Texture?> textures = new List<Texture?>();
+
+            // Check primitive type - we only support TRIANGLES for now
+            var drawMode = primitive.DrawPrimitiveType;
+            if (drawMode != SharpGLTF.Schema2.PrimitiveType.TRIANGLES)
+            {
+                Console.WriteLine($"[SharpGLTF] Warning: Primitive type {drawMode} not supported, skipping. Only TRIANGLES are currently supported.");
+                return;
+            }
 
             // Get positions
             var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
@@ -235,24 +242,22 @@ namespace Sokol
             // We'll use white as default and let the material processing handle the actual color
             Vector4 materialColor = Vector4.One; // Default white
             
-            // Debug: Check if we have vertex colors
-            if (colors != null)
-            {
-                Console.WriteLine($"[SharpGLTF] Mesh has {colors.Count} vertex colors");
-            }
-            else
-            {
-                Console.WriteLine($"[SharpGLTF] Mesh has NO vertex colors - using material color");
-            }
-
             int vertexCount = positions.Count;
+            
+            // Determine if we need 32-bit indices based on HIGHEST vertex index that will be used
+            // 16-bit indices (ushort) can only reference vertices 0-65535
+            // The limit is based on vertex count, not index count, because indices reference vertices
+            bool needs32BitIndices = vertexCount > 65535;
 
-            // DEBUG: Check if we have normals
-            Console.WriteLine($"[SharpGLTF] Normals: {(normals != null ? $"{normals.Count} normals loaded" : "NO NORMALS")}");
-            if (normals != null && normals.Count > 0)
-            {
-                Console.WriteLine($"[SharpGLTF] First normal: {normals[0]}");
-            }
+            // Log mesh info
+            Console.WriteLine($"[SharpGLTF] Processing mesh primitive:");
+            Console.WriteLine($"  - Draw mode: {drawMode}");
+            Console.WriteLine($"  - Vertices: {vertexCount}");
+            Console.WriteLine($"  - Index type: {(needs32BitIndices ? "32-bit" : "16-bit")} (max vertex index: {vertexCount - 1})");
+            Console.WriteLine($"  - Has normals: {normals != null}");
+            Console.WriteLine($"  - Has texcoords: {texCoords != null}");
+            Console.WriteLine($"  - Has vertex colors: {colors != null}");
+            Console.WriteLine($"  - Has skinning: {hasSkinning}");
 
             // Build vertices
             for (int i = 0; i < vertexCount; i++)
@@ -290,27 +295,56 @@ namespace Sokol
                 vertices.Add(vertex);
             }
 
-            // Get indices
+            // Get indices - use 16-bit or 32-bit based on vertex count
+            Mesh mesh;
             var indexAccessor = primitive.IndexAccessor;
-            if (indexAccessor != null)
+            
+            if (needs32BitIndices)
             {
-                var indexArray = indexAccessor.AsIndicesArray();
-                foreach (var idx in indexArray)
+                // Use 32-bit indices for large meshes
+                List<uint> indices32 = new List<uint>();
+                if (indexAccessor != null)
                 {
-                    indices.Add((ushort)idx);
+                    var indexArray = indexAccessor.AsIndicesArray();
+                    foreach (var idx in indexArray)
+                    {
+                        indices32.Add(idx);
+                    }
                 }
+                else
+                {
+                    // No indices - generate them
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        indices32.Add((uint)i);
+                    }
+                }
+                Console.WriteLine($"  - Indices: {indices32.Count} (32-bit for large mesh)");
+                mesh = new Mesh(vertices.ToArray(), indices32.ToArray(), hasSkinning);
             }
             else
             {
-                // No indices - generate them
-                for (int i = 0; i < vertexCount; i++)
+                // Use 16-bit indices for smaller meshes (memory efficient)
+                List<ushort> indices16 = new List<ushort>();
+                if (indexAccessor != null)
                 {
-                    indices.Add((ushort)i);
+                    var indexArray = indexAccessor.AsIndicesArray();
+                    foreach (var idx in indexArray)
+                    {
+                        indices16.Add((ushort)idx);
+                    }
                 }
+                else
+                {
+                    // No indices - generate them
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        indices16.Add((ushort)i);
+                    }
+                }
+                Console.WriteLine($"  - Indices: {indices16.Count} (16-bit for memory efficiency)");
+                mesh = new Mesh(vertices.ToArray(), indices16.ToArray(), hasSkinning);
             }
-
-            // Create mesh
-            var mesh = new Mesh(vertices.ToArray(), indices.ToArray(), hasSkinning);
 
             // Process material
             var material = primitive.Material;

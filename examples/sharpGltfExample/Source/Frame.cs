@@ -340,9 +340,12 @@ public static unsafe partial class SharpGLTFApp
 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
+                
+                // Check if mesh uses 32-bit indices (based on IndexType field)
+                bool needs32BitIndices = (mesh.IndexType == sg_index_type.SG_INDEXTYPE_UINT32);
 
-                // Choose pipeline based on alpha mode, skinning, and rendering mode
-                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning);
+                // Choose pipeline based on alpha mode, skinning, index type, and rendering mode
+                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning, needs32BitIndices);
                 
                 // Get appropriate pipeline based on rendering mode
                 sg_pipeline pipeline;
