@@ -171,6 +171,19 @@ public static unsafe partial class SharpGLTFApp
         public TransmissionPass transmission;
         public bool enableTransmission = false;
 
+        // Glass material overrides (for testing/debugging)
+        public bool overrideGlassMaterials = false;
+        public float overrideIOR = 1.5f;               // 1.0-2.4 (water=1.33, glass=1.5, diamond=2.4)
+        public float overrideTransmission = 1.0f;      // 0.0-1.0
+        public Vector3 overrideAttenuationColor = new Vector3(1.0f, 1.0f, 1.0f);  // RGB color
+        public float overrideAttenuationDistance = 1.0f;  // Distance for Beer's Law
+        public float overrideThickness = 1.0f;         // Thickness multiplier
+
+        // Debug visualization modes
+        public bool debugShowScreenTexture = false;
+        public bool debugShowDepthBuffer = false;
+        public bool debugWireframe = false;
+
         // UI state
         public UIState ui;
     }

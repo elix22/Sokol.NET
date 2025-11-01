@@ -382,13 +382,14 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawGlassMaterialsWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(280, 200), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(400, 600), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Glass Materials (Transmission)", ref open, ImGuiWindowFlags.None))
         {
             state.ui.glass_materials_open = open != 0;
 
+            // Main enable/disable
             byte transmissionEnabled = (byte)(state.enableTransmission ? 1 : 0);
             if (igCheckbox("Enable Transmission/Refraction", ref transmissionEnabled))
             {
@@ -398,33 +399,212 @@ public static unsafe partial class SharpGLTFApp
             igSeparator();
             igTextWrapped("Glass materials use screen-space refraction with Index of Refraction (IOR) for realistic light bending through transparent objects.");
 
+            // Model info section
             if (state.model != null && state.enableTransmission)
             {
                 igSeparator();
-                igText("Model Transmission Properties:");
-                
-                int transmissiveMeshes = 0;
-                foreach (var mesh in state.model.Meshes)
+                if (igCollapsingHeader_TreeNodeFlags("Model Properties", ImGuiTreeNodeFlags.DefaultOpen))
                 {
-                    if (mesh.TransmissionFactor > 0.0f)
-                    {
-                        transmissiveMeshes++;
-                    }
-                }
-                
-                igText($"Transmissive meshes: {transmissiveMeshes}/{state.model.Meshes.Count}");
-                
-                if (transmissiveMeshes > 0)
-                {
-                    igText("Examples found:");
-                    int shown = 0;
+                    int transmissiveMeshes = 0;
                     foreach (var mesh in state.model.Meshes)
                     {
-                        if (mesh.TransmissionFactor > 0.0f && shown < 3)
+                        if (mesh.TransmissionFactor > 0.0f)
                         {
-                            igBulletText($"IOR: {mesh.IOR:F2}, Transmission: {mesh.TransmissionFactor:F2}");
-                            shown++;
+                            transmissiveMeshes++;
                         }
+                    }
+                    
+                    igText($"Transmissive meshes: {transmissiveMeshes}/{state.model.Meshes.Count}");
+                    
+                    if (transmissiveMeshes > 0)
+                    {
+                        igText("Examples found:");
+                        int shown = 0;
+                        foreach (var mesh in state.model.Meshes)
+                        {
+                            if (mesh.TransmissionFactor > 0.0f && shown < 3)
+                            {
+                                igBulletText($"IOR: {mesh.IOR:F2}, Transmission: {mesh.TransmissionFactor:F2}");
+                                if (mesh.AttenuationColor != Vector3.One)
+                                {
+                                    igBulletText($"  Attenuation: ({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2})");
+                                }
+                                shown++;
+                            }
+                        }
+                    }
+                }
+
+                // Override section
+                igSeparator();
+                if (igCollapsingHeader_TreeNodeFlags("Material Overrides", ImGuiTreeNodeFlags.None))
+                {
+                    byte overrideEnabled = (byte)(state.overrideGlassMaterials ? 1 : 0);
+                    if (igCheckbox("Enable Overrides", ref overrideEnabled))
+                    {
+                        state.overrideGlassMaterials = overrideEnabled != 0;
+                    }
+                    
+                    if (state.overrideGlassMaterials)
+                    {
+                        igPushItemWidth(150);
+                        
+                        // IOR slider
+                        float ior = state.overrideIOR;
+                        if (igSliderFloat("IOR", ref ior, 1.0f, 2.4f, "%.2f", ImGuiSliderFlags.None))
+                        {
+                            state.overrideIOR = ior;
+                        }
+                        if (igIsItemHovered(ImGuiHoveredFlags.None))
+                        {
+                            igSetTooltip("Index of Refraction\nWater: 1.33, Glass: 1.5, Diamond: 2.4");
+                        }
+
+                        // Transmission slider
+                        float transmission = state.overrideTransmission;
+                        if (igSliderFloat("Transmission", ref transmission, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags.None))
+                        {
+                            state.overrideTransmission = transmission;
+                        }
+                        if (igIsItemHovered(ImGuiHoveredFlags.None))
+                        {
+                            igSetTooltip("Transmission Factor\n0.0 = opaque, 1.0 = fully transparent");
+                        }
+
+                        // Thickness slider
+                        float thickness = state.overrideThickness;
+                        if (igSliderFloat("Thickness", ref thickness, 0.0f, 5.0f, "%.2f", ImGuiSliderFlags.None))
+                        {
+                            state.overrideThickness = thickness;
+                        }
+                        if (igIsItemHovered(ImGuiHoveredFlags.None))
+                        {
+                            igSetTooltip("Thickness multiplier for volume absorption");
+                        }
+
+                        // Attenuation distance slider
+                        float attenuationDist = state.overrideAttenuationDistance;
+                        if (igSliderFloat("Attenuation Dist", ref attenuationDist, 0.01f, 10.0f, "%.2f", ImGuiSliderFlags.Logarithmic))
+                        {
+                            state.overrideAttenuationDistance = attenuationDist;
+                        }
+                        if (igIsItemHovered(ImGuiHoveredFlags.None))
+                        {
+                            igSetTooltip("Distance for Beer's Law absorption\nSmaller = more absorption");
+                        }
+
+                        // Attenuation color picker
+                        Vector3 attenuationColor = state.overrideAttenuationColor;
+                        if (igColorEdit3("Attenuation Color", ref attenuationColor, ImGuiColorEditFlags.None))
+                        {
+                            state.overrideAttenuationColor = attenuationColor;
+                        }
+                        if (igIsItemHovered(ImGuiHoveredFlags.None))
+                        {
+                            igSetTooltip("Color absorption for volume\nWhite = no absorption (clear glass)");
+                        }
+
+                        igPopItemWidth();
+
+                        // Preset buttons
+                        igSeparator();
+                        igText("Presets:");
+                        if (igButton("Clear Glass", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 1.5f;
+                            state.overrideTransmission = 1.0f;
+                            state.overrideAttenuationColor = Vector3.One;
+                            state.overrideAttenuationDistance = 1.0f;
+                            state.overrideThickness = 1.0f;
+                        }
+                        igSameLine(0, 5);
+                        if (igButton("Amber", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 1.55f;
+                            state.overrideTransmission = 0.9f;
+                            state.overrideAttenuationColor = new Vector3(1.0f, 0.6f, 0.2f);
+                            state.overrideAttenuationDistance = 0.5f;
+                            state.overrideThickness = 1.0f;
+                        }
+                        
+                        if (igButton("Water", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 1.33f;
+                            state.overrideTransmission = 0.95f;
+                            state.overrideAttenuationColor = new Vector3(0.8f, 0.9f, 1.0f);
+                            state.overrideAttenuationDistance = 2.0f;
+                            state.overrideThickness = 1.0f;
+                        }
+                        igSameLine(0, 5);
+                        if (igButton("Emerald", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 1.57f;
+                            state.overrideTransmission = 0.85f;
+                            state.overrideAttenuationColor = new Vector3(0.2f, 0.8f, 0.3f);
+                            state.overrideAttenuationDistance = 0.3f;
+                            state.overrideThickness = 1.0f;
+                        }
+
+                        if (igButton("Ruby", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 1.77f;
+                            state.overrideTransmission = 0.8f;
+                            state.overrideAttenuationColor = new Vector3(0.9f, 0.1f, 0.2f);
+                            state.overrideAttenuationDistance = 0.4f;
+                            state.overrideThickness = 1.0f;
+                        }
+                        igSameLine(0, 5);
+                        if (igButton("Diamond", new Vector2(120, 0)))
+                        {
+                            state.overrideIOR = 2.42f;
+                            state.overrideTransmission = 1.0f;
+                            state.overrideAttenuationColor = Vector3.One;
+                            state.overrideAttenuationDistance = 1.0f;
+                            state.overrideThickness = 0.5f;
+                        }
+                    }
+                }
+
+                // Debug visualization section
+                igSeparator();
+                if (igCollapsingHeader_TreeNodeFlags("Debug Visualization", ImGuiTreeNodeFlags.None))
+                {
+                    byte showScreenTex = (byte)(state.debugShowScreenTexture ? 1 : 0);
+                    if (igCheckbox("Show Screen Texture", ref showScreenTex))
+                    {
+                        state.debugShowScreenTexture = showScreenTex != 0;
+                        if (state.debugShowScreenTexture)
+                        {
+                            state.debugShowDepthBuffer = false;
+                        }
+                    }
+                    if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    {
+                        igSetTooltip("Display the captured screen texture used for refraction");
+                    }
+
+                    byte showDepth = (byte)(state.debugShowDepthBuffer ? 1 : 0);
+                    if (igCheckbox("Show Depth Buffer", ref showDepth))
+                    {
+                        state.debugShowDepthBuffer = showDepth != 0;
+                        if (state.debugShowDepthBuffer)
+                        {
+                            state.debugShowScreenTexture = false;
+                        }
+                    }
+                    if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    {
+                        igSetTooltip("Visualize the depth buffer (white=near, black=far)");
+                    }
+
+                    byte wireframe = (byte)(state.debugWireframe ? 1 : 0);
+                    if (igCheckbox("Wireframe Overlay", ref wireframe))
+                    {
+                        state.debugWireframe = wireframe != 0;
+                    }
+                    if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    {
+                        igSetTooltip("Show wireframe overlay on glass materials");
                     }
                 }
             }

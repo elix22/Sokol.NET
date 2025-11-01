@@ -23,6 +23,33 @@ using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 
 public static unsafe partial class SharpGLTFApp
 {
+    /// <summary>
+    /// Applies glass material overrides if enabled, otherwise returns original values.
+    /// </summary>
+    static (float transmission, float ior, Vector3 attenuationColor, float attenuationDistance, float thickness) 
+        GetGlassMaterialValues(Sokol.Mesh mesh)
+    {
+        if (state.overrideGlassMaterials)
+        {
+            return (
+                state.overrideTransmission,
+                state.overrideIOR,
+                state.overrideAttenuationColor,
+                state.overrideAttenuationDistance,
+                mesh.ThicknessFactor * state.overrideThickness
+            );
+        }
+        else
+        {
+            return (
+                mesh.TransmissionFactor,
+                mesh.IOR,
+                mesh.AttenuationColor,
+                mesh.AttenuationDistance,
+                mesh.ThicknessFactor
+            );
+        }
+    }
 
     /// <summary>
     /// Calculates a bounding sphere that contains the entire axis-aligned bounding box.
@@ -408,14 +435,17 @@ public static unsafe partial class SharpGLTFApp
                     // Set emissive strength (KHR_materials_emissive_strength extension)
                     metallicParams.emissive_strength = mesh.EmissiveStrength;
 
+                    // Get glass material values (with overrides if enabled)
+                    var glassValues = GetGlassMaterialValues(mesh);
+                    
                     // Set transmission parameters (KHR_materials_transmission extension)
-                    metallicParams.transmission_factor = mesh.TransmissionFactor;
-                    metallicParams.ior = mesh.IOR;
+                    metallicParams.transmission_factor = glassValues.transmission;
+                    metallicParams.ior = glassValues.ior;
 
                     // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
-                    metallicParams.attenuation_color = mesh.AttenuationColor;
-                    metallicParams.attenuation_distance = mesh.AttenuationDistance;
-                    metallicParams.thickness_factor = mesh.ThicknessFactor;
+                    metallicParams.attenuation_color = glassValues.attenuationColor;
+                    metallicParams.attenuation_distance = glassValues.attenuationDistance;
+                    metallicParams.thickness_factor = glassValues.thickness;
 
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
@@ -463,14 +493,17 @@ public static unsafe partial class SharpGLTFApp
                     // Set emissive strength (KHR_materials_emissive_strength extension)
                     metallicParams.emissive_strength = mesh.EmissiveStrength;
 
+                    // Get glass material values (with overrides if enabled)
+                    var glassValues = GetGlassMaterialValues(mesh);
+                    
                     // Set transmission parameters (KHR_materials_transmission extension)
-                    metallicParams.transmission_factor = mesh.TransmissionFactor;
-                    metallicParams.ior = mesh.IOR;
+                    metallicParams.transmission_factor = glassValues.transmission;
+                    metallicParams.ior = glassValues.ior;
 
                     // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
-                    metallicParams.attenuation_color = mesh.AttenuationColor;
-                    metallicParams.attenuation_distance = mesh.AttenuationDistance;
-                    metallicParams.thickness_factor = mesh.ThicknessFactor;
+                    metallicParams.attenuation_color = glassValues.attenuationColor;
+                    metallicParams.attenuation_distance = glassValues.attenuationDistance;
+                    metallicParams.thickness_factor = glassValues.thickness;
 
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 
