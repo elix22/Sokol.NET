@@ -91,6 +91,9 @@ public static unsafe partial class SharpGLTFApp
         PipeLineManager.GetOrCreatePipeline(PipelineType.Standard);
         PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
 
+        // Initialize bloom post-processing
+        InitializeBloom();
+
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
 
@@ -209,5 +212,396 @@ public static unsafe partial class SharpGLTFApp
                 Error($"[SharpGLTF] Failed to load file '{path}': {status}");
             }
         }); // 3 GB max size
+    }
+
+    static void InitializeBloom()
+    {
+        // Get screen dimensions (we'll create bloom textures at 1/2 resolution for performance)
+        int fb_width = sapp_width();
+        int fb_height = sapp_height();
+        int bloom_width = Math.Max(fb_width / 2, 256);
+        int bloom_height = Math.Max(fb_height / 2, 256);
+
+        // Get swapchain info to match formats
+        var swapchain = sglue_swapchain();
+        
+        // Create color texture for main scene rendering (full resolution)
+        // NOTE: Offscreen rendering uses explicit formats and sample_count = 1 (no MSAA) as per offscreen example
+        var scene_color_desc = new sg_image_desc()
+        {
+            usage = { color_attachment = true },
+            width = fb_width,
+            height = fb_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // Explicit format for offscreen rendering
+            sample_count = 1,  // Offscreen passes don't use MSAA
+            label = "bloom-scene-color"
+        };
+        state.bloom.scene_color_img = sg_make_image(scene_color_desc);
+
+        // Create depth texture for main scene rendering  
+        // Use SG_PIXELFORMAT_DEPTH exactly like the offscreen example
+        var scene_depth_desc = new sg_image_desc()
+        {
+            usage = { depth_stencil_attachment = true },
+            width = fb_width,
+            height = fb_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Explicit format matching offscreen example
+            sample_count = 1,  // Offscreen passes don't use MSAA
+            label = "bloom-scene-depth"
+        };
+        state.bloom.scene_depth_img = sg_make_image(scene_depth_desc);
+
+        // Create bloom processing textures (reduced resolution)
+        var bloom_desc = new sg_image_desc()
+        {
+            usage = { color_attachment = true },
+            width = bloom_width,
+            height = bloom_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            sample_count = 1
+        };
+
+        bloom_desc.label = "bloom-bright";
+        state.bloom.bright_img = sg_make_image(bloom_desc);
+        
+        bloom_desc.label = "bloom-blur-h";
+        state.bloom.blur_h_img = sg_make_image(bloom_desc);
+        
+        bloom_desc.label = "bloom-blur-v";
+        state.bloom.blur_v_img = sg_make_image(bloom_desc);
+
+        // Create sampler for all bloom passes
+        state.bloom.sampler = sg_make_sampler(new sg_sampler_desc()
+        {
+            min_filter = sg_filter.SG_FILTER_LINEAR,
+            mag_filter = sg_filter.SG_FILTER_LINEAR,
+            wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+            wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+            label = "bloom-sampler"
+        });
+
+        // Create render passes
+        // Scene pass (renders main scene to offscreen buffer)
+        var scene_color_view = sg_make_view(new sg_view_desc
+        {
+            color_attachment = { image = state.bloom.scene_color_img },
+            label = "scene-color-view"
+        });
+        var scene_depth_view = sg_make_view(new sg_view_desc
+        {
+            depth_stencil_attachment = { image = state.bloom.scene_depth_img },
+            label = "scene-depth-view"
+        });
+        
+        state.bloom.scene_pass = new sg_pass
+        {
+            attachments = new sg_attachments
+            {
+                colors = { [0] = scene_color_view },
+                depth_stencil = scene_depth_view
+            },
+            action = new sg_pass_action
+            {
+                colors = {
+                    [0] = new sg_color_attachment_action
+                    {
+                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                        clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f }
+                    }
+                },
+                depth = new sg_depth_attachment_action
+                {
+                    load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                    clear_value = 1.0f
+                }
+            },
+            label = "bloom-scene-pass"
+        };
+
+        // Bright pass (extracts bright pixels)
+        var bright_view = sg_make_view(new sg_view_desc
+        {
+            color_attachment = { image = state.bloom.bright_img },
+            label = "bright-view"
+        });
+        
+        state.bloom.bright_pass = new sg_pass
+        {
+            attachments = new sg_attachments { colors = { [0] = bright_view } },
+            action = new sg_pass_action
+            {
+                colors = {
+                    [0] = new sg_color_attachment_action
+                    {
+                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
+                    }
+                }
+            },
+            label = "bloom-bright-pass"
+        };
+
+        // Horizontal blur pass  
+        var blur_h_view = sg_make_view(new sg_view_desc
+        {
+            color_attachment = { image = state.bloom.blur_h_img },
+            label = "blur-h-view"
+        });
+        
+        state.bloom.blur_h_pass = new sg_pass
+        {
+            attachments = new sg_attachments { colors = { [0] = blur_h_view } },
+            action = new sg_pass_action
+            {
+                colors = {
+                    [0] = new sg_color_attachment_action
+                    {
+                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
+                    }
+                }
+            },
+            label = "bloom-blur-h-pass"
+        };
+
+        // Vertical blur pass
+        var blur_v_view = sg_make_view(new sg_view_desc
+        {
+            color_attachment = { image = state.bloom.blur_v_img },
+            label = "blur-v-view"
+        });
+        
+        state.bloom.blur_v_pass = new sg_pass
+        {
+            attachments = new sg_attachments { colors = { [0] = blur_v_view } },
+            action = new sg_pass_action
+            {
+                colors = {
+                    [0] = new sg_color_attachment_action
+                    {
+                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
+                    }
+                }
+            },
+            label = "bloom-blur-v-pass"
+        };
+
+        // Note: Composite pass renders to swapchain and must be created each frame
+        // with the current swapchain, so we don't create it here.
+
+        // Create offscreen pipelines for rendering the model to bloom scene pass
+        // Use SG_PIXELFORMAT_DEPTH exactly like the offscreen example
+        state.bloom.scene_standard_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.Standard, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        state.bloom.scene_skinned_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.Skinned, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        state.bloom.scene_standard_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.StandardBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        state.bloom.scene_skinned_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.SkinnedBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        state.bloom.scene_standard_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.StandardMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        state.bloom.scene_skinned_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
+            PipelineType.SkinnedMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+
+        // Create fullscreen quad vertices for post-processing passes
+        float[] fullscreen_quad_vertices = {
+            // Triangle 1: Full-screen triangle (covers entire NDC)
+            -1.0f, -1.0f,   // Bottom-left
+             3.0f, -1.0f,   // Bottom-right (extends past screen)
+            -1.0f,  3.0f    // Top-left (extends past screen)
+        };
+
+        // Create vertex buffer for fullscreen quad
+        var fullscreen_vbuf = sg_make_buffer(new sg_buffer_desc()
+        {
+            data = SG_RANGE(fullscreen_quad_vertices),
+            label = "bloom-fullscreen-vbuf"
+        });
+
+        // Create pipelines for bloom post-processing passes
+        // Bright pass pipeline (fullscreen quad, no depth testing needed)
+        state.bloom.bright_pipeline = sg_make_pipeline(new sg_pipeline_desc()
+        {
+            layout = new sg_vertex_layout_state()
+            {
+                attrs = {
+                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_bright_pass_position] = new sg_vertex_attr_state()
+                    {
+                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
+                    }
+                }
+            },
+            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_bright_pass_shader_desc(sg_query_backend())),
+            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+            sample_count = 1,
+            depth = new sg_depth_state()
+            {
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                write_enabled = false,
+                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
+            },
+            colors = {
+                [0] = new sg_color_target_state()
+                {
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
+                }
+            },
+            label = "bloom-bright-pipeline"
+        });
+
+        // Horizontal blur pipeline (fullscreen quad, no depth testing needed)
+        state.bloom.blur_h_pipeline = sg_make_pipeline(new sg_pipeline_desc()
+        {
+            layout = new sg_vertex_layout_state()
+            {
+                attrs = {
+                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_blur_horizontal_position] = new sg_vertex_attr_state()
+                    {
+                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
+                    }
+                }
+            },
+            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_blur_horizontal_shader_desc(sg_query_backend())),
+            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+            sample_count = 1,
+            depth = new sg_depth_state()
+            {
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                write_enabled = false,
+                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
+            },
+            colors = {
+                [0] = new sg_color_target_state()
+                {
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
+                }
+            },
+            label = "bloom-blur-h-pipeline"
+        });
+
+        // Vertical blur pipeline (fullscreen quad, no depth testing needed)
+        state.bloom.blur_v_pipeline = sg_make_pipeline(new sg_pipeline_desc()
+        {
+            layout = new sg_vertex_layout_state()
+            {
+                attrs = {
+                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_blur_vertical_position] = new sg_vertex_attr_state()
+                    {
+                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
+                    }
+                }
+            },
+            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_blur_vertical_shader_desc(sg_query_backend())),
+            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+            sample_count = 1,
+            depth = new sg_depth_state()
+            {
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_NONE,  // No depth buffer in this pass
+                write_enabled = false,
+                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
+            },
+            colors = {
+                [0] = new sg_color_target_state()
+                {
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
+                }
+            },
+            label = "bloom-blur-v-pipeline"
+        });
+
+        // Composite pipeline (renders to swapchain, fullscreen quad doesn't need depth testing)
+        state.bloom.composite_pipeline = sg_make_pipeline(new sg_pipeline_desc()
+        {
+            layout = new sg_vertex_layout_state()
+            {
+                attrs = {
+                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_bloom_composite_position] = new sg_vertex_attr_state()
+                    {
+                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
+                    }
+                }
+            },
+            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_bloom_composite_shader_desc(sg_query_backend())),
+            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+            sample_count = swapchain.sample_count,  // Match swapchain MSAA
+            depth = new sg_depth_state()
+            {
+                write_enabled = false,  // Explicitly disable depth writes
+                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS  // Always pass depth test
+            },
+            colors = {
+                [0] = new sg_color_target_state()
+                {
+                    pixel_format = swapchain.color_format  // Match swapchain color format
+                }
+            },
+            label = "bloom-composite-pipeline"
+        });
+
+        // Create resource bindings
+        // Bright pass bindings (scene texture -> bright pass)
+        state.bloom.bright_bindings = new sg_bindings()
+        {
+            vertex_buffers = { [0] = fullscreen_vbuf },
+            views = {
+                [0] = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = state.bloom.scene_color_img },
+                    label = "bright-scene-texture-view"
+                })
+            },
+            samplers = { [0] = state.bloom.sampler }
+        };
+
+        // Horizontal blur bindings (bright pass -> blur horizontal)
+        state.bloom.blur_h_bindings = new sg_bindings()
+        {
+            vertex_buffers = { [0] = fullscreen_vbuf },
+            views = {
+                [0] = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = state.bloom.bright_img },
+                    label = "blur-h-input-view"
+                })
+            },
+            samplers = { [0] = state.bloom.sampler }
+        };
+
+        // Vertical blur bindings (horizontal blur -> blur vertical)
+        state.bloom.blur_v_bindings = new sg_bindings()
+        {
+            vertex_buffers = { [0] = fullscreen_vbuf },
+            views = {
+                [0] = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = state.bloom.blur_h_img },
+                    label = "blur-v-input-view"
+                })
+            },
+            samplers = { [0] = state.bloom.sampler }
+        };
+
+        // Composite bindings (scene + final bloom -> swapchain)
+        state.bloom.composite_bindings = new sg_bindings()
+        {
+            vertex_buffers = { [0] = fullscreen_vbuf },
+            views = {
+                [0] = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = state.bloom.scene_color_img },
+                    label = "composite-scene-view"
+                }),
+                [1] = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = state.bloom.blur_v_img },
+                    label = "composite-bloom-view"
+                })
+            },
+            samplers = { [0] = state.bloom.sampler, [1] = state.bloom.sampler }
+        };
+
+        Info("[Bloom] Bloom system initialized successfully");
     }
 }

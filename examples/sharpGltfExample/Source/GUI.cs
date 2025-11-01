@@ -144,6 +144,34 @@ public static unsafe partial class SharpGLTFApp
                     igPopID();
                 }
                 igUnindent(20);
+
+                igSeparator();
+                igText("=== Bloom Post-Processing ===");
+                
+                // Bloom enable/disable
+                byte bloomEnabled = (byte)(state.enableBloom ? 1 : 0);
+                if (igCheckbox("Enable Bloom", ref bloomEnabled))
+                {
+                    state.enableBloom = bloomEnabled != 0;
+                }
+
+                // Bloom parameters (only show when enabled)
+                if (state.enableBloom)
+                {
+                    igText("Bloom Intensity:");
+                    float bloomIntensity = state.bloomIntensity;
+                    if (igSliderFloat("##bloom_intensity", ref bloomIntensity, 0.0f, 3.0f, "%.2f", ImGuiSliderFlags.None))
+                    {
+                        state.bloomIntensity = bloomIntensity;
+                    }
+
+                    igText("Brightness Threshold:");
+                    float bloomThreshold = state.bloomThreshold;
+                    if (igSliderFloat("##bloom_threshold", ref bloomThreshold, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags.None))
+                    {
+                        state.bloomThreshold = bloomThreshold;
+                    }
+                }
             }
             else
             {

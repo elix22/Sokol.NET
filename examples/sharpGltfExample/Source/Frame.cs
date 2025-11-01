@@ -160,7 +160,16 @@ public static unsafe partial class SharpGLTFApp
         }
 
         // Begin rendering
-        sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+        if (state.enableBloom && state.modelLoaded && state.model != null && state.bloom.scene_color_img.id != 0)
+        {
+            // BLOOM PASS 1: Render scene to offscreen buffer
+            sg_begin_pass(state.bloom.scene_pass);
+        }
+        else
+        {
+            // Regular rendering to swapchain
+            sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+        }
 
         // Render model if loaded
         if (state.modelLoaded && state.model != null)
@@ -309,9 +318,30 @@ public static unsafe partial class SharpGLTFApp
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
 
-                // Choose pipeline based on alpha mode and skinning
+                // Choose pipeline based on alpha mode, skinning, and whether bloom is active
                 PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning);
-                sg_pipeline pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType);
+                
+                // Get appropriate pipeline - use bloom scene pipelines if rendering to offscreen target
+                sg_pipeline pipeline;
+                if (state.enableBloom && state.bloom.scene_color_img.id != 0)
+                {
+                    // Use offscreen pipeline for bloom scene pass
+                    pipeline = pipelineType switch
+                    {
+                        PipelineType.Standard => state.bloom.scene_standard_pipeline,
+                        PipelineType.Skinned => state.bloom.scene_skinned_pipeline,
+                        PipelineType.StandardBlend => state.bloom.scene_standard_blend_pipeline,
+                        PipelineType.SkinnedBlend => state.bloom.scene_skinned_blend_pipeline,
+                        PipelineType.StandardMask => state.bloom.scene_standard_mask_pipeline,
+                        PipelineType.SkinnedMask => state.bloom.scene_skinned_mask_pipeline,
+                        _ => PipeLineManager.GetOrCreatePipeline(pipelineType)
+                    };
+                }
+                else
+                {
+                    // Use regular swapchain pipeline
+                    pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType);
+                }
 
                 if (useSkinning)
                 {
@@ -424,15 +454,86 @@ public static unsafe partial class SharpGLTFApp
                 _loggedMeshInfoOnce = true;
         }
 
-        // Draw UI (builds ImGui commands)
-        DrawUI();
+        // Perform bloom post-processing if enabled
+        if (state.enableBloom && state.modelLoaded && state.model != null && state.bloom.scene_color_img.id != 0)
+        {
+            // End the offscreen scene rendering pass
+            sg_end_pass();
+            
+            // Perform bloom processing passes
+            PerformBloomPasses(fb_width, fb_height);
+            // After bloom, we're in the composite pass which renders to swapchain
+            // Now render UI on top of the bloom composite
+            DrawUI();
+            simgui_render();
+            sg_end_pass();
+        }
+        else
+        {
+            // No bloom - UI is rendered in the same pass as the model
+            DrawUI();
+            simgui_render();
+            sg_end_pass();
+        }
 
-        // Render ImGui (submits draw commands to sokol-gfx)
-        simgui_render();
-
-        sg_end_pass();
         sg_commit();
 
         _frameCount++;  // Increment frame counter
+    }
+
+    private static unsafe void PerformBloomPasses(int screenWidth, int screenHeight)
+    {
+        // Prepare bloom parameters
+        cgltf_bloom_params_t bloomParams = new cgltf_bloom_params_t();
+        bloomParams.brightness_threshold = state.bloomThreshold;
+        bloomParams.bloom_intensity = state.bloomIntensity;
+        bloomParams.texel_size[0] = 1.0f / (screenWidth / 2);  // Half resolution for blur
+        bloomParams.texel_size[1] = 1.0f / (screenHeight / 2);
+
+        // PASS 2: Bright pass - extract bright pixels
+        sg_begin_pass(state.bloom.bright_pass);
+        sg_apply_pipeline(state.bloom.bright_pipeline);
+        sg_apply_bindings(state.bloom.bright_bindings);
+        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_draw(0, 3, 1);  // Fullscreen triangle
+        sg_end_pass();
+
+        // PASS 3: Horizontal blur
+        sg_begin_pass(state.bloom.blur_h_pass);
+        sg_apply_pipeline(state.bloom.blur_h_pipeline);
+        sg_apply_bindings(state.bloom.blur_h_bindings);
+        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_draw(0, 3, 1);  // Fullscreen triangle
+        sg_end_pass();
+
+        // PASS 4: Vertical blur
+        sg_begin_pass(state.bloom.blur_v_pass);
+        sg_apply_pipeline(state.bloom.blur_v_pipeline);
+        sg_apply_bindings(state.bloom.blur_v_bindings);
+        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_draw(0, 3, 1);  // Fullscreen triangle
+        sg_end_pass();
+
+        // PASS 5: Composite bloom with scene (to swapchain)
+        // Must create pass with current swapchain each frame (can't cache it)
+        sg_begin_pass(new sg_pass
+        {
+            action = new sg_pass_action
+            {
+                colors = {
+                    [0] = new sg_color_attachment_action
+                    {
+                        load_action = sg_load_action.SG_LOADACTION_CLEAR,
+                        clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f }
+                    }
+                }
+            },
+            swapchain = sglue_swapchain()
+        });
+        sg_apply_pipeline(state.bloom.composite_pipeline);
+        sg_apply_bindings(state.bloom.composite_bindings);
+        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_draw(0, 3, 1);  // Fullscreen triangle
+        // Don't end pass here - continue with UI rendering on same pass
     }
 }

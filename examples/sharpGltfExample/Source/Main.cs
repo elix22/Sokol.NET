@@ -41,7 +41,7 @@ public static unsafe partial class SharpGLTFApp
     // const string filename = "AttenuationTest/glTF-Binary/AttenuationTest.glb";
 
 
-    const string filename = "glb/BoomBox.glb";
+    // const string filename = "glb/BoomBox.glb";
 
     // const string filename = "glb/ClearCoatCarPaint.glb";
 
@@ -49,13 +49,50 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "glb/DragonAttenuation.glb";
 
-    // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
+    const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
     // const string filename = "glb/MetalRoughSpheres.glb";
 
     // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
 
     //  const string filename = "Sponza/glTF/Sponza.gltf";
+
+    // Bloom post-processing structures
+    struct BloomPass
+    {
+        public sg_pass scene_pass;       // Main scene render target
+        public sg_pass bright_pass;      // Bright pass extraction
+        public sg_pass blur_h_pass;      // Horizontal blur
+        public sg_pass blur_v_pass;      // Vertical blur
+        // Note: composite pass renders to swapchain and is created each frame
+        
+        // Model rendering pipelines for offscreen scene pass (sample_count = 1)
+        public sg_pipeline scene_standard_pipeline;
+        public sg_pipeline scene_skinned_pipeline;
+        public sg_pipeline scene_standard_blend_pipeline;
+        public sg_pipeline scene_skinned_blend_pipeline;
+        public sg_pipeline scene_standard_mask_pipeline;
+        public sg_pipeline scene_skinned_mask_pipeline;
+        
+        // Bloom post-processing pipelines
+        public sg_pipeline bright_pipeline;
+        public sg_pipeline blur_h_pipeline; 
+        public sg_pipeline blur_v_pipeline;
+        public sg_pipeline composite_pipeline;
+        
+        public sg_bindings bright_bindings;
+        public sg_bindings blur_h_bindings;
+        public sg_bindings blur_v_bindings;
+        public sg_bindings composite_bindings;
+        
+        public sg_image scene_color_img;     // Main scene color buffer
+        public sg_image scene_depth_img;     // Main scene depth buffer
+        public sg_image bright_img;          // Bright pass result
+        public sg_image blur_h_img;          // Horizontal blur result
+        public sg_image blur_v_img;          // Vertical blur result (final bloom)
+        
+        public sg_sampler sampler;           // Linear sampler for all passes
+    }
 
     class _state
     {
@@ -83,6 +120,12 @@ public static unsafe partial class SharpGLTFApp
         // Lighting system
         public List<Light> lights = new List<Light>();
         public float ambientStrength = 0.03f;   // Ambient light strength (0.0 to 1.0)
+        
+        // Bloom post-processing
+        public BloomPass bloom;
+        public bool enableBloom = false;
+        public float bloomIntensity = 1.5f;      // Bloom intensity (0.0 - 2.0)
+        public float bloomThreshold = 0.8f;      // Brightness threshold (0.0 - 10.0)
     }
 
     static _state state = new _state();

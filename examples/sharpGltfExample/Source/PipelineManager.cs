@@ -50,6 +50,7 @@ public static class PipeLineManager
         {
             case PipelineType.Standard:
                 sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                var swapchain = sglue_swapchain();
                 // Create pipeline for static meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -63,11 +64,15 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain.color_format;
+                pipeline_desc.depth.pixel_format = swapchain.depth_format;
                 pipeline_desc.label = "static-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
             case PipelineType.Skinned:
                 sg_shader shader_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                var swapchain_skinned = sglue_swapchain();
                 // Create pipeline for skinned meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -81,12 +86,16 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain_skinned.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain_skinned.color_format;
+                pipeline_desc.depth.pixel_format = swapchain_skinned.depth_format;
                 pipeline_desc.label = "skinned-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.StandardBlend:
                 sg_shader shader_static_blend = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                var swapchain_blend = sglue_swapchain();
                 // Create pipeline for static meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -100,6 +109,9 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain_blend.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain_blend.color_format;
+                pipeline_desc.depth.pixel_format = swapchain_blend.depth_format;
                 // Enable alpha blending
                 pipeline_desc.colors[0].blend.enabled = true;
                 pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
@@ -112,6 +124,7 @@ public static class PipeLineManager
                 
             case PipelineType.SkinnedBlend:
                 sg_shader shader_skinned_blend = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                var swapchain_skinned_blend = sglue_swapchain();
                 // Create pipeline for skinned meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -125,6 +138,9 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain_skinned_blend.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain_skinned_blend.color_format;
+                pipeline_desc.depth.pixel_format = swapchain_skinned_blend.depth_format;
                 // Enable alpha blending
                 pipeline_desc.colors[0].blend.enabled = true;
                 pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
@@ -137,6 +153,7 @@ public static class PipeLineManager
                 
             case PipelineType.StandardMask:
                 sg_shader shader_static_mask = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                var swapchain_mask = sglue_swapchain();
                 // Create pipeline for static meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -150,17 +167,21 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain_mask.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain_mask.color_format;
+                pipeline_desc.depth.pixel_format = swapchain_mask.depth_format;
                 pipeline_desc.label = "static-mask-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.SkinnedMask:
                 sg_shader shader_skinned_mask = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                var swapchain_skinned_mask = sglue_swapchain();
                 // Create pipeline for skinned meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_mask;
@@ -169,6 +190,9 @@ public static class PipeLineManager
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = swapchain_skinned_mask.sample_count;
+                pipeline_desc.colors[0].pixel_format = swapchain_skinned_mask.color_format;
+                pipeline_desc.depth.pixel_format = swapchain_skinned_mask.depth_format;
                 pipeline_desc.label = "skinned-mask-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
@@ -385,6 +409,159 @@ public static class PipeLineManager
             default:
                 return hasSkinning ? PipelineType.Skinned : PipelineType.Standard;
         }
+    }
+
+    /// <summary>
+    /// Create a pipeline for offscreen rendering with custom formats (for bloom scene pass)
+    /// </summary>
+    public static sg_pipeline CreateOffscreenPipeline(PipelineType type, sg_pixel_format colorFormat, sg_pixel_format depthFormat)
+    {
+        sg_pipeline pipeline;
+        var pipeline_desc = default(sg_pipeline_desc);
+        
+        switch (type)
+        {
+            case PipelineType.Standard:
+                sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-static-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.Skinned:
+                sg_shader shader_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-skinned-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.StandardBlend:
+                sg_shader shader_static_blend = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static_blend;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-static-blend-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.SkinnedBlend:
+                sg_shader shader_skinned_blend = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned_blend;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.colors[0].blend.enabled = true;
+                pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+                pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-skinned-blend-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.StandardMask:
+                sg_shader shader_static_mask = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static_mask;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-static-mask-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            case PipelineType.SkinnedMask:
+                sg_shader shader_skinned_mask = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned_mask;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = 1;  // Offscreen rendering uses sample_count = 1
+                pipeline_desc.colors[0].pixel_format = colorFormat;
+                pipeline_desc.depth.pixel_format = depthFormat;
+                pipeline_desc.label = "bloom-scene-skinned-mask-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+                
+            default:
+                throw new ArgumentException($"Unsupported pipeline type: {type}");
+        }
+        
+        return pipeline;
     }
 
 }
