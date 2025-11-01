@@ -96,8 +96,8 @@ public static unsafe partial class SharpGLTFApp
 
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
-
-        // Load model asynchronously
+        
+        // Load model asynchronously (FileSystem will handle platform-specific path conversion)
         FileSystem.Instance.LoadFile(filename, (path, buffer, status) =>
         {
             if (status == FileLoadStatus.Success && buffer != null)

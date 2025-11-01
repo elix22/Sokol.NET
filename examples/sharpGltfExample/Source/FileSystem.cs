@@ -349,14 +349,16 @@ namespace Sokol
 
         private void StartRequest(FileLoadRequest request)
         {
-            Info($"FileSystem: Starting file load: {request.FilePath}");
+            // Convert to platform-specific path (iOS/Android need bundle paths)
+            string platformPath = util_get_file_path(request.FilePath);
+            Info($"FileSystem: Starting file load: {request.FilePath} -> {platformPath}");
 
             // Choose channel based on request count to distribute load
             uint channel = (uint)(_activeRequests.Count % NUM_CHANNELS);
 
             var sfetchRequest = new sfetch_request_t
             {
-                path = request.FilePath,
+                path = platformPath,
                 channel = channel,
                 callback = &FileLoadCallback_Internal,
                 buffer = SFETCH_RANGE(request.Buffer)
