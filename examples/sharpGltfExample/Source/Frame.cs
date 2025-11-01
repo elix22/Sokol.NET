@@ -412,6 +412,11 @@ public static unsafe partial class SharpGLTFApp
                     metallicParams.transmission_factor = mesh.TransmissionFactor;
                     metallicParams.ior = mesh.IOR;
 
+                    // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
+                    metallicParams.attenuation_color = mesh.AttenuationColor;
+                    metallicParams.attenuation_distance = mesh.AttenuationDistance;
+                    metallicParams.thickness_factor = mesh.ThicknessFactor;
+
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms (cast to skinning version)
@@ -461,6 +466,11 @@ public static unsafe partial class SharpGLTFApp
                     // Set transmission parameters (KHR_materials_transmission extension)
                     metallicParams.transmission_factor = mesh.TransmissionFactor;
                     metallicParams.ior = mesh.IOR;
+
+                    // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
+                    metallicParams.attenuation_color = mesh.AttenuationColor;
+                    metallicParams.attenuation_distance = mesh.AttenuationDistance;
+                    metallicParams.thickness_factor = mesh.ThicknessFactor;
 
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 

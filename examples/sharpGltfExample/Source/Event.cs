@@ -25,6 +25,16 @@ public static unsafe partial class SharpGLTFApp
 {
     private static unsafe void HandleEvent(sapp_event* e)
     {
+        // Handle window resize - destroy ALL sokol resources and recreate from scratch
+        // This ensures we don't leak any resources (pipelines, shaders, images, views, etc.)
+        if (e->type == sapp_event_type.SAPP_EVENTTYPE_RESIZED)
+        {
+            CleanupAllResources();
+            InitializeTransmission();
+            InitializeBloom();
+            return;
+        }
+        
         // Handle ImGui events first
         if (simgui_handle_event(in *e))
         {

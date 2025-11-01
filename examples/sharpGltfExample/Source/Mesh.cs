@@ -35,6 +35,11 @@ namespace Sokol
         public float TransmissionFactor = 0.0f;  // 0.0 = opaque, 1.0 = fully transparent/refractive
         public int TransmissionTextureIndex = -1;  // Index into Textures list, -1 = no texture
 
+        // Volume properties (KHR_materials_volume) - Beer's Law absorption
+        public Vector3 AttenuationColor = new Vector3(1.0f, 1.0f, 1.0f);  // RGB color, white = no tint
+        public float AttenuationDistance = float.MaxValue;  // Distance at which color reaches AttenuationColor
+        public float ThicknessFactor = 0.0f;  // Thickness of volume in world units
+
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;

@@ -438,6 +438,42 @@ namespace Sokol
                 Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: using default TransmissionFactor = 0.0 (opaque)");
             }
 
+            // Extract volume properties from KHR_materials_volume extension (Beer's Law absorption)
+            // This provides the color tint as light passes through transparent materials (e.g., amber, colored glass)
+            var volumeExt = material.GetExtension<SharpGLTF.Schema2.MaterialVolume>();
+            if (volumeExt != null)
+            {
+                mesh.ThicknessFactor = volumeExt.ThicknessFactor;
+                mesh.AttenuationDistance = volumeExt.AttenuationDistance;
+                mesh.AttenuationColor = volumeExt.AttenuationColor;
+                
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Volume - Thickness={mesh.ThicknessFactor:F2}, " +
+                    $"AttenuationColor=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2}), " +
+                    $"AttenuationDistance={(float.IsPositiveInfinity(mesh.AttenuationDistance) ? "Infinity" : mesh.AttenuationDistance.ToString("F2"))}");
+            }
+            else if (mesh.TransmissionFactor > 0.0f)
+            {
+                // Fallback for transmission without volume: use base color as attenuation color
+                // This provides approximate colored glass effect (e.g., amber tint)
+                mesh.ThicknessFactor = 1.0f;  // Use unit thickness as default
+                mesh.AttenuationDistance = 1.0f;  // Moderate absorption
+                // Use base color's RGB as attenuation color
+                mesh.AttenuationColor = new Vector3(
+                    mesh.BaseColorFactor.X,
+                    mesh.BaseColorFactor.Y,
+                    mesh.BaseColorFactor.Z
+                );
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: No volume extension, using base color as attenuation fallback - " +
+                    $"Color=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2})");
+            }
+            else
+            {
+                mesh.ThicknessFactor = 0.0f;
+                mesh.AttenuationDistance = float.MaxValue;
+                mesh.AttenuationColor = new Vector3(1.0f, 1.0f, 1.0f); // White = no tint
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: opaque material, no volume needed");
+            }
+
             // Extract alpha mode and cutoff
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;

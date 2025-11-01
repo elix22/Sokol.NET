@@ -217,6 +217,67 @@ public static unsafe partial class SharpGLTFApp
         }); // 3 GB max size
     }
 
+    /// <summary>
+    /// Destroy only the resources that MUST be recreated on window resize (images, views, samplers).
+    /// Pipelines are NOT destroyed because they contain shaders and don't depend on framebuffer size.
+    /// This prevents shader pool exhaustion while still handling resize correctly.
+    /// </summary>
+    private static void CleanupAllResources()
+    {
+        Info("[Resize] Cleaning up size-dependent resources...");
+
+        // Uninitialize Bloom images and views (size-dependent) - following MRT example pattern
+        if (state.bloom.scene_color_img.id != 0)
+        {
+            Info("[Resize] Uninitializing bloom resources...");
+            sg_uninit_image(state.bloom.scene_color_img);
+            sg_uninit_image(state.bloom.scene_depth_img);
+            sg_uninit_image(state.bloom.bright_img);
+            sg_uninit_image(state.bloom.blur_h_img);
+            sg_uninit_image(state.bloom.blur_v_img);
+            sg_uninit_image(state.bloom.dummy_depth_img);
+            
+            // Uninitialize bloom views
+            sg_uninit_view(state.bloom.scene_pass.attachments.colors[0]);
+            sg_uninit_view(state.bloom.scene_pass.attachments.depth_stencil);
+            sg_uninit_view(state.bloom.bright_pass.attachments.colors[0]);
+            sg_uninit_view(state.bloom.bright_pass.attachments.depth_stencil);
+            sg_uninit_view(state.bloom.blur_h_pass.attachments.colors[0]);
+            sg_uninit_view(state.bloom.blur_h_pass.attachments.depth_stencil);
+            sg_uninit_view(state.bloom.blur_v_pass.attachments.colors[0]);
+            sg_uninit_view(state.bloom.blur_v_pass.attachments.depth_stencil);
+            
+            // Uninitialize sampler
+            if (state.bloom.sampler.id != 0)
+            {
+                sg_uninit_sampler(state.bloom.sampler);
+            }
+            
+            Info("[Resize] Bloom resources uninitialized");
+        }
+
+        // Uninitialize Transmission images and views (size-dependent)
+        if (state.transmission.screen_color_img.id != 0)
+        {
+            Info("[Resize] Uninitializing transmission resources...");
+            sg_uninit_image(state.transmission.screen_color_img);
+            sg_uninit_image(state.transmission.screen_depth_img);
+            sg_uninit_view(state.transmission.screen_color_view);
+            sg_uninit_view(state.transmission.opaque_pass.attachments.colors[0]);
+            sg_uninit_view(state.transmission.opaque_pass.attachments.depth_stencil);
+            
+            // Uninitialize sampler
+            if (state.transmission.sampler.id != 0)
+            {
+                sg_uninit_sampler(state.transmission.sampler);
+            }
+            
+            Info("[Resize] Transmission resources uninitialized");
+        }
+
+        Info("[Resize] Cleanup complete");
+    }
+
     static void InitializeBloom()
     {
         // Get screen dimensions (we'll create bloom textures at 1/2 resolution for performance)
@@ -230,9 +291,13 @@ public static unsafe partial class SharpGLTFApp
         // Get swapchain info to match formats
         var swapchain = sglue_swapchain();
         
-        // Create color texture for main scene rendering (full resolution)
-        // NOTE: Offscreen rendering uses explicit formats and sample_count = 1 (no MSAA) as per offscreen example
-        var scene_color_desc = new sg_image_desc()
+        // Allocate/initialize color texture for main scene rendering (full resolution)
+        // Following MRT example pattern: alloc once, then init/uninit/reinit on resize
+        if (state.bloom.scene_color_img.id == 0)
+        {
+            state.bloom.scene_color_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.scene_color_img, new sg_image_desc()
         {
             usage = { color_attachment = true },
             width = fb_width,
@@ -240,12 +305,14 @@ public static unsafe partial class SharpGLTFApp
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // Explicit format for offscreen rendering
             sample_count = 1,  // Offscreen passes don't use MSAA
             label = "bloom-scene-color"
-        };
-        state.bloom.scene_color_img = sg_make_image(scene_color_desc);
+        });
 
-        // Create depth texture for main scene rendering  
-        // Use SG_PIXELFORMAT_DEPTH exactly like the offscreen example
-        var scene_depth_desc = new sg_image_desc()
+        // Allocate/initialize depth texture for main scene rendering  
+        if (state.bloom.scene_depth_img.id == 0)
+        {
+            state.bloom.scene_depth_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.scene_depth_img, new sg_image_desc()
         {
             usage = { depth_stencil_attachment = true },
             width = fb_width,
@@ -253,34 +320,61 @@ public static unsafe partial class SharpGLTFApp
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Same as offscreen example - works on all platforms
             sample_count = 1,  // Offscreen passes don't use MSAA
             label = "bloom-scene-depth"
-        };
-        state.bloom.scene_depth_img = sg_make_image(scene_depth_desc);
+        });
 
-        // Create bloom processing textures (reduced resolution)
-        var bloom_desc = new sg_image_desc()
+        // Allocate/initialize bloom processing textures (reduced resolution)
+        if (state.bloom.bright_img.id == 0)
+        {
+            state.bloom.bright_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.bright_img, new sg_image_desc()
         {
             usage = { color_attachment = true },
             width = bloom_width,
             height = bloom_height,
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-            sample_count = 1
-        };
-
-        bloom_desc.label = "bloom-bright";
-        state.bloom.bright_img = sg_make_image(bloom_desc);
+            sample_count = 1,
+            label = "bloom-bright"
+        });
         
-        bloom_desc.label = "bloom-blur-h";
-        state.bloom.blur_h_img = sg_make_image(bloom_desc);
+        if (state.bloom.blur_h_img.id == 0)
+        {
+            state.bloom.blur_h_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.blur_h_img, new sg_image_desc()
+        {
+            usage = { color_attachment = true },
+            width = bloom_width,
+            height = bloom_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            sample_count = 1,
+            label = "bloom-blur-h"
+        });
         
-        bloom_desc.label = "bloom-blur-v";
-        state.bloom.blur_v_img = sg_make_image(bloom_desc);
+        if (state.bloom.blur_v_img.id == 0)
+        {
+            state.bloom.blur_v_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.blur_v_img, new sg_image_desc()
+        {
+            usage = { color_attachment = true },
+            width = bloom_width,
+            height = bloom_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            sample_count = 1,
+            label = "bloom-blur-v"
+        });
 
-        // WebGL workaround: Create a dummy depth buffer matching bloom resolution
+        // Allocate/initialize dummy depth buffer matching bloom resolution
         // WebGL requires consistent framebuffer attachments - we can't switch between
         // passes with depth and without depth on the same FBO without explicitly unbinding.
         // The workaround is to always have a depth attachment, even if unused.
         // IMPORTANT: All attachments must have the same dimensions!
-        var dummy_depth_desc = new sg_image_desc()
+        if (state.bloom.dummy_depth_img.id == 0)
+        {
+            state.bloom.dummy_depth_img = sg_alloc_image();
+        }
+        sg_init_image(state.bloom.dummy_depth_img, new sg_image_desc()
         {
             usage = { depth_stencil_attachment = true },
             width = bloom_width,
@@ -288,11 +382,14 @@ public static unsafe partial class SharpGLTFApp
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
             sample_count = 1,
             label = "bloom-dummy-depth"
-        };
-        state.bloom.dummy_depth_img = sg_make_image(dummy_depth_desc);
+        });
 
-        // Create sampler for all bloom passes
-        state.bloom.sampler = sg_make_sampler(new sg_sampler_desc()
+        // Allocate/initialize sampler for all bloom passes
+        if (state.bloom.sampler.id == 0)
+        {
+            state.bloom.sampler = sg_alloc_sampler();
+        }
+        sg_init_sampler(state.bloom.sampler, new sg_sampler_desc()
         {
             min_filter = sg_filter.SG_FILTER_LINEAR,
             mag_filter = sg_filter.SG_FILTER_LINEAR,
@@ -301,25 +398,30 @@ public static unsafe partial class SharpGLTFApp
             label = "bloom-sampler"
         });
 
-        // Create render passes
+        // Allocate/initialize render passes
         // Scene pass (renders main scene to offscreen buffer)
-        // Use same pattern as offscreen example for WebGL compatibility
-        sg_view_desc scene_color_view_desc = default;
-        scene_color_view_desc.color_attachment.image = state.bloom.scene_color_img;
-        scene_color_view_desc.label = "scene-color-view";
+        // Following MRT example pattern: alloc once, then init/uninit/reinit on resize
+        if (state.bloom.scene_pass.attachments.colors[0].id == 0)
+        {
+            state.bloom.scene_pass.attachments.colors[0] = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.scene_pass.attachments.colors[0], new sg_view_desc()
+        {
+            color_attachment = { image = state.bloom.scene_color_img },
+            label = "scene-color-view"
+        });
         
-        sg_view_desc scene_depth_view_desc = default;
-        scene_depth_view_desc.depth_stencil_attachment.image = state.bloom.scene_depth_img;
-        scene_depth_view_desc.label = "scene-depth-view";
+        if (state.bloom.scene_pass.attachments.depth_stencil.id == 0)
+        {
+            state.bloom.scene_pass.attachments.depth_stencil = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.scene_pass.attachments.depth_stencil, new sg_view_desc()
+        {
+            depth_stencil_attachment = { image = state.bloom.scene_depth_img },
+            label = "scene-depth-view"
+        });
         
-        var scene_color_view = sg_make_view(scene_color_view_desc);
-        var scene_depth_view = sg_make_view(scene_depth_view_desc);
-        Info($"[Bloom] Scene views created: color={scene_color_view.id}, depth={scene_depth_view.id}");
-        
-        // Create attachments struct explicitly (like offscreen example)
-        sg_attachments scene_attachments = default;
-        scene_attachments.colors[0] = scene_color_view;
-        scene_attachments.depth_stencil = scene_depth_view;
+        Info($"[Bloom] Scene views initialized: color={state.bloom.scene_pass.attachments.colors[0].id}, depth={state.bloom.scene_pass.attachments.depth_stencil.id}");
         
         // Create action
         sg_pass_action scene_action = default;
@@ -328,94 +430,115 @@ public static unsafe partial class SharpGLTFApp
         scene_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         scene_action.depth.clear_value = 1.0f;
         
-        // Assign to pass
-        state.bloom.scene_pass = default;
-        state.bloom.scene_pass.attachments = scene_attachments;
+        // Assign action to pass (attachments already set above)
         state.bloom.scene_pass.action = scene_action;
         state.bloom.scene_pass.label = "bloom-scene-pass";
 
-        // Bright pass - WebGL requires depth attachment for FBO consistency
-        sg_view_desc bright_view_desc = default;
-        bright_view_desc.color_attachment.image = state.bloom.bright_img;
-        bright_view_desc.label = "bright-view";
-        sg_view bright_color_view = sg_make_view(bright_view_desc);
+        // Allocate/initialize bright pass - WebGL requires depth attachment for FBO consistency
+        if (state.bloom.bright_pass.attachments.colors[0].id == 0)
+        {
+            state.bloom.bright_pass.attachments.colors[0] = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.bright_pass.attachments.colors[0], new sg_view_desc()
+        {
+            color_attachment = { image = state.bloom.bright_img },
+            label = "bright-view"
+        });
         
-        sg_view_desc bright_depth_view_desc = default;
-        bright_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
-        bright_depth_view_desc.label = "bright-depth-view";
-        sg_view bright_depth_view = sg_make_view(bright_depth_view_desc);
-        
-        sg_attachments bright_attachments = default;
-        bright_attachments.colors[0] = bright_color_view;
-        bright_attachments.depth_stencil = bright_depth_view;
+        if (state.bloom.bright_pass.attachments.depth_stencil.id == 0)
+        {
+            state.bloom.bright_pass.attachments.depth_stencil = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.bright_pass.attachments.depth_stencil, new sg_view_desc()
+        {
+            depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
+            label = "bright-depth-view"
+        });
         
         sg_pass_action bright_action = default;
         bright_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         bright_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
         
-        state.bloom.bright_pass.attachments = bright_attachments;
         state.bloom.bright_pass.action = bright_action;
         state.bloom.bright_pass.label = "bloom-bright-pass";
 
-        // Horizontal blur pass - WebGL requires depth attachment for FBO consistency
-        sg_view_desc blur_h_view_desc = default;
-        blur_h_view_desc.color_attachment.image = state.bloom.blur_h_img;
-        blur_h_view_desc.label = "blur-h-view";
+        // Allocate/initialize horizontal blur pass - WebGL requires depth attachment for FBO consistency
+        if (state.bloom.blur_h_pass.attachments.colors[0].id == 0)
+        {
+            state.bloom.blur_h_pass.attachments.colors[0] = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.blur_h_pass.attachments.colors[0], new sg_view_desc()
+        {
+            color_attachment = { image = state.bloom.blur_h_img },
+            label = "blur-h-view"
+        });
         
-        sg_view_desc blur_h_depth_view_desc = default;
-        blur_h_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
-        blur_h_depth_view_desc.label = "blur-h-depth-view";
-        
-        sg_attachments blur_h_attachments = default;
-        blur_h_attachments.colors[0] = sg_make_view(blur_h_view_desc);
-        blur_h_attachments.depth_stencil = sg_make_view(blur_h_depth_view_desc);
+        if (state.bloom.blur_h_pass.attachments.depth_stencil.id == 0)
+        {
+            state.bloom.blur_h_pass.attachments.depth_stencil = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.blur_h_pass.attachments.depth_stencil, new sg_view_desc()
+        {
+            depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
+            label = "blur-h-depth-view"
+        });
         
         sg_pass_action blur_h_action = default;
         blur_h_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         blur_h_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
         
-        state.bloom.blur_h_pass.attachments = blur_h_attachments;
         state.bloom.blur_h_pass.action = blur_h_action;
         state.bloom.blur_h_pass.label = "bloom-blur-h-pass";
 
-        // Vertical blur pass - WebGL requires depth attachment for FBO consistency
-        sg_view_desc blur_v_view_desc = default;
-        blur_v_view_desc.color_attachment.image = state.bloom.blur_v_img;
-        blur_v_view_desc.label = "blur-v-view";
+        // Allocate/initialize vertical blur pass - WebGL requires depth attachment for FBO consistency
+        if (state.bloom.blur_v_pass.attachments.colors[0].id == 0)
+        {
+            state.bloom.blur_v_pass.attachments.colors[0] = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.blur_v_pass.attachments.colors[0], new sg_view_desc()
+        {
+            color_attachment = { image = state.bloom.blur_v_img },
+            label = "blur-v-view"
+        });
         
-        sg_view_desc blur_v_depth_view_desc = default;
-        blur_v_depth_view_desc.depth_stencil_attachment.image = state.bloom.dummy_depth_img;
-        blur_v_depth_view_desc.label = "blur-v-depth-view";
-        
-        sg_attachments blur_v_attachments = default;
-        blur_v_attachments.colors[0] = sg_make_view(blur_v_view_desc);
-        blur_v_attachments.depth_stencil = sg_make_view(blur_v_depth_view_desc);
+        if (state.bloom.blur_v_pass.attachments.depth_stencil.id == 0)
+        {
+            state.bloom.blur_v_pass.attachments.depth_stencil = sg_alloc_view();
+        }
+        sg_init_view(state.bloom.blur_v_pass.attachments.depth_stencil, new sg_view_desc()
+        {
+            depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
+            label = "blur-v-depth-view"
+        });
         
         sg_pass_action blur_v_action = default;
         blur_v_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         blur_v_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
         
-        state.bloom.blur_v_pass.attachments = blur_v_attachments;
         state.bloom.blur_v_pass.action = blur_v_action;
         state.bloom.blur_v_pass.label = "bloom-blur-v-pass";
 
         // Note: Composite pass renders to swapchain and must be created each frame
         // with the current swapchain, so we don't create it here.
 
-        // Create offscreen pipelines for rendering the model to bloom scene pass
+        // Create offscreen pipelines for rendering the model to bloom scene pass (only if not already created)
         // Use SG_PIXELFORMAT_DEPTH exactly like the offscreen example
-        state.bloom.scene_standard_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.Standard, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-        state.bloom.scene_skinned_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.Skinned, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-        state.bloom.scene_standard_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.StandardBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-        state.bloom.scene_skinned_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.SkinnedBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-        state.bloom.scene_standard_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.StandardMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-        state.bloom.scene_skinned_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
-            PipelineType.SkinnedMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        // These pipelines don't depend on framebuffer size, so we only create them once
+        if (state.bloom.scene_standard_pipeline.id == 0)
+        {
+            state.bloom.scene_standard_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.Standard, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_skinned_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.Skinned, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_standard_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.StandardBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_skinned_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.SkinnedBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_standard_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.StandardMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_skinned_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
+                PipelineType.SkinnedMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+        }
 
         // Create fullscreen quad vertices for post-processing passes
         float[] fullscreen_quad_vertices = {
@@ -432,7 +555,10 @@ public static unsafe partial class SharpGLTFApp
             label = "bloom-fullscreen-vbuf"
         });
 
-        // Create pipelines for bloom post-processing passes
+        // Create pipelines for bloom post-processing passes (only if not already created)
+        // These don't depend on framebuffer size, so we only create them once
+        if (state.bloom.bright_pipeline.id == 0)
+        {
         // Bright pass pipeline (fullscreen quad, no depth testing needed)
         state.bloom.bright_pipeline = sg_make_pipeline(new sg_pipeline_desc()
         {
@@ -462,7 +588,10 @@ public static unsafe partial class SharpGLTFApp
             },
             label = "bloom-bright-pipeline"
         });
+        }
 
+        if (state.bloom.blur_h_pipeline.id == 0)
+        {
         // Horizontal blur pipeline (fullscreen quad, no depth testing needed)
         state.bloom.blur_h_pipeline = sg_make_pipeline(new sg_pipeline_desc()
         {
@@ -492,7 +621,10 @@ public static unsafe partial class SharpGLTFApp
             },
             label = "bloom-blur-h-pipeline"
         });
+        }
 
+        if (state.bloom.blur_v_pipeline.id == 0)
+        {
         // Vertical blur pipeline (fullscreen quad, no depth testing needed)
         state.bloom.blur_v_pipeline = sg_make_pipeline(new sg_pipeline_desc()
         {
@@ -522,7 +654,10 @@ public static unsafe partial class SharpGLTFApp
             },
             label = "bloom-blur-v-pipeline"
         });
+        }
 
+        if (state.bloom.composite_pipeline.id == 0)
+        {
         // Composite pipeline (renders to swapchain, fullscreen quad doesn't need depth testing)
         state.bloom.composite_pipeline = sg_make_pipeline(new sg_pipeline_desc()
         {
@@ -551,6 +686,7 @@ public static unsafe partial class SharpGLTFApp
             },
             label = "bloom-composite-pipeline"
         });
+        }
 
         // Create resource bindings
         // Bright pass bindings (scene texture -> bright pass)
@@ -624,8 +760,13 @@ public static unsafe partial class SharpGLTFApp
 
         Info($"[Transmission] Initializing screen-space refraction: {fb_width}x{fb_height}, backend={sg_query_backend()}");
 
-        // Create screen texture for capturing scene behind transparent objects
-        var screen_color_desc = new sg_image_desc()
+        // Allocate/initialize screen texture for capturing scene behind transparent objects
+        // Following MRT example pattern: alloc once, then init/uninit/reinit on resize
+        if (state.transmission.screen_color_img.id == 0)
+        {
+            state.transmission.screen_color_img = sg_alloc_image();
+        }
+        sg_init_image(state.transmission.screen_color_img, new sg_image_desc()
         {
             usage = { color_attachment = true },
             width = fb_width,
@@ -633,11 +774,14 @@ public static unsafe partial class SharpGLTFApp
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
             sample_count = 1,  // No MSAA for offscreen rendering
             label = "transmission-screen-color"
-        };
-        state.transmission.screen_color_img = sg_make_image(screen_color_desc);
+        });
 
-        // Create depth texture for opaque pass
-        var screen_depth_desc = new sg_image_desc()
+        // Allocate/initialize depth texture for opaque pass
+        if (state.transmission.screen_depth_img.id == 0)
+        {
+            state.transmission.screen_depth_img = sg_alloc_image();
+        }
+        sg_init_image(state.transmission.screen_depth_img, new sg_image_desc()
         {
             usage = { depth_stencil_attachment = true },
             width = fb_width,
@@ -645,11 +789,14 @@ public static unsafe partial class SharpGLTFApp
             pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
             sample_count = 1,
             label = "transmission-screen-depth"
-        };
-        state.transmission.screen_depth_img = sg_make_image(screen_depth_desc);
+        });
 
-        // Create sampler for screen texture sampling
-        state.transmission.sampler = sg_make_sampler(new sg_sampler_desc()
+        // Allocate/initialize sampler for screen texture sampling
+        if (state.transmission.sampler.id == 0)
+        {
+            state.transmission.sampler = sg_alloc_sampler();
+        }
+        sg_init_sampler(state.transmission.sampler, new sg_sampler_desc()
         {
             min_filter = sg_filter.SG_FILTER_LINEAR,
             mag_filter = sg_filter.SG_FILTER_LINEAR,
@@ -658,29 +805,39 @@ public static unsafe partial class SharpGLTFApp
             label = "transmission-sampler"
         });
 
-        // Create view for screen texture (create once, reuse every frame)
-        state.transmission.screen_color_view = sg_make_view(new sg_view_desc
+        // Allocate/initialize view for screen texture (create once, reuse every frame)
+        if (state.transmission.screen_color_view.id == 0)
+        {
+            state.transmission.screen_color_view = sg_alloc_view();
+        }
+        sg_init_view(state.transmission.screen_color_view, new sg_view_desc
         {
             texture = { image = state.transmission.screen_color_img },
             label = "transmission-screen-color-view"
         });
-        Info("[Transmission] Created screen color view for refraction sampling");
+        Info("[Transmission] Initialized screen color view for refraction sampling");
 
-        // Create opaque pass (renders opaque objects to screen texture)
-        sg_view_desc opaque_color_view_desc = default;
-        opaque_color_view_desc.color_attachment.image = state.transmission.screen_color_img;
-        opaque_color_view_desc.label = "opaque-color-view";
+        // Allocate/initialize opaque pass (renders opaque objects to screen texture)
+        // Following MRT example pattern: alloc once, then init/uninit/reinit on resize
+        if (state.transmission.opaque_pass.attachments.colors[0].id == 0)
+        {
+            state.transmission.opaque_pass.attachments.colors[0] = sg_alloc_view();
+        }
+        sg_init_view(state.transmission.opaque_pass.attachments.colors[0], new sg_view_desc()
+        {
+            color_attachment = { image = state.transmission.screen_color_img },
+            label = "opaque-color-view"
+        });
         
-        sg_view_desc opaque_depth_view_desc = default;
-        opaque_depth_view_desc.depth_stencil_attachment.image = state.transmission.screen_depth_img;
-        opaque_depth_view_desc.label = "opaque-depth-view";
-        
-        var opaque_color_view = sg_make_view(opaque_color_view_desc);
-        var opaque_depth_view = sg_make_view(opaque_depth_view_desc);
-        
-        sg_attachments opaque_attachments = default;
-        opaque_attachments.colors[0] = opaque_color_view;
-        opaque_attachments.depth_stencil = opaque_depth_view;
+        if (state.transmission.opaque_pass.attachments.depth_stencil.id == 0)
+        {
+            state.transmission.opaque_pass.attachments.depth_stencil = sg_alloc_view();
+        }
+        sg_init_view(state.transmission.opaque_pass.attachments.depth_stencil, new sg_view_desc()
+        {
+            depth_stencil_attachment = { image = state.transmission.screen_depth_img },
+            label = "opaque-depth-view"
+        });
         
         sg_pass_action opaque_action = default;
         opaque_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
@@ -688,27 +845,28 @@ public static unsafe partial class SharpGLTFApp
         opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.depth.clear_value = 1.0f;
         
-        state.transmission.opaque_pass = default;
-        state.transmission.opaque_pass.attachments = opaque_attachments;
         state.transmission.opaque_pass.action = opaque_action;
         state.transmission.opaque_pass.label = "transmission-opaque-pass";
 
-        // Create pipelines for rendering opaque objects to screen texture
-        // These pipelines are identical to standard pipelines but render to offscreen texture
-        Info("[Transmission] Creating opaque rendering pipelines...");
-        state.transmission.opaque_standard_pipeline = PipeLineManager.CreatePipelineForPass(
-            PipelineType.TransmissionOpaque,
-            sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // screen_color_img format
-            sg_pixel_format.SG_PIXELFORMAT_DEPTH,   // screen_depth_img format
-            1                                        // sample_count
-        );
-        state.transmission.opaque_skinned_pipeline = PipeLineManager.CreatePipelineForPass(
-            PipelineType.TransmissionOpaqueSkinned,
-            sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-            sg_pixel_format.SG_PIXELFORMAT_DEPTH,
-            1
-        );
-        Info("[Transmission] Opaque pipelines created (standard + skinned)");
+        // Create pipelines for rendering opaque objects to screen texture (only if not already created)
+        // These pipelines don't depend on framebuffer size, so we only create them once
+        if (state.transmission.opaque_standard_pipeline.id == 0)
+        {
+            Info("[Transmission] Creating opaque rendering pipelines...");
+            state.transmission.opaque_standard_pipeline = PipeLineManager.CreatePipelineForPass(
+                PipelineType.TransmissionOpaque,
+                sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // screen_color_img format
+                sg_pixel_format.SG_PIXELFORMAT_DEPTH,   // screen_depth_img format
+                1                                        // sample_count
+            );
+            state.transmission.opaque_skinned_pipeline = PipeLineManager.CreatePipelineForPass(
+                PipelineType.TransmissionOpaqueSkinned,
+                sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                1
+            );
+            Info("[Transmission] Opaque pipelines created (standard + skinned)");
+        }
 
         Info("[Transmission] Transmission system initialized successfully");
         Info("[Transmission] Two-pass rendering ready: Pass 1 (opaque objects → screen texture), Pass 2 (transparent with refraction)");

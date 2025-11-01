@@ -40,6 +40,20 @@ public enum PipelineType
 public static class PipeLineManager
 {
     private static Dictionary<PipelineType, sg_pipeline> _pipelines = new Dictionary<PipelineType, sg_pipeline>();
+    
+    // Cache for custom render pass pipelines (key includes format/sample_count)
+    private static Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int), sg_pipeline> _customPassPipelines = 
+        new Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int), sg_pipeline>();
+
+    /// <summary>
+    /// Clear all pipeline caches. Call this when destroying all resources (e.g., on window resize).
+    /// This ensures pipelines will be recreated on next use.
+    /// </summary>
+    public static void ClearCaches()
+    {
+        _pipelines.Clear();
+        _customPassPipelines.Clear();
+    }
 
     public static sg_pipeline GetOrCreatePipeline(PipelineType type)
     {
@@ -216,10 +230,17 @@ public static class PipeLineManager
 
     /// <summary>
     /// Create a pipeline for a custom render pass (e.g., transmission opaque pass)
-    /// This doesn't cache the pipeline - caller is responsible for storing it
+    /// Caches pipelines based on type and render pass parameters to avoid recreating them
     /// </summary>
     public static sg_pipeline CreatePipelineForPass(PipelineType type, sg_pixel_format color_format, sg_pixel_format depth_format, int sample_count)
     {
+        // Check cache first
+        var cache_key = (type, color_format, depth_format, sample_count);
+        if (_customPassPipelines.ContainsKey(cache_key))
+        {
+            return _customPassPipelines[cache_key];
+        }
+        
         var pipeline_desc = default(sg_pipeline_desc);
         
         switch (type)
@@ -243,7 +264,7 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = color_format;
                 pipeline_desc.depth.pixel_format = depth_format;
                 pipeline_desc.label = "transmission-opaque-static-pipeline";
-                return sg_make_pipeline(pipeline_desc);
+                break;
                 
             case PipelineType.TransmissionOpaqueSkinned:
                 // Skinned mesh pipeline rendering to transmission opaque pass
@@ -264,11 +285,15 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = color_format;
                 pipeline_desc.depth.pixel_format = depth_format;
                 pipeline_desc.label = "transmission-opaque-skinned-pipeline";
-                return sg_make_pipeline(pipeline_desc);
+                break;
                 
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, "Pipeline type not supported for custom render pass");
         }
+        
+        var pipeline = sg_make_pipeline(pipeline_desc);
+        _customPassPipelines[cache_key] = pipeline;
+        return pipeline;
     }
 
     public static int GetAttrSlot(PipelineType type, string attr_name)
@@ -479,9 +504,17 @@ public static class PipeLineManager
 
     /// <summary>
     /// Create a pipeline for offscreen rendering with custom formats (for bloom scene pass)
+    /// Caches pipelines based on type and format parameters to avoid recreating them
     /// </summary>
     public static sg_pipeline CreateOffscreenPipeline(PipelineType type, sg_pixel_format colorFormat, sg_pixel_format depthFormat)
     {
+        // Check cache first (sample_count is always 1 for offscreen)
+        var cache_key = (type, colorFormat, depthFormat, 1);
+        if (_customPassPipelines.ContainsKey(cache_key))
+        {
+            return _customPassPipelines[cache_key];
+        }
+        
         sg_pipeline pipeline;
         var pipeline_desc = default(sg_pipeline_desc);
         
@@ -505,7 +538,6 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-static-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.Skinned:
@@ -526,7 +558,6 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-skinned-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.StandardBlend:
@@ -552,7 +583,6 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-static-blend-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.SkinnedBlend:
@@ -578,7 +608,6 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-skinned-blend-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.StandardMask:
@@ -599,7 +628,6 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-static-mask-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             case PipelineType.SkinnedMask:
@@ -620,13 +648,14 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = colorFormat;
                 pipeline_desc.depth.pixel_format = depthFormat;
                 pipeline_desc.label = "bloom-scene-skinned-mask-pipeline";
-                pipeline = sg_make_pipeline(pipeline_desc);
                 break;
                 
             default:
                 throw new ArgumentException($"Unsupported pipeline type: {type}");
         }
         
+        pipeline = sg_make_pipeline(pipeline_desc);
+        _customPassPipelines[cache_key] = pipeline;
         return pipeline;
     }
 

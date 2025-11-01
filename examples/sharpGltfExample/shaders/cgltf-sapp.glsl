@@ -131,6 +131,10 @@ layout(binding=1) uniform metallic_params {
     // Transmission (glass/refraction) parameters - KHR_materials_transmission
     float transmission_factor;  // 0.0 = opaque, 1.0 = fully transparent with refraction
     float ior;                  // Index of Refraction (1.0 = air, 1.5 = glass, 1.55 = amber)
+    // Volume absorption parameters - KHR_materials_volume (Beer's Law)
+    vec3 attenuation_color;     // RGB color filter (e.g., orange for amber)
+    float attenuation_distance; // Distance at which light reaches attenuation_color intensity
+    float thickness_factor;     // Thickness of the volume in world units
 };
 
 const int MAX_LIGHTS = 4;
@@ -543,6 +547,19 @@ void main() {
     if (transmission_factor > 0.0) {
         // Calculate refracted background color
         vec3 refracted_color = calculate_refraction(normal, view, ior, transmission_factor);
+        
+        // Apply volume absorption (Beer's Law) if thickness is defined
+        // This creates the colored tint effect (e.g., golden amber, blue glass)
+        if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
+            // Beer's Law: Intensity = I0 * exp(-absorption_coefficient * distance)
+            // attenuation_color is the target color at attenuation_distance
+            // We invert it to get absorption coefficients
+            vec3 absorption = -log(attenuation_color + vec3(0.001)) / attenuation_distance;
+            vec3 attenuation = exp(-absorption * thickness_factor);
+            
+            // Apply attenuation to refracted color
+            refracted_color *= attenuation;
+        }
         
         // Mix between surface color and refracted background based on transmission factor
         // transmission_factor = 0.0 -> fully opaque (use surface color)
