@@ -179,11 +179,6 @@ public static unsafe partial class SharpGLTFApp
         public float overrideAttenuationDistance = 1.0f;  // Distance for Beer's Law
         public float overrideThickness = 1.0f;         // Thickness multiplier
 
-        // Debug visualization modes
-        public bool debugShowScreenTexture = false;
-        public bool debugShowDepthBuffer = false;
-        public bool debugWireframe = false;
-
         // UI state
         public UIState ui;
     }

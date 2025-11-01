@@ -382,7 +382,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawGlassMaterialsWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(400, 600), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(400, 500), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Glass Materials (Transmission)", ref open, ImGuiWindowFlags.None))
@@ -562,49 +562,6 @@ public static unsafe partial class SharpGLTFApp
                             state.overrideAttenuationDistance = 1.0f;
                             state.overrideThickness = 0.5f;
                         }
-                    }
-                }
-
-                // Debug visualization section
-                igSeparator();
-                if (igCollapsingHeader_TreeNodeFlags("Debug Visualization", ImGuiTreeNodeFlags.None))
-                {
-                    byte showScreenTex = (byte)(state.debugShowScreenTexture ? 1 : 0);
-                    if (igCheckbox("Show Screen Texture", ref showScreenTex))
-                    {
-                        state.debugShowScreenTexture = showScreenTex != 0;
-                        if (state.debugShowScreenTexture)
-                        {
-                            state.debugShowDepthBuffer = false;
-                        }
-                    }
-                    if (igIsItemHovered(ImGuiHoveredFlags.None))
-                    {
-                        igSetTooltip("Display the captured screen texture used for refraction");
-                    }
-
-                    byte showDepth = (byte)(state.debugShowDepthBuffer ? 1 : 0);
-                    if (igCheckbox("Show Depth Buffer", ref showDepth))
-                    {
-                        state.debugShowDepthBuffer = showDepth != 0;
-                        if (state.debugShowDepthBuffer)
-                        {
-                            state.debugShowScreenTexture = false;
-                        }
-                    }
-                    if (igIsItemHovered(ImGuiHoveredFlags.None))
-                    {
-                        igSetTooltip("Visualize the depth buffer (white=near, black=far)");
-                    }
-
-                    byte wireframe = (byte)(state.debugWireframe ? 1 : 0);
-                    if (igCheckbox("Wireframe Overlay", ref wireframe))
-                    {
-                        state.debugWireframe = wireframe != 0;
-                    }
-                    if (igIsItemHovered(ImGuiHoveredFlags.None))
-                    {
-                        igSetTooltip("Show wireframe overlay on glass materials");
                     }
                 }
             }
