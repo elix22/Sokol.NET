@@ -31,6 +31,10 @@ public enum PipelineType
     SkinnedBlend,         // For alpha blending with skinning
     StandardMask,         // For alpha masking
     SkinnedMask,          // For alpha masking with skinning
+    
+    // Transmission (glass materials) pipelines - render opaque objects to screen texture
+    TransmissionOpaque,        // Opaque pass for standard meshes
+    TransmissionOpaqueSkinned, // Opaque pass for skinned meshes
 }
 
 public static class PipeLineManager
@@ -196,6 +200,11 @@ public static class PipeLineManager
                 pipeline_desc.label = "skinned-mask-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
+                
+            case PipelineType.TransmissionOpaque:
+            case PipelineType.TransmissionOpaqueSkinned:
+                // These require custom render pass, use CreatePipelineForPass instead
+                throw new InvalidOperationException($"Pipeline type {type} requires CreatePipelineForPass with custom render pass");
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
@@ -203,6 +212,63 @@ public static class PipeLineManager
 
         _pipelines[type] = pipeline;
         return pipeline;
+    }
+
+    /// <summary>
+    /// Create a pipeline for a custom render pass (e.g., transmission opaque pass)
+    /// This doesn't cache the pipeline - caller is responsible for storing it
+    /// </summary>
+    public static sg_pipeline CreatePipelineForPass(PipelineType type, sg_pixel_format color_format, sg_pixel_format depth_format, int sample_count)
+    {
+        var pipeline_desc = default(sg_pipeline_desc);
+        
+        switch (type)
+        {
+            case PipelineType.TransmissionOpaque:
+                // Standard mesh pipeline rendering to transmission opaque pass
+                sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_static;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = sample_count;
+                pipeline_desc.colors[0].pixel_format = color_format;
+                pipeline_desc.depth.pixel_format = depth_format;
+                pipeline_desc.label = "transmission-opaque-static-pipeline";
+                return sg_make_pipeline(pipeline_desc);
+                
+            case PipelineType.TransmissionOpaqueSkinned:
+                // Skinned mesh pipeline rendering to transmission opaque pass
+                sg_shader shader_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_skinned;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = sample_count;
+                pipeline_desc.colors[0].pixel_format = color_format;
+                pipeline_desc.depth.pixel_format = depth_format;
+                pipeline_desc.label = "transmission-opaque-skinned-pipeline";
+                return sg_make_pipeline(pipeline_desc);
+                
+            default:
+                throw new ArgumentOutOfRangeException(nameof(type), type, "Pipeline type not supported for custom render pass");
+        }
     }
 
     public static int GetAttrSlot(PipelineType type, string attr_name)

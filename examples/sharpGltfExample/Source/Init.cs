@@ -94,6 +94,9 @@ public static unsafe partial class SharpGLTFApp
         // Initialize bloom post-processing
         InitializeBloom();
 
+        // Initialize transmission (glass/refraction) rendering
+        InitializeTransmission();
+
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
         
@@ -612,5 +615,103 @@ public static unsafe partial class SharpGLTFApp
         };
 
         Info("[Bloom] Bloom system initialized successfully");
+    }
+
+    static void InitializeTransmission()
+    {
+        int fb_width = sapp_width();
+        int fb_height = sapp_height();
+
+        Info($"[Transmission] Initializing screen-space refraction: {fb_width}x{fb_height}, backend={sg_query_backend()}");
+
+        // Create screen texture for capturing scene behind transparent objects
+        var screen_color_desc = new sg_image_desc()
+        {
+            usage = { color_attachment = true },
+            width = fb_width,
+            height = fb_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            sample_count = 1,  // No MSAA for offscreen rendering
+            label = "transmission-screen-color"
+        };
+        state.transmission.screen_color_img = sg_make_image(screen_color_desc);
+
+        // Create depth texture for opaque pass
+        var screen_depth_desc = new sg_image_desc()
+        {
+            usage = { depth_stencil_attachment = true },
+            width = fb_width,
+            height = fb_height,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+            sample_count = 1,
+            label = "transmission-screen-depth"
+        };
+        state.transmission.screen_depth_img = sg_make_image(screen_depth_desc);
+
+        // Create sampler for screen texture sampling
+        state.transmission.sampler = sg_make_sampler(new sg_sampler_desc()
+        {
+            min_filter = sg_filter.SG_FILTER_LINEAR,
+            mag_filter = sg_filter.SG_FILTER_LINEAR,
+            wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+            wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+            label = "transmission-sampler"
+        });
+
+        // Create view for screen texture (create once, reuse every frame)
+        state.transmission.screen_color_view = sg_make_view(new sg_view_desc
+        {
+            texture = { image = state.transmission.screen_color_img },
+            label = "transmission-screen-color-view"
+        });
+        Info("[Transmission] Created screen color view for refraction sampling");
+
+        // Create opaque pass (renders opaque objects to screen texture)
+        sg_view_desc opaque_color_view_desc = default;
+        opaque_color_view_desc.color_attachment.image = state.transmission.screen_color_img;
+        opaque_color_view_desc.label = "opaque-color-view";
+        
+        sg_view_desc opaque_depth_view_desc = default;
+        opaque_depth_view_desc.depth_stencil_attachment.image = state.transmission.screen_depth_img;
+        opaque_depth_view_desc.label = "opaque-depth-view";
+        
+        var opaque_color_view = sg_make_view(opaque_color_view_desc);
+        var opaque_depth_view = sg_make_view(opaque_depth_view_desc);
+        
+        sg_attachments opaque_attachments = default;
+        opaque_attachments.colors[0] = opaque_color_view;
+        opaque_attachments.depth_stencil = opaque_depth_view;
+        
+        sg_pass_action opaque_action = default;
+        opaque_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        opaque_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
+        opaque_action.depth.clear_value = 1.0f;
+        
+        state.transmission.opaque_pass = default;
+        state.transmission.opaque_pass.attachments = opaque_attachments;
+        state.transmission.opaque_pass.action = opaque_action;
+        state.transmission.opaque_pass.label = "transmission-opaque-pass";
+
+        // Create pipelines for rendering opaque objects to screen texture
+        // These pipelines are identical to standard pipelines but render to offscreen texture
+        Info("[Transmission] Creating opaque rendering pipelines...");
+        state.transmission.opaque_standard_pipeline = PipeLineManager.CreatePipelineForPass(
+            PipelineType.TransmissionOpaque,
+            sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // screen_color_img format
+            sg_pixel_format.SG_PIXELFORMAT_DEPTH,   // screen_depth_img format
+            1                                        // sample_count
+        );
+        state.transmission.opaque_skinned_pipeline = PipeLineManager.CreatePipelineForPass(
+            PipelineType.TransmissionOpaqueSkinned,
+            sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+            sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+            1
+        );
+        Info("[Transmission] Opaque pipelines created (standard + skinned)");
+
+        Info("[Transmission] Transmission system initialized successfully");
+        Info("[Transmission] Two-pass rendering ready: Pass 1 (opaque objects → screen texture), Pass 2 (transparent with refraction)");
+        Info("[Transmission] Screen texture available for refraction shader sampling");
     }
 }

@@ -160,7 +160,17 @@ public static unsafe partial class SharpGLTFApp
         }
 
         // Begin rendering
-        if (state.enableBloom && state.modelLoaded && state.model != null && state.bloom.scene_color_img.id != 0)
+        // Priority: Transmission > Bloom > Regular
+        bool useTransmission = state.enableTransmission && state.modelLoaded && state.model != null && state.transmission.screen_color_img.id != 0;
+        bool useBloom = !useTransmission && state.enableBloom && state.modelLoaded && state.model != null && state.bloom.scene_color_img.id != 0;
+        
+        if (useTransmission)
+        {
+            // TRANSMISSION PASS 1: Render opaque objects to offscreen screen texture
+            // This captures the background for transparent objects to refract
+            sg_begin_pass(state.transmission.opaque_pass);
+        }
+        else if (useBloom)
         {
             // BLOOM PASS 1: Render scene to offscreen buffer
             sg_begin_pass(state.bloom.scene_pass);
@@ -291,7 +301,10 @@ public static unsafe partial class SharpGLTFApp
                 float distanceToCamera = Vector3.Distance(meshCenter, state.camera.EyePos);
 
                 // Categorize as opaque or transparent
-                if (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND)
+                // When transmission is enabled, use TransmissionFactor; otherwise use AlphaMode
+                bool isTransparent = useTransmission ? (mesh.TransmissionFactor > 0.0f) : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND);
+                
+                if (isTransparent)
                 {
                     transparentNodes.Add((node, distanceToCamera));
                 }
@@ -305,7 +318,8 @@ public static unsafe partial class SharpGLTFApp
             transparentNodes.Sort((a, b) => b.distance.CompareTo(a.distance));
 
             // Helper function to render a node
-            void RenderNode(SharpGltfNode node)
+            // useScreenTexture: When true, bind the screen texture for refraction (transmission Pass 2)
+            void RenderNode(SharpGltfNode node, bool useScreenTexture = false)
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
@@ -326,12 +340,17 @@ public static unsafe partial class SharpGLTFApp
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
 
-                // Choose pipeline based on alpha mode, skinning, and whether bloom is active
+                // Choose pipeline based on alpha mode, skinning, and rendering mode
                 PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning);
                 
-                // Get appropriate pipeline - use bloom scene pipelines if rendering to offscreen target
+                // Get appropriate pipeline based on rendering mode
                 sg_pipeline pipeline;
-                if (state.enableBloom && state.bloom.scene_color_img.id != 0)
+                if (useTransmission && mesh.TransmissionFactor == 0.0f)
+                {
+                    // Rendering opaque object to transmission opaque pass
+                    pipeline = useSkinning ? state.transmission.opaque_skinned_pipeline : state.transmission.opaque_standard_pipeline;
+                }
+                else if (useBloom)
                 {
                     // Use offscreen pipeline for bloom scene pass
                     pipeline = pipelineType switch
@@ -389,6 +408,10 @@ public static unsafe partial class SharpGLTFApp
                     // Set emissive strength (KHR_materials_emissive_strength extension)
                     metallicParams.emissive_strength = mesh.EmissiveStrength;
 
+                    // Set transmission parameters (KHR_materials_transmission extension)
+                    metallicParams.transmission_factor = mesh.TransmissionFactor;
+                    metallicParams.ior = mesh.IOR;
+
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms (cast to skinning version)
@@ -435,26 +458,65 @@ public static unsafe partial class SharpGLTFApp
                     // Set emissive strength (KHR_materials_emissive_strength extension)
                     metallicParams.emissive_strength = mesh.EmissiveStrength;
 
+                    // Set transmission parameters (KHR_materials_transmission extension)
+                    metallicParams.transmission_factor = mesh.TransmissionFactor;
+                    metallicParams.ior = mesh.IOR;
+
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms
                     sg_apply_uniforms(UB_cgltf_light_params, SG_RANGE(ref lightParams));
                 }
 
-                // Draw the mesh
-                mesh.Draw(pipeline);
+                // Draw the mesh with optional screen texture for refraction
+                if (useScreenTexture)
+                {
+                    // Pass pre-created screen view for refraction sampling (transmission materials)
+                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler);
+                }
+                else
+                {
+                    // Regular draw without screen texture
+                    mesh.Draw(pipeline);
+                }
             }
 
-            // PASS 1: Render all opaque objects (no specific order needed)
-            foreach (var (node, _) in opaqueNodes)
+            // Render based on mode: Transmission / Bloom / Regular
+            if (useTransmission)
             {
-                RenderNode(node);
+                // TRANSMISSION TWO-PASS RENDERING
+                // Pass 1: Render opaque objects to offscreen texture (already in transmission.opaque_pass)
+                foreach (var (node, _) in opaqueNodes)
+                {
+                    RenderNode(node, useScreenTexture: false);
+                }
+                
+                // End opaque pass
+                sg_end_pass();
+                
+                // Pass 2: Render transparent objects to swapchain (with refraction from screen texture)
+                sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+                
+                // Render transparent objects with screen texture binding for refraction
+                foreach (var (node, _) in transparentNodes)
+                {
+                    RenderNode(node, useScreenTexture: true);
+                }
             }
-
-            // PASS 2: Render all transparent objects (back-to-front order)
-            foreach (var (node, _) in transparentNodes)
+            else
             {
-                RenderNode(node);
+                // REGULAR RENDERING (Bloom or swapchain)
+                // PASS 1: Render all opaque objects (no specific order needed)
+                foreach (var (node, _) in opaqueNodes)
+                {
+                    RenderNode(node);
+                }
+
+                // PASS 2: Render all transparent objects (back-to-front order)
+                foreach (var (node, _) in transparentNodes)
+                {
+                    RenderNode(node);
+                }
             }
 
             // Mark that we've logged mesh info

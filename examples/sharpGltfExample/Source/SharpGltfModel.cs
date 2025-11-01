@@ -407,6 +407,37 @@ namespace Sokol
                 Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex} (no extension): using default emissiveStrength = 1.0");
             }
 
+            // Extract IOR from KHR_materials_ior extension
+            // SharpGLTF has built-in support for this extension
+            var iorExt = material.GetExtension<SharpGLTF.Schema2.MaterialIOR>();
+            if (iorExt != null)
+            {
+                mesh.IOR = iorExt.IndexOfRefraction;
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: IOR = {mesh.IOR} (Air: 1.0, Water: 1.33, Glass: 1.5, Amber: 1.55, Diamond: 2.4)");
+            }
+            else
+            {
+                mesh.IOR = 1.5f; // Default value for glass (no extension present)
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: using default IOR = 1.5 (glass)");
+            }
+
+            // Extract transmission from KHR_materials_transmission extension
+            // This enables glass/transparent materials with refraction
+            var transmissionExt = material.GetExtension<SharpGLTF.Schema2.MaterialTransmission>();
+            if (transmissionExt != null)
+            {
+                mesh.TransmissionFactor = transmissionExt.TransmissionFactor;
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: TransmissionFactor = {mesh.TransmissionFactor} (0.0 = opaque, 1.0 = fully transparent)");
+                
+                // TODO: Transmission texture support (MaterialChannel "Transmission" from GetChannels)
+                // Will be implemented when texture coordinate mapping is needed
+            }
+            else
+            {
+                mesh.TransmissionFactor = 0.0f; // Default: opaque (no refraction)
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: using default TransmissionFactor = 0.0 (opaque)");
+            }
+
             // Extract alpha mode and cutoff
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;

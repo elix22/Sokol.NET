@@ -49,11 +49,11 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "glb/DragonAttenuation.glb";
 
-    const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
+    // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
     // const string filename = "glb/MetalRoughSpheres.glb";
 
-    // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
+    const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
 
     //  const string filename = "Sponza/glTF/Sponza.gltf";
 
@@ -95,12 +95,32 @@ public static unsafe partial class SharpGLTFApp
         public sg_sampler sampler;           // Linear sampler for all passes
     }
 
+    struct TransmissionPass
+    {
+        // Two-pass rendering: opaque objects first, then transparent with refraction
+        public sg_pass opaque_pass;          // Render opaque objects to screen texture
+        
+        // Pipelines for opaque rendering (captures scene behind transparent objects)
+        public sg_pipeline opaque_standard_pipeline;
+        public sg_pipeline opaque_skinned_pipeline;
+        public sg_pipeline opaque_standard_blend_pipeline;
+        public sg_pipeline opaque_skinned_blend_pipeline;
+        public sg_pipeline opaque_standard_mask_pipeline;
+        public sg_pipeline opaque_skinned_mask_pipeline;
+        
+        public sg_image screen_color_img;    // Screen texture for refraction sampling
+        public sg_image screen_depth_img;    // Depth buffer
+        public sg_view screen_color_view;    // View for screen texture (created once, reused)
+        public sg_sampler sampler;           // Linear sampler for screen texture
+    }
+
     struct UIState
     {
         public bool model_info_open;
         public bool animation_open;
         public bool lighting_open;
         public bool bloom_open;
+        public bool glass_materials_open;
         public bool culling_open;
         public bool statistics_open;
         public bool camera_info_open;
@@ -146,6 +166,10 @@ public static unsafe partial class SharpGLTFApp
         public bool enableBloom = false;
         public float bloomIntensity = 1.5f;      // Bloom intensity (0.0 - 2.0)
         public float bloomThreshold = 0.8f;      // Brightness threshold (0.0 - 10.0)
+
+        // Transmission (glass/refraction) rendering
+        public TransmissionPass transmission;
+        public bool enableTransmission = false;
 
         // UI state
         public UIState ui;

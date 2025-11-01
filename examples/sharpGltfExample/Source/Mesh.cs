@@ -28,6 +28,13 @@ namespace Sokol
         public AlphaMode AlphaMode = AlphaMode.OPAQUE;
         public float AlphaCutoff = 0.5f;
 
+        // Glass material properties
+        public float IOR = 1.5f;  // Index of Refraction (KHR_materials_ior, default: 1.5 for glass)
+        
+        // Transmission properties (KHR_materials_transmission)
+        public float TransmissionFactor = 0.0f;  // 0.0 = opaque, 1.0 = fully transparent/refractive
+        public int TransmissionTextureIndex = -1;  // Index into Textures list, -1 = no texture
+
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;
@@ -105,7 +112,7 @@ namespace Sokol
             return _defaultBlackTexture;
         }
 
-        public void Draw(sg_pipeline pipeline)
+        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default)
         {
             if (IndexCount == 0)
             {
@@ -145,6 +152,21 @@ namespace Sokol
             var emissiveTex = Textures.Count > 4 && Textures[4] != null ? Textures[4] : GetDefaultBlackTexture();
             bind.views[4] = emissiveTex.View;
             bind.samplers[4] = emissiveTex.Sampler;
+
+            // 5: screen_tex (for refraction in transmission materials)
+            // Use pre-created view if provided, otherwise bind default texture
+            if (screenView.id != 0 && screenSampler.id != 0)
+            {
+                bind.views[5] = screenView;  // Use pre-created view (created once in Init)
+                bind.samplers[5] = screenSampler;
+            }
+            else
+            {
+                // Use default black texture when screen view not provided
+                var defaultTex = GetDefaultBlackTexture();
+                bind.views[5] = defaultTex.View;
+                bind.samplers[5] = defaultTex.Sampler;
+            }
 
             sg_apply_bindings(bind);
             sg_draw(0, (uint)IndexCount, 1);

@@ -128,6 +128,9 @@ layout(binding=1) uniform metallic_params {
     float alpha_cutoff;
     // Emissive strength (KHR_materials_emissive_strength extension)
     float emissive_strength;
+    // Transmission (glass/refraction) parameters - KHR_materials_transmission
+    float transmission_factor;  // 0.0 = opaque, 1.0 = fully transparent with refraction
+    float ior;                  // Index of Refraction (1.0 = air, 1.5 = glass, 1.55 = amber)
 };
 
 const int MAX_LIGHTS = 4;
@@ -149,12 +152,14 @@ layout(binding=1) uniform texture2D metallic_roughness_tex;
 layout(binding=2) uniform texture2D normal_tex;
 layout(binding=3) uniform texture2D occlusion_tex;
 layout(binding=4) uniform texture2D emissive_tex;
+layout(binding=5) uniform texture2D screen_tex;  // Screen texture for refraction (transmission pass)
 
 layout(binding=0) uniform sampler base_color_smp;
 layout(binding=1) uniform sampler metallic_roughness_smp;
 layout(binding=2) uniform sampler normal_smp;
 layout(binding=3) uniform sampler occlusion_smp;
 layout(binding=4) uniform sampler emissive_smp;
+layout(binding=5) uniform sampler screen_smp;  // Sampler for screen texture
 
 vec3 linear_to_srgb(vec3 linear) {
     return pow(linear, vec3(1.0/2.2));
@@ -410,6 +415,38 @@ vec3 tone_map(vec3 color) {
     return toneMapUncharted(color);
 }
 
+// Calculate refracted color for transmission/glass materials
+// Uses screen-space refraction with IOR-based ray bending
+vec3 calculate_refraction(vec3 normal, vec3 view, float ior, float transmission_factor) {
+    // Calculate refraction direction using Snell's law
+    // Assuming we're going from air (IOR=1.0) into the material
+    float eta = 1.0 / ior;  // Ratio of indices (air to material)
+    
+    // Refract the view ray through the surface
+    vec3 refracted = refract(-view, normal, eta);
+    
+    // If total internal reflection occurs, use reflection instead
+    if (length(refracted) < 0.01) {
+        refracted = reflect(-view, normal);
+    }
+    
+    // Convert fragment position to screen space UV coordinates
+    vec2 screen_uv = gl_FragCoord.xy / vec2(textureSize(sampler2D(screen_tex, screen_smp), 0));
+    
+    // Distort UV based on refracted direction
+    // The strength of distortion depends on the angle of refraction and transmission factor
+    float distortion_strength = 0.1 * transmission_factor;  // Scale factor for visible effect
+    vec2 distorted_uv = screen_uv + refracted.xy * distortion_strength;
+    
+    // Clamp UV to valid range to avoid sampling outside texture
+    distorted_uv = clamp(distorted_uv, vec2(0.0), vec2(1.0));
+    
+    // Sample the background (screen texture) at distorted coordinates
+    vec3 refracted_color = texture(sampler2D(screen_tex, screen_smp), distorted_uv).rgb;
+    
+    return refracted_color;
+}
+
 void main() {
     // Step 1: Get base color
     // Manual sRGB to linear conversion (textures are RGBA8 format)
@@ -501,6 +538,26 @@ void main() {
     
     // Add emissive
     color += emissive;
+    
+    // Apply transmission (glass/refraction) if enabled
+    if (transmission_factor > 0.0) {
+        // Calculate refracted background color
+        vec3 refracted_color = calculate_refraction(normal, view, ior, transmission_factor);
+        
+        // Mix between surface color and refracted background based on transmission factor
+        // transmission_factor = 0.0 -> fully opaque (use surface color)
+        // transmission_factor = 1.0 -> fully transparent (use refracted background)
+        color = mix(color, refracted_color, transmission_factor);
+        
+        // For glass materials, also apply some Fresnel effect
+        // Objects are more transparent when viewed straight on, more reflective at grazing angles
+        float n_dot_v = max(dot(normal, view), 0.0);
+        float fresnel = pow(1.0 - n_dot_v, 5.0);  // Schlick's approximation
+        
+        // Reduce transmission at grazing angles (makes edges more reflective)
+        float effective_transmission = transmission_factor * (1.0 - fresnel * 0.5);
+        color = mix(color, refracted_color, effective_transmission);
+    }
     
     // Apply tone mapping (Uncharted 2) and gamma correction
     frag_color = vec4(tone_map(color), base_color.a);

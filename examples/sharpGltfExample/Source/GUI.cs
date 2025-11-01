@@ -55,6 +55,12 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.bloom_open = bloom_open != 0;
                 }
 
+                byte glass_materials_open = state.ui.glass_materials_open ? (byte)1 : (byte)0;
+                if (igMenuItem_BoolPtr("Glass Materials...", null, ref glass_materials_open, true))
+                {
+                    state.ui.glass_materials_open = glass_materials_open != 0;
+                }
+
                 byte culling_open = state.ui.culling_open ? (byte)1 : (byte)0;
                 if (igMenuItem_BoolPtr("Culling...", null, ref culling_open, true))
                 {
@@ -140,6 +146,13 @@ public static unsafe partial class SharpGLTFApp
         if (state.ui.bloom_open)
         {
             DrawBloomWindow(ref pos);
+            pos.X += 20; pos.Y += 20;
+        }
+
+        // Glass Materials Window
+        if (state.ui.glass_materials_open)
+        {
+            DrawGlassMaterialsWindow(ref pos);
             pos.X += 20; pos.Y += 20;
         }
 
@@ -361,6 +374,58 @@ public static unsafe partial class SharpGLTFApp
                 if (igSliderFloat("##bloom_threshold", ref bloomThreshold, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags.None))
                 {
                     state.bloomThreshold = bloomThreshold;
+                }
+            }
+        }
+        igEnd();
+    }
+
+    static void DrawGlassMaterialsWindow(ref Vector2 pos)
+    {
+        igSetNextWindowSize(new Vector2(280, 200), ImGuiCond.Once);
+        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        byte open = 1;
+        if (igBegin("Glass Materials (Transmission)", ref open, ImGuiWindowFlags.None))
+        {
+            state.ui.glass_materials_open = open != 0;
+
+            byte transmissionEnabled = (byte)(state.enableTransmission ? 1 : 0);
+            if (igCheckbox("Enable Transmission/Refraction", ref transmissionEnabled))
+            {
+                state.enableTransmission = transmissionEnabled != 0;
+            }
+
+            igSeparator();
+            igTextWrapped("Glass materials use screen-space refraction with Index of Refraction (IOR) for realistic light bending through transparent objects.");
+
+            if (state.model != null && state.enableTransmission)
+            {
+                igSeparator();
+                igText("Model Transmission Properties:");
+                
+                int transmissiveMeshes = 0;
+                foreach (var mesh in state.model.Meshes)
+                {
+                    if (mesh.TransmissionFactor > 0.0f)
+                    {
+                        transmissiveMeshes++;
+                    }
+                }
+                
+                igText($"Transmissive meshes: {transmissiveMeshes}/{state.model.Meshes.Count}");
+                
+                if (transmissiveMeshes > 0)
+                {
+                    igText("Examples found:");
+                    int shown = 0;
+                    foreach (var mesh in state.model.Meshes)
+                    {
+                        if (mesh.TransmissionFactor > 0.0f && shown < 3)
+                        {
+                            igBulletText($"IOR: {mesh.IOR:F2}, Transmission: {mesh.TransmissionFactor:F2}");
+                            shown++;
+                        }
+                    }
                 }
             }
         }
