@@ -21,44 +21,27 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
-    // const string filename = "DamagedHelmet.glb";
-    //   const string filename = "assimpScene.glb";
-    // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
+    // Model list for browser
+    static readonly string[] availableModels = new string[]
+    {
+        "DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+        "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
+        "DancingGangster/glTF-Binary/DancingGangster.glb",
+        "ABeautifulGame/glTF/ABeautifulGame.gltf",
+        "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",
+        "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
+        "AttenuationTest/glTF-Binary/AttenuationTest.glb",
+        "BoomBox/glTF-Binary/BoomBox.glb",
+        "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb",
+        "ClearcoatRing/glTF/ClearcoatRing.gltf",
+        "DragonAttenuation/glTF-Binary/DragonAttenuation.glb",
+        "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
+        "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
+        "IridescenceLamp/glTF-Binary/IridescenceLamp.glb"
+    };
 
-    // const string filename = "DancingGangster.glb";
-    // const string filename = "Gangster.glb";
+    static string filename => availableModels[state.currentModelIndex];
 
-    //race_track
-    // const string filename = "race_track.glb";
-    // const string filename = "mainsponza/NewSponza_Main_glTF_003.gltf";
-
-    // const string filename = "glb/2CylinderEngine.glb";
-
-    // const string filename = "ABeautifulGame/glTF/ABeautifulGame.gltf";
-    // const string filename = "glb/AlphaBlendModeTest.glb";
-    // const string filename = "glb/AntiqueCamera.glb";
-
-    // const string filename = "AttenuationTest/glTF-Binary/AttenuationTest.glb";
-
-
-    // const string filename = "glb/BoomBox.glb";
-
-    const string filename = "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb";
-
-    // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
-
-   
-    // const string filename = "DragonAttenuation/glTF-Binary/DragonAttenuation.glb";
-
-    // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
-
-    // const string filename = "glb/MetalRoughSpheres.glb";
-
-    // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
-
-    //  const string filename = "Sponza/glTF/Sponza.gltf";
-
-    // const string filename = "IridescenceLamp/glTF-Binary/IridescenceLamp.glb";
 
     // Bloom post-processing structures
     struct BloomPass
@@ -120,6 +103,7 @@ public static unsafe partial class SharpGLTFApp
     struct UIState
     {
         public bool model_info_open;
+        public bool model_browser_open;
         public bool animation_open;
         public bool lighting_open;
         public bool bloom_open;
@@ -143,6 +127,10 @@ public static unsafe partial class SharpGLTFApp
         public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
+
+        // Model browser
+        public int currentModelIndex = 0;
+        public bool isLoadingModel = false;
 
         // Model rotation (middle mouse button)
         public float modelRotationX = 0.0f;     // Rotation around X-axis (vertical mouse movement)

@@ -37,6 +37,12 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.model_info_open = model_info_open != 0;
                 }
 
+                byte model_browser_open = state.ui.model_browser_open ? (byte)1 : (byte)0;
+                if (igMenuItem_BoolPtr("Model Browser...", null, ref model_browser_open, true))
+                {
+                    state.ui.model_browser_open = model_browser_open != 0;
+                }
+
                 byte animation_open = state.ui.animation_open ? (byte)1 : (byte)0;
                 if (igMenuItem_BoolPtr("Animation...", null, ref animation_open, true))
                 {
@@ -125,6 +131,13 @@ public static unsafe partial class SharpGLTFApp
         if (state.ui.model_info_open)
         {
             DrawModelInfoWindow(ref pos);
+            pos.X += 20; pos.Y += 20;
+        }
+
+        // Model Browser Window
+        if (state.ui.model_browser_open)
+        {
+            DrawModelBrowserWindow(ref pos);
             pos.X += 20; pos.Y += 20;
         }
 
@@ -222,6 +235,59 @@ public static unsafe partial class SharpGLTFApp
             }
             else
             {
+                igText("Loading model...");
+            }
+        }
+        igEnd();
+    }
+
+    static void DrawModelBrowserWindow(ref Vector2 pos)
+    {
+        igSetNextWindowSize(new Vector2(350, 150), ImGuiCond.Once);
+        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        byte open = 1;
+        if (igBegin("Model Browser", ref open, ImGuiWindowFlags.None))
+        {
+            state.ui.model_browser_open = open != 0;
+
+            // Extract model name from path
+            string currentModelPath = availableModels[state.currentModelIndex];
+            string modelName = System.IO.Path.GetFileNameWithoutExtension(currentModelPath);
+            
+            igText($"Current Model: {modelName}");
+            igText($"Model {state.currentModelIndex + 1} of {availableModels.Length}");
+            
+            igSeparator();
+
+            // Previous button
+            if (igButton("<- Previous", new Vector2(160, 0)))
+            {
+                if (!state.isLoadingModel)
+                {
+                    state.currentModelIndex--;
+                    if (state.currentModelIndex < 0)
+                        state.currentModelIndex = availableModels.Length - 1;
+                    LoadNewModel();
+                }
+            }
+
+            igSameLine(0, 10);
+
+            // Next button
+            if (igButton("Next ->", new Vector2(160, 0)))
+            {
+                if (!state.isLoadingModel)
+                {
+                    state.currentModelIndex++;
+                    if (state.currentModelIndex >= availableModels.Length)
+                        state.currentModelIndex = 0;
+                    LoadNewModel();
+                }
+            }
+
+            if (state.isLoadingModel)
+            {
+                igSeparator();
                 igText("Loading model...");
             }
         }

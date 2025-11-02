@@ -54,6 +54,9 @@ public static unsafe partial class SharpGLTFApp
             Longitude = 0.0f,
         });
 
+        // Initialize UI state - show model browser by default
+        state.ui.model_browser_open = true;
+
         // Initialize lighting system - Multi-light setup for both indoor and outdoor scenes
         // Light 1: Main directional light (sun) - provides broad coverage for outdoor/large indoor spaces
         state.lights.Add(Light.CreateDirectionalLight(
@@ -887,5 +890,152 @@ public static unsafe partial class SharpGLTFApp
         Info("[Transmission] Transmission system initialized successfully");
         Info("[Transmission] Two-pass rendering ready: Pass 1 (opaque objects → screen texture), Pass 2 (transparent with refraction)");
         Info("[Transmission] Screen texture available for refraction shader sampling");
+    }
+
+    public static void LoadNewModel()
+    {
+        if (state.isLoadingModel)
+            return;
+
+        state.isLoadingModel = true;
+        Info($"[ModelBrowser] Loading new model: {filename}");
+
+        // Store old model for disposal after new one loads
+        var oldModel = state.model;
+        
+        // Clear state BEFORE disposing (so rendering stops using it)
+        state.model = null;
+        state.animator = null;
+        state.modelLoaded = false;
+        state.cameraInitialized = false;
+        
+        // Dispose the old model (after rendering has stopped using it)
+        oldModel?.Dispose();
+        
+        // Clear the texture cache since old textures are now invalid
+        // This ensures the new model creates fresh textures instead of reusing disposed ones
+        TextureCache.Instance.Clear();
+
+        // Load new model asynchronously
+        FileSystem.Instance.LoadFile(filename, (path, buffer, status) =>
+        {
+            if (status == FileLoadStatus.Success && buffer != null)
+            {
+                try
+                {
+                    var memoryStream = new MemoryStream(buffer);
+                    string? baseDirectory = Path.GetDirectoryName(path);
+
+                    SharpGLTF.Schema2.FileReaderCallback fileReader = (assetName) =>
+                    {
+                        string fullAssetPath = string.IsNullOrEmpty(baseDirectory)
+                            ? assetName
+                            : Path.Combine(baseDirectory, assetName);
+
+                        Info($"[SharpGLTF] Loading dependent asset: {assetName} -> {fullAssetPath}");
+                        var (data, loadStatus) = FileSystem.Instance.LoadFileSync(fullAssetPath);
+
+                        if (loadStatus == FileLoadStatus.Success && data != null)
+                        {
+                            Info($"[SharpGLTF] Successfully loaded {fullAssetPath} ({data.Length} bytes)");
+                            return new ArraySegment<byte>(data);
+                        }
+                        else
+                        {
+                            Error($"[SharpGLTF] Failed to load {fullAssetPath}: {loadStatus}");
+                            throw new FileNotFoundException($"Failed to load asset: {fullAssetPath}");
+                        }
+                    };
+
+                    var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
+                    ModelRoot modelRoot = context.ReadSchema2(memoryStream);
+
+                    // Calculate model bounds
+                    state.modelBoundsMin = new Vector3(float.MaxValue);
+                    state.modelBoundsMax = new Vector3(float.MinValue);
+
+                    foreach (var mesh in modelRoot.LogicalMeshes)
+                    {
+                        foreach (var primitive in mesh.Primitives)
+                        {
+                            var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
+                            if (positions != null)
+                            {
+                                foreach (var pos in positions)
+                                {
+                                    state.modelBoundsMin = Vector3.Min(state.modelBoundsMin, pos);
+                                    state.modelBoundsMax = Vector3.Max(state.modelBoundsMax, pos);
+                                }
+                            }
+                        }
+                    }
+
+                    Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
+                    Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
+                    float boundingRadius = Vector3.Distance(state.modelBoundsMin, state.modelBoundsMax) * 0.5f;
+
+                    Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
+                    Info($"[SharpGLTF] Model size: {size}, Center: {center}");
+                    Info($"[SharpGLTF] Bounding sphere radius: {boundingRadius:F6}");
+
+                    if (boundingRadius > 1000.0f)
+                    {
+                        Info($"[SharpGLTF] WARNING: Very large bounding radius detected!");
+                        float clampedRadius = Math.Min(boundingRadius, 10.0f);
+                        state.modelBoundsMin = center - new Vector3(clampedRadius);
+                        state.modelBoundsMax = center + new Vector3(clampedRadius);
+                    }
+
+                    if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
+                    {
+                        Info("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
+                        state.modelBoundsMin = new Vector3(-1, 0, -1);
+                        state.modelBoundsMax = new Vector3(1, 2, 1);
+                    }
+
+                    state.model = new SharpGltfModel(modelRoot, path);
+
+                    state.isMixamoModel = modelRoot.LogicalNodes.Any(n =>
+                        n.Name != null && (n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
+                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase)));
+
+                    if (state.isMixamoModel)
+                    {
+                        Info("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
+                    }
+
+                    Info($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
+                    Info($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
+
+                    if (state.model.HasAnimations)
+                    {
+                        state.animator = new SharpGltfAnimator(state.model.Animation);
+                        Info("[SharpGLTF] Animator created for animated model");
+                    }
+                    else
+                    {
+                        Info("[SharpGLTF] No animations found in model");
+                    }
+
+                    // Reset model rotation
+                    state.modelRotationX = 0.0f;
+                    state.modelRotationY = 0.0f;
+
+                    state.modelLoaded = true;
+                    state.isLoadingModel = false;
+                    Info($"[ModelBrowser] Model loaded successfully: {path}");
+                }
+                catch (Exception ex)
+                {
+                    Error($"[ModelBrowser] Error loading model: {ex.Message}");
+                    state.isLoadingModel = false;
+                }
+            }
+            else
+            {
+                Error($"[ModelBrowser] Failed to load file '{path}': {status}");
+                state.isLoadingModel = false;
+            }
+        });
     }
 }
