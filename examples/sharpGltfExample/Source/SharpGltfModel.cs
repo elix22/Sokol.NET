@@ -508,17 +508,49 @@ namespace Sokol
                 Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: opaque material, no volume needed");
             }
 
+            // Extract clearcoat properties from KHR_materials_clearcoat extension
+            // This adds an additional specular layer on top of the base material (car paint, varnished wood, etc.)
+            var clearcoatExt = material.GetExtension<SharpGLTF.Schema2.MaterialClearCoat>();
+            if (clearcoatExt != null)
+            {
+                mesh.ClearcoatFactor = clearcoatExt.ClearCoatFactor;
+                mesh.ClearcoatRoughness = clearcoatExt.RoughnessFactor;
+                
+                // Clearcoat texture indices (if available)
+                // TODO: Extract clearcoat texture indices once SharpGLTF exposes them
+                
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Clearcoat - Factor={mesh.ClearcoatFactor:F2}, " +
+                    $"Roughness={mesh.ClearcoatRoughness:F2}");
+            }
+            else
+            {
+                mesh.ClearcoatFactor = 0.0f;
+                mesh.ClearcoatRoughness = 0.0f;
+                mesh.ClearcoatTextureIndex = -1;
+                mesh.ClearcoatRoughnessTextureIndex = -1;
+                mesh.ClearcoatNormalTextureIndex = -1;
+            }
+
             // Extract alpha mode and cutoff
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;
             Console.WriteLine($"[SharpGLTF] Material alpha mode: {mesh.AlphaMode}, cutoff: {mesh.AlphaCutoff}");
 
-            // Load textures
+            // Load textures and extract texture transforms
             LoadTexture(material, "BaseColor", mesh, 0);
+            ExtractTextureTransform(material, "BaseColor", ref mesh.BaseColorTexOffset, ref mesh.BaseColorTexRotation, ref mesh.BaseColorTexScale);
+            
             LoadTexture(material, "MetallicRoughness", mesh, 1);
+            ExtractTextureTransform(material, "MetallicRoughness", ref mesh.MetallicRoughnessTexOffset, ref mesh.MetallicRoughnessTexRotation, ref mesh.MetallicRoughnessTexScale);
+            
             LoadTexture(material, "Normal", mesh, 2);
+            ExtractTextureTransform(material, "Normal", ref mesh.NormalTexOffset, ref mesh.NormalTexRotation, ref mesh.NormalTexScale);
+            
             LoadTexture(material, "Occlusion", mesh, 3);
+            ExtractTextureTransform(material, "Occlusion", ref mesh.OcclusionTexOffset, ref mesh.OcclusionTexRotation, ref mesh.OcclusionTexScale);
+            
             LoadTexture(material, "Emissive", mesh, 4);
+            ExtractTextureTransform(material, "Emissive", ref mesh.EmissiveTexOffset, ref mesh.EmissiveTexRotation, ref mesh.EmissiveTexScale);
         }
 
         private void LoadTexture(Material material, string channelName, Mesh mesh, int index)
@@ -548,6 +580,36 @@ namespace Sokol
             var imageData = textureImage.Content.Content.ToArray();
             var texture = TextureCache.Instance.GetOrCreate(textureId, imageData, format);
             mesh.Textures.Add(texture);
+        }
+
+        private void ExtractTextureTransform(Material material, string channelName, 
+            ref Vector2 offset, ref float rotation, ref Vector2 scale)
+        {
+            var channel = material.FindChannel(channelName);
+            if (channel == null || channel.Value.Texture == null)
+            {
+                // No texture, use defaults
+                offset = Vector2.Zero;
+                rotation = 0.0f;
+                scale = Vector2.One;
+                return;
+            }
+
+            var transform = channel.Value.TextureTransform;
+            
+            // Extract texture transform parameters from KHR_texture_transform extension
+            offset = transform.Offset;
+            rotation = transform.Rotation;
+            scale = transform.Scale;
+            
+            // Log if non-default transform found
+            if (offset != Vector2.Zero || rotation != 0.0f || scale != Vector2.One)
+            {
+                Console.WriteLine($"[SharpGLTF] Material {channelName} texture transform - " +
+                    $"Offset=({offset.X:F2}, {offset.Y:F2}), " +
+                    $"Rotation={rotation:F2} rad, " +
+                    $"Scale=({scale.X:F2}, {scale.Y:F2})");
+            }
         }
 
         private void ProcessAnimations()

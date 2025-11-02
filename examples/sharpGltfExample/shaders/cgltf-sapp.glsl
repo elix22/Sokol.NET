@@ -135,6 +135,30 @@ layout(binding=1) uniform metallic_params {
     vec3 attenuation_color;     // RGB color filter (e.g., orange for amber)
     float attenuation_distance; // Distance at which light reaches attenuation_color intensity
     float thickness_factor;     // Thickness of the volume in world units
+    // Clearcoat parameters - KHR_materials_clearcoat (additional specular layer)
+    float clearcoat_factor;     // 0.0 = no clearcoat, 1.0 = full clearcoat layer
+    float clearcoat_roughness;  // Roughness of clearcoat layer (0.0 = mirror-like)
+    // Texture transform parameters - KHR_texture_transform
+    // Base color texture transform (offset.xy, rotation, scale.xy)
+    vec2 base_color_tex_offset;
+    float base_color_tex_rotation;
+    vec2 base_color_tex_scale;
+    // Normal texture transform
+    vec2 normal_tex_offset;
+    float normal_tex_rotation;
+    vec2 normal_tex_scale;
+    // Metallic/Roughness texture transform
+    vec2 metallic_roughness_tex_offset;
+    float metallic_roughness_tex_rotation;
+    vec2 metallic_roughness_tex_scale;
+    // Emissive texture transform
+    vec2 emissive_tex_offset;
+    float emissive_tex_rotation;
+    vec2 emissive_tex_scale;
+    // Occlusion texture transform
+    vec2 occlusion_tex_offset;
+    float occlusion_tex_rotation;
+    vec2 occlusion_tex_scale;
 };
 
 const int MAX_LIGHTS = 4;
@@ -173,16 +197,37 @@ vec4 srgb_to_linear(vec4 srgb) {
     return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
 }
 
+// Apply texture transform (KHR_texture_transform)
+// Transforms UV coordinates using offset, rotation, and scale
+vec2 apply_texture_transform(vec2 uv, vec2 offset, float rotation, vec2 scale) {
+    // Apply scale and offset first
+    vec2 transformed = uv * scale + offset;
+    
+    // Apply rotation around (0,0)
+    // Note: rotation is in radians, counter-clockwise
+    if (abs(rotation) > 0.0001) {
+        float cos_rot = cos(rotation);
+        float sin_rot = sin(rotation);
+        mat2 rotation_matrix = mat2(cos_rot, sin_rot, -sin_rot, cos_rot);
+        transformed = rotation_matrix * (transformed - vec2(0.5)) + vec2(0.5);
+    }
+    
+    return transformed;
+}
+
 vec3 get_normal() {
     if (has_normal_tex < 0.5) {
         return normalize(v_nrm);
     }
     
+    // Apply texture transform to normal map UVs
+    vec2 normal_uv = apply_texture_transform(v_uv, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
+    
     // Calculate TBN matrix using screen-space derivatives
     vec3 pos_dx = dFdx(v_pos);
     vec3 pos_dy = dFdy(v_pos);
-    vec2 tex_dx = dFdx(v_uv);
-    vec2 tex_dy = dFdy(v_uv);
+    vec2 tex_dx = dFdx(normal_uv);
+    vec2 tex_dy = dFdy(normal_uv);
     
     // Calculate tangent vector
     float det = tex_dx.s * tex_dy.t - tex_dy.s * tex_dx.t;
@@ -197,7 +242,7 @@ vec3 get_normal() {
     // GLTF normal maps: RGB channels, stored as RGBA8
     // Normal maps are already in LINEAR space (they're direction vectors, not colors)
     // DO NOT apply sRGB->linear conversion!
-    vec3 normal_sample = texture(sampler2D(normal_tex, normal_smp), v_uv).rgb;
+    vec3 normal_sample = texture(sampler2D(normal_tex, normal_smp), normal_uv).rgb;
     // Convert from [0,1] to [-1,1] tangent space
     vec3 n = normal_sample * 2.0 - 1.0;
     // Transform from tangent space to world space
@@ -453,9 +498,12 @@ vec3 calculate_refraction(vec3 normal, vec3 view, float ior, float transmission_
 
 void main() {
     // Step 1: Get base color
+    // Apply texture transform to base color UVs
+    vec2 base_color_uv = apply_texture_transform(v_uv, base_color_tex_offset, base_color_tex_rotation, base_color_tex_scale);
+    
     // Manual sRGB to linear conversion (textures are RGBA8 format)
     vec4 base_color = (has_base_color_tex > 0.5)
-        ? srgb_to_linear(texture(sampler2D(base_color_tex, base_color_smp), v_uv))
+        ? srgb_to_linear(texture(sampler2D(base_color_tex, base_color_smp), base_color_uv))
         : base_color_factor;
     base_color *= base_color_factor;
     
@@ -470,31 +518,45 @@ void main() {
         discard;
     }
     
-    // Step 2: Get metallic/roughness from texture
+    // Step 2: Get metallic/roughness from texture (with texture transform)
     float metallic = metallic_factor;
     float perceptual_roughness = roughness_factor;
     
     if (has_metallic_roughness_tex > 0.5) {
+        // Apply texture transform to UV coordinates
+        vec2 mr_uv = apply_texture_transform(v_uv, metallic_roughness_tex_offset, metallic_roughness_tex_rotation, metallic_roughness_tex_scale);
         // GLTF: Blue channel = metallic, Green channel = roughness
-        vec4 mr_sample = texture(sampler2D(metallic_roughness_tex, metallic_roughness_smp), v_uv);
+        vec4 mr_sample = texture(sampler2D(metallic_roughness_tex, metallic_roughness_smp), mr_uv);
         metallic = mr_sample.b * metallic_factor;
         perceptual_roughness = mr_sample.g * roughness_factor;
     }
     
-    // Step 3: Get normal using proper tangent-space transformation
+    // Step 3: Get normal using proper tangent-space transformation (transform applied in get_normal())
     vec3 normal = get_normal();
     
-    // Step 4: Get ambient occlusion (stored in Red channel)
-    float occlusion = 1.0;
-    if (has_occlusion_tex > 0.5) {
-        occlusion = texture(sampler2D(occlusion_tex, occlusion_smp), v_uv).r;
+    // Apply clearcoat normal smoothing: blend toward geometric normal
+    // Strong clearcoat significantly reduces normal map influence for smooth glossy appearance
+    if (clearcoat_factor > 0.01) {
+        vec3 geometric_normal = normalize(v_nrm);
+        // Blend toward geometric normal based on clearcoat strength
+        // With full clearcoat (factor=1), use almost entirely geometric normal for mirror-like glossiness
+        float blend_factor = clearcoat_factor * 0.97; // Very strong blending for maximum glossiness
+        normal = normalize(mix(normal, geometric_normal, blend_factor));
     }
     
-    // Step 5: Get emissive (self-illumination)
+    // Step 4: Get ambient occlusion (stored in Red channel) with texture transform
+    float occlusion = 1.0;
+    if (has_occlusion_tex > 0.5) {
+        vec2 occlusion_uv = apply_texture_transform(v_uv, occlusion_tex_offset, occlusion_tex_rotation, occlusion_tex_scale);
+        occlusion = texture(sampler2D(occlusion_tex, occlusion_smp), occlusion_uv).r;
+    }
+    
+    // Step 5: Get emissive (self-illumination) with texture transform
     // Manual sRGB to linear conversion (textures are RGBA8 format)
     vec3 emissive = emissive_factor;
     if (has_emissive_tex > 0.5) {
-        vec3 emissive_sample = srgb_to_linear(texture(sampler2D(emissive_tex, emissive_smp), v_uv)).rgb;
+        vec2 emissive_uv = apply_texture_transform(v_uv, emissive_tex_offset, emissive_tex_rotation, emissive_tex_scale);
+        vec3 emissive_sample = srgb_to_linear(texture(sampler2D(emissive_tex, emissive_smp), emissive_uv)).rgb;
         emissive *= emissive_sample;
     }
     // Apply emissive strength (KHR_materials_emissive_strength extension)
@@ -582,6 +644,75 @@ void main() {
         // Reduce transmission at grazing angles (makes edges more reflective)
         float effective_transmission = transmission_factor * (1.0 - fresnel * 0.5);
         color = mix(color, refracted_color, effective_transmission);
+    }
+    
+    // Apply clearcoat layer (KHR_materials_clearcoat)
+    // This adds an additional specular reflection layer on top of the base material
+    // Common use case: car paint, varnished wood, coated surfaces
+    if (clearcoat_factor > 0.01) {
+        // Clearcoat uses geometric normal (not perturbed by base normal map)
+        // This creates the smooth glossy layer effect on top of a rough base
+        vec3 clearcoat_normal = normalize(v_nrm);
+        
+        // Clearcoat is a dielectric layer (non-metallic), so we use F0 = 0.04
+        vec3 clearcoat_f0 = vec3(0.04);
+        vec3 clearcoat_f90 = vec3(1.0);
+        
+        // Create material info for clearcoat layer
+        // For smooth clearcoat (roughness near 0), we want glossy mirror-like highlights
+        // Only add minimum roughness for very rough clearcoats to avoid artifacts
+        float clearcoat_perceptual = max(clearcoat_roughness, 0.01);
+        float clearcoat_alpha_roughness = clearcoat_perceptual * clearcoat_perceptual;
+        material_info_t clearcoat_material = material_info_t(
+            clearcoat_perceptual,     // perceptualRoughness (use clamped value)
+            clearcoat_f0,             // specularEnvironmentR0
+            clearcoat_alpha_roughness,// alphaRoughness
+            vec3(0.0),                // diffuseColor (clearcoat is pure specular)
+            clearcoat_f90,            // specularEnvironmentR90
+            clearcoat_f0,             // f0 (for metals, but clearcoat is dielectric)
+            0.0                       // metallic (clearcoat is always dielectric)
+        );
+        
+        // Calculate clearcoat Fresnel for energy conservation (Schlick's approximation)
+        float clearcoat_NdotV = max(dot(clearcoat_normal, view), 0.0);
+        float clearcoat_fresnel = 0.04 + (1.0 - 0.04) * pow(1.0 - clearcoat_NdotV, 5.0);
+        
+        // Calculate clearcoat specular reflection
+        vec3 clearcoat_specular = vec3(0.0);
+        for (int i = 0; i < num_lights && i < MAX_LIGHTS; i++) {
+            vec3 light_pos = light_positions[i].xyz;
+            int light_type = int(light_positions[i].w);
+            vec3 light_dir_unnorm = light_pos - v_pos;
+            vec3 light_dir = normalize(light_dir_unnorm);
+            
+            vec3 light_color = light_colors[i].rgb;
+            float light_intensity = light_colors[i].w;
+            
+            // Calculate light contribution based on type
+            vec3 pointToLight = light_dir;
+            float attenuation = 1.0;
+            
+            if (light_type == LIGHT_TYPE_POINT) {
+                float distance = length(light_dir_unnorm);
+                attenuation = 1.0 / (distance * distance);
+            }
+            
+            // Calculate clearcoat specular using microfacet BRDF with geometric normal
+            angular_info_t angular_info = get_angular_info(pointToLight, clearcoat_normal, view);
+            
+            vec3 clearcoat_brdf = specular_reflection(clearcoat_material, angular_info);
+            clearcoat_specular += clearcoat_brdf * angular_info.n_dot_l * light_color * light_intensity * attenuation;
+        }
+        
+        // Apply clearcoat with energy conservation
+        // Boost clearcoat specular for bright glossy highlights
+        // Smooth clearcoat (low roughness) gets strong boost for wet-paint, mirror-like appearance
+        float clearcoat_spec_boost = mix(4.0, 10.0, clearcoat_factor * (1.0 - clearcoat_roughness));
+        clearcoat_specular *= clearcoat_spec_boost;
+        
+        // Standard energy conservation with Fresnel
+        float clearcoat_attenuation = 1.0 - clearcoat_factor * clearcoat_fresnel;
+        color = color * clearcoat_attenuation + clearcoat_specular * clearcoat_factor;
     }
     
     // Apply tone mapping (Uncharted 2) and gamma correction
