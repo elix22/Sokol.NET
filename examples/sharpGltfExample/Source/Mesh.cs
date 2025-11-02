@@ -41,6 +41,19 @@ namespace Sokol
         public float AttenuationDistance = float.MaxValue;  // Distance at which color reaches AttenuationColor
         public float ThicknessFactor = 0.0f;  // Thickness of volume in world units
 
+        // Clearcoat properties (KHR_materials_clearcoat)
+        public float ClearcoatFactor = 0.0f;  // 0.0 = no clearcoat, 1.0 = full clearcoat
+        public float ClearcoatRoughness = 0.0f;  // Roughness of clearcoat layer (usually very low for glossy coating)
+
+        // Texture transform for normal map (KHR_texture_transform)
+        // Allows tiling the normal texture to increase detail
+        public Vector2 NormalTexOffset = Vector2.Zero;
+        public float NormalTexRotation = 0.0f;  // Rotation in radians
+        public Vector2 NormalTexScale = Vector2.One;
+        
+        // Normal map scale (strength of normal perturbation)
+        public float NormalMapScale = 1.0f;  // 1.0 = full strength, 0.2 = subtle (like car paint)
+
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;

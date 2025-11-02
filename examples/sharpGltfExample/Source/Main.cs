@@ -21,7 +21,7 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
-    const string filename = "DamagedHelmet.glb";
+    // const string filename = "DamagedHelmet.glb";
     //   const string filename = "assimpScene.glb";
     // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
@@ -43,7 +43,7 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "glb/BoomBox.glb";
 
-    // const string filename = "glb/ClearCoatCarPaint.glb";
+    const string filename = "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb";
 
     // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
 

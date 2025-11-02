@@ -508,6 +508,51 @@ namespace Sokol
                 Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: opaque material, no volume needed");
             }
 
+            // Extract clearcoat properties from KHR_materials_clearcoat extension
+            var clearcoatExt = material.GetExtension<SharpGLTF.Schema2.MaterialClearCoat>();
+            if (clearcoatExt != null)
+            {
+                mesh.ClearcoatFactor = clearcoatExt.ClearCoatFactor;
+                mesh.ClearcoatRoughness = clearcoatExt.RoughnessFactor;
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Clearcoat - Factor={mesh.ClearcoatFactor:F2}, Roughness={mesh.ClearcoatRoughness:F2}");
+            }
+            else
+            {
+                mesh.ClearcoatFactor = 0.0f;  // No clearcoat
+                mesh.ClearcoatRoughness = 0.0f;
+                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: No clearcoat extension");
+            }
+
+            // Extract normal map scale and texture transform
+            var normalChannel = material.FindChannel("Normal");
+            if (normalChannel.HasValue && normalChannel.Value.Texture != null)
+            {
+                // Extract normal scale (strength of normal perturbation)
+                // According to glTF spec, normalTexture.scale is the first parameter
+                if (normalChannel.Value.Parameters.Count > 0)
+                {
+                    mesh.NormalMapScale = Convert.ToSingle(normalChannel.Value.Parameters[0].Value);
+                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal scale = {mesh.NormalMapScale:F2}");
+                }
+                
+                // Check if texture has transform extension (KHR_texture_transform)
+                var textureTransform = normalChannel.Value.TextureTransform;
+                if (textureTransform != null)
+                {
+                    mesh.NormalTexOffset = textureTransform.Offset;
+                    mesh.NormalTexRotation = textureTransform.Rotation;
+                    mesh.NormalTexScale = textureTransform.Scale;
+                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal texture transform - " +
+                        $"Offset=({mesh.NormalTexOffset.X:F2}, {mesh.NormalTexOffset.Y:F2}), " +
+                        $"Rotation={mesh.NormalTexRotation:F2}rad, " +
+                        $"Scale=({mesh.NormalTexScale.X:F2}, {mesh.NormalTexScale.Y:F2})");
+                }
+                else
+                {
+                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal texture has no transform");
+                }
+            }
+
             // Extract alpha mode and cutoff
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;

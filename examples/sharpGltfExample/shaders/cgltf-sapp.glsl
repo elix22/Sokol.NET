@@ -135,6 +135,15 @@ layout(binding=1) uniform metallic_params {
     vec3 attenuation_color;     // RGB color filter (e.g., orange for amber)
     float attenuation_distance; // Distance at which light reaches attenuation_color intensity
     float thickness_factor;     // Thickness of the volume in world units
+    // Clearcoat parameters - KHR_materials_clearcoat
+    float clearcoat_factor;     // 0.0 = no clearcoat, 1.0 = full clearcoat
+    float clearcoat_roughness;  // Roughness of the clearcoat layer
+    // Normal texture transform - KHR_texture_transform
+    vec2 normal_tex_offset;
+    float normal_tex_rotation;
+    vec2 normal_tex_scale;
+    // Normal map scale (strength of normal perturbation)
+    float normal_map_scale;     // 1.0 = full strength, 0.2 = subtle
 };
 
 const int MAX_LIGHTS = 4;
@@ -173,16 +182,46 @@ vec4 srgb_to_linear(vec4 srgb) {
     return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
 }
 
+// Apply texture transform (KHR_texture_transform)
+vec2 apply_texture_transform(vec2 uv, vec2 offset, float rotation, vec2 scale) {
+    // Scale
+    vec2 transformed_uv = uv * scale;
+    
+    // Rotation around (0.5, 0.5) pivot
+    if (rotation != 0.0) {
+        transformed_uv -= vec2(0.5);
+        float c = cos(rotation);
+        float s = sin(rotation);
+        mat2 rotation_matrix = mat2(c, s, -s, c);
+        transformed_uv = rotation_matrix * transformed_uv;
+        transformed_uv += vec2(0.5);
+    }
+    
+    // Offset
+    transformed_uv += offset;
+    
+    return transformed_uv;
+}
+
 vec3 get_normal() {
     if (has_normal_tex < 0.5) {
         return normalize(v_nrm);
     }
     
+    // Apply texture transform only if non-default values exist
+    vec2 transformed_uv = v_uv;
+    bool has_transform = (length(normal_tex_offset) > 0.001 || 
+                         abs(normal_tex_rotation) > 0.001 || 
+                         abs(length(normal_tex_scale) - 1.414213) > 0.001); // length of (1,1) = sqrt(2)
+    if (has_transform) {
+        transformed_uv = apply_texture_transform(v_uv, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
+    }
+    
     // Calculate TBN matrix using screen-space derivatives
     vec3 pos_dx = dFdx(v_pos);
     vec3 pos_dy = dFdy(v_pos);
-    vec2 tex_dx = dFdx(v_uv);
-    vec2 tex_dy = dFdy(v_uv);
+    vec2 tex_dx = dFdx(transformed_uv);
+    vec2 tex_dy = dFdy(transformed_uv);
     
     // Calculate tangent vector
     float det = tex_dx.s * tex_dy.t - tex_dy.s * tex_dx.t;
@@ -191,16 +230,17 @@ vec3 get_normal() {
     // Gram-Schmidt orthogonalization
     vec3 ng = normalize(v_nrm);
     t = normalize(t - ng * dot(ng, t));
-    vec3 b = cross(ng, t);  // No need to normalize again since ng and t are orthonormal
+    vec3 b = cross(ng, t);
     mat3 tbn = mat3(t, b, ng);
     
-    // GLTF normal maps: RGB channels, stored as RGBA8
-    // Normal maps are already in LINEAR space (they're direction vectors, not colors)
-    // DO NOT apply sRGB->linear conversion!
-    vec3 normal_sample = texture(sampler2D(normal_tex, normal_smp), v_uv).rgb;
-    // Convert from [0,1] to [-1,1] tangent space
+    // Sample normal map with transformed UVs
+    vec3 normal_sample = texture(sampler2D(normal_tex, normal_smp), transformed_uv).rgb;
     vec3 n = normal_sample * 2.0 - 1.0;
-    // Transform from tangent space to world space
+    
+    // Apply normal map scale (controls strength of perturbation)
+    // Scale 0.2 = subtle bump, 1.0 = full strength
+    n.xy *= normal_map_scale;
+    
     n = normalize(tbn * n);
     return n;
 }
@@ -246,7 +286,6 @@ vec3 specular_reflection(material_info_t material_info, angular_info_t angular_i
 }
 
 // Geometry function (Schlick-GGX)
-// Matches LearnOpenGL PBR implementation
 float geometry_schlick_ggx(float n_dot_v, float roughness) {
     float r = (roughness + 1.0);
     float k = (r * r) / 8.0;
@@ -272,7 +311,6 @@ float geometry_smith(material_info_t material_info, angular_info_t angular_info)
 // The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
 // Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
 // Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-// Matches LearnOpenGL PBR implementation (GGX/Trowbridge-Reitz)
 float microfacet_distribution(material_info_t material_info, angular_info_t angular_info) {
     float a = material_info.perceptual_roughness * material_info.perceptual_roughness;
     float a2 = a * a;
@@ -507,7 +545,7 @@ void main() {
     metallic = clamp(metallic, 0.0, 1.0);
     float alpha_roughness = perceptual_roughness * perceptual_roughness;
     
-    // Calculate reflectance - standard PBR approach (LearnOpenGL method)
+    // Calculate reflectance - standard PBR approach 
     vec3 f0 = vec3(0.04);
     vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0) * (1.0 - metallic);
     vec3 specular_color = mix(f0, base_color.rgb, metallic);
@@ -582,6 +620,81 @@ void main() {
         // Reduce transmission at grazing angles (makes edges more reflective)
         float effective_transmission = transmission_factor * (1.0 - fresnel * 0.5);
         color = mix(color, refracted_color, effective_transmission);
+    }
+    
+    // Apply clearcoat layer (KHR_materials_clearcoat) - glTF spec compliant
+    if (clearcoat_factor > 0.0) {
+        // Use geometric normal for clearcoat (smooth glossy layer)
+        vec3 clearcoat_normal = normalize(v_nrm);
+        float clearcoat_NdotV = max(abs(dot(clearcoat_normal, view)), 0.0);
+        
+        // Clearcoat parameters
+        float clearcoat_alpha = clearcoat_roughness * clearcoat_roughness;
+        
+        // Clearcoat Fresnel (f0 = 0.04 for IOR 1.5)
+        float clearcoat_f0 = 0.04;
+        float clearcoat_fresnel = clearcoat_f0 + (1.0 - clearcoat_f0) * pow(1.0 - clearcoat_NdotV, 5.0);
+        
+        // Calculate clearcoat specular from lights
+        vec3 clearcoat_specular = vec3(0.0);
+        for (int i = 0; i < num_lights && i < MAX_LIGHTS; i++) {
+            int light_type = int(light_positions[i].w);
+            vec3 light_pos = light_positions[i].xyz;
+            vec3 light_dir_data = light_directions[i].xyz;
+            vec3 light_color = light_colors[i].rgb * light_colors[i].w;
+            float light_range = light_params_data[i].x;
+            
+            vec3 L;
+            float attenuation = 1.0;
+            
+            if (light_type == LIGHT_TYPE_DIRECTIONAL) {
+                L = normalize(-light_dir_data);
+            } else if (light_type == LIGHT_TYPE_POINT) {
+                vec3 to_light = light_pos - v_pos;
+                float distance = length(to_light);
+                L = normalize(to_light);
+                attenuation = get_range_attenuation(light_range, distance);
+            } else if (light_type == LIGHT_TYPE_SPOT) {
+                vec3 to_light = light_pos - v_pos;
+                float distance = length(to_light);
+                L = normalize(to_light);
+                float spot_theta = dot(-L, normalize(-light_dir_data));
+                float inner_cutoff = light_directions[i].w;
+                float outer_cutoff = light_params_data[i].y;
+                float spot_intensity = clamp((spot_theta - outer_cutoff) / (inner_cutoff - outer_cutoff), 0.0, 1.0);
+                attenuation = get_range_attenuation(light_range, distance) * spot_intensity;
+            } else {
+                continue;
+            }
+            
+            float clearcoat_NdotL = max(dot(clearcoat_normal, L), 0.0);
+            if (clearcoat_NdotL > 0.0) {
+                vec3 H = normalize(view + L);
+                float clearcoat_NdotH = max(dot(clearcoat_normal, H), 0.0);
+                
+                // GGX distribution
+                float a2 = clearcoat_alpha * clearcoat_alpha;
+                float denom = clearcoat_NdotH * clearcoat_NdotH * (a2 - 1.0) + 1.0;
+                float D = a2 / (M_PI * denom * denom);
+                
+                // Geometry term
+                float k = clearcoat_alpha / 2.0;
+                float G_V = clearcoat_NdotV / (clearcoat_NdotV * (1.0 - k) + k);
+                float G_L = clearcoat_NdotL / (clearcoat_NdotL * (1.0 - k) + k);
+                float G = G_V * G_L;
+                
+                // Specular BRDF
+                float spec = (D * G) / max(4.0 * clearcoat_NdotV * clearcoat_NdotL, 0.001);
+                
+                clearcoat_specular += light_color * spec * clearcoat_NdotL * attenuation;
+            }
+        }
+        
+        // glTF spec layering: Clearcoat is additive on top of base layer
+        // The base layer is attenuated by the clearcoat's Fresnel term (energy conservation)
+        // Then the clearcoat specular is added on top
+        float clearcoat_contribution = clearcoat_factor * clearcoat_fresnel;
+        color = color * (1.0 - clearcoat_contribution) + clearcoat_specular * clearcoat_factor;
     }
     
     // Apply tone mapping (Uncharted 2) and gamma correction

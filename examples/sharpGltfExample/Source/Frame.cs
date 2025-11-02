@@ -428,6 +428,20 @@ public static unsafe partial class SharpGLTFApp
                     metallicParams.attenuation_distance = glassValues.attenuationDistance;
                     metallicParams.thickness_factor = glassValues.thickness;
 
+                    // Set clearcoat parameters (KHR_materials_clearcoat extension)
+                    metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
+                    metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
+
+                    // Set texture transform for normal map (KHR_texture_transform extension)
+                    unsafe {
+                        metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
+                        metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
+                        metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
+                        metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
+                    }
+                    metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
+                    metallicParams.normal_map_scale = mesh.NormalMapScale;
+
                     sg_apply_uniforms(UB_skinning_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms (cast to skinning version)
@@ -485,6 +499,20 @@ public static unsafe partial class SharpGLTFApp
                     metallicParams.attenuation_color = glassValues.attenuationColor;
                     metallicParams.attenuation_distance = glassValues.attenuationDistance;
                     metallicParams.thickness_factor = glassValues.thickness;
+
+                    // Set clearcoat parameters (KHR_materials_clearcoat extension)
+                    metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
+                    metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
+
+                    // Set texture transform for normal map (KHR_texture_transform extension)
+                    unsafe {
+                        metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
+                        metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
+                        metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
+                        metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
+                    }
+                    metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
+                    metallicParams.normal_map_scale = mesh.NormalMapScale;
 
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 
