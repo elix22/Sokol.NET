@@ -89,7 +89,7 @@ public static unsafe partial class SharpGLTFApp
 
         state.pass_action = default;
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.pass_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        state.pass_action.colors[0].clear_value = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1.0f };
 
         PipeLineManager.GetOrCreatePipeline(PipelineType.Standard);
         PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
@@ -213,10 +213,12 @@ public static unsafe partial class SharpGLTFApp
                     if (state.model.HasAnimations)
                     {
                         state.animator = new SharpGltfAnimator(state.model.Animation);
+                        state.ui.animation_open = true;  // Show animation window
                         Info("[SharpGLTF] Animator created for animated model");
                     }
                     else
                     {
+                        state.ui.animation_open = false;  // Hide animation window
                         Info("[SharpGLTF] No animations found in model");
                     }
 
@@ -1010,10 +1012,12 @@ public static unsafe partial class SharpGLTFApp
                     if (state.model.HasAnimations)
                     {
                         state.animator = new SharpGltfAnimator(state.model.Animation);
+                        state.ui.animation_open = true;  // Show animation window
                         Info("[SharpGLTF] Animator created for animated model");
                     }
                     else
                     {
+                        state.ui.animation_open = false;  // Hide animation window
                         Info("[SharpGLTF] No animations found in model");
                     }
 

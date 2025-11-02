@@ -25,8 +25,8 @@ public static unsafe partial class SharpGLTFApp
     static readonly string[] availableModels = new string[]
     {
         "DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
-        "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
+        "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",
         "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
