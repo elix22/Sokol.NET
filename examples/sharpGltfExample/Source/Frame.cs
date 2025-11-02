@@ -486,45 +486,6 @@ public static unsafe partial class SharpGLTFApp
                     metallicParams.attenuation_distance = glassValues.attenuationDistance;
                     metallicParams.thickness_factor = glassValues.thickness;
 
-                    // Set clearcoat parameters (KHR_materials_clearcoat extension)
-                    metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
-                    metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
-
-                    // Set texture transform parameters (KHR_texture_transform extension)
-                    // These are fixed buffers in the struct - directly accessible in unsafe context
-                    unsafe
-                    {
-                        metallicParams.base_color_tex_offset[0] = mesh.BaseColorTexOffset.X;
-                        metallicParams.base_color_tex_offset[1] = mesh.BaseColorTexOffset.Y;
-                        metallicParams.base_color_tex_rotation = mesh.BaseColorTexRotation;
-                        metallicParams.base_color_tex_scale[0] = mesh.BaseColorTexScale.X;
-                        metallicParams.base_color_tex_scale[1] = mesh.BaseColorTexScale.Y;
-                        
-                        metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
-                        metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
-                        metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
-                        metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
-                        metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
-                        
-                        metallicParams.metallic_roughness_tex_offset[0] = mesh.MetallicRoughnessTexOffset.X;
-                        metallicParams.metallic_roughness_tex_offset[1] = mesh.MetallicRoughnessTexOffset.Y;
-                        metallicParams.metallic_roughness_tex_rotation = mesh.MetallicRoughnessTexRotation;
-                        metallicParams.metallic_roughness_tex_scale[0] = mesh.MetallicRoughnessTexScale.X;
-                        metallicParams.metallic_roughness_tex_scale[1] = mesh.MetallicRoughnessTexScale.Y;
-                        
-                        metallicParams.emissive_tex_offset[0] = mesh.EmissiveTexOffset.X;
-                        metallicParams.emissive_tex_offset[1] = mesh.EmissiveTexOffset.Y;
-                        metallicParams.emissive_tex_rotation = mesh.EmissiveTexRotation;
-                        metallicParams.emissive_tex_scale[0] = mesh.EmissiveTexScale.X;
-                        metallicParams.emissive_tex_scale[1] = mesh.EmissiveTexScale.Y;
-                        
-                        metallicParams.occlusion_tex_offset[0] = mesh.OcclusionTexOffset.X;
-                        metallicParams.occlusion_tex_offset[1] = mesh.OcclusionTexOffset.Y;
-                        metallicParams.occlusion_tex_rotation = mesh.OcclusionTexRotation;
-                        metallicParams.occlusion_tex_scale[0] = mesh.OcclusionTexScale.X;
-                        metallicParams.occlusion_tex_scale[1] = mesh.OcclusionTexScale.Y;
-                    }
-
                     sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms

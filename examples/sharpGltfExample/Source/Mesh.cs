@@ -41,39 +41,6 @@ namespace Sokol
         public float AttenuationDistance = float.MaxValue;  // Distance at which color reaches AttenuationColor
         public float ThicknessFactor = 0.0f;  // Thickness of volume in world units
 
-        // Clearcoat properties (KHR_materials_clearcoat) - Additional specular layer
-        public float ClearcoatFactor = 0.0f;  // 0.0 = no clearcoat, 1.0 = full clearcoat layer
-        public float ClearcoatRoughness = 0.0f;  // Roughness of clearcoat layer (0.0 = mirror-like)
-        public int ClearcoatTextureIndex = -1;  // Clearcoat factor texture index, -1 = no texture
-        public int ClearcoatRoughnessTextureIndex = -1;  // Clearcoat roughness texture index
-        public int ClearcoatNormalTextureIndex = -1;  // Normal map for clearcoat layer
-
-        // Texture transform properties (KHR_texture_transform)
-        // Base color texture transform
-        public Vector2 BaseColorTexOffset = Vector2.Zero;
-        public float BaseColorTexRotation = 0.0f;
-        public Vector2 BaseColorTexScale = Vector2.One;
-        
-        // Normal texture transform
-        public Vector2 NormalTexOffset = Vector2.Zero;
-        public float NormalTexRotation = 0.0f;
-        public Vector2 NormalTexScale = Vector2.One;
-        
-        // Metallic/Roughness texture transform
-        public Vector2 MetallicRoughnessTexOffset = Vector2.Zero;
-        public float MetallicRoughnessTexRotation = 0.0f;
-        public Vector2 MetallicRoughnessTexScale = Vector2.One;
-        
-        // Emissive texture transform
-        public Vector2 EmissiveTexOffset = Vector2.Zero;
-        public float EmissiveTexRotation = 0.0f;
-        public Vector2 EmissiveTexScale = Vector2.One;
-        
-        // Occlusion texture transform
-        public Vector2 OcclusionTexOffset = Vector2.Zero;
-        public float OcclusionTexRotation = 0.0f;
-        public Vector2 OcclusionTexScale = Vector2.One;
-
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;

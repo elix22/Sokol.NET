@@ -21,10 +21,12 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
-    // const string filename = "DamagedHelmet/glTF-Binary/DamagedHelmet.glb";
+    const string filename = "DamagedHelmet.glb";
     //   const string filename = "assimpScene.glb";
+    // const string filename = "gltf/DamagedHelmet/DamagedHelmet.gltf";
 
     // const string filename = "DancingGangster.glb";
+    // const string filename = "Gangster.glb";
 
     //race_track
     // const string filename = "race_track.glb";
@@ -32,7 +34,7 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "glb/2CylinderEngine.glb";
 
-    //const string filename = "ABeautifulGame/glTF/ABeautifulGame.gltf";
+    // const string filename = "ABeautifulGame/glTF/ABeautifulGame.gltf";
     // const string filename = "glb/AlphaBlendModeTest.glb";
     // const string filename = "glb/AntiqueCamera.glb";
 
@@ -41,7 +43,7 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "glb/BoomBox.glb";
 
-    const string filename = "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb";
+    // const string filename = "glb/ClearCoatCarPaint.glb";
 
     // const string filename = "ClearcoatRing/glTF/ClearcoatRing.gltf";
 
@@ -50,7 +52,7 @@ public static unsafe partial class SharpGLTFApp
 
     // const string filename = "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb";
 
-    //  const string filename = "MetalRoughSpheres//glTF-Binary/MetalRoughSpheres.glb";
+    // const string filename = "glb/MetalRoughSpheres.glb";
 
     // const string filename = "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb";
 
