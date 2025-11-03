@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using static Sokol.SLog;
 
 namespace Sokol
 {
@@ -22,9 +23,9 @@ namespace Sokol
             if (_currentAnimation != null)
             {
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
-                Console.WriteLine($"[SharpGltfAnimator] Root node: '{rootNode.Name}' with {rootNode.ChildrenCount} children");
+                Info($"Root node: '{rootNode.Name}' with {rootNode.ChildrenCount} children", "SharpGltfAnimator");
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
-                Console.WriteLine($"[SharpGltfAnimator] Initialized with {_currentAnimation.GetBoneIDMap().Count} bones");
+                Info($"Initialized with {_currentAnimation.GetBoneIDMap().Count} bones", "SharpGltfAnimator");
             }
         }
 
@@ -40,7 +41,7 @@ namespace Sokol
             {
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
-                Console.WriteLine($"[SharpGltfAnimator] Switched to animation '{_currentAnimation.Name}' with {_currentAnimation.GetBoneIDMap().Count} bones");
+                Info($"Switched to animation '{_currentAnimation.Name}' with {_currentAnimation.GetBoneIDMap().Count} bones", "SharpGltfAnimator");
             }
         }
 
@@ -96,7 +97,7 @@ namespace Sokol
                 // Debug: Print first bone calculation
                 if (_debugBoneCount < 2 && index == 0)
                 {
-                    Console.WriteLine($"[Bone {index}] '{nodeName}': offset.M44={offset.M44:F3}, global.M44={globalTransformation.M44:F3}, final.M44={_finalBoneMatrices[index].M44:F3}");
+                    Info($"[Bone {index}] '{nodeName}': offset.M44={offset.M44:F3}, global.M44={globalTransformation.M44:F3}, final.M44={_finalBoneMatrices[index].M44:F3}");
                     _debugBoneCount++;
                 }
             }

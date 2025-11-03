@@ -78,7 +78,7 @@ namespace Sokol
             if (index >= 0 && index < Animations.Count)
             {
                 CurrentAnimationIndex = index;
-                Console.WriteLine($"[SharpGLTF] Switched to animation '{GetCurrentAnimationName()}' (index {index})");
+                Info($"Switched to animation '{GetCurrentAnimationName()}' (index {index})", "SharpGLTF");
             }
         }
 
@@ -87,7 +87,7 @@ namespace Sokol
             if (Animations.Count > 0)
             {
                 CurrentAnimationIndex = (CurrentAnimationIndex + 1) % Animations.Count;
-                Console.WriteLine($"[SharpGLTF] Next animation: '{GetCurrentAnimationName()}'");
+                Info($"Next animation: '{GetCurrentAnimationName()}'", "SharpGLTF");
             }
         }
 
@@ -96,7 +96,7 @@ namespace Sokol
             if (Animations.Count > 0)
             {
                 CurrentAnimationIndex = (CurrentAnimationIndex - 1 + Animations.Count) % Animations.Count;
-                Console.WriteLine($"[SharpGLTF] Previous animation: '{GetCurrentAnimationName()}'");
+                Info($"Previous animation: '{GetCurrentAnimationName()}'", "SharpGLTF");
             }
         }
 
@@ -113,7 +113,7 @@ namespace Sokol
 
         private void ProcessModel()
         {
-            Console.WriteLine($"[SharpGLTF] Processing model with {_model.LogicalNodes.Count} nodes, {_model.LogicalMeshes.Count} meshes");
+            Info($"Processing model with {_model.LogicalNodes.Count} nodes, {_model.LogicalMeshes.Count} meshes", "SharpGLTF");
 
             // First pass: Process skinning information
             ProcessSkinning();
@@ -144,7 +144,7 @@ namespace Sokol
             // Fourth pass: Process animations
             ProcessAnimations();
 
-            Console.WriteLine($"[SharpGLTF] Model loaded: {Nodes.Count} nodes, {Meshes.Count} meshes, {BoneCounter} bones, {(HasAnimations ? "with" : "without")} animation");
+            Info($"Model loaded: {Nodes.Count} nodes, {Meshes.Count} meshes, {BoneCounter} bones, {(HasAnimations ? "with" : "without")} animation", "SharpGLTF");
         }
 
         private void ProcessNode(Node node, Matrix4x4 parentTransform, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap)
@@ -184,7 +184,7 @@ namespace Sokol
             foreach (var skin in _model.LogicalSkins)
             {
                 var joints = skin.JointsCount;
-                Console.WriteLine($"[SharpGLTF] Processing skin with {joints} joints");
+                Info($"Processing skin with {joints} joints", "SharpGLTF");
 
                 for (int i = 0; i < joints; i++)
                 {
@@ -218,7 +218,7 @@ namespace Sokol
             var drawMode = primitive.DrawPrimitiveType;
             if (drawMode != SharpGLTF.Schema2.PrimitiveType.TRIANGLES)
             {
-                Console.WriteLine($"[SharpGLTF] Warning: Primitive type {drawMode} not supported, skipping. Only TRIANGLES are currently supported.");
+                Warning($"Primitive type {drawMode} not supported, skipping. Only TRIANGLES are currently supported.", "SharpGLTF");
                 return;
             }
 
@@ -234,7 +234,7 @@ namespace Sokol
 
             if (positions == null)
             {
-                Console.WriteLine("[SharpGLTF] Skipping mesh primitive without positions");
+                Warning("Skipping mesh primitive without positions", "SharpGLTF");
                 return;
             }
 
@@ -250,14 +250,14 @@ namespace Sokol
             bool needs32BitIndices = vertexCount > 65535;
 
             // Log mesh info
-            Console.WriteLine($"[SharpGLTF] Processing mesh primitive:");
-            Console.WriteLine($"  - Draw mode: {drawMode}");
-            Console.WriteLine($"  - Vertices: {vertexCount}");
-            Console.WriteLine($"  - Index type: {(needs32BitIndices ? "32-bit" : "16-bit")} (max vertex index: {vertexCount - 1})");
-            Console.WriteLine($"  - Has normals: {normals != null}");
-            Console.WriteLine($"  - Has texcoords: {texCoords != null}");
-            Console.WriteLine($"  - Has vertex colors: {colors != null}");
-            Console.WriteLine($"  - Has skinning: {hasSkinning}");
+            Info($"Processing mesh primitive:", "SharpGLTF");
+            Info($"  - Draw mode: {drawMode}", "SharpGLTF");
+            Info($"  - Vertices: {vertexCount}", "SharpGLTF");
+            Info($"  - Index type: {(needs32BitIndices ? "32-bit" : "16-bit")} (max vertex index: {vertexCount - 1})", "SharpGLTF");
+            Info($"  - Has normals: {normals != null}", "SharpGLTF");
+            Info($"  - Has texcoords: {texCoords != null}", "SharpGLTF");
+            Info($"  - Has vertex colors: {colors != null}", "SharpGLTF");
+            Info($"  - Has skinning: {hasSkinning}", "SharpGLTF");
 
             // Build vertices
             for (int i = 0; i < vertexCount; i++)
@@ -319,7 +319,7 @@ namespace Sokol
                         indices32.Add((uint)i);
                     }
                 }
-                Console.WriteLine($"  - Indices: {indices32.Count} (32-bit for large mesh)");
+                Info($"  - Indices: {indices32.Count} (32-bit for large mesh)", "SharpGLTF");
                 mesh = new Mesh(vertices.ToArray(), indices32.ToArray(), hasSkinning);
             }
             else
@@ -342,7 +342,7 @@ namespace Sokol
                         indices16.Add((ushort)i);
                     }
                 }
-                Console.WriteLine($"  - Indices: {indices16.Count} (16-bit for memory efficiency)");
+                Info($"  - Indices: {indices16.Count} (16-bit for memory efficiency)", "SharpGLTF");
                 mesh = new Mesh(vertices.ToArray(), indices16.ToArray(), hasSkinning);
             }
 
@@ -365,17 +365,17 @@ namespace Sokol
                 try
                 {
                     mesh.BaseColorFactor = baseColorChannel.Value.Color;
-                    Console.WriteLine($"[SharpGLTF] Material has BaseColor: {mesh.BaseColorFactor}");
+                    Info($"Material has BaseColor: {mesh.BaseColorFactor}", "SharpGLTF");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SharpGLTF] Failed to extract color: {ex.Message}");
+                    Error($"Failed to extract color: {ex.Message}", "SharpGLTF");
                     mesh.BaseColorFactor = Vector4.One; // Fallback to white
                 }
             }
             else
             {
-                Console.WriteLine("[SharpGLTF] Material has NO BaseColor channel - using white");
+                Info("Material has NO BaseColor channel - using white", "SharpGLTF");
                 mesh.BaseColorFactor = Vector4.One;
             }
             
@@ -391,7 +391,7 @@ namespace Sokol
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SharpGLTF] Failed to extract metallic/roughness: {ex.Message}");
+                    Error($"Failed to extract metallic/roughness: {ex.Message}", "SharpGLTF");
                     // Default to non-metallic, moderately rough for better shading visibility
                     mesh.MetallicFactor = 0.0f;
                     mesh.RoughnessFactor = 0.5f;
@@ -413,17 +413,17 @@ namespace Sokol
                     // Emissive is RGB color
                     var emissiveColor = emissiveChannel.Value.Color;
                     mesh.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
-                    Console.WriteLine($"[SharpGLTF] Material has Emissive: {mesh.EmissiveFactor}");
+                    Info($"Material has Emissive: {mesh.EmissiveFactor}", "SharpGLTF");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SharpGLTF] Failed to extract emissive: {ex.Message}");
+                    Error($"Failed to extract emissive: {ex.Message}", "SharpGLTF");
                     mesh.EmissiveFactor = Vector3.Zero;
                 }
             }
             else
             {
-                Console.WriteLine("[SharpGLTF] Material has NO Emissive channel");
+                Info("Material has NO Emissive channel", "SharpGLTF");
                 mesh.EmissiveFactor = Vector3.Zero;
             }
             
@@ -433,12 +433,12 @@ namespace Sokol
             if (emissiveStrengthExt != null)
             {
                 mesh.EmissiveStrength = emissiveStrengthExt.EmissiveStrength;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex} (with extension): emissiveStrength = {mesh.EmissiveStrength}");
+                Info($"Material {material.LogicalIndex} (with extension): emissiveStrength = {mesh.EmissiveStrength}", "SharpGLTF");
             }
             else
             {
                 mesh.EmissiveStrength = 1.0f; // Default value (no extension present)
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex} (no extension): using default emissiveStrength = 1.0");
+                Info($"Material {material.LogicalIndex} (no extension): using default emissiveStrength = 1.0", "SharpGLTF");
             }
 
             // Extract IOR from KHR_materials_ior extension
@@ -447,12 +447,12 @@ namespace Sokol
             if (iorExt != null)
             {
                 mesh.IOR = iorExt.IndexOfRefraction;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: IOR = {mesh.IOR} (Air: 1.0, Water: 1.33, Glass: 1.5, Amber: 1.55, Diamond: 2.4)");
+                Info($"Material {material.LogicalIndex}: IOR = {mesh.IOR} (Air: 1.0, Water: 1.33, Glass: 1.5, Amber: 1.55, Diamond: 2.4)", "SharpGLTF");
             }
             else
             {
                 mesh.IOR = 1.5f; // Default value for glass (no extension present)
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: using default IOR = 1.5 (glass)");
+                Info($"Material {material.LogicalIndex}: using default IOR = 1.5 (glass)", "SharpGLTF");
             }
 
             // Extract transmission from KHR_materials_transmission extension
@@ -461,7 +461,7 @@ namespace Sokol
             if (transmissionExt != null)
             {
                 mesh.TransmissionFactor = transmissionExt.TransmissionFactor;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: TransmissionFactor = {mesh.TransmissionFactor} (0.0 = opaque, 1.0 = fully transparent)");
+                Info($"Material {material.LogicalIndex}: TransmissionFactor = {mesh.TransmissionFactor} (0.0 = opaque, 1.0 = fully transparent)", "SharpGLTF");
                 
                 // TODO: Transmission texture support (MaterialChannel "Transmission" from GetChannels)
                 // Will be implemented when texture coordinate mapping is needed
@@ -469,7 +469,7 @@ namespace Sokol
             else
             {
                 mesh.TransmissionFactor = 0.0f; // Default: opaque (no refraction)
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: using default TransmissionFactor = 0.0 (opaque)");
+                Info($"Material {material.LogicalIndex}: using default TransmissionFactor = 0.0 (opaque)", "SharpGLTF");
             }
 
             // Extract volume properties from KHR_materials_volume extension (Beer's Law absorption)
@@ -481,9 +481,9 @@ namespace Sokol
                 mesh.AttenuationDistance = volumeExt.AttenuationDistance;
                 mesh.AttenuationColor = volumeExt.AttenuationColor;
                 
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Volume - Thickness={mesh.ThicknessFactor:F2}, " +
+                Info($"Material {material.LogicalIndex}: Volume - Thickness={mesh.ThicknessFactor:F2}, " +
                     $"AttenuationColor=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2}), " +
-                    $"AttenuationDistance={(float.IsPositiveInfinity(mesh.AttenuationDistance) ? "Infinity" : mesh.AttenuationDistance.ToString("F2"))}");
+                    $"AttenuationDistance={(float.IsPositiveInfinity(mesh.AttenuationDistance) ? "Infinity" : mesh.AttenuationDistance.ToString("F2"))}", "SharpGLTF");
             }
             else if (mesh.TransmissionFactor > 0.0f)
             {
@@ -497,15 +497,15 @@ namespace Sokol
                     mesh.BaseColorFactor.Y,
                     mesh.BaseColorFactor.Z
                 );
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: No volume extension, using base color as attenuation fallback - " +
-                    $"Color=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2})");
+                Info($"Material {material.LogicalIndex}: No volume extension, using base color as attenuation fallback - " +
+                    $"Color=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2})", "SharpGLTF");
             }
             else
             {
                 mesh.ThicknessFactor = 0.0f;
                 mesh.AttenuationDistance = float.MaxValue;
                 mesh.AttenuationColor = new Vector3(1.0f, 1.0f, 1.0f); // White = no tint
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: opaque material, no volume needed");
+                Info($"Material {material.LogicalIndex}: opaque material, no volume needed", "SharpGLTF");
             }
 
             // Extract clearcoat properties from KHR_materials_clearcoat extension
@@ -514,13 +514,13 @@ namespace Sokol
             {
                 mesh.ClearcoatFactor = clearcoatExt.ClearCoatFactor;
                 mesh.ClearcoatRoughness = clearcoatExt.RoughnessFactor;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Clearcoat - Factor={mesh.ClearcoatFactor:F2}, Roughness={mesh.ClearcoatRoughness:F2}");
+                Info($"Material {material.LogicalIndex}: Clearcoat - Factor={mesh.ClearcoatFactor:F2}, Roughness={mesh.ClearcoatRoughness:F2}", "SharpGLTF");
             }
             else
             {
                 mesh.ClearcoatFactor = 0.0f;  // No clearcoat
                 mesh.ClearcoatRoughness = 0.0f;
-                Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: No clearcoat extension");
+                Info($"Material {material.LogicalIndex}: No clearcoat extension", "SharpGLTF");
             }
 
             // Extract normal map scale and texture transform
@@ -532,7 +532,7 @@ namespace Sokol
                 if (normalChannel.Value.Parameters.Count > 0)
                 {
                     mesh.NormalMapScale = Convert.ToSingle(normalChannel.Value.Parameters[0].Value);
-                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal scale = {mesh.NormalMapScale:F2}");
+                    Info($"Material {material.LogicalIndex}: Normal scale = {mesh.NormalMapScale:F2}", "SharpGLTF");
                 }
                 
                 // Check if texture has transform extension (KHR_texture_transform)
@@ -542,21 +542,21 @@ namespace Sokol
                     mesh.NormalTexOffset = textureTransform.Offset;
                     mesh.NormalTexRotation = textureTransform.Rotation;
                     mesh.NormalTexScale = textureTransform.Scale;
-                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal texture transform - " +
+                    Info($"Material {material.LogicalIndex}: Normal texture transform - " +
                         $"Offset=({mesh.NormalTexOffset.X:F2}, {mesh.NormalTexOffset.Y:F2}), " +
                         $"Rotation={mesh.NormalTexRotation:F2}rad, " +
-                        $"Scale=({mesh.NormalTexScale.X:F2}, {mesh.NormalTexScale.Y:F2})");
+                        $"Scale=({mesh.NormalTexScale.X:F2}, {mesh.NormalTexScale.Y:F2})", "SharpGLTF");
                 }
                 else
                 {
-                    Console.WriteLine($"[SharpGLTF] Material {material.LogicalIndex}: Normal texture has no transform");
+                    Info($"Material {material.LogicalIndex}: Normal texture has no transform", "SharpGLTF");
                 }
             }
 
             // Extract alpha mode and cutoff
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;
-            Console.WriteLine($"[SharpGLTF] Material alpha mode: {mesh.AlphaMode}, cutoff: {mesh.AlphaCutoff}");
+            Info($"Material alpha mode: {mesh.AlphaMode}, cutoff: {mesh.AlphaCutoff}", "SharpGLTF");
 
             // Load textures
             LoadTexture(material, "BaseColor", mesh, 0);
@@ -602,13 +602,13 @@ namespace Sokol
             
             if (_model.LogicalAnimations.Count == 0)
             {
-                Console.WriteLine($"[SharpGLTF PROFILE] ProcessAnimations: No animations (0.000ms)");
+                Info($"ProcessAnimations: No animations (0.000ms)", "SharpGLTF PROFILE");
                 return;
             }
 
             // Use first animation for now
             var gltfAnim = _model.LogicalAnimations[0];
-            Console.WriteLine($"[SharpGLTF] Processing animation: {gltfAnim.Name ?? "Unnamed"}, duration: {gltfAnim.Duration}");
+            Info($"Processing animation: {gltfAnim.Name ?? "Unnamed"}, duration: {gltfAnim.Duration}", "SharpGLTF");
 
             // Build complete node hierarchy - create a virtual root that contains all scene nodes
             SharpGltfNodeData rootNode = new SharpGltfNodeData
@@ -625,7 +625,7 @@ namespace Sokol
                 rootNode.ChildrenCount++;
             }
             
-            Console.WriteLine($"[SharpGLTF] Built node hierarchy with {rootNode.ChildrenCount} root children");
+            Info($"Built node hierarchy with {rootNode.ChildrenCount} root children", "SharpGLTF");
 
             // Process ALL animations from the model
             foreach (var gltfAnimation in _model.LogicalAnimations)
@@ -658,12 +658,12 @@ namespace Sokol
                 }
 
                 Animations.Add(animation);
-                Console.WriteLine($"[SharpGLTF] Loaded animation '{animation.Name}' with {animation.GetBoneIDMap().Count} bones, duration: {duration:F2}s");
+                Info($"Loaded animation '{animation.Name}' with {animation.GetBoneIDMap().Count} bones, duration: {duration:F2}s", "SharpGLTF");
             }
 
             stopwatch.Stop();
-            Console.WriteLine($"[SharpGLTF] Processed {Animations.Count} animation(s)");
-            Console.WriteLine($"[SharpGLTF PROFILE] ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)");
+            Info($"Processed {Animations.Count} animation(s)", "SharpGLTF");
+            Info($"ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)", "SharpGLTF PROFILE");
         }
 
         private SharpGltfNodeData BuildNodeHierarchy(Node node)

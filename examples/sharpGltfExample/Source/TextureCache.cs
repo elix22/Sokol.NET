@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using static Sokol.SG;
+using static Sokol.SLog;
 
 namespace Sokol
 {
@@ -36,12 +37,12 @@ namespace Sokol
             if (_cache.TryGetValue(cacheKey, out var existingTexture))
             {
                 _cacheHits++;
-                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+                Info($"[TextureCache] Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})");
                 return existingTexture;
             }
 
             _cacheMisses++;
-            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+            Info($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
             
             var texture = new Texture(data, width, height, identifier, format);
             _cache[cacheKey] = texture;
@@ -59,12 +60,12 @@ namespace Sokol
             if (_cache.TryGetValue(cacheKey, out var existingTexture))
             {
                 _cacheHits++;
-                Console.WriteLine($"[TextureCache] Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+                Info($"Cache HIT for '{identifier}' (format: {format}) (Total hits: {_cacheHits}, misses: {_cacheMisses})", "TextureCache");
                 return existingTexture;
             }
 
             _cacheMisses++;
-            Console.WriteLine($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
+            Info($"Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})", "TextureCache");
 
             var texture = Texture.LoadFromMemory(data, identifier, format);
             if (texture != null)
@@ -102,7 +103,7 @@ namespace Sokol
         /// </summary>
         public void Clear()
         {
-            Console.WriteLine($"[TextureCache] Clearing cache with {_cache.Count} textures");
+            Info($"Clearing cache with {_cache.Count} textures", "TextureCache");
             
             // Dispose all textures
             foreach (var texture in _cache.Values)
@@ -141,11 +142,11 @@ namespace Sokol
                 ? (_cacheHits * 100.0 / (_cacheHits + _cacheMisses)) 
                 : 0.0;
             
-            Console.WriteLine($"[TextureCache] Stats:");
-            Console.WriteLine($"  Unique Textures: {_cache.Count}");
-            Console.WriteLine($"  Cache Hits: {_cacheHits}");
-            Console.WriteLine($"  Cache Misses: {_cacheMisses}");
-            Console.WriteLine($"  Hit Rate: {hitRate:F1}%");
+            Info($"Stats:", "TextureCache");
+            Info($"  Unique Textures: {_cache.Count}", "TextureCache");
+            Info($"  Cache Hits: {_cacheHits}", "TextureCache");
+            Info($"  Cache Misses: {_cacheMisses}", "TextureCache");
+            Info($"  Hit Rate: {hitRate:F1}%", "TextureCache");
         }
     }
 }
