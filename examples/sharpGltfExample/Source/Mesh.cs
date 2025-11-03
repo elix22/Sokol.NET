@@ -4,6 +4,7 @@ using System.Numerics;
 using static Sokol.SG;
 using static Sokol.Utils;
 using SharpGLTF.Schema2;
+using static cgltf_sapp_shader_cs_cgltf.Shaders;
 
 namespace Sokol
 {
@@ -164,7 +165,7 @@ namespace Sokol
             return _defaultBlackTexture;
         }
 
-        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default)
+        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default, cgltf_transmission_params_t? transmissionParams = null)
         {
             if (IndexCount == 0)
             {
@@ -221,6 +222,14 @@ namespace Sokol
             }
 
             sg_apply_bindings(bind);
+            
+            // Apply transmission uniforms AFTER bindings but BEFORE draw (sokol validation requirement)
+            if (transmissionParams.HasValue)
+            {
+                cgltf_transmission_params_t tp = transmissionParams.Value;
+                sg_apply_uniforms(UB_cgltf_transmission_params, SG_RANGE(ref tp));
+            }
+            
             sg_draw(0, (uint)IndexCount, 1);
         }
 

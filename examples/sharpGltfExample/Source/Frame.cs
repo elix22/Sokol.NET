@@ -682,16 +682,24 @@ public static unsafe partial class SharpGLTFApp
                     sg_apply_uniforms(UB_cgltf_light_params, SG_RANGE(ref lightParams));
                 }
 
+                // Prepare transmission uniforms (for proper 3D refraction with matrices)
+                // NOTE: These must ALWAYS be provided because the shader declares the uniform buffer
+                cgltf_transmission_params_t transmissionParams = new cgltf_transmission_params_t();
+                transmissionParams.model_matrix = node.Transform;  // Model matrix for scale extraction
+                transmissionParams.view_matrix = state.camera.View;       // View matrix
+                transmissionParams.projection_matrix = state.camera.Proj; // Projection matrix
+
                 // Draw the mesh with optional screen texture for refraction
                 if (useScreenTexture)
                 {
-                    // Pass pre-created screen view for refraction sampling (transmission materials)
-                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler);
+                    // Pass pre-created screen view AND transmission params for refraction sampling
+                    // Transmission params will be applied AFTER bindings inside mesh.Draw()
+                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler, transmissionParams);
                 }
                 else
                 {
-                    // Regular draw without screen texture
-                    mesh.Draw(pipeline);
+                    // Regular draw without screen texture (but still pass transmission params for shader)
+                    mesh.Draw(pipeline, default, default, transmissionParams);
                 }
             }
 

@@ -195,6 +195,13 @@ layout(binding=2) uniform light_params {
     vec4 light_params_data[MAX_LIGHTS]; // x: range, y: spot outer cutoff, z/w: unused
 };
 
+// Transmission matrices for proper 3D refraction calculation
+layout(binding=3) uniform transmission_params {
+    mat4 model_matrix;      // Model matrix for scale extraction
+    mat4 view_matrix;       // View matrix for world-to-view transform
+    mat4 projection_matrix; // Projection matrix for view-to-clip transform
+};
+
 layout(binding=0) uniform texture2D base_color_tex;
 layout(binding=1) uniform texture2D metallic_roughness_tex;
 layout(binding=2) uniform texture2D normal_tex;
@@ -492,36 +499,88 @@ vec3 tone_map(vec3 color) {
     return toneMapUncharted(color);
 }
 
-// Calculate refracted color for transmission/glass materials
-// Uses screen-space refraction with IOR-based ray bending
-vec3 calculate_refraction(vec3 normal, vec3 view, float ior, float transmission_factor) {
-    // Calculate refraction direction using Snell's law
-    // Assuming we're going from air (IOR=1.0) into the material
-    float eta = 1.0 / ior;  // Ratio of indices (air to material)
+// ============================================================================
+// Transmission Helper Functions (from glTF-Sample-Viewer)
+// ============================================================================
+
+// Scale roughness with IOR so that an IOR of 1.0 results in no microfacet refraction
+// and an IOR of 1.5 results in the default amount of microfacet refraction.
+float applyIorToRoughness(float roughness, float ior) {
+    return roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0);
+}
+
+// Calculate the 3D transmission ray through the volume
+// Returns a ray vector in world space representing the path through the material
+vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix) {
+    // Direction of refracted light using Snell's law
+    vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
     
-    // Refract the view ray through the surface
-    vec3 refracted = refract(-view, normal, eta);
+    // Compute rotation-independent scaling of the model matrix
+    vec3 modelScale;
+    modelScale.x = length(vec3(modelMatrix[0].xyz));
+    modelScale.y = length(vec3(modelMatrix[1].xyz));
+    modelScale.z = length(vec3(modelMatrix[2].xyz));
     
-    // If total internal reflection occurs, use reflection instead
-    if (length(refracted) < 0.01) {
-        refracted = reflect(-view, normal);
+    // The thickness is specified in local space
+    // Scale by model transform and apply the refraction direction
+    return refractionVector * thickness * modelScale;
+}
+
+// Apply Beer's law volume attenuation
+// Compute attenuated light as it travels through a volume
+vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, 
+                            vec3 attenuationColor, float attenuationDistance) {
+    if (attenuationDistance == 0.0) {
+        // Attenuation distance is +∞, transmitted color is not attenuated
+        return radiance;
     }
     
-    // Convert fragment position to screen space UV coordinates
-    vec2 screen_uv = gl_FragCoord.xy / vec2(textureSize(sampler2D(screen_tex, screen_smp), 0));
+    // Compute light attenuation using Beer's law
+    // transmittance = attenuationColor^(distance / attenuationDistance)
+    vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
+    return transmittance * radiance;
+}
+
+// Calculate refracted color for transmission/glass materials
+// Uses proper 3D volumetric refraction with perspective projection (glTF-Sample-Viewer method)
+vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view, 
+                         float ior, float thickness, float perceptual_roughness,
+                         vec3 base_color, vec3 attenuation_color, float attenuation_distance) {
+    // 1. Calculate 3D transmission ray in world space
+    vec3 transmission_ray = getVolumeTransmissionRay(normal, view, thickness, ior, model_matrix);
+    float transmission_ray_length = length(transmission_ray);
     
-    // Distort UV based on refracted direction
-    // The strength of distortion depends on the angle of refraction and transmission factor
-    float distortion_strength = 0.1 * transmission_factor;  // Scale factor for visible effect
-    vec2 distorted_uv = screen_uv + refracted.xy * distortion_strength;
+    // 2. Find where the refracted ray exits the volume (world space)
+    vec3 refracted_ray_exit = position + transmission_ray;
     
-    // Clamp UV to valid range to avoid sampling outside texture
-    distorted_uv = clamp(distorted_uv, vec2(0.0), vec2(1.0));
+    // 3. Project the exit point to screen space using proper matrices
+    vec4 ndc_pos = projection_matrix * view_matrix * vec4(refracted_ray_exit, 1.0);
+    vec2 refraction_coords = ndc_pos.xy / ndc_pos.w;  // Perspective divide
+    refraction_coords = refraction_coords * 0.5 + 0.5;  // Convert from NDC [-1,1] to UV [0,1]
     
-    // Sample the background (screen texture) at distorted coordinates
-    vec3 refracted_color = texture(sampler2D(screen_tex, screen_smp), distorted_uv).rgb;
+    // Flip Y coordinate for correct screen texture sampling (OpenGL convention)
+    refraction_coords.y = 1.0 - refraction_coords.y;
     
-    return refracted_color;
+    // Clamp to valid texture range
+    refraction_coords = clamp(refraction_coords, vec2(0.0), vec2(1.0));
+    
+    // 4. Sample background texture with roughness-based LOD
+    // Scale roughness by IOR for proper microfacet refraction
+    float transmission_roughness = applyIorToRoughness(perceptual_roughness, ior);
+    
+    // Calculate LOD based on framebuffer size and roughness
+    float framebuffer_lod = log2(float(textureSize(sampler2D(screen_tex, screen_smp), 0).x)) 
+                          * transmission_roughness;
+    
+    vec3 transmitted_light = textureLod(sampler2D(screen_tex, screen_smp), 
+                                       refraction_coords, framebuffer_lod).rgb;
+    
+    // 5. Apply Beer's law volume attenuation based on actual ray distance
+    vec3 attenuated_color = applyVolumeAttenuation(transmitted_light, transmission_ray_length,
+                                                   attenuation_color, attenuation_distance);
+    
+    // 6. Modulate by base color (tint the transmitted light)
+    return attenuated_color * base_color;
 }
 
 void main() {
@@ -599,8 +658,10 @@ void main() {
         metallic                    // Pass metallic value to material_info
     );
     
-    // Apply PBR lighting from all lights
+    // Apply PBR lighting from all lights  
     vec3 view = normalize(v_eye_pos - v_pos);
+    
+    // Get combined lighting (diffuse + specular)
     vec3 color = apply_all_lights(material_info, normal, view);
     
     // Ambient lighting - controllable via uniform
@@ -613,12 +674,32 @@ void main() {
     // Apply ambient occlusion
     color *= occlusion;
     
-    // Add emissive
-    color += emissive;
+    // NOTE: Emissive will be added AFTER transmission, so it always shows through glass
     
-    // Apply volume absorption (Beer's Law) - ALWAYS applies when thickness > 0
+    // Apply transmission (glass/refraction) BEFORE volume absorption
+    // Following glTF-Sample-Viewer approach: replace diffuse component with transmission
+    if (transmission_factor > 0.0) {
+        // Calculate refracted background color using proper 3D ray tracing
+        vec3 refracted_color = calculate_refraction(
+            v_pos,                              // Fragment position in world space
+            normal,                             // Surface normal
+            view,                               // View direction
+            ior,                                // Index of refraction
+            thickness_factor,                   // Material thickness
+            material_info.perceptual_roughness, // Roughness for blur
+            base_color.rgb,                     // Base color tint
+            attenuation_color,                  // Volume absorption color
+            attenuation_distance                // Volume absorption distance
+        );
+        
+        // glTF-Sample-Viewer approach: Mix current color with refracted background
+        // This preserves specular highlights while showing refraction
+        // The transmission replaces the diffuse component, specular remains via Fresnel
+        color = mix(color, refracted_color, transmission_factor);
+    }
+    
+    // Apply volume absorption (Beer's Law) AFTER transmission
     // This creates the colored tint effect (e.g., golden amber, orange dragon)
-    // This is separate from transmission/refraction
     if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
         // Beer's Law: Intensity = I0 * exp(-absorption_coefficient * distance)
         // attenuation_color is the target color at attenuation_distance
@@ -627,34 +708,6 @@ void main() {
         
         // Apply volume color tint to the rendered surface
         color *= volume_color;
-    }
-    
-    // Apply transmission (glass/refraction) if enabled AND transmission_factor > 0
-    // This adds refraction effect on top of the volume-tinted color
-    if (transmission_factor > 0.0) {
-        // Calculate refracted background color
-        vec3 refracted_color = calculate_refraction(normal, view, ior, transmission_factor);
-        
-        // Apply the same volume absorption to the refracted background
-        if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
-            vec3 absorption = -log(max(attenuation_color, vec3(0.001))) / max(attenuation_distance, 0.001);
-            vec3 volume_color = exp(-absorption * thickness_factor);
-            refracted_color *= volume_color;
-        }
-        
-        // Mix between surface color and refracted background based on transmission factor
-        // transmission_factor = 0.0 -> fully opaque (use surface color)
-        // transmission_factor = 1.0 -> fully transparent (use refracted background)
-        color = mix(color, refracted_color, transmission_factor);
-        
-        // For glass materials, also apply some Fresnel effect
-        // Objects are more transparent when viewed straight on, more reflective at grazing angles
-        float n_dot_v = max(dot(normal, view), 0.0);
-        float fresnel = pow(1.0 - n_dot_v, 5.0);  // Schlick's approximation
-        
-        // Reduce transmission at grazing angles (makes edges more reflective)
-        float effective_transmission = transmission_factor * (1.0 - fresnel * 0.5);
-        color = mix(color, refracted_color, effective_transmission);
     }
     
     // Apply clearcoat layer (KHR_materials_clearcoat) - glTF spec compliant
@@ -731,6 +784,10 @@ void main() {
         float clearcoat_contribution = clearcoat_factor * clearcoat_fresnel;
         color = color * (1.0 - clearcoat_contribution) + clearcoat_specular * clearcoat_factor;
     }
+    
+    // Add emissive AFTER all transmission/refraction/clearcoat calculations
+    // This ensures emissive logos show through transparent/glass materials
+    color += emissive;
     
     // Apply tone mapping (Uncharted 2) and gamma correction
     frag_color = vec4(tone_map(color), base_color.a);
