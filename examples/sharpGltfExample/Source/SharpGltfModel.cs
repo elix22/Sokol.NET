@@ -582,14 +582,15 @@ namespace Sokol
                 return;
             }
 
-            // Create unique identifier for texture to enable caching
-            // Using texture's logical index as identifier (unique within a model)
-            string textureId = $"texture_{textureImage.LogicalIndex}_{channelName}";
+            // Create texture identifier matching what ImageDecoder created
+            // Use base identifier (just image index) so we reuse the pre-created texture
+            string textureId = $"image_{textureImage.LogicalIndex}";
 
             // All textures use RGBA8 format - manual srgb_to_linear() conversion in shader
             sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
 
-            // Load texture from memory using cache
+            // Look up texture in cache (should hit - ImageDecoder already created it)
+            // If not in cache (e.g., validation was skipped), create it now
             var imageData = textureImage.Content.Content.ToArray();
             var texture = TextureCache.Instance.GetOrCreate(textureId, imageData, format);
             mesh.Textures.Add(texture);

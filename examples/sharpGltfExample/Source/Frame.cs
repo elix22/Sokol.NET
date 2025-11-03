@@ -216,8 +216,11 @@ public static unsafe partial class SharpGLTFApp
                     });
                 };
 
+                // Create image decoder to convert images to GPU textures as they load
+                var imageDecoder = CreateImageDecoder();
+
                 // Continue loading (this will start loading one dependency and return)
-                modelRoot._ContinueAsyncResolveSatelliteDependencies(loadState, asyncLoader, null);
+                modelRoot._ContinueAsyncResolveSatelliteDependencies(loadState, asyncLoader, imageDecoder);
 
                 // Update loading progress for UI
                 state.loadingProgress = (int)(loadState.Progress * 100);

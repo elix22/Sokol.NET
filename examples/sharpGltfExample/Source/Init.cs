@@ -816,6 +816,71 @@ public static unsafe partial class SharpGLTFApp
         Info("[Transmission] Screen texture available for refraction shader sampling");
     }
 
+    /// <summary>
+    /// Creates an ImageDecoder callback that decodes and uploads images to GPU during async loading.
+    /// This spreads the expensive stb_image decode + GPU upload across multiple frames (one per frame).
+    /// Returns true to keep compressed image in memory (needed for validation).
+    /// </summary>
+    /// <remarks>
+    /// Strategy: Create ONE texture per image using a base identifier (just the LogicalIndex).
+    /// SharpGltfModel.ProcessMesh() will look up textures using the same base identifier.
+    /// The TextureCache handles the (identifier + format) key, so the same physical texture
+    /// can be referenced by multiple materials/channels without duplication.
+    /// </remarks>
+    static ImageDecodeCallback CreateImageDecoder()
+    {
+        return (SharpGLTF.Schema2.Image image) =>
+        {
+            try
+            {
+                // Get the compressed image content (PNG/JPEG)
+                var content = image.Content;
+                if (content.IsEmpty)
+                {
+                    Error($"[ImageDecoder] Image {image.LogicalIndex} has no content");
+                    return true;
+                }
+
+                Info($"[ImageDecoder] Decoding image {image.LogicalIndex} ({content.Content.Length} bytes)");
+
+                // Get the compressed image bytes
+                var imageBytes = content._GetBuffer().ToArray();
+                
+                // Create base texture identifier using only the image index
+                // This is the key: ONE texture per image, not per channel
+                string textureId = $"image_{image.LogicalIndex}";
+                
+                // All textures use RGBA8 format (shader handles sRGB conversion)
+                sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
+                
+                // Decode image and upload to GPU NOW (spreads work across frames)
+                // TextureCache will:
+                // 1. Decompress PNG/JPEG using stb_image
+                // 2. Upload RGBA pixels to GPU
+                // 3. Cache the result by (textureId + format)
+                var texture = TextureCache.Instance.GetOrCreate(textureId, imageBytes, format);
+                
+                if (texture != null)
+                {
+                    Info($"[ImageDecoder] Created GPU texture: {textureId}");
+                }
+                else
+                {
+                    Error($"[ImageDecoder] Failed to create texture: {textureId}");
+                }
+                
+                // Return true to keep the compressed image in memory
+                // This is needed for validation (which accesses image.Content)
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Error($"[ImageDecoder] Error decoding image {image.LogicalIndex}: {ex.Message}");
+                return true;
+            }
+        };
+    }
+
     public static void LoadNewModel()
     {
         if (state.isLoadingModel)
