@@ -70,6 +70,11 @@ namespace SharpGLTF.Schema2
         /// </remarks>
         public String AlternateWriteFileName { get; set; }
 
+        /// <summary>
+        /// Internal accessor for URI (for async loading support)
+        /// </summary>
+        internal string? Uri => _uri;
+
         internal int _SourceBufferViewIndex => _bufferView.AsValue(-1);
 
         internal bool _HasContent
@@ -181,6 +186,16 @@ namespace SharpGLTF.Schema2
             this._mimeType = null;
             this._bufferView = null;
             this._SatelliteContent = null;
+        }
+
+        /// <summary>
+        /// Helper method for async loading - resolves image from already loaded data
+        /// </summary>
+        internal void _ResolveUriFromData(string originalUri, ArraySegment<byte> data)
+        {
+            _SatelliteContent = new SharpGLTF.Memory.MemoryImage(data, originalUri);
+            _uri = null;
+            _mimeType = null;
         }
 
         #endregion

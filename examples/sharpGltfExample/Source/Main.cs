@@ -24,10 +24,10 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
-        "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",
         "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
         "AttenuationTest/glTF-Binary/AttenuationTest.glb",
@@ -131,6 +131,13 @@ public static unsafe partial class SharpGLTFApp
         // Model browser
         public int currentModelIndex = 0;
         public bool isLoadingModel = false;
+        public string loadingStage = "";
+        public int loadingProgress = 0;  // 0-100
+
+        // Async loading state for GLTF dependencies
+        public ModelRoot? pendingModelRoot = null;
+        public SharpGLTF.Schema2.ModelRoot.AsyncSatelliteLoadState? asyncLoadState = null;
+        public string? pendingModelPath = null;
 
         // Model rotation (middle mouse button)
         public float modelRotationX = 0.0f;     // Rotation around X-axis (vertical mouse movement)

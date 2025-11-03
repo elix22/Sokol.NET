@@ -288,7 +288,12 @@ public static unsafe partial class SharpGLTFApp
             if (state.isLoadingModel)
             {
                 igSeparator();
-                igText("Loading model...");
+                igText($"Loading: {state.loadingStage}");
+                igText($"Progress: {state.loadingProgress}%");
+                
+                // Progress bar
+                float progress = state.loadingProgress / 100.0f;
+                igProgressBar(progress, new Vector2(-1, 0), null);
             }
         }
         igEnd();

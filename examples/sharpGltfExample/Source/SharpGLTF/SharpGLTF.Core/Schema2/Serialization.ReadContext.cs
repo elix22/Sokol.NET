@@ -100,6 +100,11 @@ namespace SharpGLTF.Schema2
         private Byte[] _BinaryChunk;
 
         /// <summary>
+        /// Gets a value indicating whether this context has a binary chunk (GLB format).
+        /// </summary>
+        internal bool HasBinaryChunk => _BinaryChunk != null;
+
+        /// <summary>
         /// Gets a value indicating whether to check used/required extensions.
         /// </summary>
         internal Boolean _CheckSupportedExtensions { get; private set; } = true;
@@ -324,11 +329,17 @@ namespace SharpGLTF.Schema2
 
             // resolve external dependencies
 
-            root._ResolveSatelliteDependencies(this);
+            if (!this.SkipSatelliteDependencies)
+            {
+                root._ResolveSatelliteDependencies(this);
+            }
 
             // content validation
+            // Note: Content validation requires buffer data to be loaded, so skip it if we're
+            // skipping satellite dependencies (async loading). Validation should be done manually
+            // after all dependencies are loaded.
 
-            if (this.Validation != VALIDATIONMODE.Skip) // disable validation at your own risk
+            if (this.Validation != VALIDATIONMODE.Skip && !this.SkipSatelliteDependencies)
                 {
                 root.ValidateContent(vcontext.GetContext());
                 var ex = vcontext.Errors.FirstOrDefault();

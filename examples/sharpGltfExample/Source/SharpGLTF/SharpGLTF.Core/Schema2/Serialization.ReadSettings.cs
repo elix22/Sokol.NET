@@ -69,6 +69,12 @@ namespace SharpGLTF.Schema2
         /// </summary>
         public JsonFilterCallback JsonPreprocessor { get; set; }
 
+        /// <summary>
+        /// When set to true, skips automatic resolution of satellite dependencies.
+        /// Use this with async loading to manually resolve dependencies progressively.
+        /// </summary>
+        public bool SkipSatelliteDependencies { get; set; } = false;
+
         #endregion
 
         #region API
@@ -267,6 +273,216 @@ namespace SharpGLTF.Schema2
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Asynchronous state for loading satellite dependencies one at a time
+        /// </summary>
+        public class AsyncSatelliteLoadState
+        {
+            internal Queue<(bool isBuffer, int index, string uri)> PendingDependencies = new Queue<(bool, int, string)>();
+            internal string? CurrentAsset = null;
+            internal bool IsLoading = false;
+            internal bool Failed = false;
+            internal string? ErrorMessage = null;
+            
+            public bool IsComplete => !IsLoading && PendingDependencies.Count == 0 && !Failed;
+            public bool HasFailed => Failed;
+            public string? Error => ErrorMessage;
+            public string? CurrentLoadingAsset => CurrentAsset;
+            public int TotalDependencies { get; internal set; }
+            public int LoadedDependencies { get; internal set; }
+            public float Progress => TotalDependencies > 0 ? (float)LoadedDependencies / TotalDependencies : 1.0f;
+        }
+
+        /// <summary>
+        /// Callback for asynchronously loading a single dependency file
+        /// </summary>
+        public delegate void AsyncFileLoadCallback(string assetName, Action<bool, ArraySegment<byte>> onComplete);
+
+        /// <summary>
+        /// Begins asynchronous loading of satellite dependencies. Returns a state object
+        /// that should be passed to ContinueLoadingSatelliteDependencies() each frame.
+        /// </summary>
+        internal AsyncSatelliteLoadState _BeginAsyncResolveSatelliteDependencies(ReadContext context)
+        {
+            var state = new AsyncSatelliteLoadState();
+            
+            // First, resolve all buffers with no URI or embedded (data URI) buffers immediately
+            // These don't require external file loading
+            for (int i = 0; i < this._buffers.Count; i++)
+            {
+                var buffer = this._buffers[i];
+                var uri = buffer.Uri;
+                
+                // Buffer with no URI means it uses the GLB binary chunk
+                // Only resolve if context has a binary chunk (GLB file)
+                if (string.IsNullOrWhiteSpace(uri))
+                {
+                    // Only resolve from context if it has a binary chunk (GLB format)
+                    if (context.HasBinaryChunk)
+                    {
+                        buffer._ResolveUri(context);
+                    }
+                    // If no binary chunk and no URI, this is an error in the GLTF file
+                    // But we'll let validation catch it later
+                }
+                else if (uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // This is an embedded buffer, resolve it immediately
+                    var data = uri.TryParseBase64Unchecked("data:application/gltf-buffer", "data:application/octet-stream");
+                    if (data != null)
+                    {
+                        buffer._ResolveUriFromData(new ArraySegment<byte>(data));
+                    }
+                }
+            }
+            
+            // Resolve all embedded images (data URI or bufferView) immediately
+            // These don't require external file loading
+            for (int i = 0; i < this._images.Count; i++)
+            {
+                var image = this._images[i];
+                var uri = image.Uri;
+                
+                // Image with no URI means it uses a bufferView (embedded in GLB)
+                if (string.IsNullOrWhiteSpace(uri))
+                {
+                    // This image is embedded in a buffer view, already resolved
+                    // No action needed - it will be accessed via bufferView
+                }
+                else if (uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // This is an embedded image, resolve it immediately
+                    if (Memory.MemoryImage.TryParseMime64(uri, out var memImage))
+                    {
+                        image._ResolveUriFromData(uri, new ArraySegment<byte>(memImage._GetBuffer().ToArray()));
+                    }
+                }
+            }
+            
+            // Queue all external buffers (non-embedded)
+            for (int i = 0; i < this._buffers.Count; i++)
+            {
+                var buffer = this._buffers[i];
+                var uri = buffer.Uri;
+                if (!string.IsNullOrWhiteSpace(uri) && 
+                    !uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    state.PendingDependencies.Enqueue((true, i, uri));
+                }
+            }
+            
+            // Queue all external images (non-embedded)
+            for (int i = 0; i < this._images.Count; i++)
+            {
+                var image = this._images[i];
+                var uri = image.Uri;
+                if (!string.IsNullOrWhiteSpace(uri) && 
+                    !uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    state.PendingDependencies.Enqueue((false, i, uri));
+                }
+            }
+            
+            state.TotalDependencies = state.PendingDependencies.Count;
+            state.LoadedDependencies = 0;
+            
+            return state;
+        }
+
+        /// <summary>
+        /// Validates the model content after all dependencies have been loaded.
+        /// Should be called after async loading is complete.
+        /// </summary>
+        internal void _ValidateContentAfterAsyncLoad(VALIDATIONMODE validationMode)
+        {
+            if (validationMode == VALIDATIONMODE.Skip) return;
+            
+            var vcontext = new Validation.ValidationResult(this, validationMode);
+            this.ValidateContent(vcontext.GetContext());
+            
+            if (vcontext.HasErrors)
+            {
+                var ex = vcontext.Errors.FirstOrDefault();
+                if (ex != null)
+                {
+                    Validation.ModelException._Decorate(ex);
+                    throw ex;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Continues loading the next satellite dependency. Call this once per frame.
+        /// Returns true if more dependencies remain to be loaded.
+        /// </summary>
+        internal bool _ContinueAsyncResolveSatelliteDependencies(
+            AsyncSatelliteLoadState state, 
+            AsyncFileLoadCallback loadCallback,
+            ImageDecodeCallback? imageDecoder)
+        {
+            if (state.IsComplete || state.Failed)
+                return false;
+                
+            // Already loading something
+            if (state.IsLoading)
+                return true;
+                
+            // No more dependencies
+            if (state.PendingDependencies.Count == 0)
+                return false;
+                
+            // Start loading next dependency
+            var (isBuffer, index, uri) = state.PendingDependencies.Dequeue();
+            state.CurrentAsset = uri;
+            state.IsLoading = true;
+            
+            loadCallback(uri, (success, data) =>
+            {
+                state.IsLoading = false;
+                
+                if (!success)
+                {
+                    state.Failed = true;
+                    state.ErrorMessage = $"Failed to load {(isBuffer ? "buffer" : "image")}: {uri}";
+                    return;
+                }
+                
+                try
+                {
+                    if (isBuffer)
+                    {
+                        // Resolve buffer
+                        var buffer = this._buffers[index];
+                        buffer._ResolveUriFromData(data);
+                    }
+                    else
+                    {
+                        // Resolve image
+                        var image = this._images[index];
+                        image._ResolveUriFromData(uri, data);
+                        
+                        // Call image decoder if available
+                        if (imageDecoder != null)
+                        {
+                            if (!imageDecoder(image))
+                            {
+                                image._DiscardContent();
+                            }
+                        }
+                    }
+                    
+                    state.LoadedDependencies++;
+                }
+                catch (Exception ex)
+                {
+                    state.Failed = true;
+                    state.ErrorMessage = $"Error processing {(isBuffer ? "buffer" : "image")} {uri}: {ex.Message}";
+                }
+            });
+            
+            return true;
         }
 
         #endregion

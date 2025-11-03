@@ -115,115 +115,37 @@ public static unsafe partial class SharpGLTFApp
                     // Get the directory of the main GLTF file for resolving relative paths
                     string? baseDirectory = Path.GetDirectoryName(path);
 
-                    // Create a FileReaderCallback that uses LoadFileSync for dependent files
+                    // Create a dummy FileReaderCallback - we won't actually call it since we're using async loading
+                    // This is just to satisfy the ReadContext.Create API
                     SharpGLTF.Schema2.FileReaderCallback fileReader = (assetName) =>
                     {
-                        // Construct full path by combining base directory with asset name
-                        string fullAssetPath = string.IsNullOrEmpty(baseDirectory)
-                            ? assetName
-                            : Path.Combine(baseDirectory, assetName);
-
-                        Info($"[SharpGLTF] Loading dependent asset: {assetName} -> {fullAssetPath}");
-                        var (data, loadStatus) = FileSystem.Instance.LoadFileSync(fullAssetPath);
-
-                        if (loadStatus == FileLoadStatus.Success && data != null)
-                        {
-                            Info($"[SharpGLTF] Successfully loaded {fullAssetPath} ({data.Length} bytes)");
-                            return new ArraySegment<byte>(data);
-                        }
-                        else
-                        {
-                            Error($"[SharpGLTF] Failed to load {fullAssetPath}: {loadStatus}");
-                            throw new FileNotFoundException($"Failed to load asset: {fullAssetPath}");
-                        }
+                        throw new InvalidOperationException("Synchronous file reading should not be used. Using async loading instead.");
                     };
 
                     var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
+                    
+                    // Skip automatic satellite dependency resolution - we'll do it manually and asynchronously
+                    context.SkipSatelliteDependencies = true;
 
+                    // Read the JSON structure without loading satellite dependencies
                     ModelRoot modelRoot = context.ReadSchema2(memoryStream);
 
-                    // Calculate model bounds from GLTF accessors BEFORE creating the model
-                    state.modelBoundsMin = new Vector3(float.MaxValue);
-                    state.modelBoundsMax = new Vector3(float.MinValue);
+                    Info($"[SharpGLTF] Model structure loaded, beginning async dependency loading...");
 
-                    foreach (var mesh in modelRoot.LogicalMeshes)
-                    {
-                        foreach (var primitive in mesh.Primitives)
-                        {
-                            var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
-                            if (positions != null)
-                            {
-                                foreach (var pos in positions)
-                                {
-                                    state.modelBoundsMin = Vector3.Min(state.modelBoundsMin, pos);
-                                    state.modelBoundsMax = Vector3.Max(state.modelBoundsMax, pos);
-                                }
-                            }
-                        }
-                    }
-
-                    Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
-                    Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
-                    float boundingRadius = Vector3.Distance(state.modelBoundsMin, state.modelBoundsMax) * 0.5f;
-
-                    Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
-                    Info($"[SharpGLTF] Model size: {size}, Center: {center}");
-                    Info($"[SharpGLTF] Bounding sphere radius: {boundingRadius:F6}");
+                    // Store the modelRoot and path for async dependency loading
+                    state.pendingModelRoot = modelRoot;
+                    state.pendingModelPath = path;
+                    state.isLoadingModel = true;
+                    state.loadingStage = "Loading dependencies";
                     
-                    // Log if bounds seem unusually large (might indicate bad model data)
-                    if (boundingRadius > 1000.0f)
-                    {
-                        Info($"[SharpGLTF] WARNING: Very large bounding radius detected!");
-                        Info($"[SharpGLTF] This model may have incorrect bounds or far-away vertices.");
-                        Info($"[SharpGLTF] Using clamped bounds for camera positioning.");
-                        
-                        // Clamp to reasonable size for camera positioning
-                        float clampedRadius = Math.Min(boundingRadius, 10.0f);
-                        state.modelBoundsMin = center - new Vector3(clampedRadius);
-                        state.modelBoundsMax = center + new Vector3(clampedRadius);
-                        Info($"[SharpGLTF] Clamped bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
-                    }
+                    // Begin async loading of satellite dependencies
+                    // Pass the context so embedded buffers (GLB binary chunk) can be resolved
+                    state.asyncLoadState = modelRoot._BeginAsyncResolveSatelliteDependencies(context);
+                    
+                    Info($"[SharpGLTF] Found {state.asyncLoadState.TotalDependencies} external dependencies to load");
 
-                    // Safety check: if bounds are invalid or too small, use defaults
-                    if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
-                    {
-                        Info("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
-                        state.modelBoundsMin = new Vector3(-1, 0, -1);
-                        state.modelBoundsMax = new Vector3(1, 2, 1);
-                    }
-
-                    // Create our model wrapper (pass file path for extension extraction)
-                    state.model = new SharpGltfModel(modelRoot, path);
-
-                    // TBD ELI , this is an hack to detect Mixamo models
-                    // Detect if this is a Mixamo model by checking node names
-                    state.isMixamoModel = modelRoot.LogicalNodes.Any(n =>
-                        n.Name != null && (n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
-                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase)));
-
-                    if (state.isMixamoModel)
-                    {
-                        Info("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
-                    }
-
-                    Info($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
-                    Info($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
-
-                    // Create animator if model has animations
-                    if (state.model.HasAnimations)
-                    {
-                        state.animator = new SharpGltfAnimator(state.model.Animation);
-                        state.ui.animation_open = true;  // Show animation window
-                        Info("[SharpGLTF] Animator created for animated model");
-                    }
-                    else
-                    {
-                        state.ui.animation_open = false;  // Hide animation window
-                        Info("[SharpGLTF] No animations found in model");
-                    }
-
-                    state.modelLoaded = true;
-                    Info($"[SharpGLTF] Model loaded successfully: {path}");
+                    // The actual dependency loading will happen in RunSingleFrame() one at a time
+                    // Once all dependencies are loaded, we'll finalize the model there
                 }
                 catch (Exception ex)
                 {
@@ -900,6 +822,8 @@ public static unsafe partial class SharpGLTFApp
             return;
 
         state.isLoadingModel = true;
+        state.loadingStage = "Preparing...";
+        state.loadingProgress = 0;
         Info($"[ModelBrowser] Loading new model: {filename}");
 
         // Store old model for disposal after new one loads
@@ -918,6 +842,9 @@ public static unsafe partial class SharpGLTFApp
         // This ensures the new model creates fresh textures instead of reusing disposed ones
         TextureCache.Instance.Clear();
 
+        state.loadingStage = "Loading file...";
+        state.loadingProgress = 20;
+
         // Load new model asynchronously
         FileSystem.Instance.LoadFile(filename, (path, buffer, status) =>
         {
@@ -925,119 +852,62 @@ public static unsafe partial class SharpGLTFApp
             {
                 try
                 {
+                    state.loadingStage = "Parsing glTF...";
+                    state.loadingProgress = 40;
+                    
                     var memoryStream = new MemoryStream(buffer);
+
+                    // Get the directory of the main GLTF file for resolving relative paths
                     string? baseDirectory = Path.GetDirectoryName(path);
 
+                    // Create a dummy FileReaderCallback - we won't actually call it since we're using async loading
+                    // This is just to satisfy the ReadContext.Create API
                     SharpGLTF.Schema2.FileReaderCallback fileReader = (assetName) =>
                     {
-                        string fullAssetPath = string.IsNullOrEmpty(baseDirectory)
-                            ? assetName
-                            : Path.Combine(baseDirectory, assetName);
-
-                        Info($"[SharpGLTF] Loading dependent asset: {assetName} -> {fullAssetPath}");
-                        var (data, loadStatus) = FileSystem.Instance.LoadFileSync(fullAssetPath);
-
-                        if (loadStatus == FileLoadStatus.Success && data != null)
-                        {
-                            Info($"[SharpGLTF] Successfully loaded {fullAssetPath} ({data.Length} bytes)");
-                            return new ArraySegment<byte>(data);
-                        }
-                        else
-                        {
-                            Error($"[SharpGLTF] Failed to load {fullAssetPath}: {loadStatus}");
-                            throw new FileNotFoundException($"Failed to load asset: {fullAssetPath}");
-                        }
+                        throw new InvalidOperationException("Synchronous file reading should not be used. Using async loading instead.");
                     };
 
                     var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
+                    
+                    // Skip automatic satellite dependency resolution - we'll do it manually and asynchronously
+                    context.SkipSatelliteDependencies = true;
+
+                    // Read the JSON structure without loading satellite dependencies
                     ModelRoot modelRoot = context.ReadSchema2(memoryStream);
 
-                    // Calculate model bounds
-                    state.modelBoundsMin = new Vector3(float.MaxValue);
-                    state.modelBoundsMax = new Vector3(float.MinValue);
+                    Info($"[SharpGLTF] Model structure loaded, beginning async dependency loading...");
 
-                    foreach (var mesh in modelRoot.LogicalMeshes)
-                    {
-                        foreach (var primitive in mesh.Primitives)
-                        {
-                            var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
-                            if (positions != null)
-                            {
-                                foreach (var pos in positions)
-                                {
-                                    state.modelBoundsMin = Vector3.Min(state.modelBoundsMin, pos);
-                                    state.modelBoundsMax = Vector3.Max(state.modelBoundsMax, pos);
-                                }
-                            }
-                        }
-                    }
+                    // Store the modelRoot and path for async dependency loading
+                    state.pendingModelRoot = modelRoot;
+                    state.pendingModelPath = path;
+                    state.loadingStage = "Loading dependencies";
 
-                    Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
-                    Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
-                    float boundingRadius = Vector3.Distance(state.modelBoundsMin, state.modelBoundsMax) * 0.5f;
+                    // Begin async loading of satellite dependencies
+                    // Pass the context so embedded buffers (GLB binary chunk) can be resolved
+                    state.asyncLoadState = modelRoot._BeginAsyncResolveSatelliteDependencies(context);
+                    
+                    Info($"[SharpGLTF] Found {state.asyncLoadState.TotalDependencies} external dependencies to load");
 
-                    Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
-                    Info($"[SharpGLTF] Model size: {size}, Center: {center}");
-                    Info($"[SharpGLTF] Bounding sphere radius: {boundingRadius:F6}");
+                    // The actual dependency loading will happen in RunSingleFrame() one at a time
+                    // Once all dependencies are loaded, we'll finalize the model there
 
-                    if (boundingRadius > 1000.0f)
-                    {
-                        Info($"[SharpGLTF] WARNING: Very large bounding radius detected!");
-                        float clampedRadius = Math.Min(boundingRadius, 10.0f);
-                        state.modelBoundsMin = center - new Vector3(clampedRadius);
-                        state.modelBoundsMax = center + new Vector3(clampedRadius);
-                    }
-
-                    if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
-                    {
-                        Info("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
-                        state.modelBoundsMin = new Vector3(-1, 0, -1);
-                        state.modelBoundsMax = new Vector3(1, 2, 1);
-                    }
-
-                    state.model = new SharpGltfModel(modelRoot, path);
-
-                    state.isMixamoModel = modelRoot.LogicalNodes.Any(n =>
-                        n.Name != null && (n.Name.Contains("mixamorig", StringComparison.OrdinalIgnoreCase) ||
-                        n.Name.Contains("Armature", StringComparison.OrdinalIgnoreCase)));
-
-                    if (state.isMixamoModel)
-                    {
-                        Info("[SharpGLTF] Detected Mixamo model - will apply scale/rotation correction");
-                    }
-
-                    Info($"[SharpGLTF] Model has {state.model.Meshes.Count} meshes, {state.model.Nodes.Count} nodes");
-                    Info($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
-
-                    if (state.model.HasAnimations)
-                    {
-                        state.animator = new SharpGltfAnimator(state.model.Animation);
-                        state.ui.animation_open = true;  // Show animation window
-                        Info("[SharpGLTF] Animator created for animated model");
-                    }
-                    else
-                    {
-                        state.ui.animation_open = false;  // Hide animation window
-                        Info("[SharpGLTF] No animations found in model");
-                    }
-
-                    // Reset model rotation
-                    state.modelRotationX = 0.0f;
-                    state.modelRotationY = 0.0f;
-
-                    state.modelLoaded = true;
-                    state.isLoadingModel = false;
-                    Info($"[ModelBrowser] Model loaded successfully: {path}");
+                    // Remove the old code that calculated bounds here - it will be done after async loading completes
                 }
                 catch (Exception ex)
                 {
-                    Error($"[ModelBrowser] Error loading model: {ex.Message}");
+                    Error($"[ModelBrowser] Error starting async model load: {ex.Message}");
+                    state.loadingStage = "Error!";
+                    state.loadingProgress = 0;
                     state.isLoadingModel = false;
+                    state.pendingModelRoot = null;
+                    state.asyncLoadState = null;
                 }
             }
             else
             {
                 Error($"[ModelBrowser] Failed to load file '{path}': {status}");
+                state.loadingStage = "Failed!";
+                state.loadingProgress = 0;
                 state.isLoadingModel = false;
             }
         });

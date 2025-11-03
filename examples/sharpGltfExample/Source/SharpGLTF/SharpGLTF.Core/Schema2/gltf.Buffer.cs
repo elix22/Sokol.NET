@@ -33,6 +33,11 @@ namespace SharpGLTF.Schema2
         public Byte[] Content => _Content;
         #pragma warning restore CA1819 // Properties should not return arrays
 
+        /// <summary>
+        /// Internal accessor for URI (for async loading support)
+        /// </summary>
+        internal string? Uri => _uri;
+
         #endregion
 
         #region binary read
@@ -58,6 +63,18 @@ namespace SharpGLTF.Schema2
             return segment.TryGetUnderlayingArray(out var array)
                 ? array
                 : segment.ToArray();
+        }
+
+        /// <summary>
+        /// Helper method for async loading - resolves buffer from already loaded data
+        /// </summary>
+        internal void _ResolveUriFromData(ArraySegment<byte> data)
+        {
+            _Content = data.TryGetUnderlayingArray(out var array)
+                ? array
+                : data.ToArray();
+
+            _uri = null; // When _Data is not empty, clear URI
         }
 
         #endregion
