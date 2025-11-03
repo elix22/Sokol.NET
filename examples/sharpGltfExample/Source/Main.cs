@@ -26,6 +26,7 @@ public static unsafe partial class SharpGLTFApp
     {
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+        "DamagedHelmet/glTF/DamagedHelmet/DamagedHelmet.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
         "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",

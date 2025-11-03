@@ -31,8 +31,8 @@ public static unsafe partial class SharpGLTFApp
 
         state.model?.Dispose();
 
-        // Clear texture cache (will dispose all cached textures)
-        TextureCache.Instance.Clear();
+        // Shutdown texture cache (will dispose all cached textures and cleanup Basis Universal)
+        TextureCache.Instance.Shutdown();
 
         FileSystem.Instance.Shutdown();
         simgui_shutdown();

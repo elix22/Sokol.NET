@@ -16,8 +16,14 @@ namespace Sokol
         private readonly Dictionary<string, Texture> _cache = new Dictionary<string, Texture>();
         private int _cacheHits = 0;
         private int _cacheMisses = 0;
+        private bool _basisuInitialized = false;
 
-        private TextureCache() { }
+        private TextureCache() 
+        {
+            // Initialize Basis Universal transcoder
+            SBasisu.sbasisu_setup();
+            _basisuInitialized = true;
+        }
 
         /// <summary>
         /// Get or create a texture from raw data.
@@ -107,6 +113,23 @@ namespace Sokol
             _cache.Clear();
             _cacheHits = 0;
             _cacheMisses = 0;
+        }
+
+        /// <summary>
+        /// Shutdown the texture cache and cleanup Basis Universal transcoder.
+        /// Should be called during application cleanup.
+        /// </summary>
+        public void Shutdown()
+        {
+            // Clear all cached textures first
+            Clear();
+            
+            // Shutdown Basis Universal transcoder
+            if (_basisuInitialized)
+            {
+                SBasisu.sbasisu_shutdown();
+                _basisuInitialized = false;
+            }
         }
 
         /// <summary>

@@ -1,6 +1,8 @@
 using System;
 using static Sokol.SG;
 using static Sokol.StbImage;
+using static Sokol.SBasisu;
+using static Sokol.Utils;
 
 namespace Sokol
 {
@@ -49,6 +51,13 @@ namespace Sokol
 
         public static unsafe Texture? LoadFromMemory(byte[] data, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
         {
+            // Check if this is a basisu/basis file by checking magic bytes
+            if (IsBasisImage(data))
+            {
+                return LoadFromMemoryBasisU(data, label);
+            }
+            
+            // Regular PNG/JPEG loading via stb_image
             int width = 0, height = 0, channels = 0;
             byte* pixels = stbi_load_csharp(
                 in data[0],
@@ -66,6 +75,50 @@ namespace Sokol
             stbi_image_free_csharp(pixels);
             return texture;
         }
+
+        private static bool IsBasisImage(byte[] data)
+        {
+            // Basis Universal (.basis) magic bytes: "sB" (0x73, 0x42)
+            // Reference: https://github.com/BinomialLLC/basis_universal
+            if (data.Length < 2) return false;
+            if (data[0] != 0x73) return false; // 's'
+            if (data[1] != 0x42) return false; // 'B'
+            return true;
+        }
+
+        private static unsafe Texture? LoadFromMemoryBasisU(byte[] data, string label)
+        {
+            var texture = new Texture();
+            texture._cacheKey = label;
+            
+            // Create basisu image using sokol-basisu
+            texture.Image = sbasisu_make_image(SG_RANGE(data));
+            
+            if (texture.Image.id == 0)
+                return null;
+                
+            // Create view
+            texture.View = sg_make_view(new sg_view_desc
+            {
+                texture = new sg_texture_view_desc { image = texture.Image },
+                label = $"{label}-view"
+            });
+
+            // Create sampler
+            texture.Sampler = sg_make_sampler(new sg_sampler_desc
+            {
+                min_filter = sg_filter.SG_FILTER_LINEAR,
+                mag_filter = sg_filter.SG_FILTER_LINEAR,
+                wrap_u = sg_wrap.SG_WRAP_REPEAT,
+                wrap_v = sg_wrap.SG_WRAP_REPEAT,
+                label = $"{label}-sampler"
+            });
+            
+            return texture;
+        }
+        
+        // Private parameterless constructor for basisu loading
+        private Texture() { }
 
         public void Dispose()
         {

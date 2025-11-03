@@ -27,6 +27,7 @@ namespace SharpGLTF.Memory
             if (IsDds) return $"DDS {_Image.Count}ᴮʸᵗᵉˢ";
             if (IsWebp) return $"WEBP {_Image.Count}ᴮʸᵗᵉˢ";
             if (IsKtx2) return $"KTX2 {_Image.Count}ᴮʸᵗᵉˢ";
+            if (IsBasis) return $"BASIS {_Image.Count}ᴮʸᵗᵉˢ";
 
             return "Undefined";
         }
@@ -42,12 +43,14 @@ namespace SharpGLTF.Memory
         const string EMBEDDED_DDS_BUFFER = "data:image/vnd-ms.dds";
         const string EMBEDDED_WEBP_BUFFER = "data:image/webp";
         const string EMBEDDED_KTX2_BUFFER = "data:image/ktx2";
+        const string EMBEDDED_BASIS_BUFFER = "data:image/x-basis";
 
         const string MIME_PNG = "image/png";
         const string MIME_JPG = "image/jpeg";
         const string MIME_DDS = "image/vnd-ms.dds";
         const string MIME_WEBP = "image/webp";
         const string MIME_KTX2 = "image/ktx2";
+        const string MIME_BASIS = "image/x-basis";
 
         /// <summary>
         /// Represents a 4x4 white PNG image.
@@ -263,9 +266,14 @@ namespace SharpGLTF.Memory
         public bool IsKtx2 => _IsKtx2Image(_Image);
 
         /// <summary>
+        /// Gets a value indicating whether this object represents a valid Basis Universal image.
+        /// </summary>
+        public bool IsBasis => _IsBasisImage(_Image);
+
+        /// <summary>
         /// Gets a value indicating whether this object represents an image backed by a glTF extension.
         /// </summary>
-        public bool IsExtendedFormat => IsDds || IsWebp || IsKtx2;
+        public bool IsExtendedFormat => IsDds || IsWebp || IsKtx2 || IsBasis;
 
         /// <summary>
         /// Gets a value indicating whether this object represents a valid image.
@@ -292,6 +300,7 @@ namespace SharpGLTF.Memory
                 if (IsDds) return "dds";
                 if (IsWebp) return "webp";
                 if (IsKtx2) return "ktx2";
+                if (IsBasis) return "basis";
                 throw new InvalidOperationException("Image format not recognized.");
             }
         }
@@ -309,6 +318,7 @@ namespace SharpGLTF.Memory
                 if (IsDds) return MIME_DDS;
                 if (IsWebp) return MIME_WEBP;
                 if (IsKtx2) return MIME_KTX2;
+                if (IsBasis) return MIME_BASIS;
                 throw new InvalidOperationException("Image format not recognized.");
             }
         }
@@ -322,7 +332,7 @@ namespace SharpGLTF.Memory
         {
             if (path == null) return null;
 
-            foreach (var ext in new string[] { ".jpg",".jpeg",".png",".dds",".webp",".ktx2" })
+            foreach (var ext in new string[] { ".jpg",".jpeg",".png",".dds",".webp",".ktx2",".basis",".basisu" })
             {
                 if (path.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) return path.Substring(0, path.Length - ext.Length);
             }
@@ -475,6 +485,16 @@ namespace SharpGLTF.Memory
             catch { return false; }
         }
 
+        private static bool _IsBasisImage(IReadOnlyList<Byte> data)
+        {
+            // Basis Universal (.basis) magic bytes: "sB" (0x73, 0x42)
+            // Reference: https://github.com/BinomialLLC/basis_universal
+            if (data.Count < 2) return false;
+            if (data[0] != 0x73) return false; // 's'
+            if (data[1] != 0x42) return false; // 'B'
+            return true;
+        }
+
         private static bool _IsImage(IReadOnlyList<Byte> data)
         {
             if (data == null) return false;
@@ -485,6 +505,7 @@ namespace SharpGLTF.Memory
             if (_IsPngImage(data)) return true;
             if (_IsWebpImage(data)) return true;
             if (_IsKtx2Image(data)) return true;
+            if (_IsBasisImage(data)) return true;
 
             return false;
         }
