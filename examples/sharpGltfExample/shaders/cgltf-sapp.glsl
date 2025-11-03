@@ -13,15 +13,19 @@
 @ctype vec3 hmm_vec3
 
 @vs vs
+// Force high precision on ARM32 GPUs (default is mediump which loses bone matrix precision)
+precision highp float;
+precision highp int;
+
 const int MAX_BONES = 100;
 const int MAX_BONE_INFLUENCE = 4;
 
-layout(binding=0) uniform vs_params {
-    mat4 model;
-    mat4 view_proj;
-    vec3 eye_pos;
+layout(binding=0, std140) uniform vs_params {
+    layout(offset=0) highp mat4 model;              // offset 0, size 64
+    layout(offset=64) highp mat4 view_proj;         // offset 64, size 64
+    layout(offset=128) highp vec3 eye_pos;          // offset 128, size 12 (but std140 pads to 16)
 #ifdef SKINNING
-    mat4 finalBonesMatrices[MAX_BONES];
+    layout(offset=144) highp mat4 finalBonesMatrices[MAX_BONES];  // offset 144 (128+16)
 #endif
 };
 
@@ -40,34 +44,65 @@ out vec2 v_uv;
 out vec3 v_eye_pos;
 
 void main() {
-    vec3 finalPosition = position;
-    vec3 finalNormal = normal;
+    highp vec3 finalPosition = position;
+    highp vec3 finalNormal = normal;
     
     // Apply skinning only if animation is available
 #ifdef SKINNING
         bool hasValidBone = false;
-        vec4 totalPosition = vec4(0.0);
-        vec3 totalNormal = vec3(0.0);
+        highp vec4 totalPosition = vec4(0.0);
+        highp vec3 totalNormal = vec3(0.0);
         
         // Apply skinning if bones are present
-        for(int i = 0; i < MAX_BONE_INFLUENCE; i++)
-        {
-            // Skip if weight is zero or bone ID is invalid
-            if(weights[i] <= 0.0) 
-                continue;
-            int boneId = int(boneIds[i]);  // Convert float to int
-            if(boneId >= MAX_BONES) 
-            {
-                totalPosition = vec4(position, 1.0);
-                totalNormal = normal;
+        // Unroll loop explicitly to avoid dynamic array indexing issues on ARM32 drivers
+        // ARM32 GLES3 drivers may have bugs with uniform array dynamic indexing
+        
+        // Bone influence 0
+        if(weights.x > 0.0) {
+            int boneId = int(boneIds.x + 0.5);
+            if(boneId < MAX_BONES) {
+                highp vec4 localPosition = finalBonesMatrices[boneId] * vec4(position, 1.0);
+                totalPosition += localPosition * weights.x;
+                highp vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
+                totalNormal += localNormal * weights.x;
                 hasValidBone = true;
-                break;
             }
-            vec4 localPosition = finalBonesMatrices[boneId] * vec4(position, 1.0);
-            totalPosition += localPosition * weights[i];
-            vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
-            totalNormal += localNormal * weights[i];
-            hasValidBone = true;
+        }
+        
+        // Bone influence 1
+        if(weights.y > 0.0) {
+            int boneId = int(boneIds.y + 0.5);
+            if(boneId < MAX_BONES) {
+                highp vec4 localPosition = finalBonesMatrices[boneId] * vec4(position, 1.0);
+                totalPosition += localPosition * weights.y;
+                highp vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
+                totalNormal += localNormal * weights.y;
+                hasValidBone = true;
+            }
+        }
+        
+        // Bone influence 2
+        if(weights.z > 0.0) {
+            int boneId = int(boneIds.z + 0.5);
+            if(boneId < MAX_BONES) {
+                highp vec4 localPosition = finalBonesMatrices[boneId] * vec4(position, 1.0);
+                totalPosition += localPosition * weights.z;
+                highp vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
+                totalNormal += localNormal * weights.z;
+                hasValidBone = true;
+            }
+        }
+        
+        // Bone influence 3
+        if(weights.w > 0.0) {
+            int boneId = int(boneIds.w + 0.5);
+            if(boneId < MAX_BONES) {
+                highp vec4 localPosition = finalBonesMatrices[boneId] * vec4(position, 1.0);
+                totalPosition += localPosition * weights.w;
+                highp vec3 localNormal = mat3(finalBonesMatrices[boneId]) * normal;
+                totalNormal += localNormal * weights.w;
+                hasValidBone = true;
+            }
         }
         
         // If valid bone influences found, use them (extract xyz from vec4)
