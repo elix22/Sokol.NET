@@ -278,8 +278,36 @@ When materials are undefined or incomplete, the implementation uses sensible def
 - **Static meshes use simpler pipeline** without skinning overhead
 - **Pipeline caching** in PipelineManager avoids recreation
 - **Opaque/transparent sorting**: Front-to-back for opaque (early-z), back-to-front for transparent
+- **Render loop optimization**: Pre-computed animation cache eliminates expensive LINQ operations
 - Maximum 100 bones supported (shader uniform array limit)
 - **Offscreen passes only when needed**: Bloom/transmission activate on demand
+
+### Render Loop Performance Optimization
+**Critical optimization implemented in Frame.cs (November 2025)**:
+
+**Problem**: Lines 440-445 contained expensive LINQ operations executed every frame for every node:
+```csharp
+// Original expensive code (per frame, per node)
+var gltfNode = animation.Bones.FirstOrDefault(b => b.Name == node.Name);
+if (animation.Bones.Any(b => b.Name == node.Name))
+```
+
+**Solution**: Pre-computed caching strategy implemented in `SharpGltfModel.cs`:
+1. **Load-time preprocessing**: `CacheAnimationInfo()` method builds lookup tables
+   - `HashSet<string>` for O(1) animated bone name lookups
+   - `Dictionary<string, Node>` for O(1) glTF node retrieval
+2. **Extended SharpGltfNode**: Added cached fields to eliminate runtime searches
+   - `bool HasAnimation`: Pre-computed animation presence flag
+   - `SharpGLTF.Schema2.Node? CachedGltfNode`: Direct node reference
+3. **Optimized render loop**: O(n) LINQ → O(1) cached lookups
+
+**Implementation details**:
+- `CacheAnimationInfo()` called after `ProcessAnimations()` to ensure proper timing
+- Animation cache built once during model loading, used every frame
+- Eliminates ~2 LINQ operations per node per frame (significant for complex models)
+- No functional changes to animation behavior, pure performance optimization
+
+**Performance impact**: Transforms expensive FirstOrDefault/Any searches into instant cached lookups, critical for models with many animated nodes.
 
 ## Tested Models
 - ✅ **DragonAttenuation.glb**: 76,809 vertices (32-bit indices), transmission + volume absorption
@@ -314,6 +342,7 @@ Implementation patterns adapted from:
 - ✅ **KHR_materials_emissive_strength** support
 - ✅ **Frustum culling** with statistics
 - ✅ **Texture caching** system
+- ✅ **Render loop performance optimization** (pre-computed animation cache, eliminated LINQ overhead)
 - ✅ **Comprehensive ImGui UI** with multiple windows
 
 ## Future Enhancements

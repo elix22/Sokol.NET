@@ -431,31 +431,15 @@ public static unsafe partial class SharpGLTFApp
                 var mesh = state.model.Meshes[node.MeshIndex];
                 state.totalMeshes++;
 
-                // For node animations, extract rotation from animated LocalMatrix and apply to cached position
-                // For static/skinned, use the cached node.Transform
                 Matrix4x4 nodeTransform;
-                if (state.animator != null && state.model.BoneCounter == 0 && node.NodeName != null)
+                if (state.animator != null && state.model.BoneCounter == 0 && node.HasAnimation && node.CachedGltfNode != null)
                 {
-                    // Find the glTF node - animator has updated its LocalMatrix
-                    var gltfNode = state.model.ModelRoot.LogicalNodes.FirstOrDefault(n => n.Name == node.NodeName);
-                    
-                    // Check if this node actually has animation channels
-                    bool hasAnimation = state.model.Animation != null && 
-                                       state.model.Animation.GetBones().Any(b => b.Name == node.NodeName);
-                    
-                    if (gltfNode != null && hasAnimation)
-                    {
-                        nodeTransform = gltfNode.LocalMatrix * node.Transform;
-          
-                    }
-                    else
-                    {
-                        // No animation for this node - use cached transform
-                        nodeTransform = node.Transform;
-                    }
+                    // Use pre-cached animated node reference (optimized - no LINQ lookup needed)
+                    nodeTransform = node.CachedGltfNode.LocalMatrix * node.Transform;
                 }
                 else
                 {
+                    // Static node or skinned animation - use cached transform
                     nodeTransform = node.Transform;
                 }
 

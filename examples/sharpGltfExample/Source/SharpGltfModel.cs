@@ -55,6 +55,8 @@ namespace Sokol
         public Matrix4x4 Transform;
         public int MeshIndex = -1;  // Index into SharpGltfModel.Meshes
         public string? NodeName = null;  // Name of the original glTF node (for matching with animations)
+        public SharpGLTF.Schema2.Node? CachedGltfNode = null;  // Cached reference to glTF node (for animation optimization)
+        public bool HasAnimation = false;  // Pre-calculated flag to avoid expensive LINQ calls
     }
 
     public class SharpGltfModel
@@ -147,6 +149,9 @@ namespace Sokol
             // Fourth pass: Process animations
             ProcessAnimations();
 
+            // Fifth pass: Cache animation info for rendering optimization (must be done after ProcessAnimations)
+            CacheAnimationInfo();
+
             Info($"Model loaded: {Nodes.Count} nodes, {Meshes.Count} meshes, {BoneCounter} bones, {(HasAnimations ? "with" : "without")} animation", "SharpGLTF");
         }
 
@@ -214,7 +219,9 @@ namespace Sokol
                     {
                         Transform = worldTransform,
                         MeshIndex = meshIndex + i,
-                        NodeName = node.Name  // Store node name for animation matching
+                        NodeName = node.Name,  // Store node name for animation matching
+                        CachedGltfNode = node,  // Cache glTF node reference directly (no lookup needed!)
+                        HasAnimation = false  // Will be set later after animations are processed
                     };
                     Nodes.Add(renderNode);
                 }
@@ -225,6 +232,35 @@ namespace Sokol
             {
                 ProcessNode(child, worldTransform, meshMap);
             }
+        }
+
+        // Cache animation info for rendering optimization (called after ProcessAnimations)
+        private void CacheAnimationInfo()
+        {
+            if (!HasAnimations || Animation == null) return;
+
+            // Get list of animated bone names for faster lookup
+            var animatedBoneNames = new HashSet<string>();
+            foreach (var bone in Animation.GetBones())
+            {
+                if (!string.IsNullOrEmpty(bone.Name))
+                {
+                    animatedBoneNames.Add(bone.Name);
+                }
+            }
+
+            // Update all render nodes with animation flags (glTF nodes already cached in ProcessNode)
+            foreach (var renderNode in Nodes)
+            {
+                if (!string.IsNullOrEmpty(renderNode.NodeName))
+                {
+                    // Check if this node has animation
+                    bool hasAnimation = animatedBoneNames.Contains(renderNode.NodeName);
+                    renderNode.HasAnimation = hasAnimation;
+                }
+            }
+
+            Info($"Animation cache updated: {animatedBoneNames.Count} animated nodes cached");
         }
 
         private void ProcessSkinning()
