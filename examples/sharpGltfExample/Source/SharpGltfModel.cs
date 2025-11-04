@@ -679,6 +679,14 @@ namespace Sokol
                 foreach (var channel in gltfAnimation.Channels)
                 {
                     var targetNode = channel.TargetNode;
+                    
+                    // Skip non-node targets (e.g., KHR_animation_pointer material properties)
+                    if (targetNode == null)
+                    {
+                        Info($"Skipping non-node animation channel (likely KHR_animation_pointer): {channel.TargetNodePath}", "SharpGLTF");
+                        continue;
+                    }
+                    
                     string boneName = targetNode.Name ?? "Unnamed";
 
                     // Find or create bone
