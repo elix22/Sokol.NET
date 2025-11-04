@@ -1,5 +1,286 @@
 # sharpGltfExample TODO List
 
+## 🚧 In Progress Features (November 2025)
+
+### KHR_animation_pointer Support 🚧
+**Status:** Not started - Detailed implementation plan below
+
+**Target Model:** `PotOfCoalsAnimationPointer.gltf`
+- Animates texture transform rotation for heat refraction effect
+- Two counter-rotating textures (normal + thickness) create interference pattern
+
+**Overview:**
+The KHR_animation_pointer extension allows animating arbitrary glTF properties beyond just node transforms. In this case, it animates material texture transforms (`/materials/2/normalTexture/extensions/KHR_texture_transform/rotation`).
+
+---
+
+#### Implementation Sequence
+
+##### Step 1: Data Structure Design 📋
+**File:** `SharpGltfAnimation.cs` (new class or extend existing)
+
+**Tasks:**
+1. Create `MaterialPropertyAnimation` class to hold:
+   - Material index (int)
+   - Property path (string, e.g., "normalTexture/rotation")
+   - Sampler type (rotation, offset, scale)
+   - Keyframe data or sampler reference
+   
+2. Add to `SharpGltfAnimation`:
+   ```csharp
+   public List<MaterialPropertyAnimation> MaterialAnimations = new();
+   ```
+
+3. Create property target enum:
+   ```csharp
+   enum MaterialAnimationTarget {
+       NormalTextureRotation,
+       NormalTextureOffset,
+       NormalTextureScale,
+       // Add others as needed
+   }
+   ```
+
+**Verification:** Compile successfully with new data structures
+
+---
+
+##### Step 2: Parse Animation Pointer Channels 📥
+**File:** `SharpGltfModel.cs` → `ProcessAnimations()` method (lines ~675-710)
+
+**Tasks:**
+1. In the `foreach (var channel in gltfAnimation.Channels)` loop:
+   - After the null check, add parsing for non-node channels
+   
+2. Detect animation pointer targets:
+   ```csharp
+   if (targetNode == null)
+   {
+       // Parse the target path (e.g., "/materials/2/normalTexture/extensions/KHR_texture_transform/rotation")
+       var targetPath = channel.TargetNodePath;
+       
+       if (targetPath.Contains("/materials/") && targetPath.Contains("/KHR_texture_transform/"))
+       {
+           ParseMaterialPropertyAnimation(channel, animation);
+       }
+       else
+       {
+           Info($"Skipping unsupported animation pointer: {targetPath}", "SharpGLTF");
+       }
+       continue;
+   }
+   ```
+
+3. Implement `ParseMaterialPropertyAnimation()`:
+   - Extract material index from path (regex or string parsing)
+   - Determine property type (rotation/offset/scale)
+   - Store sampler reference
+   - Add to `animation.MaterialAnimations`
+
+**Verification:** Log material property animations correctly parsed
+
+---
+
+##### Step 3: Extract Sampler Data 🎯
+**File:** `SharpGltfModel.cs` or `SharpGltfAnimation.cs`
+
+**Tasks:**
+1. For each material property channel, extract keyframes:
+   ```csharp
+   var sampler = channel.GetCubicSampler(); // or GetLinearSampler() based on interpolation
+   foreach (var (time, value) in sampler)
+   {
+       // Store keyframes for runtime evaluation
+   }
+   ```
+
+2. Handle different data types:
+   - Rotation: single float (radians)
+   - Offset: Vector2
+   - Scale: Vector2
+
+3. Store in `MaterialPropertyAnimation` for efficient lookup
+
+**Verification:** Keyframe data extracted and logged correctly
+
+---
+
+##### Step 4: Runtime Animation Update 🔄
+**File:** `Frame.cs` → `UpdateAnimations()` method (or similar)
+
+**Tasks:**
+1. After updating bone transforms, add material property updates:
+   ```csharp
+   if (model.Animation != null)
+   {
+       // Existing bone animation code...
+       
+       // NEW: Material property animations
+       foreach (var matAnim in model.Animation.MaterialAnimations)
+       {
+           float value = matAnim.SampleAtTime(currentTime);
+           ApplyMaterialPropertyValue(matAnim.MaterialIndex, matAnim.Target, value);
+       }
+   }
+   ```
+
+2. Implement `SampleAtTime()`:
+   - Linear or cubic interpolation between keyframes
+   - Handle looping/clamping
+
+3. Implement `ApplyMaterialPropertyValue()`:
+   - Update the corresponding `Mesh` property
+   - Mark as "dirty" if needed for shader uniform updates
+
+**Verification:** Material properties update correctly at runtime
+
+---
+
+##### Step 5: Update Mesh Material Properties 🎨
+**File:** `Mesh.cs` and `SharpGltfModel.cs`
+
+**Tasks:**
+1. Ensure `Mesh` class has runtime-mutable properties:
+   - `NormalTexRotation` (already exists, verify it's mutable)
+   - `NormalTexOffset` (already exists)
+   - `NormalTexScale` (already exists)
+
+2. Add similar properties for thickness texture if needed:
+   ```csharp
+   public float ThicknessTexRotation { get; set; }
+   public Vector2 ThicknessTexOffset { get; set; }
+   public Vector2 ThicknessTexScale { get; set; }
+   ```
+
+3. Map material index → mesh (may need lookup table):
+   ```csharp
+   Dictionary<int, Mesh> _materialToMeshMap = new();
+   ```
+
+**Verification:** Property updates propagate to mesh instances
+
+---
+
+##### Step 6: Pass Animated Values to Shader 🖌️
+**File:** `Frame.cs` → shader uniform binding (where `vs_params` is set)
+
+**Tasks:**
+1. Update shader uniform binding to use runtime values:
+   ```csharp
+   // For each mesh being rendered:
+   vsParams.normal_tex_rotation = mesh.NormalTexRotation; // Animated value
+   vsParams.normal_tex_offset = mesh.NormalTexOffset;
+   vsParams.normal_tex_scale = mesh.NormalTexScale;
+   ```
+
+2. Verify shader already supports these uniforms (check `cgltf-sapp.glsl`)
+
+3. If thickness texture animation is needed, add those uniforms too
+
+**Verification:** Shader receives updated values each frame
+
+---
+
+##### Step 7: Shader Texture Transform Application ⚙️
+**File:** `assets/cgltf-sapp.glsl` (vertex shader)
+
+**Tasks:**
+1. Verify texture coordinate transformation is already implemented:
+   ```glsl
+   // Should already exist from KHR_texture_transform support
+   vec2 transformed_uv = apply_texture_transform(uv, rotation, offset, scale);
+   ```
+
+2. If not present, implement texture transform matrix:
+   ```glsl
+   mat3 get_texture_transform_matrix(float rotation, vec2 offset, vec2 scale)
+   {
+       float c = cos(rotation);
+       float s = sin(rotation);
+       return mat3(
+           scale.x * c, scale.x * s, 0.0,
+           scale.y * -s, scale.y * c, 0.0,
+           offset.x, offset.y, 1.0
+       );
+   }
+   ```
+
+3. Apply to normal map sampling in fragment shader
+
+**Verification:** Texture coordinates rotate/transform correctly
+
+---
+
+##### Step 8: Testing & Validation ✅
+**Test Cases:**
+
+1. **Load PotOfCoalsAnimationPointer.gltf:**
+   - ✅ No crash on load
+   - ✅ Animation channels detected and logged
+   - ✅ Material property animations parsed
+
+2. **Runtime Animation:**
+   - ✅ Normal texture rotates counter-clockwise
+   - ✅ Thickness texture rotates clockwise (if animated)
+   - ✅ Heat refraction effect visible
+   - ✅ Smooth animation loop
+
+3. **Fallback Behavior:**
+   - ✅ Models without animation pointer still work
+   - ✅ Standard bone animations unaffected
+
+4. **UI Verification:**
+   - ✅ Add debug display for material property values
+   - ✅ Consider adding override controls (pause/speed)
+
+**Verification:** Full animation works as intended
+
+---
+
+##### Step 9: Documentation & Polish 📝
+**Tasks:**
+
+1. Update `IMPLEMENTATION_SUMMARY.md`:
+   - Document KHR_animation_pointer support
+   - Explain texture transform animation architecture
+
+2. Add code comments explaining:
+   - Property path parsing logic
+   - Why texture transforms need per-frame updates
+
+3. Consider future extensions:
+   - Other animatable properties (emissive, IOR, etc.)
+   - Support for multiple simultaneous animations
+
+**Verification:** Documentation complete and clear
+
+---
+
+#### Technical Notes
+
+**SharpGLTF Support:**
+- SharpGLTF may not have native `KHR_animation_pointer` support
+- Will need to access raw JSON extensions:
+  ```csharp
+  var extensions = channel.Extensions;
+  if (extensions.TryGetValue("KHR_animation_pointer", out var pointerExt))
+  {
+      // Parse manually
+  }
+  ```
+
+**Performance Considerations:**
+- Material property animations are typically less frequent than bone animations
+- Cache material-to-mesh mappings at load time
+- Consider batching uniform updates if multiple materials animated
+
+**Shader Coordinate System:**
+- glTF texture coordinates: (0,0) = bottom-left
+- Most rendering systems: (0,0) = top-left
+- Verify rotation direction matches glTF spec
+
+---
+
 ## ✅ Completed Features (November 2025)
 
 ### Render Loop Performance Optimization ✅

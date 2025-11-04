@@ -680,10 +680,21 @@ namespace Sokol
                 {
                     var targetNode = channel.TargetNode;
                     
-                    // Skip non-node targets (e.g., KHR_animation_pointer material properties)
+                    // Handle non-node targets (e.g., KHR_animation_pointer material properties)
                     if (targetNode == null)
                     {
-                        Info($"Skipping non-node animation channel (likely KHR_animation_pointer): {channel.TargetNodePath}", "SharpGLTF");
+                        string pointerPath = channel.TargetPointerPath;
+                        Info($"Detected non-node animation channel: {pointerPath}", "SharpGLTF");
+                        
+                        // Check if this is a material property animation
+                        if (pointerPath != null && pointerPath.Contains("/materials/"))
+                        {
+                            ParseMaterialPropertyAnimation(channel, animation);
+                        }
+                        else
+                        {
+                            Info($"Skipping unsupported animation pointer: {pointerPath}", "SharpGLTF");
+                        }
                         continue;
                     }
                     
@@ -712,6 +723,125 @@ namespace Sokol
             stopwatch.Stop();
             Info($"Processed {Animations.Count} animation(s)", "SharpGLTF");
             Info($"ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)", "SharpGLTF PROFILE");
+        }
+
+        private void ParseMaterialPropertyAnimation(AnimationChannel channel, SharpGltfAnimation animation)
+        {
+            string pointerPath = channel.TargetPointerPath;
+            Info($"Parsing material property animation: {pointerPath}", "SharpGLTF");
+
+            // Parse the pointer path to extract material index and property type
+            // Example paths:
+            // "/materials/2/normalTexture/extensions/KHR_texture_transform/rotation"
+            // "/materials/2/normalTexture/extensions/KHR_texture_transform/offset"
+            
+            if (!TryParseMaterialPointerPath(pointerPath, out int materialIndex, out MaterialAnimationTarget target))
+            {
+                Info($"Could not parse material property path: {pointerPath}", "SharpGLTF");
+                return;
+            }
+
+            // Create material property animation object
+            var matPropAnim = new MaterialPropertyAnimation
+            {
+                MaterialIndex = materialIndex,
+                Target = target,
+                PropertyPath = pointerPath
+            };
+
+            // Extract keyframe data from the sampler
+            var sampler = channel._GetSampler();
+            if (sampler == null)
+            {
+                Info($"No sampler found for material property animation", "SharpGLTF");
+                return;
+            }
+
+            // Sample based on target type (float or Vector2)
+            if (matPropAnim.IsFloatType)
+            {
+                // Rotation is a float (radians)
+                var floatSampler = sampler as IAnimationSampler<float>;
+                if (floatSampler != null)
+                {
+                    foreach (var (time, value) in floatSampler.GetLinearKeys())
+                    {
+                        matPropAnim.FloatKeyframes.Add((time, value));
+                    }
+                    Info($"  Material {materialIndex} {target}: {matPropAnim.FloatKeyframes.Count} float keyframes", "SharpGLTF");
+                }
+            }
+            else
+            {
+                // Offset/Scale are Vector2
+                var vec2Sampler = sampler as IAnimationSampler<Vector2>;
+                if (vec2Sampler != null)
+                {
+                    foreach (var (time, value) in vec2Sampler.GetLinearKeys())
+                    {
+                        matPropAnim.Vector2Keyframes.Add((time, value));
+                    }
+                    Info($"  Material {materialIndex} {target}: {matPropAnim.Vector2Keyframes.Count} Vector2 keyframes", "SharpGLTF");
+                }
+            }
+
+            // Add to animation's material animations list
+            animation.MaterialAnimations.Add(matPropAnim);
+            Info($"Added material property animation for material {materialIndex}, target: {target}", "SharpGLTF");
+        }
+
+        private bool TryParseMaterialPointerPath(string pointerPath, out int materialIndex, out MaterialAnimationTarget target)
+        {
+            materialIndex = -1;
+            target = MaterialAnimationTarget.NormalTextureRotation;
+
+            if (string.IsNullOrEmpty(pointerPath))
+                return false;
+
+            // Parse material index from path like "/materials/2/..."
+            var parts = pointerPath.Split('/');
+            int matIdx = -1;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (parts[i] == "materials" && int.TryParse(parts[i + 1], out matIdx))
+                {
+                    materialIndex = matIdx;
+                    break;
+                }
+            }
+
+            if (materialIndex < 0)
+                return false;
+
+            // Determine the property type from the path
+            if (pointerPath.Contains("normalTexture"))
+            {
+                if (pointerPath.EndsWith("/rotation"))
+                    target = MaterialAnimationTarget.NormalTextureRotation;
+                else if (pointerPath.EndsWith("/offset"))
+                    target = MaterialAnimationTarget.NormalTextureOffset;
+                else if (pointerPath.EndsWith("/scale"))
+                    target = MaterialAnimationTarget.NormalTextureScale;
+                else
+                    return false;
+            }
+            else if (pointerPath.Contains("thicknessTexture"))
+            {
+                if (pointerPath.EndsWith("/rotation"))
+                    target = MaterialAnimationTarget.ThicknessTextureRotation;
+                else if (pointerPath.EndsWith("/offset"))
+                    target = MaterialAnimationTarget.ThicknessTextureOffset;
+                else if (pointerPath.EndsWith("/scale"))
+                    target = MaterialAnimationTarget.ThicknessTextureScale;
+                else
+                    return false;
+            }
+            else
+            {
+                return false; // Unsupported texture type
+            }
+
+            return true;
         }
 
         private SharpGltfNodeData BuildNodeHierarchy(Node node)
