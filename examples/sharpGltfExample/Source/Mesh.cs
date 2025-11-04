@@ -29,6 +29,9 @@ namespace Sokol
         // Alpha properties
         public AlphaMode AlphaMode = AlphaMode.OPAQUE;
         public float AlphaCutoff = 0.5f;
+        
+        // Double-sided rendering (glTF doubleSided property)
+        public bool DoubleSided = false;
 
         // Glass material properties
         public float IOR = 1.5f;  // Index of Refraction (KHR_materials_ior, default: 1.5 for glass)

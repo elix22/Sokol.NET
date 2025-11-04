@@ -514,6 +514,9 @@ public static unsafe partial class SharpGLTFApp
                 // Choose pipeline based on alpha mode, skinning, index type, and rendering mode
                 PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning, needs32BitIndices);
                 
+                // Override cull mode for double-sided materials
+                sg_cull_mode cullMode = mesh.DoubleSided ? SG_CULLMODE_NONE : SG_CULLMODE_BACK;
+                
                 // Get appropriate pipeline based on rendering mode
                 sg_pipeline pipeline;
                 if (renderToOffscreen && useTransmission)
@@ -537,8 +540,8 @@ public static unsafe partial class SharpGLTFApp
                 }
                 else
                 {
-                    // Use regular swapchain pipeline
-                    pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType);
+                    // Use regular swapchain pipeline with appropriate cull mode
+                    pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType, cullMode);
                 }
 
                 if (useSkinning)

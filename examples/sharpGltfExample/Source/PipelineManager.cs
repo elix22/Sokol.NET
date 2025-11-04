@@ -47,11 +47,12 @@ public enum PipelineType
 
 public static class PipeLineManager
 {
-    private static Dictionary<PipelineType, sg_pipeline> _pipelines = new Dictionary<PipelineType, sg_pipeline>();
+    // Pipeline cache with cull mode support (key: (type, cullMode))
+    private static Dictionary<(PipelineType, sg_cull_mode), sg_pipeline> _pipelines = new Dictionary<(PipelineType, sg_cull_mode), sg_pipeline>();
     
-    // Cache for custom render pass pipelines (key includes format/sample_count)
-    private static Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int), sg_pipeline> _customPassPipelines = 
-        new Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int), sg_pipeline>();
+    // Cache for custom render pass pipelines (key includes format/sample_count/cullMode)
+    private static Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int, sg_cull_mode), sg_pipeline> _customPassPipelines = 
+        new Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int, sg_cull_mode), sg_pipeline>();
 
     /// <summary>
     /// Clear all pipeline caches. Call this when destroying all resources (e.g., on window resize).
@@ -63,11 +64,12 @@ public static class PipeLineManager
         _customPassPipelines.Clear();
     }
 
-    public static sg_pipeline GetOrCreatePipeline(PipelineType type)
+    public static sg_pipeline GetOrCreatePipeline(PipelineType type, sg_cull_mode cullMode = SG_CULLMODE_BACK)
     {
-        if (_pipelines.ContainsKey(type))
+        var cacheKey = (type, cullMode);
+        if (_pipelines.ContainsKey(cacheKey))
         {
-            return _pipelines[type];
+            return _pipelines[cacheKey];
         }
 
         sg_pipeline pipeline;
@@ -86,7 +88,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;  // Use 32-bit to support large meshes (>65535 vertices)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -108,7 +110,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -131,7 +133,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_blend;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-                pipeline_desc.cull_mode = SG_CULLMODE_NONE; // Disable culling for transparent objects
+                pipeline_desc.cull_mode = cullMode;  // Use provided cull mode
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -160,7 +162,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_blend;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-                pipeline_desc.cull_mode = SG_CULLMODE_NONE; // Disable culling for transparent objects
+                pipeline_desc.cull_mode = cullMode;  // Use provided cull mode
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = false; // Disable depth writes for transparent objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -189,7 +191,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_mask;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -212,7 +214,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_mask;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true; // Keep depth writes for masked objects
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -232,11 +234,11 @@ public static class PipeLineManager
             case PipelineType.SkinnedMask32:
                 // Create pipeline with same settings as base type, but with 32-bit indices
                 var baseType = GetBasePipelineType(type);
-                var basePipeline = GetOrCreatePipeline(baseType);
+                var basePipeline = GetOrCreatePipeline(baseType, cullMode);
                 
                 // Copy the base pipeline descriptor but change index type
                 // Since we can't copy pipeline descriptors, we'll create a new one with 32-bit indices
-                pipeline = CreatePipeline32BitVariant(type);
+                pipeline = CreatePipeline32BitVariant(type, cullMode);
                 break;
                 
             case PipelineType.TransmissionOpaque:
@@ -248,14 +250,14 @@ public static class PipeLineManager
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
 
-        _pipelines[type] = pipeline;
+        _pipelines[cacheKey] = pipeline;
         return pipeline;
     }
     
     /// <summary>
     /// Create a 32-bit index variant of a pipeline
     /// </summary>
-    private static sg_pipeline CreatePipeline32BitVariant(PipelineType type)
+    private static sg_pipeline CreatePipeline32BitVariant(PipelineType type, sg_cull_mode cullMode)
     {
         var baseType = GetBasePipelineType(type);
         var pipeline_desc = default(sg_pipeline_desc);
@@ -291,19 +293,19 @@ public static class PipeLineManager
         switch (baseType)
         {
             case PipelineType.Standard:
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.label = "static-32bit-pipeline";
                 break;
                 
             case PipelineType.Skinned:
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.label = "skinned-32bit-pipeline";
                 break;
                 
             case PipelineType.StandardBlend:
-                pipeline_desc.cull_mode = SG_CULLMODE_NONE;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = false;
                 pipeline_desc.colors[0].blend.enabled = true;
                 pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
@@ -314,7 +316,7 @@ public static class PipeLineManager
                 break;
                 
             case PipelineType.SkinnedBlend:
-                pipeline_desc.cull_mode = SG_CULLMODE_NONE;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = false;
                 pipeline_desc.colors[0].blend.enabled = true;
                 pipeline_desc.colors[0].blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
@@ -325,13 +327,13 @@ public static class PipeLineManager
                 break;
                 
             case PipelineType.StandardMask:
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.label = "static-mask-32bit-pipeline";
                 break;
                 
             case PipelineType.SkinnedMask:
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.label = "skinned-mask-32bit-pipeline";
                 break;
@@ -344,10 +346,10 @@ public static class PipeLineManager
     /// Create a pipeline for a custom render pass (e.g., transmission opaque pass)
     /// Caches pipelines based on type and render pass parameters to avoid recreating them
     /// </summary>
-    public static sg_pipeline CreatePipelineForPass(PipelineType type, sg_pixel_format color_format, sg_pixel_format depth_format, int sample_count)
+    public static sg_pipeline CreatePipelineForPass(PipelineType type, sg_pixel_format color_format, sg_pixel_format depth_format, int sample_count, sg_cull_mode cullMode = SG_CULLMODE_BACK)
     {
         // Check cache first
-        var cache_key = (type, color_format, depth_format, sample_count);
+        var cache_key = (type, color_format, depth_format, sample_count, cullMode);
         if (_customPassPipelines.ContainsKey(cache_key))
         {
             return _customPassPipelines[cache_key];
@@ -373,7 +375,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -394,7 +396,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -668,10 +670,10 @@ public static class PipeLineManager
     /// Create a pipeline for offscreen rendering with custom formats (for bloom scene pass)
     /// Caches pipelines based on type and format parameters to avoid recreating them
     /// </summary>
-    public static sg_pipeline CreateOffscreenPipeline(PipelineType type, sg_pixel_format colorFormat, sg_pixel_format depthFormat)
+    public static sg_pipeline CreateOffscreenPipeline(PipelineType type, sg_pixel_format colorFormat, sg_pixel_format depthFormat, sg_cull_mode cullMode = SG_CULLMODE_BACK)
     {
         // Check cache first (sample_count is always 1 for offscreen)
-        var cache_key = (type, colorFormat, depthFormat, 1);
+        var cache_key = (type, colorFormat, depthFormat, 1, cullMode);
         if (_customPassPipelines.ContainsKey(cache_key))
         {
             return _customPassPipelines[cache_key];
@@ -697,7 +699,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -717,7 +719,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -737,7 +739,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_blend;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -762,7 +764,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_blend;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -787,7 +789,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_mask;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
@@ -807,7 +809,7 @@ public static class PipeLineManager
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_mask;
                 pipeline_desc.index_type = indexType;  // Use appropriate index type (16-bit or 32-bit)
-                pipeline_desc.cull_mode = SG_CULLMODE_BACK;
+                pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
                 pipeline_desc.depth.write_enabled = true;
                 pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;

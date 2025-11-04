@@ -617,7 +617,11 @@ void main() {
     }
     
     // Step 3: Get normal using proper tangent-space transformation
+    // For double-sided materials, flip normal to face the camera if needed
     vec3 normal = get_normal();
+    if (!gl_FrontFacing) {
+        normal = -normal;  // Flip normal for backfaces (double-sided rendering)
+    }
     
     // Step 4: Get ambient occlusion (stored in Red channel)
     float occlusion = 1.0;

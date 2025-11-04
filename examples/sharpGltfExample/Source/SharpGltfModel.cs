@@ -600,6 +600,10 @@ namespace Sokol
             mesh.AlphaMode = material.Alpha;
             mesh.AlphaCutoff = material.AlphaCutoff;
             Info($"Material alpha mode: {mesh.AlphaMode}, cutoff: {mesh.AlphaCutoff}", "SharpGLTF");
+            
+            // Extract double-sided property
+            mesh.DoubleSided = material.DoubleSided;
+            Info($"Material double-sided: {mesh.DoubleSided}", "SharpGLTF");
 
             // Load textures
             LoadTexture(material, "BaseColor", mesh, 0);
