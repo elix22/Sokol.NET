@@ -558,8 +558,11 @@ vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view,
     vec2 refraction_coords = ndc_pos.xy / ndc_pos.w;  // Perspective divide
     refraction_coords = refraction_coords * 0.5 + 0.5;  // Convert from NDC [-1,1] to UV [0,1]
     
-    // Flip Y coordinate for correct screen texture sampling (OpenGL convention)
-    refraction_coords.y = 1.0 - refraction_coords.y;
+    // Metal/D3D use Y-down clip space, OpenGL uses Y-up
+    // Flip Y coordinate for Metal/D3D to match screen texture orientation
+    #if !SOKOL_GLSL
+        refraction_coords.y = 1.0 - refraction_coords.y;
+    #endif
     
     // Clamp to valid texture range
     refraction_coords = clamp(refraction_coords, vec2(0.0), vec2(1.0));
