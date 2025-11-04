@@ -169,7 +169,7 @@ public static unsafe partial class SharpGLTFApp
                 // Create animator if model has animations
                 if (state.model.HasAnimations)
                 {
-                    state.animator = new SharpGltfAnimator(state.model.Animation, state.model.ModelRoot);
+                    state.animator = new SharpGltfAnimator(state.model);
                     state.ui.animation_open = true;
                     Info("[SharpGLTF] Animator created for animated model");
                 }

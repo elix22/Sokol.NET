@@ -12,12 +12,14 @@ namespace Sokol
         private int _debugBoneCount = 0;  // Debug counter
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
         private SharpGLTF.Schema2.ModelRoot? _modelRoot;  // Reference to glTF model for updating nodes
+        private Dictionary<int, List<Mesh>> _materialToMeshMap;  // Material index to mesh mapping for property animations
 
-        public SharpGltfAnimator(SharpGltfAnimation? animation, SharpGLTF.Schema2.ModelRoot? modelRoot = null)
+        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, SharpGLTF.Schema2.ModelRoot? modelRoot = null)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
             _modelRoot = modelRoot;
+            _materialToMeshMap = materialToMeshMap;
 
             // Initialize with identity matrices
             Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
@@ -30,6 +32,14 @@ namespace Sokol
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
                 Info($"Initialized with {_currentAnimation.GetBoneIDMap().Count} bones", "SharpGltfAnimator");
             }
+        }
+
+        /// <summary>
+        /// Convenient constructor that accepts a SharpGltfModel
+        /// </summary>
+        public SharpGltfAnimator(SharpGltfModel model)
+            : this(model.Animation, model.MaterialToMeshMap, model.ModelRoot)
+        {
         }
 
         public void SetAnimation(SharpGltfAnimation? animation)
@@ -69,6 +79,9 @@ namespace Sokol
                 
                 // Apply animated values back to glTF nodes (for node animations)
                 ApplyAnimationToNodes();
+                
+                // NEW: Update material property animations (KHR_animation_pointer)
+                UpdateMaterialPropertyAnimations(_currentTime);
             }
         }
 
@@ -146,6 +159,80 @@ namespace Sokol
         public bool TryGetNodeGlobalTransform(string nodeName, out Matrix4x4 globalTransform)
         {
             return _nodeGlobalTransforms.TryGetValue(nodeName, out globalTransform);
+        }
+
+        /// <summary>
+        /// Updates material property animations (KHR_animation_pointer support)
+        /// </summary>
+        private void UpdateMaterialPropertyAnimations(float currentTime)
+        {
+            if (_currentAnimation == null || _currentAnimation.MaterialAnimations.Count == 0 || _materialToMeshMap == null)
+                return;
+
+            foreach (var matAnim in _currentAnimation.MaterialAnimations)
+            {
+                // Sample the animation at the current time
+                if (matAnim.IsFloatType)
+                {
+                    float value = matAnim.SampleFloatAtTime(currentTime);
+                    ApplyMaterialFloatProperty(matAnim.MaterialIndex, matAnim.Target, value);
+                }
+                else
+                {
+                    Vector2 value = matAnim.SampleVector2AtTime(currentTime);
+                    ApplyMaterialVector2Property(matAnim.MaterialIndex, matAnim.Target, value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Apply float property value to all meshes using the given material
+        /// </summary>
+        private void ApplyMaterialFloatProperty(int materialIndex, MaterialAnimationTarget target, float value)
+        {
+            if (_materialToMeshMap == null || !_materialToMeshMap.TryGetValue(materialIndex, out var meshes))
+                return;
+
+            foreach (var mesh in meshes)
+            {
+                switch (target)
+                {
+                    case MaterialAnimationTarget.NormalTextureRotation:
+                        mesh.NormalTexRotation = value;
+                        break;
+                    case MaterialAnimationTarget.ThicknessTextureRotation:
+                        // TODO: Add thickness texture rotation property to Mesh if needed
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Apply Vector2 property value to all meshes using the given material
+        /// </summary>
+        private void ApplyMaterialVector2Property(int materialIndex, MaterialAnimationTarget target, Vector2 value)
+        {
+            if (_materialToMeshMap == null || !_materialToMeshMap.TryGetValue(materialIndex, out var meshes))
+                return;
+
+            foreach (var mesh in meshes)
+            {
+                switch (target)
+                {
+                    case MaterialAnimationTarget.NormalTextureOffset:
+                        mesh.NormalTexOffset = value;
+                        break;
+                    case MaterialAnimationTarget.NormalTextureScale:
+                        mesh.NormalTexScale = value;
+                        break;
+                    case MaterialAnimationTarget.ThicknessTextureOffset:
+                        // TODO: Add thickness texture offset property to Mesh if needed
+                        break;
+                    case MaterialAnimationTarget.ThicknessTextureScale:
+                        // TODO: Add thickness texture scale property to Mesh if needed
+                        break;
+                }
+            }
         }
     }
 }

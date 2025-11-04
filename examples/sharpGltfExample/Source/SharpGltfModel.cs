@@ -70,6 +70,9 @@ namespace Sokol
         public SharpGltfAnimation? Animation => Animations.Count > 0 ? Animations[CurrentAnimationIndex] : null;
         public bool HasAnimations => Animations.Count > 0;
         public bool AnimationsReady { get; private set; } = false;
+        
+        // Material index to mesh mapping for KHR_animation_pointer support
+        public Dictionary<int, List<Mesh>> MaterialToMeshMap = new Dictionary<int, List<Mesh>>();
 
         public int GetAnimationCount() => Animations.Count;
         
@@ -604,6 +607,14 @@ namespace Sokol
             LoadTexture(material, "Normal", mesh, 2);
             LoadTexture(material, "Occlusion", mesh, 3);
             LoadTexture(material, "Emissive", mesh, 4);
+            
+            // Map material index to mesh for KHR_animation_pointer support
+            int materialIndex = material.LogicalIndex;
+            if (!MaterialToMeshMap.ContainsKey(materialIndex))
+            {
+                MaterialToMeshMap[materialIndex] = new List<Mesh>();
+            }
+            MaterialToMeshMap[materialIndex].Add(mesh);
         }
 
         private void LoadTexture(Material material, string channelName, Mesh mesh, int index)
