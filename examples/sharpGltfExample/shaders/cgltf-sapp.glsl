@@ -642,8 +642,14 @@ void main() {
     metallic = clamp(metallic, 0.0, 1.0);
     float alpha_roughness = perceptual_roughness * perceptual_roughness;
     
-    // Calculate reflectance - standard PBR approach 
-    vec3 f0 = vec3(0.04);
+    // Calculate F0 from IOR (KHR_materials_ior)
+    // Formula: F0 = ((ior - 1) / (ior + 1))^2
+    // This is CRITICAL for proper IOR rendering
+    float ior_to_f0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
+    vec3 f0 = vec3(ior_to_f0);
+    
+    // For dielectrics (non-metals), use IOR-based F0
+    // For metals, use base color as F0 (standard metallic workflow)
     vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0) * (1.0 - metallic);
     vec3 specular_color = mix(f0, base_color.rgb, metallic);
     
@@ -667,10 +673,26 @@ void main() {
     // Get combined lighting (diffuse + specular)
     vec3 color = apply_all_lights(material_info, normal, view);
     
-    // Ambient lighting - controllable via uniform
-    // Metals need to stay dark to look shiny and reflective
+    // Ambient lighting with IOR-aware adjustments
+    // High-IOR materials (glass, diamond) need strong ambient to simulate environment reflections
+    float n_dot_v = max(dot(normal, view), 0.0);
+    
+    // Fresnel for ambient lighting (view-dependent reflectance)
+    vec3 ambient_fresnel = specular_environment_r0 + (specular_environment_r90 - specular_environment_r0) * pow(1.0 - n_dot_v, 5.0);
+    
+    // Base ambient strength
+    float effective_ambient = ambient_strength;
+    
+    // Boost ambient for high-IOR materials (they need visible reflections)
+    // IOR 1.0 (air) -> F0=0.0 -> no boost
+    // IOR 1.5 (glass) -> F0=0.04 -> moderate boost  
+    // IOR 2.42 (diamond) -> F0=0.17 -> strong boost
+    float ior_boost = mix(1.0, 30.0, ior_to_f0);  // Scale from 1x to 30x based on F0
+    effective_ambient = ambient_strength * ior_boost;
+    
+    // Apply ambient: diffuse for non-metals, Fresnel-based specular for all
     vec3 ambient_diffuse = (1.0 - metallic) * diffuse_color * ambient_strength;
-    vec3 ambient_specular = metallic * specular_color * ambient_strength * 0.5;  // Even less for metals
+    vec3 ambient_specular = ambient_fresnel * effective_ambient;
     vec3 ambient = ambient_diffuse + ambient_specular;
     color += ambient;
     
