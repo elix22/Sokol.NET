@@ -10,11 +10,14 @@ namespace Sokol
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
         private int _debugBoneCount = 0;  // Debug counter
+        private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
+        private SharpGLTF.Schema2.ModelRoot? _modelRoot;  // Reference to glTF model for updating nodes
 
-        public SharpGltfAnimator(SharpGltfAnimation? animation)
+        public SharpGltfAnimator(SharpGltfAnimation? animation, SharpGLTF.Schema2.ModelRoot? modelRoot = null)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
+            _modelRoot = modelRoot;
 
             // Initialize with identity matrices
             Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
@@ -63,6 +66,30 @@ namespace Sokol
                 // Only recalculate bone transforms when we update the bone data
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                
+                // Apply animated values back to glTF nodes (for node animations)
+                ApplyAnimationToNodes();
+            }
+        }
+
+        // Apply animated transform values back to the glTF node properties
+        private void ApplyAnimationToNodes()
+        {
+            if (_currentAnimation == null || _modelRoot == null) return;
+
+            var bones = _currentAnimation.GetBones();
+            foreach (var bone in bones)
+            {
+                // Find the corresponding glTF node
+                var gltfNode = _modelRoot.LogicalNodes.FirstOrDefault(n => n.Name == bone.Name);
+                if (gltfNode != null)
+                {
+                    // Get the animated TRS from the bone
+                    bone.GetTRS(out Vector3 translation, out Quaternion rotation, out Vector3 scale);
+                    
+                    // Update the glTF node's properties (this is what LocalMatrix reads from)
+                    gltfNode.LocalTransform = new SharpGLTF.Transforms.AffineTransform(scale, rotation, translation);
+                }
             }
         }
 
@@ -87,6 +114,9 @@ namespace Sokol
 
             Matrix4x4 globalTransformation = nodeTransform * parentTransform;
 
+            // Store global transform for node animations (non-skinned)
+            _nodeGlobalTransforms[nodeName] = globalTransformation;
+
             var boneInfoMap = _currentAnimation?.GetBoneIDMap();
             if (boneInfoMap != null && boneInfoMap.ContainsKey(nodeName))
             {
@@ -109,5 +139,13 @@ namespace Sokol
         public Matrix4x4[] GetFinalBoneMatrices() => _finalBoneMatrices;
         public float GetCurrentTime() => _currentTime;
         public SharpGltfAnimation? GetCurrentAnimation() => _currentAnimation;
+        
+        /// <summary>
+        /// Gets the global (world) transform for a node by name (for node animations)
+        /// </summary>
+        public bool TryGetNodeGlobalTransform(string nodeName, out Matrix4x4 globalTransform)
+        {
+            return _nodeGlobalTransforms.TryGetValue(nodeName, out globalTransform);
+        }
     }
 }

@@ -71,8 +71,24 @@ namespace Sokol
             Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(scale);
 
             LocalTransform = scaleMatrix * rotationMatrix * translationMatrix;
+            
+            // Store TRS for later retrieval
+            _lastTranslation = translation;
+            _lastRotation = rotation;
+            _lastScale = scale;
         }
 
+        private Vector3 _lastTranslation = Vector3.Zero;
+        private Quaternion _lastRotation = Quaternion.Identity;
+        private Vector3 _lastScale = Vector3.One;
+
         public Matrix4x4 GetLocalTransform() => LocalTransform;
+        
+        public void GetTRS(out Vector3 translation, out Quaternion rotation, out Vector3 scale)
+        {
+            translation = _lastTranslation;
+            rotation = _lastRotation;
+            scale = _lastScale;
+        }
     }
 }

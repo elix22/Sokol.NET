@@ -169,7 +169,7 @@ public static unsafe partial class SharpGLTFApp
                 // Create animator if model has animations
                 if (state.model.HasAnimations)
                 {
-                    state.animator = new SharpGltfAnimator(state.model.Animation);
+                    state.animator = new SharpGltfAnimator(state.model.Animation, state.model.ModelRoot);
                     state.ui.animation_open = true;
                     Info("[SharpGLTF] Animator created for animated model");
                 }
@@ -417,9 +417,9 @@ public static unsafe partial class SharpGLTFApp
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = state.camera.ViewProj;
 
-            // Separate nodes into opaque and transparent lists
-            List<(SharpGltfNode node, float distance)> opaqueNodes = new List<(SharpGltfNode, float)>();
-            List<(SharpGltfNode node, float distance)> transparentNodes = new List<(SharpGltfNode, float)>();
+            // Separate nodes into opaque and transparent lists - store node, transform, and distance
+            List<(SharpGltfNode node, Matrix4x4 transform, float distance)> opaqueNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
+            List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transparentNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
 
             // Collect and categorize all visible nodes
             foreach (var node in state.model.Nodes)
@@ -431,6 +431,34 @@ public static unsafe partial class SharpGLTFApp
                 var mesh = state.model.Meshes[node.MeshIndex];
                 state.totalMeshes++;
 
+                // For node animations, extract rotation from animated LocalMatrix and apply to cached position
+                // For static/skinned, use the cached node.Transform
+                Matrix4x4 nodeTransform;
+                if (state.animator != null && state.model.BoneCounter == 0 && node.NodeName != null)
+                {
+                    // Find the glTF node - animator has updated its LocalMatrix
+                    var gltfNode = state.model.ModelRoot.LogicalNodes.FirstOrDefault(n => n.Name == node.NodeName);
+                    
+                    // Check if this node actually has animation channels
+                    bool hasAnimation = state.model.Animation != null && 
+                                       state.model.Animation.GetBones().Any(b => b.Name == node.NodeName);
+                    
+                    if (gltfNode != null && hasAnimation)
+                    {
+                        nodeTransform = gltfNode.LocalMatrix * node.Transform;
+          
+                    }
+                    else
+                    {
+                        // No animation for this node - use cached transform
+                        nodeTransform = node.Transform;
+                    }
+                }
+                else
+                {
+                    nodeTransform = node.Transform;
+                }
+
                 // Apply Mixamo-specific transforms if needed
                 Matrix4x4 modelMatrix;
                 if (state.isMixamoModel)
@@ -438,12 +466,14 @@ public static unsafe partial class SharpGLTFApp
                     // Mixamo models exported from Blender have 0.01 scale and need rotation correction
                     var scaleMatrix = Matrix4x4.CreateScale(100.0f);
                     var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
-                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix * model;
+                    modelMatrix = nodeTransform * scaleMatrix * rotationMatrix * model;
                 }
                 else
                 {
-                    // Use the node's original transform from the GLTF file + global model rotation
-                    modelMatrix = node.Transform * model;
+                    // Both animated and static nodes use the same transform
+                    // nodeTransform is either the animated global transform or the static node.Transform
+                    // Both are in model-local space and need the user's model transform applied
+                    modelMatrix = nodeTransform * model;
                 }
 
                 // FRUSTUM CULLING: Check if mesh is visible
@@ -467,16 +497,16 @@ public static unsafe partial class SharpGLTFApp
                 float distanceToCamera = Vector3.Distance(meshCenter, state.camera.EyePos);
 
                 // Categorize as opaque or transparent
-                // When transmission is enabled, use TransmissionFactor; otherwise use AlphaMode
-                bool isTransparent = useTransmission ? (mesh.TransmissionFactor > 0.0f) : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND);
+                // Check both TransmissionFactor (glass) and AlphaMode (regular transparency)
+                bool isTransparent = (mesh.TransmissionFactor > 0.0f) || (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND);
                 
                 if (isTransparent)
                 {
-                    transparentNodes.Add((node, distanceToCamera));
+                    transparentNodes.Add((node, modelMatrix, distanceToCamera));
                 }
                 else
                 {
-                    opaqueNodes.Add((node, distanceToCamera));
+                    opaqueNodes.Add((node, modelMatrix, distanceToCamera));
                 }
             }
 
@@ -484,25 +514,12 @@ public static unsafe partial class SharpGLTFApp
             transparentNodes.Sort((a, b) => b.distance.CompareTo(a.distance));
 
             // Helper function to render a node
+            // modelMatrix: Pre-calculated transform matrix (includes node transform + global rotation + animation)
             // useScreenTexture: When true, bind the screen texture for refraction (transmission Pass 2)
             // renderToOffscreen: When true, use offscreen pipelines (transmission Pass 1 or bloom)
-            void RenderNode(SharpGltfNode node, bool useScreenTexture = false, bool renderToOffscreen = false)
+            void RenderNode(SharpGltfNode node, Matrix4x4 modelMatrix, bool useScreenTexture = false, bool renderToOffscreen = false)
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
-
-                // Apply Mixamo-specific transforms if needed
-                Matrix4x4 modelMatrix;
-                if (state.isMixamoModel)
-                {
-                    var scaleMatrix = Matrix4x4.CreateScale(100.0f);
-                    var rotationMatrix = Matrix4x4.CreateRotationX(-MathF.PI / 2.0f);
-                    modelMatrix = node.Transform * scaleMatrix * rotationMatrix * model;
-                }
-                else
-                {
-                    // Apply global model rotation to node transform
-                    modelMatrix = node.Transform * model;
-                }
 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
@@ -685,7 +702,7 @@ public static unsafe partial class SharpGLTFApp
                 // Prepare transmission uniforms (for proper 3D refraction with matrices)
                 // NOTE: These must ALWAYS be provided because the shader declares the uniform buffer
                 cgltf_transmission_params_t transmissionParams = new cgltf_transmission_params_t();
-                transmissionParams.model_matrix = node.Transform;  // Model matrix for scale extraction
+                transmissionParams.model_matrix = modelMatrix;  // Use full model matrix (includes node animation + user rotation)
                 transmissionParams.view_matrix = state.camera.View;       // View matrix
                 transmissionParams.projection_matrix = state.camera.Proj; // Projection matrix
 
@@ -709,9 +726,9 @@ public static unsafe partial class SharpGLTFApp
                 // TRANSMISSION TWO-PASS RENDERING
                 // Pass 1: Render opaque objects to offscreen texture (already in transmission.opaque_pass)
                 // This captures the background for refraction sampling
-                foreach (var (node, _) in opaqueNodes)
+                foreach (var (node, transform, _) in opaqueNodes)
                 {
-                    RenderNode(node, useScreenTexture: false, renderToOffscreen: true);
+                    RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: true);
                 }
                 
                 // End opaque pass
@@ -721,30 +738,30 @@ public static unsafe partial class SharpGLTFApp
                 sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
                 
                 // Render opaque objects again to the actual screen (using regular swapchain pipelines)
-                foreach (var (node, _) in opaqueNodes)
+                foreach (var (node, transform, _) in opaqueNodes)
                 {
-                    RenderNode(node, useScreenTexture: false, renderToOffscreen: false);
+                    RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: false);
                 }
                 
                 // Render transparent objects with screen texture binding for refraction
-                foreach (var (node, _) in transparentNodes)
+                foreach (var (node, transform, _) in transparentNodes)
                 {
-                    RenderNode(node, useScreenTexture: true, renderToOffscreen: false);
+                    RenderNode(node, transform, useScreenTexture: true, renderToOffscreen: false);
                 }
             }
             else
             {
                 // REGULAR RENDERING (Bloom or swapchain)
                 // PASS 1: Render all opaque objects (no specific order needed)
-                foreach (var (node, _) in opaqueNodes)
+                foreach (var (node, transform, _) in opaqueNodes)
                 {
-                    RenderNode(node);
+                    RenderNode(node, transform);
                 }
 
                 // PASS 2: Render all transparent objects (back-to-front order)
-                foreach (var (node, _) in transparentNodes)
+                foreach (var (node, transform, _) in transparentNodes)
                 {
-                    RenderNode(node);
+                    RenderNode(node, transform);
                 }
             }
 
