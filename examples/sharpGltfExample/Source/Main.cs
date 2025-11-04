@@ -24,6 +24,8 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
+        "DragonAttenuation/glTF-Binary/DragonAttenuation.glb",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
         "PotOfCoals/glTF/PotOfCoals.gltf",
@@ -32,7 +34,6 @@ public static unsafe partial class SharpGLTFApp
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
-        "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "FlightHelmet/glTF/FlightHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "CompareIor/glTF/CompareIor.gltf",
@@ -52,7 +53,6 @@ public static unsafe partial class SharpGLTFApp
         "BoomBox/glTF-Binary/BoomBox.glb",
         "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb",
         "ClearcoatRing/glTF/ClearcoatRing.gltf",
-        "DragonAttenuation/glTF-Binary/DragonAttenuation.glb",
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
         "IridescenceLamp/glTF-Binary/IridescenceLamp.glb"
@@ -201,6 +201,7 @@ public static unsafe partial class SharpGLTFApp
 
     static _state state = new _state();
     static bool _loggedMeshInfoOnce = false;  // Debug flag for mesh info
+    static bool _loggedTransmissionDebug = false;  // Debug flag for transmission info
     static int _frameCount = 0;  // Frame counter for debugging
 
 

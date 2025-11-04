@@ -726,10 +726,9 @@ void main() {
         // The transmission replaces the diffuse component, specular remains via Fresnel
         color = mix(color, refracted_color, transmission_factor);
     }
-    
-    // Apply volume absorption (Beer's Law) AFTER transmission
-    // This creates the colored tint effect (e.g., golden amber, orange dragon)
-    if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
+    // Apply volume absorption ONLY for non-transmissive materials
+    // (e.g., solid colored objects that aren't glass)
+    else if (thickness_factor > 0.0 && attenuation_distance < 1e10) {
         // Beer's Law: Intensity = I0 * exp(-absorption_coefficient * distance)
         // attenuation_color is the target color at attenuation_distance
         vec3 absorption = -log(max(attenuation_color, vec3(0.001))) / max(attenuation_distance, 0.001);
