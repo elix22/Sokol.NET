@@ -155,50 +155,6 @@ namespace Sokol
             Info($"Model loaded: {Nodes.Count} nodes, {Meshes.Count} meshes, {BoneCounter} bones, {(HasAnimations ? "with" : "without")} animation", "SharpGLTF");
         }
 
-        // Update node transforms for node animations (non-skinned animations)
-        public void UpdateNodeTransforms()
-        {
-            var defaultScene = _model.DefaultScene;
-            if (defaultScene == null) return;
-
-            void UpdateNodeTransform(Node gltfNode, Matrix4x4 parentTransform)
-            {
-                // Get updated local transform (animation may have changed rotation/translation/scale)
-                var localMatrix = gltfNode.LocalMatrix;
-                Matrix4x4 worldTransform = localMatrix * parentTransform;
-
-                // DEBUG: Log second hand updates
-                if (gltfNode.Name != null && gltfNode.Name.Contains("second_hand", StringComparison.OrdinalIgnoreCase))
-                {
-                    var rotation = gltfNode.LocalTransform.Rotation;
-                    Info($"[UpdateTransforms] {gltfNode.Name}: Rotation={rotation}, WorldPos={worldTransform.Translation}");
-                }
-
-                // Update all render nodes that match this glTF node name
-                if (gltfNode.Mesh != null && !string.IsNullOrEmpty(gltfNode.Name))
-                {
-                    foreach (var renderNode in Nodes)
-                    {
-                        if (renderNode.NodeName == gltfNode.Name)
-                        {
-                            renderNode.Transform = worldTransform;
-                        }
-                    }
-                }
-
-                // Recursively update children
-                foreach (var child in gltfNode.VisualChildren)
-                {
-                    UpdateNodeTransform(child, worldTransform);
-                }
-            }
-
-            foreach (var node in defaultScene.VisualChildren)
-            {
-                UpdateNodeTransform(node, Matrix4x4.Identity);
-            }
-        }
-
         private void ProcessNode(Node node, Matrix4x4 parentTransform, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap)
         {
             // Get node's local transform
