@@ -301,7 +301,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawAnimationWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(250, 150), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(250, 200), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Animation", ref open, ImGuiWindowFlags.None))
@@ -348,6 +348,20 @@ public static unsafe partial class SharpGLTFApp
                     igText($"Duration: {durationInSeconds:F2}s");
                     igText($"Time: {currentTimeInSeconds:F2}s");
                     igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                }
+                
+                // Playback speed control
+                igSeparator();
+                igText("Playback Speed:");
+                float playbackSpeed = state.animator.PlaybackSpeed;
+                if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
+                {
+                    state.animator.PlaybackSpeed = playbackSpeed;
+                }
+                
+                if (igButton("Reset to 1.0x", new Vector2(110, 0)))
+                {
+                    state.animator.PlaybackSpeed = 1.0f;
                 }
             }
             else

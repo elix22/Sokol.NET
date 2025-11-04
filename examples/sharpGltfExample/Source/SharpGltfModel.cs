@@ -682,7 +682,7 @@ namespace Sokol
             foreach (var gltfAnimation in _model.LogicalAnimations)
             {
                 float duration = (float)gltfAnimation.Duration;
-                int ticksPerSecond = 1; // SharpGLTF uses seconds, we'll convert
+                int ticksPerSecond = 1; // SharpGLTF uses seconds directly (no conversion needed)
                 var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
                 animation.Name = gltfAnimation.Name ?? $"Animation{Animations.Count}";
 
@@ -695,16 +695,11 @@ namespace Sokol
                     if (targetNode == null)
                     {
                         string pointerPath = channel.TargetPointerPath;
-                        Info($"Detected non-node animation channel: {pointerPath}", "SharpGLTF");
                         
                         // Check if this is a material property animation
                         if (pointerPath != null && pointerPath.Contains("/materials/"))
                         {
                             ParseMaterialPropertyAnimation(channel, animation);
-                        }
-                        else
-                        {
-                            Info($"Skipping unsupported animation pointer: {pointerPath}", "SharpGLTF");
                         }
                         continue;
                     }
@@ -739,7 +734,6 @@ namespace Sokol
         private void ParseMaterialPropertyAnimation(AnimationChannel channel, SharpGltfAnimation animation)
         {
             string pointerPath = channel.TargetPointerPath;
-            Info($"Parsing material property animation: {pointerPath}", "SharpGLTF");
 
             // Parse the pointer path to extract material index and property type
             // Example paths:
@@ -747,10 +741,7 @@ namespace Sokol
             // "/materials/2/normalTexture/extensions/KHR_texture_transform/offset"
             
             if (!TryParseMaterialPointerPath(pointerPath, out int materialIndex, out MaterialAnimationTarget target))
-            {
-                Info($"Could not parse material property path: {pointerPath}", "SharpGLTF");
                 return;
-            }
 
             // Create material property animation object
             var matPropAnim = new MaterialPropertyAnimation
@@ -763,10 +754,7 @@ namespace Sokol
             // Extract keyframe data from the sampler
             var sampler = channel._GetSampler();
             if (sampler == null)
-            {
-                Info($"No sampler found for material property animation", "SharpGLTF");
                 return;
-            }
 
             // Sample based on target type (float or Vector2)
             if (matPropAnim.IsFloatType)
@@ -779,7 +767,6 @@ namespace Sokol
                     {
                         matPropAnim.FloatKeyframes.Add((time, value));
                     }
-                    Info($"  Material {materialIndex} {target}: {matPropAnim.FloatKeyframes.Count} float keyframes", "SharpGLTF");
                 }
             }
             else
@@ -792,13 +779,11 @@ namespace Sokol
                     {
                         matPropAnim.Vector2Keyframes.Add((time, value));
                     }
-                    Info($"  Material {materialIndex} {target}: {matPropAnim.Vector2Keyframes.Count} Vector2 keyframes", "SharpGLTF");
                 }
             }
 
             // Add to animation's material animations list
             animation.MaterialAnimations.Add(matPropAnim);
-            Info($"Added material property animation for material {materialIndex}, target: {target}", "SharpGLTF");
         }
 
         private bool TryParseMaterialPointerPath(string pointerPath, out int materialIndex, out MaterialAnimationTarget target)

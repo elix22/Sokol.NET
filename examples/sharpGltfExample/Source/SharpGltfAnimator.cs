@@ -9,10 +9,14 @@ namespace Sokol
         private Matrix4x4[] _finalBoneMatrices = new Matrix4x4[AnimationConstants.MAX_BONES];
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
-        private int _debugBoneCount = 0;  // Debug counter
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
         private SharpGLTF.Schema2.ModelRoot? _modelRoot;  // Reference to glTF model for updating nodes
         private Dictionary<int, List<Mesh>> _materialToMeshMap;  // Material index to mesh mapping for property animations
+        
+        /// <summary>
+        /// Playback speed multiplier. 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
+        /// </summary>
+        public float PlaybackSpeed { get; set; } = 1.0f;
 
         public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, SharpGLTF.Schema2.ModelRoot? modelRoot = null)
         {
@@ -28,9 +32,7 @@ namespace Sokol
             if (_currentAnimation != null)
             {
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
-                Info($"Root node: '{rootNode.Name}' with {rootNode.ChildrenCount} children", "SharpGltfAnimator");
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
-                Info($"Initialized with {_currentAnimation.GetBoneIDMap().Count} bones", "SharpGltfAnimator");
             }
         }
 
@@ -54,7 +56,6 @@ namespace Sokol
             {
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
-                Info($"Switched to animation '{_currentAnimation.Name}' with {_currentAnimation.GetBoneIDMap().Count} bones", "SharpGltfAnimator");
             }
         }
 
@@ -62,9 +63,9 @@ namespace Sokol
         {
             if (_currentAnimation != null)
             {
-                _currentTime += _currentAnimation.GetTicksPerSecond() * dt;
+                // Apply playback speed multiplier
+                _currentTime += _currentAnimation.GetTicksPerSecond() * dt * PlaybackSpeed;
                 _currentTime = _currentTime % _currentAnimation.GetDuration();
-
 
                 // Batch update all bones at once before hierarchy traversal (optimization for WebAssembly)
                 var bones = _currentAnimation.GetBones();
@@ -136,13 +137,6 @@ namespace Sokol
                 int index = boneInfoMap[nodeName].Id;
                 Matrix4x4 offset = boneInfoMap[nodeName].Offset;
                 _finalBoneMatrices[index] = offset * globalTransformation;
-
-                // Debug: Print first bone calculation
-                if (_debugBoneCount < 2 && index == 0)
-                {
-                    Info($"[Bone {index}] '{nodeName}': offset.M44={offset.M44:F3}, global.M44={globalTransformation.M44:F3}, final.M44={_finalBoneMatrices[index].M44:F3}");
-                    _debugBoneCount++;
-                }
             }
 
             for (int i = 0; i < node.ChildrenCount; i++)

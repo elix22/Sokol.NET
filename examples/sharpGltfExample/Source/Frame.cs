@@ -319,7 +319,7 @@ public static unsafe partial class SharpGLTFApp
         // Update animation if available
         if (state.animator != null)
         {
-            state.animator.UpdateAnimation((float)sapp_frame_duration());
+            state.animator.UpdateAnimation(deltaTime);
         }
 
         // Begin rendering
