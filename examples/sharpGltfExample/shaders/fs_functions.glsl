@@ -263,13 +263,6 @@ vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view,
     vec2 screen_size = vec2(textureSize(sampler2D(screen_tex, screen_smp), 0));
     vec2 refraction_coords = gl_FragCoord.xy / screen_size;
     
-    // Handle Y-axis orientation differences between graphics APIs
-    // Metal/D3D use Y-down framebuffer coordinates (matches gl_FragCoord)
-    // OpenGL uses Y-up, so we need to flip Y for OpenGL
-    #if SOKOL_GLSL
-        refraction_coords.y = 1.0 - refraction_coords.y;
-    #endif
-    
     // Clamp to valid texture range
     refraction_coords = clamp(refraction_coords, vec2(0.0), vec2(1.0));
     
