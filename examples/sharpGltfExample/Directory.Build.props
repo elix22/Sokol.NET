@@ -53,14 +53,18 @@
   </ItemGroup>
 
    <!-- Compile shaders into the host-specific folder before build -->
+   <!-- Recompile ALL shaders if ANY .glsl file is modified -->
   <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
           Inputs="@(ShaderFiles)"
-          Outputs="@(ShaderFiles -> 'shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs')">
+          Outputs="shaders/compiled/$(HostShaderFolder)/.shader_timestamp">
         <!-- Ensure the output folder exists -->
     <MakeDir Directories="shaders/compiled/$(HostShaderFolder)" />
-    <Message Text="Compiling shader: %(ShaderFiles.Identity) into shaders/compiled/$(HostShaderFolder)" Importance="high" />
-    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
-    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --defines &quot;SKINNING&quot; --module &quot;skinning&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(Filename)-shader-skinning.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Message Text="Compiling all shaders into shaders/compiled/$(HostShaderFolder)" Importance="high" />
+    <!-- Compile each shader file -->
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(ShaderFiles.Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --defines &quot;SKINNING&quot; --module &quot;skinning&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(ShaderFiles.Filename)-shader-skinning.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <!-- Create timestamp file to track completion -->
+    <Touch Files="shaders/compiled/$(HostShaderFolder)/.shader_timestamp" AlwaysCreate="true" />
   </Target>
 
 
