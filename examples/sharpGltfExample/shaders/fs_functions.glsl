@@ -89,9 +89,11 @@ vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 m
     modelScale.y = length(vec3(modelMatrix[1].xyz));
     modelScale.z = length(vec3(modelMatrix[2].xyz));
     
-    // The thickness is specified in local space
-    // Scale by model transform and apply the refraction direction
-    return refractionVector * thickness * modelScale;
+    // Get average scale to apply uniformly (avoid distortion from non-uniform scaling)
+    float avgScale = (modelScale.x + modelScale.y + modelScale.z) / 3.0;
+    
+    // The thickness is specified in local space, apply average scale
+    return normalize(refractionVector) * thickness * avgScale;
 }
 
 // Apply Beer's law volume attenuation
@@ -232,12 +234,23 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
 // ============================================================================
 
 // Calculate refracted color for transmission/glass materials
-// Uses proper 3D volumetric refraction with perspective projection (glTF-Sample-Viewer method)
+// Uses proper 3D volumetric refraction with screen-space sampling
+//
+// IMPLEMENTATION NOTE: This function uses gl_FragCoord directly for screen-space
+// sampling instead of projecting world-space positions. This is critical for
+// correctness in a two-pass rendering setup where:
+//   - Pass 1: Renders opaque objects to an offscreen texture
+//   - Pass 2: Renders transparent objects, sampling the offscreen texture
+//
+// Using gl_FragCoord ensures the fragment's screen position in Pass 2 exactly
+// matches where the background was rendered in Pass 1, preventing misalignment
+// artifacts during camera/model rotation.
 vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view, 
                          float ior, float thickness, float perceptual_roughness,
                          vec3 base_color, vec3 attenuation_color, float attenuation_distance,
                          texture2D screen_tex, sampler screen_smp,
                          mat4 model_mat, mat4 view_mat, mat4 proj_mat) {
+    
     // 1. Calculate 3D transmission ray in world space
     vec3 transmission_ray = getVolumeTransmissionRay(normal, view, thickness, ior, model_mat);
     float transmission_ray_length = length(transmission_ray);
@@ -245,14 +258,15 @@ vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view,
     // 2. Find where the refracted ray exits the volume (world space)
     vec3 refracted_ray_exit = position + transmission_ray;
     
-    // 3. Project the exit point to screen space using proper matrices
-    vec4 ndc_pos = proj_mat * view_mat * vec4(refracted_ray_exit, 1.0);
-    vec2 refraction_coords = ndc_pos.xy / ndc_pos.w;  // Perspective divide
-    refraction_coords = refraction_coords * 0.5 + 0.5;  // Convert from NDC [-1,1] to UV [0,1]
+    // 3. Use gl_FragCoord for screen-space sampling (prevents misalignment)
+    // gl_FragCoord is already in screen space and matches the screen texture exactly
+    vec2 screen_size = vec2(textureSize(sampler2D(screen_tex, screen_smp), 0));
+    vec2 refraction_coords = gl_FragCoord.xy / screen_size;
     
-    // Metal/D3D use Y-down clip space, OpenGL uses Y-up
-    // Flip Y coordinate for Metal/D3D to match screen texture orientation
-    #if !SOKOL_GLSL
+    // Handle Y-axis orientation differences between graphics APIs
+    // Metal/D3D use Y-down framebuffer coordinates (matches gl_FragCoord)
+    // OpenGL uses Y-up, so we need to flip Y for OpenGL
+    #if SOKOL_GLSL
         refraction_coords.y = 1.0 - refraction_coords.y;
     #endif
     
