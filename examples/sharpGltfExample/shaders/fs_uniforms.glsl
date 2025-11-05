@@ -46,3 +46,18 @@ layout(binding=3) uniform transmission_params {
     mat4 view_matrix;       // View matrix for world-to-view transform
     mat4 projection_matrix; // Projection matrix for view-to-clip transform
 };
+
+
+layout(binding=0) uniform texture2D base_color_tex;
+layout(binding=1) uniform texture2D metallic_roughness_tex;
+layout(binding=2) uniform texture2D normal_tex;
+layout(binding=3) uniform texture2D occlusion_tex;
+layout(binding=4) uniform texture2D emissive_tex;
+layout(binding=5) uniform texture2D screen_tex;  // Screen texture for refraction (transmission pass)
+
+layout(binding=0) uniform sampler base_color_smp;
+layout(binding=1) uniform sampler metallic_roughness_smp;
+layout(binding=2) uniform sampler normal_smp;
+layout(binding=3) uniform sampler occlusion_smp;
+layout(binding=4) uniform sampler emissive_smp;
+layout(binding=5) uniform sampler screen_smp;  // Sampler for screen texture

@@ -5,7 +5,7 @@
  */
 
 // this is just here to test the `@module` prefix feature of the sokol-shdc
-// C code generator, other then that it's not needed
+// C# code generator, other then that it's not needed
 @module cgltf
 
 
@@ -21,28 +21,9 @@ precision highp int;
 const int MAX_BONES = 100;
 const int MAX_BONE_INFLUENCE = 4;
 
-layout(binding=0, std140) uniform vs_params {
-    layout(offset=0) highp mat4 model;              // offset 0, size 64
-    layout(offset=64) highp mat4 view_proj;         // offset 64, size 64
-    layout(offset=128) highp vec3 eye_pos;          // offset 128, size 12 (but std140 pads to 16)
-#ifdef SKINNING
-    layout(offset=144) highp mat4 finalBonesMatrices[MAX_BONES];  // offset 144 (128+16)
-#endif
-};
+@include vs_uniforms.glsl
+@include vs_attributes.glsl
 
-layout(location=0) in vec3 position;  // FIXED: Was vec4, should be vec3 to match Vertex struct!
-layout(location=1) in vec3 normal;
-layout(location=2) in vec4 color;
-layout(location=3) in vec2 texcoord;
-layout(location=4) in vec4 boneIds;  // Changed from uvec4 for WebGL compatibility
-layout(location=5) in vec4 weights;
-
-
-out vec3 v_pos;
-out vec3 v_nrm;
-out vec4 v_color;
-out vec2 v_uv;
-out vec3 v_eye_pos;
 
 void main() {
     highp vec3 finalPosition = position;
@@ -129,36 +110,18 @@ void main() {
 }
 @end
 
+
+
 @fs metallic_fs
 
 @include fs_constants.glsl
+@include fs_uniforms.glsl
+@include fs_attributes.glsl
 @include fs_structures.glsl
 @include fs_functions.glsl
-@include fs_uniforms.glsl
 @include fs_lighting.glsl
 @include brdf.glsl
 
-in vec3 v_pos;
-in vec3 v_nrm;
-in vec4 v_color;
-in vec2 v_uv;
-in vec3 v_eye_pos;
-
-out vec4 frag_color;
-
-layout(binding=0) uniform texture2D base_color_tex;
-layout(binding=1) uniform texture2D metallic_roughness_tex;
-layout(binding=2) uniform texture2D normal_tex;
-layout(binding=3) uniform texture2D occlusion_tex;
-layout(binding=4) uniform texture2D emissive_tex;
-layout(binding=5) uniform texture2D screen_tex;  // Screen texture for refraction (transmission pass)
-
-layout(binding=0) uniform sampler base_color_smp;
-layout(binding=1) uniform sampler metallic_roughness_smp;
-layout(binding=2) uniform sampler normal_smp;
-layout(binding=3) uniform sampler occlusion_smp;
-layout(binding=4) uniform sampler emissive_smp;
-layout(binding=5) uniform sampler screen_smp;  // Sampler for screen texture
 
 void main() {
     // Step 1: Get base color
