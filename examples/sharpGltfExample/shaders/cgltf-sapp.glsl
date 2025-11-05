@@ -160,57 +160,6 @@ layout(binding=3) uniform sampler occlusion_smp;
 layout(binding=4) uniform sampler emissive_smp;
 layout(binding=5) uniform sampler screen_smp;  // Sampler for screen texture
 
-
-// ============================================================================
-// Transmission Helper Functions (from glTF-Sample-Viewer)
-// ============================================================================
-
-
-// Calculate refracted color for transmission/glass materials
-// Uses proper 3D volumetric refraction with perspective projection (glTF-Sample-Viewer method)
-vec3 calculate_refraction(vec3 position, vec3 normal, vec3 view, 
-                         float ior, float thickness, float perceptual_roughness,
-                         vec3 base_color, vec3 attenuation_color, float attenuation_distance) {
-    // 1. Calculate 3D transmission ray in world space
-    vec3 transmission_ray = getVolumeTransmissionRay(normal, view, thickness, ior, model_matrix);
-    float transmission_ray_length = length(transmission_ray);
-    
-    // 2. Find where the refracted ray exits the volume (world space)
-    vec3 refracted_ray_exit = position + transmission_ray;
-    
-    // 3. Project the exit point to screen space using proper matrices
-    vec4 ndc_pos = projection_matrix * view_matrix * vec4(refracted_ray_exit, 1.0);
-    vec2 refraction_coords = ndc_pos.xy / ndc_pos.w;  // Perspective divide
-    refraction_coords = refraction_coords * 0.5 + 0.5;  // Convert from NDC [-1,1] to UV [0,1]
-    
-    // Metal/D3D use Y-down clip space, OpenGL uses Y-up
-    // Flip Y coordinate for Metal/D3D to match screen texture orientation
-    #if !SOKOL_GLSL
-        refraction_coords.y = 1.0 - refraction_coords.y;
-    #endif
-    
-    // Clamp to valid texture range
-    refraction_coords = clamp(refraction_coords, vec2(0.0), vec2(1.0));
-    
-    // 4. Sample background texture with roughness-based LOD
-    // Scale roughness by IOR for proper microfacet refraction
-    float transmission_roughness = applyIorToRoughness(perceptual_roughness, ior);
-    
-    // Calculate LOD based on framebuffer size and roughness
-    float framebuffer_lod = log2(float(textureSize(sampler2D(screen_tex, screen_smp), 0).x)) 
-                          * transmission_roughness;
-    
-    vec3 transmitted_light = textureLod(sampler2D(screen_tex, screen_smp), 
-                                       refraction_coords, framebuffer_lod).rgb;
-    
-    // 5. Apply Beer's law volume attenuation based on actual ray distance
-    vec3 attenuated_color = applyVolumeAttenuation(transmitted_light, transmission_ray_length,
-                                                   attenuation_color, attenuation_distance);
-    
-    // 6. Modulate by base color (tint the transmitted light)
-    return attenuated_color * base_color;
-}
-
 void main() {
     // Step 1: Get base color
     // Manual sRGB to linear conversion (textures are RGBA8 format)
@@ -346,7 +295,12 @@ void main() {
             material_info.perceptual_roughness, // Roughness for blur
             base_color.rgb,                     // Base color tint
             attenuation_color,                  // Volume absorption color
-            attenuation_distance                // Volume absorption distance
+            attenuation_distance,               // Volume absorption distance
+            screen_tex,                         // Screen texture for refraction
+            screen_smp,                         // Screen texture sampler
+            model_matrix,                       // Model matrix
+            view_matrix,                        // View matrix
+            projection_matrix                   // Projection matrix
         );
         
         // glTF-Sample-Viewer approach: Mix current color with refracted background
