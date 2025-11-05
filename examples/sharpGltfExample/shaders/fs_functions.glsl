@@ -287,12 +287,3 @@ vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 no
     return vec3(0.0, 0.0, 0.0);
 }
 
-
-float get_range_attenuation(float range, float distance) {
-    if (range < 0.0) {
-        return 1.0;
-    }
-    return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
-}
-
-
