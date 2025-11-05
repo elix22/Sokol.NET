@@ -206,113 +206,113 @@ public static unsafe class Shaders
 [StructLayout(LayoutKind.Sequential)]
     public struct skinning_vs_params_t {
         public skinning_vs_params_t(){}
-        public hmm_mat4 model;
-        public hmm_mat4 view_proj;
-        public hmm_vec3 eye_pos;
+        public System.Numerics.Matrix4x4 model;
+        public System.Numerics.Matrix4x4 view_proj;
+        public System.Numerics.Vector3 eye_pos;
         fixed byte _pad_140[4];
         #pragma warning disable 169
         public struct finalBonesMatricesCollection {
-            public ref hmm_mat4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 100)[index];
-            private hmm_mat4 _item0;
-            private hmm_mat4 _item1;
-            private hmm_mat4 _item2;
-            private hmm_mat4 _item3;
-            private hmm_mat4 _item4;
-            private hmm_mat4 _item5;
-            private hmm_mat4 _item6;
-            private hmm_mat4 _item7;
-            private hmm_mat4 _item8;
-            private hmm_mat4 _item9;
-            private hmm_mat4 _item10;
-            private hmm_mat4 _item11;
-            private hmm_mat4 _item12;
-            private hmm_mat4 _item13;
-            private hmm_mat4 _item14;
-            private hmm_mat4 _item15;
-            private hmm_mat4 _item16;
-            private hmm_mat4 _item17;
-            private hmm_mat4 _item18;
-            private hmm_mat4 _item19;
-            private hmm_mat4 _item20;
-            private hmm_mat4 _item21;
-            private hmm_mat4 _item22;
-            private hmm_mat4 _item23;
-            private hmm_mat4 _item24;
-            private hmm_mat4 _item25;
-            private hmm_mat4 _item26;
-            private hmm_mat4 _item27;
-            private hmm_mat4 _item28;
-            private hmm_mat4 _item29;
-            private hmm_mat4 _item30;
-            private hmm_mat4 _item31;
-            private hmm_mat4 _item32;
-            private hmm_mat4 _item33;
-            private hmm_mat4 _item34;
-            private hmm_mat4 _item35;
-            private hmm_mat4 _item36;
-            private hmm_mat4 _item37;
-            private hmm_mat4 _item38;
-            private hmm_mat4 _item39;
-            private hmm_mat4 _item40;
-            private hmm_mat4 _item41;
-            private hmm_mat4 _item42;
-            private hmm_mat4 _item43;
-            private hmm_mat4 _item44;
-            private hmm_mat4 _item45;
-            private hmm_mat4 _item46;
-            private hmm_mat4 _item47;
-            private hmm_mat4 _item48;
-            private hmm_mat4 _item49;
-            private hmm_mat4 _item50;
-            private hmm_mat4 _item51;
-            private hmm_mat4 _item52;
-            private hmm_mat4 _item53;
-            private hmm_mat4 _item54;
-            private hmm_mat4 _item55;
-            private hmm_mat4 _item56;
-            private hmm_mat4 _item57;
-            private hmm_mat4 _item58;
-            private hmm_mat4 _item59;
-            private hmm_mat4 _item60;
-            private hmm_mat4 _item61;
-            private hmm_mat4 _item62;
-            private hmm_mat4 _item63;
-            private hmm_mat4 _item64;
-            private hmm_mat4 _item65;
-            private hmm_mat4 _item66;
-            private hmm_mat4 _item67;
-            private hmm_mat4 _item68;
-            private hmm_mat4 _item69;
-            private hmm_mat4 _item70;
-            private hmm_mat4 _item71;
-            private hmm_mat4 _item72;
-            private hmm_mat4 _item73;
-            private hmm_mat4 _item74;
-            private hmm_mat4 _item75;
-            private hmm_mat4 _item76;
-            private hmm_mat4 _item77;
-            private hmm_mat4 _item78;
-            private hmm_mat4 _item79;
-            private hmm_mat4 _item80;
-            private hmm_mat4 _item81;
-            private hmm_mat4 _item82;
-            private hmm_mat4 _item83;
-            private hmm_mat4 _item84;
-            private hmm_mat4 _item85;
-            private hmm_mat4 _item86;
-            private hmm_mat4 _item87;
-            private hmm_mat4 _item88;
-            private hmm_mat4 _item89;
-            private hmm_mat4 _item90;
-            private hmm_mat4 _item91;
-            private hmm_mat4 _item92;
-            private hmm_mat4 _item93;
-            private hmm_mat4 _item94;
-            private hmm_mat4 _item95;
-            private hmm_mat4 _item96;
-            private hmm_mat4 _item97;
-            private hmm_mat4 _item98;
-            private hmm_mat4 _item99;
+            public ref System.Numerics.Matrix4x4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 100)[index];
+            private System.Numerics.Matrix4x4 _item0;
+            private System.Numerics.Matrix4x4 _item1;
+            private System.Numerics.Matrix4x4 _item2;
+            private System.Numerics.Matrix4x4 _item3;
+            private System.Numerics.Matrix4x4 _item4;
+            private System.Numerics.Matrix4x4 _item5;
+            private System.Numerics.Matrix4x4 _item6;
+            private System.Numerics.Matrix4x4 _item7;
+            private System.Numerics.Matrix4x4 _item8;
+            private System.Numerics.Matrix4x4 _item9;
+            private System.Numerics.Matrix4x4 _item10;
+            private System.Numerics.Matrix4x4 _item11;
+            private System.Numerics.Matrix4x4 _item12;
+            private System.Numerics.Matrix4x4 _item13;
+            private System.Numerics.Matrix4x4 _item14;
+            private System.Numerics.Matrix4x4 _item15;
+            private System.Numerics.Matrix4x4 _item16;
+            private System.Numerics.Matrix4x4 _item17;
+            private System.Numerics.Matrix4x4 _item18;
+            private System.Numerics.Matrix4x4 _item19;
+            private System.Numerics.Matrix4x4 _item20;
+            private System.Numerics.Matrix4x4 _item21;
+            private System.Numerics.Matrix4x4 _item22;
+            private System.Numerics.Matrix4x4 _item23;
+            private System.Numerics.Matrix4x4 _item24;
+            private System.Numerics.Matrix4x4 _item25;
+            private System.Numerics.Matrix4x4 _item26;
+            private System.Numerics.Matrix4x4 _item27;
+            private System.Numerics.Matrix4x4 _item28;
+            private System.Numerics.Matrix4x4 _item29;
+            private System.Numerics.Matrix4x4 _item30;
+            private System.Numerics.Matrix4x4 _item31;
+            private System.Numerics.Matrix4x4 _item32;
+            private System.Numerics.Matrix4x4 _item33;
+            private System.Numerics.Matrix4x4 _item34;
+            private System.Numerics.Matrix4x4 _item35;
+            private System.Numerics.Matrix4x4 _item36;
+            private System.Numerics.Matrix4x4 _item37;
+            private System.Numerics.Matrix4x4 _item38;
+            private System.Numerics.Matrix4x4 _item39;
+            private System.Numerics.Matrix4x4 _item40;
+            private System.Numerics.Matrix4x4 _item41;
+            private System.Numerics.Matrix4x4 _item42;
+            private System.Numerics.Matrix4x4 _item43;
+            private System.Numerics.Matrix4x4 _item44;
+            private System.Numerics.Matrix4x4 _item45;
+            private System.Numerics.Matrix4x4 _item46;
+            private System.Numerics.Matrix4x4 _item47;
+            private System.Numerics.Matrix4x4 _item48;
+            private System.Numerics.Matrix4x4 _item49;
+            private System.Numerics.Matrix4x4 _item50;
+            private System.Numerics.Matrix4x4 _item51;
+            private System.Numerics.Matrix4x4 _item52;
+            private System.Numerics.Matrix4x4 _item53;
+            private System.Numerics.Matrix4x4 _item54;
+            private System.Numerics.Matrix4x4 _item55;
+            private System.Numerics.Matrix4x4 _item56;
+            private System.Numerics.Matrix4x4 _item57;
+            private System.Numerics.Matrix4x4 _item58;
+            private System.Numerics.Matrix4x4 _item59;
+            private System.Numerics.Matrix4x4 _item60;
+            private System.Numerics.Matrix4x4 _item61;
+            private System.Numerics.Matrix4x4 _item62;
+            private System.Numerics.Matrix4x4 _item63;
+            private System.Numerics.Matrix4x4 _item64;
+            private System.Numerics.Matrix4x4 _item65;
+            private System.Numerics.Matrix4x4 _item66;
+            private System.Numerics.Matrix4x4 _item67;
+            private System.Numerics.Matrix4x4 _item68;
+            private System.Numerics.Matrix4x4 _item69;
+            private System.Numerics.Matrix4x4 _item70;
+            private System.Numerics.Matrix4x4 _item71;
+            private System.Numerics.Matrix4x4 _item72;
+            private System.Numerics.Matrix4x4 _item73;
+            private System.Numerics.Matrix4x4 _item74;
+            private System.Numerics.Matrix4x4 _item75;
+            private System.Numerics.Matrix4x4 _item76;
+            private System.Numerics.Matrix4x4 _item77;
+            private System.Numerics.Matrix4x4 _item78;
+            private System.Numerics.Matrix4x4 _item79;
+            private System.Numerics.Matrix4x4 _item80;
+            private System.Numerics.Matrix4x4 _item81;
+            private System.Numerics.Matrix4x4 _item82;
+            private System.Numerics.Matrix4x4 _item83;
+            private System.Numerics.Matrix4x4 _item84;
+            private System.Numerics.Matrix4x4 _item85;
+            private System.Numerics.Matrix4x4 _item86;
+            private System.Numerics.Matrix4x4 _item87;
+            private System.Numerics.Matrix4x4 _item88;
+            private System.Numerics.Matrix4x4 _item89;
+            private System.Numerics.Matrix4x4 _item90;
+            private System.Numerics.Matrix4x4 _item91;
+            private System.Numerics.Matrix4x4 _item92;
+            private System.Numerics.Matrix4x4 _item93;
+            private System.Numerics.Matrix4x4 _item94;
+            private System.Numerics.Matrix4x4 _item95;
+            private System.Numerics.Matrix4x4 _item96;
+            private System.Numerics.Matrix4x4 _item97;
+            private System.Numerics.Matrix4x4 _item98;
+            private System.Numerics.Matrix4x4 _item99;
         }
         #pragma warning restore 169
         public finalBonesMatricesCollection finalBonesMatrices;
@@ -321,8 +321,8 @@ public static unsafe class Shaders
 [StructLayout(LayoutKind.Sequential)]
     public struct skinning_metallic_params_t {
         public skinning_metallic_params_t(){}
-        public hmm_vec4 base_color_factor;
-        public hmm_vec3 emissive_factor;
+        public System.Numerics.Vector4 base_color_factor;
+        public System.Numerics.Vector3 emissive_factor;
         public float metallic_factor;
         public float roughness_factor;
         public float has_base_color_tex;
@@ -335,7 +335,7 @@ public static unsafe class Shaders
         public float transmission_factor;
         public float ior;
         fixed byte _pad_72[8];
-        public hmm_vec3 attenuation_color;
+        public System.Numerics.Vector3 attenuation_color;
         public float attenuation_distance;
         public float thickness_factor;
         public float clearcoat_factor;
@@ -357,41 +357,41 @@ public static unsafe class Shaders
         fixed byte _pad_8[8];
         #pragma warning disable 169
         public struct light_positionsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_positionsCollection light_positions;
         #pragma warning disable 169
         public struct light_directionsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_directionsCollection light_directions;
         #pragma warning disable 169
         public struct light_colorsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_colorsCollection light_colors;
         #pragma warning disable 169
         public struct light_params_dataCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_params_dataCollection light_params_data;
@@ -400,9 +400,9 @@ public static unsafe class Shaders
 [StructLayout(LayoutKind.Sequential)]
     public struct skinning_transmission_params_t {
         public skinning_transmission_params_t(){}
-        public hmm_mat4 model_matrix;
-        public hmm_mat4 view_matrix;
-        public hmm_mat4 projection_matrix;
+        public System.Numerics.Matrix4x4 model_matrix;
+        public System.Numerics.Matrix4x4 view_matrix;
+        public System.Numerics.Matrix4x4 projection_matrix;
     };
     /*
         #pragma clang diagnostic ignored "-Wmissing-prototypes"

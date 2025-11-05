@@ -8,9 +8,9 @@
 // C code generator, other then that it's not needed
 @module cgltf
 
-@ctype mat4 hmm_mat4
-@ctype vec4 hmm_vec4
-@ctype vec3 hmm_vec3
+@ctype mat4 System.Numerics.Matrix4x4
+@ctype vec4 System.Numerics.Vector4
+@ctype vec3 System.Numerics.Vector3
 
 @vs vs
 // Force high precision on ARM32 GPUs (default is mediump which loses bone matrix precision)

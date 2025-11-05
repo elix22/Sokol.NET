@@ -206,17 +206,17 @@ public static unsafe class Shaders
 [StructLayout(LayoutKind.Sequential)]
     public struct cgltf_vs_params_t {
         public cgltf_vs_params_t(){}
-        public hmm_mat4 model;
-        public hmm_mat4 view_proj;
-        public hmm_vec3 eye_pos;
+        public System.Numerics.Matrix4x4 model;
+        public System.Numerics.Matrix4x4 view_proj;
+        public System.Numerics.Vector3 eye_pos;
         fixed byte _pad_140[4];
     };
     
 [StructLayout(LayoutKind.Sequential)]
     public struct cgltf_metallic_params_t {
         public cgltf_metallic_params_t(){}
-        public hmm_vec4 base_color_factor;
-        public hmm_vec3 emissive_factor;
+        public System.Numerics.Vector4 base_color_factor;
+        public System.Numerics.Vector3 emissive_factor;
         public float metallic_factor;
         public float roughness_factor;
         public float has_base_color_tex;
@@ -229,7 +229,7 @@ public static unsafe class Shaders
         public float transmission_factor;
         public float ior;
         fixed byte _pad_72[8];
-        public hmm_vec3 attenuation_color;
+        public System.Numerics.Vector3 attenuation_color;
         public float attenuation_distance;
         public float thickness_factor;
         public float clearcoat_factor;
@@ -251,41 +251,41 @@ public static unsafe class Shaders
         fixed byte _pad_8[8];
         #pragma warning disable 169
         public struct light_positionsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_positionsCollection light_positions;
         #pragma warning disable 169
         public struct light_directionsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_directionsCollection light_directions;
         #pragma warning disable 169
         public struct light_colorsCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_colorsCollection light_colors;
         #pragma warning disable 169
         public struct light_params_dataCollection {
-            public ref hmm_vec4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
-            private hmm_vec4 _item0;
-            private hmm_vec4 _item1;
-            private hmm_vec4 _item2;
-            private hmm_vec4 _item3;
+            public ref System.Numerics.Vector4 this[int index] => ref MemoryMarshal.CreateSpan(ref _item0, 4)[index];
+            private System.Numerics.Vector4 _item0;
+            private System.Numerics.Vector4 _item1;
+            private System.Numerics.Vector4 _item2;
+            private System.Numerics.Vector4 _item3;
         }
         #pragma warning restore 169
         public light_params_dataCollection light_params_data;
@@ -294,9 +294,9 @@ public static unsafe class Shaders
 [StructLayout(LayoutKind.Sequential)]
     public struct cgltf_transmission_params_t {
         public cgltf_transmission_params_t(){}
-        public hmm_mat4 model_matrix;
-        public hmm_mat4 view_matrix;
-        public hmm_mat4 projection_matrix;
+        public System.Numerics.Matrix4x4 model_matrix;
+        public System.Numerics.Matrix4x4 view_matrix;
+        public System.Numerics.Matrix4x4 projection_matrix;
     };
     /*
         #pragma clang diagnostic ignored "-Wmissing-prototypes"
