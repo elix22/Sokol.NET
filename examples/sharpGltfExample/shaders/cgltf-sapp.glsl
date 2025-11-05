@@ -115,12 +115,13 @@ void main() {
 @fs metallic_fs
 
 @include fs_constants.glsl
+@include brdf.glsl
 @include fs_uniforms.glsl
 @include fs_attributes.glsl
 @include fs_structures.glsl
 @include fs_functions.glsl
 @include fs_lighting.glsl
-@include brdf.glsl
+
 
 
 void main() {
