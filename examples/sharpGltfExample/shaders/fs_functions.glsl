@@ -199,82 +199,22 @@ angular_info_t get_angular_info(vec3 point_to_light, vec3 normal, vec3 view) {
     );
 }
 
-// The following equation models the Fresnel reflectance term of the spec equation (aka F())
-// Implementation of fresnel from [4], Equation 15
-vec3 specular_reflection(material_info_t material_info, angular_info_t angular_info) {
-    return material_info.reflectance0 + (material_info.reflectance90 - material_info.reflectance0) * pow(clamp(1.0 - angular_info.v_dot_h, 0.0, 1.0), 5.0);
-}
-
-// Geometry function (Schlick-GGX)
-float geometry_schlick_ggx(float n_dot_v, float roughness) {
-    float r = (roughness + 1.0);
-    float k = (r * r) / 8.0;
-    
-    float nom = n_dot_v;
-    float denom = n_dot_v * (1.0 - k) + k;
-    
-    return nom / denom;
-}
-
-// Smith's method combines the geometry obstruction and shadowing
-float geometry_smith(material_info_t material_info, angular_info_t angular_info) {
-    float n_dot_v = angular_info.n_dot_v;
-    float n_dot_l = angular_info.n_dot_l;
-    float roughness = material_info.perceptual_roughness;
-    
-    float ggx2 = geometry_schlick_ggx(n_dot_v, roughness);
-    float ggx1 = geometry_schlick_ggx(n_dot_l, roughness);
-    
-    return ggx1 * ggx2;
-}
-
-// The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
-// Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
-// Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-float microfacet_distribution(material_info_t material_info, angular_info_t angular_info) {
-    float a = material_info.perceptual_roughness * material_info.perceptual_roughness;
-    float a2 = a * a;
-    float NdotH = angular_info.n_dot_h;
-    float NdotH2 = NdotH * NdotH;
-    
-    float nom = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = M_PI * denom * denom;
-    
-    return nom / denom;
-}
-
-// Lambert lighting
-// see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-vec3 diffuse(material_info_t material_info) {
-    return material_info.diffuse_color / M_PI;
-}
-
-// Smith Joint GGX - proper visibility term
-float visibility_occlusion(material_info_t material_info, angular_info_t angular_info) {
-    float n_dot_l = angular_info.n_dot_l;
-    float n_dot_v = angular_info.n_dot_v;
-    float alpha_roughness_sq = material_info.alpha_roughness * material_info.alpha_roughness;
-
-    float GGXV = n_dot_l * sqrt(n_dot_v * n_dot_v * (1.0 - alpha_roughness_sq) + alpha_roughness_sq);
-    float GGXL = n_dot_v * sqrt(n_dot_l * n_dot_l * (1.0 - alpha_roughness_sq) + alpha_roughness_sq);
-    float GGX = GGXV + GGXL;
-    if (GGX > 0.0) {
-        return 0.5 / GGX;
-    }
-    return 0.0;
-}
-
 vec3 get_point_shade(vec3 point_to_light, material_info_t material_info, vec3 normal, vec3 view) {
     angular_info_t angular_info = get_angular_info(point_to_light, normal, view);
     if ((angular_info.n_dot_l > 0.0) || (angular_info.n_dot_v > 0.0)) {
-        // Calculate the shading terms for the microfacet specular shading model
-        vec3 F = specular_reflection(material_info, angular_info);
-        float Vis = visibility_occlusion(material_info, angular_info);
-        float D = microfacet_distribution(material_info, angular_info);
+        // Calculate the shading terms for the microfacet specular shading model using standard BRDF functions
+        // F_Schlick: Fresnel reflectance term (optimized implementation from brdf.glsl)
+        vec3 F = F_Schlick(material_info.reflectance0, material_info.reflectance90, angular_info.v_dot_h);
+        
+        // V_GGX: Smith Joint GGX visibility term (from brdf.glsl)
+        float Vis = V_GGX(angular_info.n_dot_l, angular_info.n_dot_v, material_info.alpha_roughness);
+        
+        // D_GGX: GGX microfacet distribution (from brdf.glsl)
+        float D = D_GGX(angular_info.n_dot_h, material_info.alpha_roughness);
 
         // Calculation of analytical lighting contribution
-        vec3 diffuse_contrib = (1.0 - F) * diffuse(material_info);
+        // BRDF_lambertian: Lambert diffuse (from brdf.glsl)
+        vec3 diffuse_contrib = (1.0 - F) * BRDF_lambertian(material_info.diffuse_color);
         
         // Boost specular for metals to make them more visible and shiny
         float metallic = material_info.metallic;
