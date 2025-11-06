@@ -20,6 +20,7 @@ using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
 using static cgltf_sapp_shader_cs_cgltf.Shaders;
 using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
+using static bloom_shader_cs.Shaders;
 
 public static unsafe partial class SharpGLTFApp
 {
@@ -787,7 +788,7 @@ public static unsafe partial class SharpGLTFApp
     private static unsafe void PerformBloomPasses(int screenWidth, int screenHeight)
     {
         // Prepare bloom parameters
-        cgltf_bloom_params_t bloomParams = new cgltf_bloom_params_t();
+        var bloomParams = new bloom_params_t();
         bloomParams.brightness_threshold = state.bloomThreshold;
         bloomParams.bloom_intensity = state.bloomIntensity;
         bloomParams.texel_size[0] = 1.0f / (screenWidth / 2);  // Half resolution for blur
@@ -797,7 +798,7 @@ public static unsafe partial class SharpGLTFApp
         sg_begin_pass(state.bloom.bright_pass);
         sg_apply_pipeline(state.bloom.bright_pipeline);
         sg_apply_bindings(state.bloom.bright_bindings);
-        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_apply_uniforms(UB_bloom_params, SG_RANGE(ref bloomParams));
         sg_draw(0, 3, 1);  // Fullscreen triangle
         sg_end_pass();
 
@@ -805,7 +806,7 @@ public static unsafe partial class SharpGLTFApp
         sg_begin_pass(state.bloom.blur_h_pass);
         sg_apply_pipeline(state.bloom.blur_h_pipeline);
         sg_apply_bindings(state.bloom.blur_h_bindings);
-        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_apply_uniforms(UB_bloom_params, SG_RANGE(ref bloomParams));
         sg_draw(0, 3, 1);  // Fullscreen triangle
         sg_end_pass();
 
@@ -813,7 +814,7 @@ public static unsafe partial class SharpGLTFApp
         sg_begin_pass(state.bloom.blur_v_pass);
         sg_apply_pipeline(state.bloom.blur_v_pipeline);
         sg_apply_bindings(state.bloom.blur_v_bindings);
-        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_apply_uniforms(UB_bloom_params, SG_RANGE(ref bloomParams));
         sg_draw(0, 3, 1);  // Fullscreen triangle
         sg_end_pass();
 
@@ -835,7 +836,7 @@ public static unsafe partial class SharpGLTFApp
         });
         sg_apply_pipeline(state.bloom.composite_pipeline);
         sg_apply_bindings(state.bloom.composite_bindings);
-        sg_apply_uniforms(UB_cgltf_bloom_params, SG_RANGE(ref bloomParams));
+        sg_apply_uniforms(UB_bloom_params, SG_RANGE(ref bloomParams));
         sg_draw(0, 3, 1);  // Fullscreen triangle
         // Don't end pass here - continue with UI rendering on same pass
     }

@@ -370,5 +370,3 @@ void main() {
 
 @program metallic vs metallic_fs
 
-// Include bloom post-processing shaders
-@include bloom.glsl

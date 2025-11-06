@@ -20,6 +20,7 @@ using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
 using static cgltf_sapp_shader_cs_cgltf.Shaders;
 using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
+using static bloom_shader_cs.Shaders;
 
 public static unsafe partial class SharpGLTFApp
 {
@@ -508,13 +509,13 @@ public static unsafe partial class SharpGLTFApp
             layout = new sg_vertex_layout_state()
             {
                 attrs = {
-                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_bright_pass_position] = new sg_vertex_attr_state()
+                    [ATTR_bright_pass_position] = new sg_vertex_attr_state()
                     {
                         format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
                     }
                 }
             },
-            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_bright_pass_shader_desc(sg_query_backend())),
+            shader = sg_make_shader(bright_pass_shader_desc(sg_query_backend())),
             primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
             sample_count = 1,
             depth = new sg_depth_state()
@@ -541,13 +542,13 @@ public static unsafe partial class SharpGLTFApp
             layout = new sg_vertex_layout_state()
             {
                 attrs = {
-                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_blur_horizontal_position] = new sg_vertex_attr_state()
+                    [ATTR_blur_horizontal_position] = new sg_vertex_attr_state()
                     {
                         format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
                     }
                 }
             },
-            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_blur_horizontal_shader_desc(sg_query_backend())),
+            shader = sg_make_shader(blur_horizontal_shader_desc(sg_query_backend())),
             primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
             sample_count = 1,
             depth = new sg_depth_state()
@@ -574,13 +575,13 @@ public static unsafe partial class SharpGLTFApp
             layout = new sg_vertex_layout_state()
             {
                 attrs = {
-                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_blur_vertical_position] = new sg_vertex_attr_state()
+                    [ATTR_blur_vertical_position] = new sg_vertex_attr_state()
                     {
                         format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
                     }
                 }
             },
-            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_blur_vertical_shader_desc(sg_query_backend())),
+            shader = sg_make_shader(blur_vertical_shader_desc(sg_query_backend())),
             primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
             sample_count = 1,
             depth = new sg_depth_state()
@@ -607,13 +608,13 @@ public static unsafe partial class SharpGLTFApp
             layout = new sg_vertex_layout_state()
             {
                 attrs = {
-                    [cgltf_sapp_shader_cs_cgltf.Shaders.ATTR_cgltf_bloom_composite_position] = new sg_vertex_attr_state()
+                    [ATTR_bloom_composite_position] = new sg_vertex_attr_state()
                     {
                         format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
                     }
                 }
             },
-            shader = sg_make_shader(cgltf_sapp_shader_cs_cgltf.Shaders.cgltf_bloom_composite_shader_desc(sg_query_backend())),
+            shader = sg_make_shader(bloom_shader_cs.Shaders.bloom_composite_shader_desc(sg_query_backend())),
             primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
             sample_count = swapchain.sample_count,  // Match swapchain MSAA
             depth = new sg_depth_state()
