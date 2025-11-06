@@ -103,7 +103,7 @@ public static unsafe partial class SharpGLTFApp
 
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
-        
+
         // Load model asynchronously (FileSystem will handle platform-specific path conversion)
         FileSystem.Instance.LoadFile(filename, (path, buffer, status) =>
         {
@@ -124,7 +124,7 @@ public static unsafe partial class SharpGLTFApp
                     };
 
                     var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
-                    
+
                     // Skip automatic satellite dependency resolution - we'll do it manually and asynchronously
                     context.SkipSatelliteDependencies = true;
 
@@ -138,11 +138,11 @@ public static unsafe partial class SharpGLTFApp
                     state.pendingModelPath = path;
                     state.isLoadingModel = true;
                     state.loadingStage = "Loading dependencies";
-                    
+
                     // Begin async loading of satellite dependencies
                     // Pass the context so embedded buffers (GLB binary chunk) can be resolved
                     state.asyncLoadState = modelRoot._BeginAsyncResolveSatelliteDependencies(context);
-                    
+
                     Info($"[SharpGLTF] Found {state.asyncLoadState.TotalDependencies} external dependencies to load");
 
                     // The actual dependency loading will happen in RunSingleFrame() one at a time
@@ -180,7 +180,7 @@ public static unsafe partial class SharpGLTFApp
             sg_uninit_image(state.bloom.blur_h_img);
             sg_uninit_image(state.bloom.blur_v_img);
             sg_uninit_image(state.bloom.dummy_depth_img);
-            
+
             // Uninitialize bloom views
             sg_uninit_view(state.bloom.scene_pass.attachments.colors[0]);
             sg_uninit_view(state.bloom.scene_pass.attachments.depth_stencil);
@@ -190,13 +190,13 @@ public static unsafe partial class SharpGLTFApp
             sg_uninit_view(state.bloom.blur_h_pass.attachments.depth_stencil);
             sg_uninit_view(state.bloom.blur_v_pass.attachments.colors[0]);
             sg_uninit_view(state.bloom.blur_v_pass.attachments.depth_stencil);
-            
+
             // Uninitialize sampler
             if (state.bloom.sampler.id != 0)
             {
                 sg_uninit_sampler(state.bloom.sampler);
             }
-            
+
             Info("[Resize] Bloom resources uninitialized");
         }
 
@@ -209,13 +209,13 @@ public static unsafe partial class SharpGLTFApp
             sg_uninit_view(state.transmission.screen_color_view);
             sg_uninit_view(state.transmission.opaque_pass.attachments.colors[0]);
             sg_uninit_view(state.transmission.opaque_pass.attachments.depth_stencil);
-            
+
             // Uninitialize sampler
             if (state.transmission.sampler.id != 0)
             {
                 sg_uninit_sampler(state.transmission.sampler);
             }
-            
+
             Info("[Resize] Transmission resources uninitialized");
         }
 
@@ -234,7 +234,7 @@ public static unsafe partial class SharpGLTFApp
 
         // Get swapchain info to match formats
         var swapchain = sglue_swapchain();
-        
+
         // Allocate/initialize color texture for main scene rendering (full resolution)
         // Following MRT example pattern: alloc once, then init/uninit/reinit on resize
         if (state.bloom.scene_color_img.id == 0)
@@ -280,7 +280,7 @@ public static unsafe partial class SharpGLTFApp
             sample_count = 1,
             label = "bloom-bright"
         });
-        
+
         if (state.bloom.blur_h_img.id == 0)
         {
             state.bloom.blur_h_img = sg_alloc_image();
@@ -294,7 +294,7 @@ public static unsafe partial class SharpGLTFApp
             sample_count = 1,
             label = "bloom-blur-h"
         });
-        
+
         if (state.bloom.blur_v_img.id == 0)
         {
             state.bloom.blur_v_img = sg_alloc_image();
@@ -354,7 +354,7 @@ public static unsafe partial class SharpGLTFApp
             color_attachment = { image = state.bloom.scene_color_img },
             label = "scene-color-view"
         });
-        
+
         if (state.bloom.scene_pass.attachments.depth_stencil.id == 0)
         {
             state.bloom.scene_pass.attachments.depth_stencil = sg_alloc_view();
@@ -364,16 +364,16 @@ public static unsafe partial class SharpGLTFApp
             depth_stencil_attachment = { image = state.bloom.scene_depth_img },
             label = "scene-depth-view"
         });
-        
+
         Info($"[Bloom] Scene views initialized: color={state.bloom.scene_pass.attachments.colors[0].id}, depth={state.bloom.scene_pass.attachments.depth_stencil.id}");
-        
+
         // Create action
         sg_pass_action scene_action = default;
         scene_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         scene_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
         scene_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         scene_action.depth.clear_value = 1.0f;
-        
+
         // Assign action to pass (attachments already set above)
         state.bloom.scene_pass.action = scene_action;
         state.bloom.scene_pass.label = "bloom-scene-pass";
@@ -388,7 +388,7 @@ public static unsafe partial class SharpGLTFApp
             color_attachment = { image = state.bloom.bright_img },
             label = "bright-view"
         });
-        
+
         if (state.bloom.bright_pass.attachments.depth_stencil.id == 0)
         {
             state.bloom.bright_pass.attachments.depth_stencil = sg_alloc_view();
@@ -398,11 +398,11 @@ public static unsafe partial class SharpGLTFApp
             depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
             label = "bright-depth-view"
         });
-        
+
         sg_pass_action bright_action = default;
         bright_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         bright_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
-        
+
         state.bloom.bright_pass.action = bright_action;
         state.bloom.bright_pass.label = "bloom-bright-pass";
 
@@ -416,7 +416,7 @@ public static unsafe partial class SharpGLTFApp
             color_attachment = { image = state.bloom.blur_h_img },
             label = "blur-h-view"
         });
-        
+
         if (state.bloom.blur_h_pass.attachments.depth_stencil.id == 0)
         {
             state.bloom.blur_h_pass.attachments.depth_stencil = sg_alloc_view();
@@ -426,11 +426,11 @@ public static unsafe partial class SharpGLTFApp
             depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
             label = "blur-h-depth-view"
         });
-        
+
         sg_pass_action blur_h_action = default;
         blur_h_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         blur_h_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
-        
+
         state.bloom.blur_h_pass.action = blur_h_action;
         state.bloom.blur_h_pass.label = "bloom-blur-h-pass";
 
@@ -444,7 +444,7 @@ public static unsafe partial class SharpGLTFApp
             color_attachment = { image = state.bloom.blur_v_img },
             label = "blur-v-view"
         });
-        
+
         if (state.bloom.blur_v_pass.attachments.depth_stencil.id == 0)
         {
             state.bloom.blur_v_pass.attachments.depth_stencil = sg_alloc_view();
@@ -454,11 +454,11 @@ public static unsafe partial class SharpGLTFApp
             depth_stencil_attachment = { image = state.bloom.dummy_depth_img },
             label = "blur-v-depth-view"
         });
-        
+
         sg_pass_action blur_v_action = default;
         blur_v_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         blur_v_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
-        
+
         state.bloom.blur_v_pass.action = blur_v_action;
         state.bloom.blur_v_pass.label = "bloom-blur-v-pass";
 
@@ -503,133 +503,40 @@ public static unsafe partial class SharpGLTFApp
         // These don't depend on framebuffer size, so we only create them once
         if (state.bloom.bright_pipeline.id == 0)
         {
-        // Bright pass pipeline (fullscreen quad, no depth testing needed)
-        state.bloom.bright_pipeline = sg_make_pipeline(new sg_pipeline_desc()
-        {
-            layout = new sg_vertex_layout_state()
-            {
-                attrs = {
-                    [ATTR_bright_pass_position] = new sg_vertex_attr_state()
-                    {
-                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
-                    }
-                }
-            },
-            shader = sg_make_shader(bright_pass_shader_desc(sg_query_backend())),
-            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
-            sample_count = 1,
-            depth = new sg_depth_state()
-            {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
-                write_enabled = false,
-                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
-            },
-            colors = {
-                [0] = new sg_color_target_state()
-                {
-                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
-                }
-            },
-            label = "bloom-bright-pipeline"
-        });
+            state.bloom.bright_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.BloomBright,
+                cullMode: sg_cull_mode.SG_CULLMODE_NONE,
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
+            );
         }
 
         if (state.bloom.blur_h_pipeline.id == 0)
         {
-        // Horizontal blur pipeline (fullscreen quad, no depth testing needed)
-        state.bloom.blur_h_pipeline = sg_make_pipeline(new sg_pipeline_desc()
-        {
-            layout = new sg_vertex_layout_state()
-            {
-                attrs = {
-                    [ATTR_blur_horizontal_position] = new sg_vertex_attr_state()
-                    {
-                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
-                    }
-                }
-            },
-            shader = sg_make_shader(blur_horizontal_shader_desc(sg_query_backend())),
-            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
-            sample_count = 1,
-            depth = new sg_depth_state()
-            {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
-                write_enabled = false,
-                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
-            },
-            colors = {
-                [0] = new sg_color_target_state()
-                {
-                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
-                }
-            },
-            label = "bloom-blur-h-pipeline"
-        });
+            state.bloom.blur_h_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.BloomBlurHorizontal,
+                cullMode: sg_cull_mode.SG_CULLMODE_NONE,
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
+            );
         }
 
         if (state.bloom.blur_v_pipeline.id == 0)
         {
-        // Vertical blur pipeline (fullscreen quad, no depth testing needed)
-        state.bloom.blur_v_pipeline = sg_make_pipeline(new sg_pipeline_desc()
-        {
-            layout = new sg_vertex_layout_state()
-            {
-                attrs = {
-                    [ATTR_blur_vertical_position] = new sg_vertex_attr_state()
-                    {
-                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
-                    }
-                }
-            },
-            shader = sg_make_shader(blur_vertical_shader_desc(sg_query_backend())),
-            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
-            sample_count = 1,
-            depth = new sg_depth_state()
-            {
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_DEPTH,  // Must match dummy depth attachment
-                write_enabled = false,
-                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS
-            },
-            colors = {
-                [0] = new sg_color_target_state()
-                {
-                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
-                }
-            },
-            label = "bloom-blur-v-pipeline"
-        });
+            state.bloom.blur_v_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.BloomBlurVertical,
+                cullMode: sg_cull_mode.SG_CULLMODE_NONE,
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
+            );
         }
 
         if (state.bloom.composite_pipeline.id == 0)
         {
-        // Composite pipeline (renders to swapchain, fullscreen quad doesn't need depth testing)
-        state.bloom.composite_pipeline = sg_make_pipeline(new sg_pipeline_desc()
-        {
-            layout = new sg_vertex_layout_state()
-            {
-                attrs = {
-                    [ATTR_bloom_composite_position] = new sg_vertex_attr_state()
-                    {
-                        format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2
-                    }
-                }
-            },
-            shader = sg_make_shader(bloom_shader_cs.Shaders.bloom_composite_shader_desc(sg_query_backend())),
-            primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
-            sample_count = swapchain.sample_count,  // Match swapchain MSAA
-            depth = new sg_depth_state()
-            {
-                write_enabled = false,  // Explicitly disable depth writes
-                compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS  // Always pass depth test
-            },
-            colors = {
-                [0] = new sg_color_target_state()
-                {
-                    pixel_format = swapchain.color_format  // Match swapchain color format
-                }
-            },
-            label = "bloom-composite-pipeline"
-        });
+            state.bloom.composite_pipeline = PipeLineManager.GetOrCreatePipeline(PipelineType.BloomComposite,cullMode: sg_cull_mode.SG_CULLMODE_NONE);
         }
 
         // Create resource bindings
@@ -772,7 +679,7 @@ public static unsafe partial class SharpGLTFApp
             color_attachment = { image = state.transmission.screen_color_img },
             label = "opaque-color-view"
         });
-        
+
         if (state.transmission.opaque_pass.attachments.depth_stencil.id == 0)
         {
             state.transmission.opaque_pass.attachments.depth_stencil = sg_alloc_view();
@@ -782,13 +689,13 @@ public static unsafe partial class SharpGLTFApp
             depth_stencil_attachment = { image = state.transmission.screen_depth_img },
             label = "opaque-depth-view"
         });
-        
+
         sg_pass_action opaque_action = default;
         opaque_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
         opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.depth.clear_value = 1.0f;
-        
+
         state.transmission.opaque_pass.action = opaque_action;
         state.transmission.opaque_pass.label = "transmission-opaque-pass";
 
@@ -846,21 +753,21 @@ public static unsafe partial class SharpGLTFApp
 
                 // Get the compressed image bytes
                 var imageBytes = content._GetBuffer().ToArray();
-                
+
                 // Create base texture identifier using only the image index
                 // This is the key: ONE texture per image, not per channel
                 string textureId = $"image_{image.LogicalIndex}";
-                
+
                 // All textures use RGBA8 format (shader handles sRGB conversion)
                 sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
-                
+
                 // Decode image and upload to GPU NOW (spreads work across frames)
                 // TextureCache will:
                 // 1. Decompress PNG/JPEG using stb_image
                 // 2. Upload RGBA pixels to GPU
                 // 3. Cache the result by (textureId + format)
                 var texture = TextureCache.Instance.GetOrCreate(textureId, imageBytes, format);
-                
+
                 if (texture != null)
                 {
                     Info($"[ImageDecoder] Created GPU texture: {textureId}");
@@ -869,7 +776,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     Error($"[ImageDecoder] Failed to create texture: {textureId}");
                 }
-                
+
                 // Return true to keep the compressed image in memory
                 // This is needed for validation (which accesses image.Content)
                 return true;
@@ -894,16 +801,16 @@ public static unsafe partial class SharpGLTFApp
 
         // Store old model for disposal after new one loads
         var oldModel = state.model;
-        
+
         // Clear state BEFORE disposing (so rendering stops using it)
         state.model = null;
         state.animator = null;
         state.modelLoaded = false;
         state.cameraInitialized = false;
-        
+
         // Dispose the old model (after rendering has stopped using it)
         oldModel?.Dispose();
-        
+
         // Clear the texture cache since old textures are now invalid
         // This ensures the new model creates fresh textures instead of reusing disposed ones
         TextureCache.Instance.Clear();
@@ -920,7 +827,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.loadingStage = "Parsing glTF...";
                     state.loadingProgress = 40;
-                    
+
                     var memoryStream = new MemoryStream(buffer);
 
                     // Get the directory of the main GLTF file for resolving relative paths
@@ -934,7 +841,7 @@ public static unsafe partial class SharpGLTFApp
                     };
 
                     var context = SharpGLTF.Schema2.ReadContext.Create(fileReader);
-                    
+
                     // Skip automatic satellite dependency resolution - we'll do it manually and asynchronously
                     context.SkipSatelliteDependencies = true;
 
@@ -951,7 +858,7 @@ public static unsafe partial class SharpGLTFApp
                     // Begin async loading of satellite dependencies
                     // Pass the context so embedded buffers (GLB binary chunk) can be resolved
                     state.asyncLoadState = modelRoot._BeginAsyncResolveSatelliteDependencies(context);
-                    
+
                     Info($"[SharpGLTF] Found {state.asyncLoadState.TotalDependencies} external dependencies to load");
 
                     // The actual dependency loading will happen in RunSingleFrame() one at a time

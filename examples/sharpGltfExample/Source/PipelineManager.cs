@@ -44,6 +44,12 @@ public enum PipelineType
     SkinnedBlend32,
     StandardMask32,
     SkinnedMask32,
+    
+    // Post-processing pipelines
+    BloomBright,           // Bright pass for bloom effect
+    BloomBlurHorizontal,   // Horizontal blur for bloom effect
+    BloomBlurVertical,     // Vertical blur for bloom effect
+    BloomComposite,        // Composite pass for bloom effect
 }
 
 public static class PipeLineManager
@@ -318,6 +324,74 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = finalColorFormat;
                 pipeline_desc.depth.pixel_format = finalDepthFormat;
                 pipeline_desc.label = "transmission-opaque-skinned-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.BloomBright:
+                // Bright pass pipeline for bloom effect (fullscreen quad)
+                pipeline_desc.layout.attrs[ATTR_bright_pass_position].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.shader = sg_make_shader(bright_pass_shader_desc(sg_query_backend()));
+                pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
+                pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_ALWAYS;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                pipeline_desc.depth.pixel_format = finalDepthFormat;
+                pipeline_desc.label = "bloom-bright-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.BloomBlurHorizontal:
+                // Horizontal blur pipeline for bloom effect (fullscreen quad)
+                pipeline_desc.layout.attrs[ATTR_blur_horizontal_position].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.shader = sg_make_shader(blur_horizontal_shader_desc(sg_query_backend()));
+                pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
+                pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_ALWAYS;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                pipeline_desc.depth.pixel_format = finalDepthFormat;
+                pipeline_desc.label = "bloom-blur-h-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.BloomBlurVertical:
+                // Vertical blur pipeline for bloom effect (fullscreen quad)
+                pipeline_desc.layout.attrs[ATTR_blur_vertical_position].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.shader = sg_make_shader(blur_vertical_shader_desc(sg_query_backend()));
+                pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
+                pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_ALWAYS;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                pipeline_desc.depth.pixel_format = finalDepthFormat;
+                pipeline_desc.label = "bloom-blur-v-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.BloomComposite:
+                // Composite pipeline for bloom effect (renders to swapchain)
+                pipeline_desc.layout.attrs[ATTR_bloom_composite_position].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.shader = sg_make_shader(bloom_shader_cs.Shaders.bloom_composite_shader_desc(sg_query_backend()));
+                pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
+                pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = false;
+                pipeline_desc.depth.compare = sg_compare_func.SG_COMPAREFUNC_ALWAYS;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                // Note: depth.pixel_format is intentionally not set for composite pipeline (renders to swapchain)
+                pipeline_desc.label = "bloom-composite-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
 
