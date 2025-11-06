@@ -470,18 +470,18 @@ public static unsafe partial class SharpGLTFApp
         // These pipelines don't depend on framebuffer size, so we only create them once
         if (state.bloom.scene_standard_pipeline.id == 0)
         {
-            state.bloom.scene_standard_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.Standard, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-            state.bloom.scene_skinned_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.Skinned, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-            state.bloom.scene_standard_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.StandardBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-            state.bloom.scene_skinned_blend_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.SkinnedBlend, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-            state.bloom.scene_standard_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.StandardMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
-            state.bloom.scene_skinned_mask_pipeline = PipeLineManager.CreateOffscreenPipeline(
-                PipelineType.SkinnedMask, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH);
+            state.bloom.scene_standard_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.Standard, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.Skinned, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_standard_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.StandardBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.SkinnedBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_standard_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.StandardMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.SkinnedMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
         }
 
         // Create fullscreen quad vertices for post-processing passes
@@ -797,17 +797,17 @@ public static unsafe partial class SharpGLTFApp
         if (state.transmission.opaque_standard_pipeline.id == 0)
         {
             Info("[Transmission] Creating opaque rendering pipelines...");
-            state.transmission.opaque_standard_pipeline = PipeLineManager.CreatePipelineForPass(
+            state.transmission.opaque_standard_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.TransmissionOpaque,
-                sg_pixel_format.SG_PIXELFORMAT_RGBA8,  // screen_color_img format
-                sg_pixel_format.SG_PIXELFORMAT_DEPTH,   // screen_depth_img format
-                1                                        // sample_count
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
             );
-            state.transmission.opaque_skinned_pipeline = PipeLineManager.CreatePipelineForPass(
+            state.transmission.opaque_skinned_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.TransmissionOpaqueSkinned,
-                sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-                sg_pixel_format.SG_PIXELFORMAT_DEPTH,
-                1
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
             );
             Info("[Transmission] Opaque pipelines created (standard + skinned)");
         }

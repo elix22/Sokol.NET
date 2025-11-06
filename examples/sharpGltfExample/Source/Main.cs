@@ -45,7 +45,7 @@ public static unsafe partial class SharpGLTFApp
         "CompareTransmission/glTF/CompareTransmission.gltf",
         "Lantern/glTF/Lantern.gltf",
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
-        "MetalRoughSpheres/glTF-Binary/MetalRoughSpheres.glb",
+        "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
         "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",
         "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
         "AttenuationTest/glTF-Binary/AttenuationTest.glb",
