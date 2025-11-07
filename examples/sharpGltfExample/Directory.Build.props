@@ -53,6 +53,7 @@
 
   <ItemGroup>
     <SkinningShaderFiles Include="shaders/cgltf-sapp.glsl" />
+     <SkinningShaderFiles Include="shaders/pbr.glsl" />
   </ItemGroup>
 
   <ItemGroup>

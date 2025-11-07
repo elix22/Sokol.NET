@@ -31,9 +31,35 @@ layout(location=2) in vec4 tangent;     // w component is handedness (+1 or -1)
 layout(location=3) in vec2 texcoord_0;
 layout(location=4) in vec2 texcoord_1;
 layout(location=5) in vec4 color_0;
+layout(location=6) in vec4 joints_0;    // Bone indices for skinning
+layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
 // Uniforms
 @include vs_uniforms.glsl
+
+// Rendering feature flags (needed for morphing runtime checks)
+layout(binding=7) uniform rendering_flags {
+    int use_ibl;              // 0 or 1 (not used in VS)
+    int use_punctual_lights;  // 0 or 1 (not used in VS)
+    int use_tonemapping;      // 0 or 1 (not used in VS)
+    int linear_output;        // 0 or 1 (not used in VS)
+    int alphamode;            // 0=opaque, 1=mask, 2=blend (not used in VS)
+    // Animation flags
+    int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
+    int use_morphing;         // 0 or 1 (used for runtime morph target checks)
+    int has_morph_targets;    // 0 or 1 (used for runtime morph target checks)
+};
+
+// Animation texture samplers (use high bindings to avoid FS conflicts)
+// Note: u_morphWeights is defined in vs_params (vs_uniforms.glsl)
+layout(binding=11) uniform texture2D u_jointsSampler_Tex;
+layout(binding=11) uniform sampler u_jointsSampler_Smp;
+
+layout(binding=12) uniform texture2DArray u_MorphTargetsSampler_Tex;
+layout(binding=12) uniform sampler u_MorphTargetsSampler_Smp;
+
+// Animation support (uses uniforms defined above)
+@include animation.glsl
 
 // Outputs
 out vec3 v_Position;
@@ -45,23 +71,65 @@ out vec4 v_Color;
 out mat3 v_TBN;  // Tangent-Bitangent-Normal matrix for normal mapping
 
 void main() {
-    vec4 pos = model * vec4(position, 1.0);
+    // Apply morph targets to position
+    vec3 morphedPosition = position;
+#ifdef MORPHING
+    if (use_morphing > 0) {
+        morphedPosition += getTargetPosition(gl_VertexIndex, 8);
+    }
+#endif
+    
+    // Apply morph targets to normal
+    vec3 morphedNormal = normal;
+#ifdef MORPHING
+    if (use_morphing > 0) {
+        morphedNormal += getTargetNormal(gl_VertexIndex, 8, 8);  // Assuming normal offset = 8
+    }
+#endif
+    
+    // Apply morph targets to tangent
+    vec3 morphedTangent = tangent.xyz;
+#ifdef MORPHING
+    if (use_morphing > 0) {
+        morphedTangent += getTargetTangent(gl_VertexIndex, 8, 16);  // Assuming tangent offset = 16
+    }
+#endif
+    
+    // Apply skinning to position
+    vec4 skinnedPosition = vec4(morphedPosition, 1.0);
+#ifdef SKINNING
+    mat4 skinMatrix = getSkinningMatrix(joints_0, weights_0);
+    skinnedPosition = skinMatrix * vec4(morphedPosition, 1.0);
+#endif
+    
+    // Transform to world space
+    vec4 pos = model * skinnedPosition;
     v_Position = vec3(pos.xyz) / pos.w;
     
-    // Texture coordinates
+    // Texture coordinates (no morphing support for UVs yet - add if needed)
     v_TexCoord0 = texcoord_0;
     v_TexCoord1 = texcoord_1;
     
     // Vertex color
     v_Color = color_0;
     
+    // Apply skinning to normal and tangent
+    vec3 skinnedNormal = morphedNormal;
+    vec3 skinnedTangent = morphedTangent;
+    
+#ifdef SKINNING
+    mat4 skinNormalMatrix = getSkinningNormalMatrix(joints_0, weights_0);
+    skinnedNormal = mat3(skinNormalMatrix) * morphedNormal;
+    skinnedTangent = mat3(skinNormalMatrix) * morphedTangent;
+#endif
+    
     // Transform normal to world space
     mat3 normalMatrix = transpose(inverse(mat3(model)));
-    vec3 normalW = normalize(normalMatrix * normal);
+    vec3 normalW = normalize(normalMatrix * skinnedNormal);
     v_Normal = normalW;
     
     // Transform tangent to world space and build TBN matrix
-    vec3 tangentW = normalize(vec3(model * vec4(tangent.xyz, 0.0)));
+    vec3 tangentW = normalize(vec3(model * vec4(skinnedTangent, 0.0)));
     vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
     bitangentW = normalize(bitangentW);
     
@@ -118,6 +186,10 @@ layout(binding=7) uniform rendering_flags {
     int use_tonemapping;      // 0 or 1
     int linear_output;        // 0 or 1
     int alphamode;            // 0=opaque, 1=mask, 2=blend
+    // Animation flags (not used in FS, but must match VS definition)
+    int use_skinning;         // 0 or 1
+    int use_morphing;         // 0 or 1
+    int has_morph_targets;    // 0 or 1
 };
 
 // Texture samplers
