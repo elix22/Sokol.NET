@@ -18,6 +18,7 @@ using static Sokol.SImgui;
 using Imgui;
 using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
+using pbr_shader_cs;
 using static pbr_shader_cs.Shaders;
 using static pbr_shader_skinning_cs_skinning.Shaders;
 using static bloom_shader_cs.Shaders;
@@ -697,7 +698,10 @@ public static unsafe partial class SharpGLTFApp
                     iblParams.u_EnvBlurNormalized = 0.0f;
                     iblParams.u_MipCount = 1;
                     iblParams.u_EnvRotation = Matrix4x4.Identity;
-                    iblParams.u_TransmissionFramebufferSize = new System.Numerics.Vector2(sapp_width(), sapp_height());
+                    unsafe {
+                        iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
+                        iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
+                    }
                     sg_apply_uniforms(UB_ibl_params, SG_RANGE(ref iblParams));
                     
                     // Tonemapping params (required by pbr.glsl)
@@ -707,7 +711,7 @@ public static unsafe partial class SharpGLTFApp
                     
                     // Rendering flags (required by pbr.glsl)
                     rendering_flags_t renderingFlags = new rendering_flags_t();
-                    renderingFlags.use_ibl = 0; // Disabled for now (no IBL textures loaded)
+                    renderingFlags.use_ibl = 1; // Enable IBL (using white cubemaps as fallback)
                     renderingFlags.use_punctual_lights = 1; // Enable punctual lights
                     renderingFlags.use_tonemapping = 0; // Disabled for now
                     renderingFlags.linear_output = 0;
