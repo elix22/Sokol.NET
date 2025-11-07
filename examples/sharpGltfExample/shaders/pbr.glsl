@@ -111,6 +111,15 @@ layout(binding=5) uniform ibl_params {
     ivec2 u_TransmissionFramebufferSize;
 };
 
+// Rendering feature flags
+layout(binding=7) uniform rendering_flags {
+    int use_ibl;              // 0 or 1
+    int use_punctual_lights;  // 0 or 1
+    int use_tonemapping;      // 0 or 1
+    int linear_output;        // 0 or 1
+    int alphamode;            // 0=opaque, 1=mask, 2=blend
+};
+
 // Texture samplers
 layout(binding=0) uniform texture2D u_BaseColorTexture;
 layout(binding=0) uniform sampler u_BaseColorSampler;
@@ -256,12 +265,10 @@ void main() {
     float perceptualRoughness = clamp(metallicRoughness.y, 0.0, 1.0);
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
     
-    // Alpha test
-    #ifdef ALPHAMODE_MASK
-    if (baseColor.a < alpha_cutoff) {
+    // Alpha test (alphamode: 0=opaque, 1=mask, 2=blend)
+    if (alphamode == 1 && baseColor.a < alpha_cutoff) {
         discard;
     }
-    #endif
     
     // Get normal
     vec3 n = getNormal();
@@ -286,95 +293,93 @@ void main() {
     
     vec3 color = vec3(0.0);
     
-    #ifdef USE_IBL
-    // Diffuse contribution
-    vec3 irradiance = getDiffuseLight(n);
-    vec3 diffuse = irradiance * diffuseColor;
-    
-    // Specular contribution
-    vec3 specularLight = getIBLRadianceGGX(n, v, perceptualRoughness);
-    vec3 iblFresnel = getIBLGGXFresnel(n, v, perceptualRoughness, specularColor, 1.0);
-    vec3 specular = specularLight * iblFresnel;
-    
-    // Combine diffuse and specular
-    color = diffuse + specular;
-    #endif
+    if (use_ibl > 0) {
+        // Diffuse contribution
+        vec3 irradiance = getDiffuseLight(n);
+        vec3 diffuse = irradiance * diffuseColor;
+        
+        // Specular contribution
+        vec3 specularLight = getIBLRadianceGGX(n, v, perceptualRoughness);
+        vec3 iblFresnel = getIBLGGXFresnel(n, v, perceptualRoughness, specularColor, 1.0);
+        vec3 specular = specularLight * iblFresnel;
+        
+        // Combine diffuse and specular
+        color = diffuse + specular;
+    }
     
     
     // ========================================================================
     // Punctual Lights (optional)
     // ========================================================================
     
-    #ifdef USE_PUNCTUAL_LIGHTS
-    for (int i = 0; i < num_lights; i++) {
-        vec3 lightPos = light_positions[i].xyz;
-        vec3 lightDir = light_directions[i].xyz;
-        vec3 lightColor = light_colors[i].rgb;
-        float lightIntensity = light_colors[i].w;
-        int lightType = int(light_positions[i].w);
-        
-        vec3 l; // Light direction
-        float attenuation = 1.0;
-        
-        // Directional light
-        if (lightType == 0) {
-            l = normalize(-lightDir);
-        }
-        // Point light
-        else if (lightType == 1) {
-            vec3 pointToLight = lightPos - v_Position;
-            l = normalize(pointToLight);
-            float distance = length(pointToLight);
-            float range = light_params_data[i].x;
-            attenuation = max(0.0, 1.0 - (distance / range));
-            attenuation *= attenuation;
-        }
-        // Spot light
-        else if (lightType == 2) {
-            vec3 pointToLight = lightPos - v_Position;
-            l = normalize(pointToLight);
-            float distance = length(pointToLight);
-            float range = light_params_data[i].x;
-            attenuation = max(0.0, 1.0 - (distance / range));
-            attenuation *= attenuation;
+    if (use_punctual_lights > 0) {
+        for (int i = 0; i < num_lights; i++) {
+            vec3 lightPos = light_positions[i].xyz;
+            vec3 lightDir = light_directions[i].xyz;
+            vec3 lightColor = light_colors[i].rgb;
+            float lightIntensity = light_colors[i].w;
+            int lightType = int(light_positions[i].w);
             
-            // Spot cone
-            float angle = dot(l, normalize(-lightDir));
-            float innerCutoff = light_directions[i].w;
-            float outerCutoff = light_params_data[i].y;
-            float epsilon = innerCutoff - outerCutoff;
-            float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
-            attenuation *= spotIntensity;
-        }
-        
-        vec3 h = normalize(l + v);
-        float NdotL = clampedDot(n, l);
-        float NdotH = clampedDot(n, h);
-        float VdotH = clampedDot(v, h);
-        
-        if (NdotL > 0.0 || NdotV > 0.0) {
-            // Calculate BRDF
-            vec3 F = F_Schlick(specularColor, f90, VdotH);
-            float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
-            float D = D_GGX(NdotH, alphaRoughness);
+            vec3 l; // Light direction
+            float attenuation = 1.0;
             
-            vec3 diffuseContrib = (1.0 - F) * diffuseColor / M_PI;
-            vec3 specContrib = F * Vis * D;
+            // Directional light
+            if (lightType == 0) {
+                l = normalize(-lightDir);
+            }
+            // Point light
+            else if (lightType == 1) {
+                vec3 pointToLight = lightPos - v_Position;
+                l = normalize(pointToLight);
+                float distance = length(pointToLight);
+                float range = light_params_data[i].x;
+                attenuation = max(0.0, 1.0 - (distance / range));
+                attenuation *= attenuation;
+            }
+            // Spot light
+            else if (lightType == 2) {
+                vec3 pointToLight = lightPos - v_Position;
+                l = normalize(pointToLight);
+                float distance = length(pointToLight);
+                float range = light_params_data[i].x;
+                attenuation = max(0.0, 1.0 - (distance / range));
+                attenuation *= attenuation;
+                
+                // Spot cone
+                float angle = dot(l, normalize(-lightDir));
+                float innerCutoff = light_directions[i].w;
+                float outerCutoff = light_params_data[i].y;
+                float epsilon = innerCutoff - outerCutoff;
+                float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
+                attenuation *= spotIntensity;
+            }
             
-            color += NdotL * lightColor * lightIntensity * attenuation * (diffuseContrib + specContrib);
+            vec3 h = normalize(l + v);
+            float NdotL = clampedDot(n, l);
+            float NdotH = clampedDot(n, h);
+            float VdotH = clampedDot(v, h);
+            
+            if (NdotL > 0.0 || NdotV > 0.0) {
+                // Calculate BRDF
+                vec3 F = F_Schlick(specularColor, f90, VdotH);
+                float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
+                float D = D_GGX(NdotH, alphaRoughness);
+                
+                vec3 diffuseContrib = (1.0 - F) * diffuseColor / M_PI;
+                vec3 specContrib = F * Vis * D;
+                
+                color += NdotL * lightColor * lightIntensity * attenuation * (diffuseContrib + specContrib);
+            }
         }
     }
-    #endif
     
     
     // ========================================================================
     // Ambient occlusion
     // ========================================================================
     
-    #ifdef HAS_OCCLUSION_MAP
     float ao = getOcclusion();
     color = mix(color, color * ao, 1.0); // Apply AO
-    #endif
     
     
     // ========================================================================
@@ -388,14 +393,14 @@ void main() {
     // Tone mapping and output
     // ========================================================================
     
-    #ifdef USE_TONEMAPPING
-    color = toneMap(color);
-    #endif
+    if (use_tonemapping > 0) {
+        color = toneMap(color);
+    }
     
-    // Gamma correction (if not in LINEAR_OUTPUT mode)
-    #ifndef LINEAR_OUTPUT
-    color = pow(color, vec3(1.0/2.2));
-    #endif
+    // Gamma correction (if not in linear output mode)
+    if (linear_output == 0) {
+        color = pow(color, vec3(1.0/2.2));
+    }
     
     frag_color = vec4(color, baseColor.a);
 }

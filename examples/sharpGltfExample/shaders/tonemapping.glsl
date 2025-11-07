@@ -4,7 +4,7 @@
 #define TONEMAP_ACES_HILL_EXPOSURE_BOOST 3
 #define TONEMAP_KHR_PBR_NEUTRAL 4
 
-layout(binding=2) uniform tonemapping_params {
+layout(binding=6) uniform tonemapping_params {
  float u_Exposure;
  int u_type;
 };
