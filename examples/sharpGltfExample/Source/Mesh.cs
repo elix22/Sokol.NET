@@ -4,7 +4,7 @@ using System.Numerics;
 using static Sokol.SG;
 using static Sokol.Utils;
 using SharpGLTF.Schema2;
-using static cgltf_sapp_shader_cs_cgltf.Shaders;
+using static pbr_shader_cs.Shaders;
 
 namespace Sokol
 {
@@ -61,6 +61,8 @@ namespace Sokol
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;
+        private static sg_view _defaultWhiteCubemapView;
+        private static sg_sampler _defaultCubemapSampler;
         private static bool _firstDrawCall = true;  // Debug flag
 
         // Constructor for 16-bit indices (up to 65535 vertices)
@@ -168,7 +170,61 @@ namespace Sokol
             return _defaultBlackTexture;
         }
 
-        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default, cgltf_transmission_params_t? transmissionParams = null)
+        private static unsafe void EnsureDefaultCubemap()
+        {
+            if (_defaultWhiteCubemapView.id != 0)
+            {
+                return; // Already created
+            }
+
+            // Create a 1x1 white cubemap (all 6 faces)
+            const int FACE_SIZE = 1;
+            const int BYTES_PER_PIXEL = 4;
+            const int FACE_NUM_BYTES = FACE_SIZE * FACE_SIZE * BYTES_PER_PIXEL;
+            const int NUM_FACES = 6;
+            
+            byte[] pixels = new byte[NUM_FACES * FACE_NUM_BYTES];
+            // Fill all pixels with white (255, 255, 255, 255)
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = 255;
+            }
+
+            fixed (byte* pixelPtr = pixels)
+            {
+                var img = sg_make_image(new sg_image_desc
+                {
+                    type = sg_image_type.SG_IMAGETYPE_CUBE,
+                    width = FACE_SIZE,
+                    height = FACE_SIZE,
+                    pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                    data = {
+                        mip_levels = {
+                            [0] = new sg_range { ptr = pixelPtr, size = (nuint)pixels.Length }
+                        }
+                    },
+                    label = "default-white-cubemap"
+                });
+
+                _defaultWhiteCubemapView = sg_make_view(new sg_view_desc
+                {
+                    texture = { image = img },
+                    label = "default-white-cubemap-view"
+                });
+
+                _defaultCubemapSampler = sg_make_sampler(new sg_sampler_desc
+                {
+                    min_filter = sg_filter.SG_FILTER_LINEAR,
+                    mag_filter = sg_filter.SG_FILTER_LINEAR,
+                    wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                    wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                    wrap_w = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                    label = "default-cubemap-sampler"
+                });
+            }
+        }
+
+        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default)
         {
             if (IndexCount == 0)
             {
@@ -209,29 +265,46 @@ namespace Sokol
             bind.views[4] = emissiveTex.View;
             bind.samplers[4] = emissiveTex.Sampler;
 
-            // 5: screen_tex (for refraction in transmission materials)
-            // Use pre-created view if provided, otherwise bind default texture
+            // 5-6: IBL cubemap textures (GGX and Lambertian environment maps)
+            // 7: GGX LUT texture (2D)
+            // 8: Charlie environment cubemap
+            // 9: Charlie LUT texture (2D)
+            // 10: Transmission framebuffer texture (2D)
+            // For now, use default textures (no IBL lighting)
+            EnsureDefaultCubemap();
+            
+            // Bindings 5-6: IBL cubemaps
+            bind.views[5] = _defaultWhiteCubemapView;
+            bind.samplers[5] = _defaultCubemapSampler;
+            bind.views[6] = _defaultWhiteCubemapView;
+            bind.samplers[6] = _defaultCubemapSampler;
+            
+            // Bindings 7, 9, 10: 2D textures (GGX LUT, Charlie LUT, Transmission)
+            var defaultWhite = GetDefaultWhiteTexture();
+            bind.views[7] = defaultWhite.View;
+            bind.samplers[7] = defaultWhite.Sampler;
+            
+            // Binding 8: Charlie environment cubemap
+            bind.views[8] = _defaultWhiteCubemapView;
+            bind.samplers[8] = _defaultCubemapSampler;
+            
+            // Binding 9: Charlie LUT
+            bind.views[9] = defaultWhite.View;
+            bind.samplers[9] = defaultWhite.Sampler;
+            
+            // Binding 10: Transmission framebuffer or default
             if (screenView.id != 0 && screenSampler.id != 0)
             {
-                bind.views[5] = screenView;  // Use pre-created view (created once in Init)
-                bind.samplers[5] = screenSampler;
+                bind.views[10] = screenView;
+                bind.samplers[10] = screenSampler;
             }
             else
             {
-                // Use default black texture when screen view not provided
-                var defaultTex = GetDefaultBlackTexture();
-                bind.views[5] = defaultTex.View;
-                bind.samplers[5] = defaultTex.Sampler;
+                bind.views[10] = defaultWhite.View;
+                bind.samplers[10] = defaultWhite.Sampler;
             }
 
             sg_apply_bindings(bind);
-            
-            // Apply transmission uniforms AFTER bindings but BEFORE draw (sokol validation requirement)
-            if (transmissionParams.HasValue)
-            {
-                cgltf_transmission_params_t tp = transmissionParams.Value;
-                sg_apply_uniforms(UB_cgltf_transmission_params, SG_RANGE(ref tp));
-            }
             
             sg_draw(0, (uint)IndexCount, 1);
         }

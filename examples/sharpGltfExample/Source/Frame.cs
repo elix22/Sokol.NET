@@ -18,8 +18,9 @@ using static Sokol.SImgui;
 using Imgui;
 using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
-using static cgltf_sapp_shader_cs_cgltf.Shaders;
-using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
+using pbr_shader_cs;
+using static pbr_shader_cs.Shaders;
+using static pbr_shader_skinning_cs_skinning.Shaders;
 using static bloom_shader_cs.Shaders;
 
 public static unsafe partial class SharpGLTFApp
@@ -368,7 +369,7 @@ public static unsafe partial class SharpGLTFApp
 
             // Prepare fragment shader uniforms (lighting)
             // Build light parameters from the lights list
-            cgltf_light_params_t lightParams = new cgltf_light_params_t();
+            light_params_t lightParams = new light_params_t();
 
             // Count enabled lights (max 4 supported by shader)
             int enabledLightCount = 0;
@@ -627,16 +628,16 @@ public static unsafe partial class SharpGLTFApp
                 else
                 {
                     // Use static pipeline
-                    cgltf_vs_params_t vsParams = new cgltf_vs_params_t();
+                    vs_params_t vsParams = new vs_params_t();
                     vsParams.model = modelMatrix;
                     vsParams.view_proj = state.camera.ViewProj;
                     vsParams.eye_pos = state.camera.EyePos;
 
                     sg_apply_pipeline(pipeline);
-                    sg_apply_uniforms(UB_cgltf_vs_params, SG_RANGE(ref vsParams));
+                    sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vsParams));
 
                     // Material uniforms
-                    cgltf_metallic_params_t metallicParams = new cgltf_metallic_params_t();
+                    metallic_params_t metallicParams = new metallic_params_t();
                     metallicParams.base_color_factor = mesh.BaseColorFactor;
                     metallicParams.metallic_factor = mesh.MetallicFactor;
                     metallicParams.roughness_factor = mesh.RoughnessFactor;
@@ -681,30 +682,56 @@ public static unsafe partial class SharpGLTFApp
                     metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
                     metallicParams.normal_map_scale = mesh.NormalMapScale;
 
-                    sg_apply_uniforms(UB_cgltf_metallic_params, SG_RANGE(ref metallicParams));
+                    sg_apply_uniforms(UB_metallic_params, SG_RANGE(ref metallicParams));
 
                     // Light uniforms
-                    sg_apply_uniforms(UB_cgltf_light_params, SG_RANGE(ref lightParams));
+                    sg_apply_uniforms(UB_light_params, SG_RANGE(ref lightParams));
+                    
+                    // Camera params (required by pbr.glsl)
+                    camera_params_t cameraParams = new camera_params_t();
+                    cameraParams.u_Camera = state.camera.EyePos;
+                    sg_apply_uniforms(UB_camera_params, SG_RANGE(ref cameraParams));
+                    
+                    // IBL params (required by pbr.glsl)
+                    ibl_params_t iblParams = new ibl_params_t();
+                    iblParams.u_EnvIntensity = 1.0f;
+                    iblParams.u_EnvBlurNormalized = 0.0f;
+                    iblParams.u_MipCount = 1;
+                    iblParams.u_EnvRotation = Matrix4x4.Identity;
+                    unsafe {
+                        iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
+                        iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
+                    }
+                    sg_apply_uniforms(UB_ibl_params, SG_RANGE(ref iblParams));
+                    
+                    // Tonemapping params (required by pbr.glsl)
+                    tonemapping_params_t tonemappingParams = new tonemapping_params_t();
+                    tonemappingParams.u_Exposure = 1.0f;
+                    sg_apply_uniforms(UB_tonemapping_params, SG_RANGE(ref tonemappingParams));
+                    
+                    // Rendering flags (required by pbr.glsl)
+                    rendering_flags_t renderingFlags = new rendering_flags_t();
+                    renderingFlags.use_ibl = 1; // Enable IBL (using white cubemaps as fallback)
+                    renderingFlags.use_punctual_lights = 1; // Enable punctual lights
+                    renderingFlags.use_tonemapping = 0; // Disabled for now
+                    renderingFlags.linear_output = 0;
+                    renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
+                    renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
+                    renderingFlags.use_morphing = 0;
+                    renderingFlags.has_morph_targets = 0;
+                    sg_apply_uniforms(UB_rendering_flags, SG_RANGE(ref renderingFlags));
                 }
-
-                // Prepare transmission uniforms (for proper 3D refraction with matrices)
-                // NOTE: These must ALWAYS be provided because the shader declares the uniform buffer
-                cgltf_transmission_params_t transmissionParams = new cgltf_transmission_params_t();
-                transmissionParams.model_matrix = modelMatrix;  // Use full model matrix (includes node animation + user rotation)
-                transmissionParams.view_matrix = state.camera.View;       // View matrix
-                transmissionParams.projection_matrix = state.camera.Proj; // Projection matrix
 
                 // Draw the mesh with optional screen texture for refraction
                 if (useScreenTexture)
                 {
-                    // Pass pre-created screen view AND transmission params for refraction sampling
-                    // Transmission params will be applied AFTER bindings inside mesh.Draw()
-                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler, transmissionParams);
+                    // Pass pre-created screen view for refraction sampling
+                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler);
                 }
                 else
                 {
-                    // Regular draw without screen texture (but still pass transmission params for shader)
-                    mesh.Draw(pipeline, default, default, transmissionParams);
+                    // Regular draw without screen texture
+                    mesh.Draw(pipeline);
                 }
             }
 

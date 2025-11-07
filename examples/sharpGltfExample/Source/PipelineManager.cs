@@ -20,8 +20,8 @@ using static Sokol.SLog;
 using static Sokol.SDebugUI;
 using static Sokol.SImgui;
 using Imgui;
-using static cgltf_sapp_shader_cs_cgltf.Shaders;
-using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
+using static pbr_shader_cs.Shaders;
+using static pbr_shader_skinning_cs_skinning.Shaders;
 using static bloom_shader_cs.Shaders;
 
 public enum PipelineType
@@ -129,14 +129,16 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                sg_shader shader_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_static = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for static meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;  // Use 32-bit to support large meshes (>65535 vertices)
                 pipeline_desc.cull_mode = cullMode;
@@ -150,14 +152,16 @@ public static class PipeLineManager
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
             case PipelineType.Skinned:
-                sg_shader shader_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for skinned meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
                 pipeline_desc.cull_mode = cullMode;
@@ -172,14 +176,16 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.StandardBlend:
-                sg_shader shader_static_blend = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_static_blend = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for static meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_blend;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
                 pipeline_desc.cull_mode = cullMode;  // Use provided cull mode
@@ -200,14 +206,16 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedBlend:
-                sg_shader shader_skinned_blend = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_blend = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for skinned meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_blend;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
                 pipeline_desc.cull_mode = cullMode;  // Use provided cull mode
@@ -228,14 +236,16 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.StandardMask:
-                sg_shader shader_static_mask = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_static_mask = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for static meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_static_mask;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
                 pipeline_desc.cull_mode = cullMode;
@@ -250,14 +260,16 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedMask:
-                sg_shader shader_skinned_mask = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_mask = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
                 // Create pipeline for skinned meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_skinned_mask;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
                 pipeline_desc.cull_mode = cullMode;
@@ -285,13 +297,15 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaque:
                 // Standard mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_static = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_static = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_transmission_static;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = cullMode;
@@ -307,13 +321,15 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaqueSkinned:
                 // Skinned mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_skinned = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_skinned = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
                 pipeline_desc.shader = shader_transmission_skinned;
                 pipeline_desc.index_type = SG_INDEXTYPE_UINT16;  // Use appropriate index type (16-bit or 32-bit)
                 pipeline_desc.cull_mode = cullMode;
@@ -424,20 +440,22 @@ public static class PipeLineManager
         sg_shader shader;
         if (baseType == PipelineType.Skinned || baseType == PipelineType.SkinnedBlend || baseType == PipelineType.SkinnedMask)
         {
-            shader = sg_make_shader(skinning_metallic_shader_desc(sg_query_backend()));
+            shader = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
         }
         else
         {
-            shader = sg_make_shader(cgltf_metallic_shader_desc(sg_query_backend()));
+            shader = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
         }
         
         // Common setup for all variants
         pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
         pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
-        pipeline_desc.layout.attrs[GetAttrSlot(type, "color")].format = SG_VERTEXFORMAT_FLOAT4;
-        pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord")].format = SG_VERTEXFORMAT_FLOAT2;
-        pipeline_desc.layout.attrs[GetAttrSlot(type, "boneIds")].format = SG_VERTEXFORMAT_FLOAT4;
-        pipeline_desc.layout.attrs[GetAttrSlot(type, "weights")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+        pipeline_desc.layout.attrs[GetAttrSlot(type, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
         pipeline_desc.shader = shader;
         pipeline_desc.index_type = SG_INDEXTYPE_UINT32;  // 32-bit indices for large meshes
         pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
@@ -535,14 +553,24 @@ public static class PipeLineManager
             case PipelineType.Standard:
             case PipelineType.StandardBlend:
             case PipelineType.StandardMask:
-                result = cgltf_metallic_attr_slot(attr_name);
+            case PipelineType.TransmissionOpaque:
+                result = pbr_program_attr_slot(attr_name);
                 break;
 
             case PipelineType.Skinned:
             case PipelineType.SkinnedBlend:
             case PipelineType.SkinnedMask:
-                result = skinning_metallic_attr_slot(attr_name);
+            case PipelineType.TransmissionOpaqueSkinned:
+                result = skinning_pbr_program_attr_slot(attr_name);
                 break;
+                
+            case PipelineType.BloomBright:
+            case PipelineType.BloomBlurHorizontal:
+            case PipelineType.BloomBlurVertical:
+            case PipelineType.BloomComposite:
+                // Bloom pipelines use different shaders with different attributes
+                // These are handled in GetOrCreatePipeline and don't use this method
+                throw new InvalidOperationException($"Bloom pipeline types should not call GetAttrSlot. Use shader-specific attribute indices instead.");
         }
 
         if (result == -1)
@@ -556,11 +584,11 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_texture_slot(tex_name);
+                result = pbr_program_texture_slot(tex_name);
                 break;
 
             case PipelineType.Skinned:
-                result = skinning_metallic_texture_slot(tex_name);
+                result = skinning_pbr_program_texture_slot(tex_name);
                 break;
 
 
@@ -576,12 +604,12 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_sampler_slot(smp_name);
+                result = pbr_program_sampler_slot(smp_name);
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_sampler_slot(smp_name);
+                result = skinning_pbr_program_sampler_slot(smp_name);
                 break;
 
 
@@ -597,12 +625,12 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_uniformblock_slot(ub_name);
+                result = pbr_program_uniformblock_slot(ub_name);
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_uniformblock_slot(ub_name);
+                result = skinning_pbr_program_uniformblock_slot(ub_name);
                 break;
 
 
@@ -619,12 +647,12 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_uniformblock_size(ub_name);
+                result = pbr_program_uniformblock_size(ub_name);
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_uniformblock_size(ub_name);
+                result = skinning_pbr_program_uniformblock_size(ub_name);
                 break;
 
         }
@@ -640,12 +668,12 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_uniform_offset(ub_name, u_name);
+                result = pbr_program_uniform_offset(ub_name, u_name);
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_uniform_offset(ub_name, u_name);
+                result = skinning_pbr_program_uniform_offset(ub_name, u_name);
                 break;
 
         }
@@ -662,13 +690,13 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_uniform_desc(ub_name, u_name);
+                result = pbr_program_uniform_desc(ub_name, u_name);
                 found = true;
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_uniform_desc(ub_name, u_name);
+                result = skinning_pbr_program_uniform_desc(ub_name, u_name);
                 found = true;
                 break;
 
@@ -685,12 +713,12 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_storagebuffer_slot(sbuf_name);
+                result = pbr_program_storagebuffer_slot(sbuf_name);
                 break;
 
 
             case PipelineType.Skinned:
-                result = skinning_metallic_storagebuffer_slot(sbuf_name);
+                result = skinning_pbr_program_storagebuffer_slot(sbuf_name);
                 break;
 
         }
@@ -704,10 +732,10 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                result = cgltf_metallic_storageimage_slot(simg_name);
+                result = pbr_program_storageimage_slot(simg_name);
                 break;      
             case PipelineType.Skinned:
-                result = skinning_metallic_storageimage_slot(simg_name);
+                result = skinning_pbr_program_storageimage_slot(simg_name);
                 break;
         }
         if (result == -1)
