@@ -35,28 +35,18 @@ layout(location=6) in vec4 joints_0;    // Bone indices for skinning
 layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
 // Uniforms (PBR-specific, separate from cgltf-sapp.glsl)
+// Note: vs_params includes use_morphing and has_morph_targets flags
 @include pbr_vs_uniforms.glsl
-
-// Rendering feature flags (needed for morphing runtime checks)
-layout(binding=7) uniform rendering_flags {
-    int use_ibl;              // 0 or 1 (not used in VS)
-    int use_punctual_lights;  // 0 or 1 (not used in VS)
-    int use_tonemapping;      // 0 or 1 (not used in VS)
-    int linear_output;        // 0 or 1 (not used in VS)
-    int alphamode;            // 0=opaque, 1=mask, 2=blend (not used in VS)
-    // Animation flags
-    int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
-    int use_morphing;         // 0 or 1 (used for runtime morph target checks)
-    int has_morph_targets;    // 0 or 1 (used for runtime morph target checks)
-};
 
 // Animation texture samplers (use high bindings to avoid FS conflicts)
 // Note: u_morphWeights is defined in vs_params (vs_uniforms.glsl)
+// Note: Morph targets share slot 9 with CharlieLUT - they're unlikely to be used together
+// (morphing is for character animation, Charlie sheen is for fabric materials)
 layout(binding=11) uniform texture2D u_jointsSampler_Tex;
 layout(binding=11) uniform sampler u_jointsSampler_Smp;
 
-layout(binding=12) uniform texture2DArray u_MorphTargetsSampler_Tex;
-layout(binding=12) uniform sampler u_MorphTargetsSampler_Smp;
+layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex;
+layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;
 
 // Animation support (uses uniforms defined above)
 @include animation.glsl
@@ -186,10 +176,9 @@ layout(binding=7) uniform rendering_flags {
     int use_tonemapping;      // 0 or 1
     int linear_output;        // 0 or 1
     int alphamode;            // 0=opaque, 1=mask, 2=blend
-    // Animation flags (not used in FS, but must match VS definition)
-    int use_skinning;         // 0 or 1
-    int use_morphing;         // 0 or 1
-    int has_morph_targets;    // 0 or 1
+    int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
+    int use_morphing;         // 0 or 1 (not used in FS - only for consistency)
+    int has_morph_targets;    // 0 or 1 (not used in FS - only for consistency)
 };
 
 // Texture samplers
@@ -218,11 +207,13 @@ layout(binding=6) uniform sampler u_LambertianEnvSampler_Raw;
 layout(binding=7) uniform texture2D u_GGXLUTTexture;
 layout(binding=7) uniform sampler u_GGXLUTSampler_Raw;
 
+#ifndef MORPHING
 layout(binding=8) uniform textureCube u_CharlieEnvTexture;
 layout(binding=8) uniform sampler u_CharlieEnvSampler_Raw;
 
 layout(binding=9) uniform texture2D u_CharlieLUTTexture;
 layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
+#endif
 
 // Transmission framebuffer (for refraction/transparency)
 layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
@@ -232,8 +223,10 @@ layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
 #define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
 #define u_LambertianEnvSampler samplerCube(u_LambertianEnvTexture, u_LambertianEnvSampler_Raw)
 #define u_GGXLUT sampler2D(u_GGXLUTTexture, u_GGXLUTSampler_Raw)
+#ifndef MORPHING
 #define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
 #define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
+#endif
 #define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
 
 // Utility functions (must be defined before includes that use them)

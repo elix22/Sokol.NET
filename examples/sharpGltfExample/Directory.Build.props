@@ -51,8 +51,9 @@
    </ItemGroup>
 
   <ItemGroup>
-     <SkinningShaderFiles Include="shaders/pbr.glsl" />
+     <SkinningMorphingShaderFiles Include="shaders/pbr.glsl" />
   </ItemGroup>
+
 
   <ItemGroup>
     <AssetsSourceFiles Include="Assets/**/*.*" />
@@ -68,7 +69,9 @@
     <Message Text="Compiling all shaders into shaders/compiled/$(HostShaderFolder)" Importance="high" />
     <!-- Compile each shader file -->
     <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(ShaderFiles.Identity)&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(ShaderFiles.Filename)-shader.cs --slang $(ShaderSlang) -f sokol_csharp" />
-    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(SkinningShaderFiles.Identity)&quot; --defines &quot;SKINNING&quot; --module &quot;skinning&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(SkinningShaderFiles.Filename)-shader-skinning.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(SkinningMorphingShaderFiles.Identity)&quot; --defines &quot;SKINNING&quot; --module &quot;skinning&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(SkinningMorphingShaderFiles.Filename)-shader-skinning.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(SkinningMorphingShaderFiles.Identity)&quot; --defines &quot;MORPHING&quot; --module &quot;morphing&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(SkinningMorphingShaderFiles.Filename)-shader-morphing.cs --slang $(ShaderSlang) -f sokol_csharp" />
+    <Exec Command="&quot;$(SokolShdcPath)&quot; --input &quot;%(SkinningMorphingShaderFiles.Identity)&quot; --defines &quot;SKINNING:MORPHING&quot; --module &quot;skinning_morphing&quot; --reflection  --output shaders/compiled/$(HostShaderFolder)/%(SkinningMorphingShaderFiles.Filename)-shader-skinning-morphing.cs --slang $(ShaderSlang) -f sokol_csharp" />
     <!-- Create timestamp file to track completion -->
     <Touch Files="shaders/compiled/$(HostShaderFolder)/.shader_timestamp" AlwaysCreate="true" />
   </Target>

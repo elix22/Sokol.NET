@@ -187,6 +187,13 @@ public static unsafe partial class SharpGLTFApp
                     Info("[SharpGLTF] No animations found in model");
                 }
 
+                // Create morph target texture if model has morph targets
+                bool hasAnyMorphTargets = state.model.Meshes.Any(m => m.HasMorphTargets);
+                if (hasAnyMorphTargets)
+                {
+                    CreateMorphTargetTexture(state.model);
+                }
+
                 state.modelLoaded = true;
                 state.isLoadingModel = false;
                 state.pendingModelRoot = null;
@@ -522,12 +529,13 @@ public static unsafe partial class SharpGLTFApp
 
                 // Use skinning if mesh has it and animator exists
                 bool useSkinning = mesh.HasSkinning && state.animator != null;
+                bool useMorphing = mesh.HasMorphTargets;
                 
                 // Check if mesh uses 32-bit indices (based on IndexType field)
                 bool needs32BitIndices = (mesh.IndexType == sg_index_type.SG_INDEXTYPE_UINT32);
 
-                // Choose pipeline based on alpha mode, skinning, index type, and rendering mode
-                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning, needs32BitIndices);
+                // Choose pipeline based on alpha mode, skinning, morphing, index type, and rendering mode
+                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(mesh.AlphaMode, useSkinning, useMorphing, needs32BitIndices);
                 
                 // Override cull mode for double-sided materials
                 sg_cull_mode cullMode = mesh.DoubleSided ? SG_CULLMODE_NONE : SG_CULLMODE_BACK;
@@ -570,9 +578,45 @@ public static unsafe partial class SharpGLTFApp
                     // Copy bone matrices
                     var boneMatrices = state.animator.GetFinalBoneMatrices();
 
-
                     var destSpan = MemoryMarshal.CreateSpan(ref vsParams.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
                     boneMatrices.AsSpan().CopyTo(destSpan);
+
+                    // Set morph weights if mesh has morph targets
+                    if (mesh.HasMorphTargets && node.CachedGltfNode != null)
+                    {
+                        var gltfNode = node.CachedGltfNode;
+                        var gltfMesh = gltfNode.Mesh;
+                        
+                        // Get weights from node or mesh (node weights override mesh weights)
+                        IReadOnlyList<float>? weights = null;
+                        if (gltfNode.MorphWeights != null && gltfNode.MorphWeights.Count > 0)
+                        {
+                            weights = gltfNode.MorphWeights;
+                        }
+                        else if (gltfMesh != null && gltfMesh.MorphWeights != null && gltfMesh.MorphWeights.Count > 0)
+                        {
+                            weights = gltfMesh.MorphWeights;
+                        }
+                        
+                        // Pack up to 8 weights into 2 vec4s
+                        if (weights != null && weights.Count > 0)
+                        {
+                            for (int i = 0; i < Math.Min(weights.Count, 8); i++)
+                            {
+                                int vec4Index = i / 4;  // 0 or 1
+                                int componentIndex = i % 4;  // 0, 1, 2, or 3
+                                
+                                ref var vec = ref vsParams.u_morphWeights[vec4Index];
+                                switch (componentIndex)
+                                {
+                                    case 0: vec.X = weights[i]; break;
+                                    case 1: vec.Y = weights[i]; break;
+                                    case 2: vec.Z = weights[i]; break;
+                                    case 3: vec.W = weights[i]; break;
+                                }
+                            }
+                        }
+                    }
 
                     sg_apply_pipeline(pipeline);
                     sg_apply_uniforms(UB_skinning_vs_params, SG_RANGE(ref vsParams));
@@ -668,8 +712,8 @@ public static unsafe partial class SharpGLTFApp
                     renderingFlags.linear_output = 0;
                     renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
                     renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
-                    renderingFlags.use_morphing = 0;
-                    renderingFlags.has_morph_targets = 0;
+                    renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
+                    renderingFlags.has_morph_targets = mesh.HasMorphTargets ? 1 : 0;
                     sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
                 }
                 else
@@ -766,8 +810,8 @@ public static unsafe partial class SharpGLTFApp
                     renderingFlags.linear_output = 0;
                     renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
                     renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
-                    renderingFlags.use_morphing = 0;
-                    renderingFlags.has_morph_targets = 0;
+                    renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
+                    renderingFlags.has_morph_targets = mesh.HasMorphTargets ? 1 : 0;
                     sg_apply_uniforms(UB_rendering_flags, SG_RANGE(ref renderingFlags));
                 }
 
@@ -780,15 +824,23 @@ public static unsafe partial class SharpGLTFApp
                     ? state.jointMatrixSampler 
                     : default;
                 
+                // Pass morph target texture if mesh has morph targets
+                sg_view morphView = mesh.HasMorphTargets && state.morphTargetView.id != 0
+                    ? state.morphTargetView
+                    : default;
+                sg_sampler morphSampler = mesh.HasMorphTargets && state.morphTargetSampler.id != 0
+                    ? state.morphTargetSampler
+                    : default;
+                
                 if (useScreenTexture)
                 {
-                    // Pass pre-created screen view for refraction sampling + joint texture
-                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler, jointView, jointSampler);
+                    // Pass pre-created screen view for refraction sampling + joint texture + morph texture
+                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler, jointView, jointSampler, morphView, morphSampler);
                 }
                 else
                 {
-                    // Regular draw with joint texture if skinning
-                    mesh.Draw(pipeline, default, default, jointView, jointSampler);
+                    // Regular draw with joint texture and morph texture
+                    mesh.Draw(pipeline, default, default, jointView, jointSampler, morphView, morphSampler);
                 }
             }
 

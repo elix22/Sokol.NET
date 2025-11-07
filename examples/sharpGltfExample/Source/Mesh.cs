@@ -19,6 +19,11 @@ namespace Sokol
         public bool HasSkinning;
         public BoundingBox Bounds;
 
+        // Morph target properties
+        public bool HasMorphTargets = false;
+        public MeshPrimitive? GltfPrimitive = null;  // Keep reference to glTF primitive for morph target access
+        public int MorphTargetCount = 0;
+
         // Material properties
         public Vector4 BaseColorFactor = Vector4.One;
         public float MetallicFactor = 1.0f;
@@ -225,7 +230,8 @@ namespace Sokol
         }
 
         public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default, 
-                         sg_view jointMatrixView = default, sg_sampler jointMatrixSampler = default)
+                         sg_view jointMatrixView = default, sg_sampler jointMatrixSampler = default,
+                         sg_view morphTargetView = default, sg_sampler morphTargetSampler = default)
         {
             if (IndexCount == 0)
             {
@@ -317,6 +323,21 @@ namespace Sokol
                 // Even if not skinned, provide a default to avoid validation errors
                 bind.views[11] = defaultWhite.View;
                 bind.samplers[11] = defaultWhite.Sampler;
+            }
+
+            // Binding 9: Morph target texture for morphing (u_MorphTargetsSampler)
+            // This is REQUIRED for morphed meshes - the shader expects this binding
+            // NOTE: Shares slot 9 with CharlieLUT (sheen) - rarely used together (morphing is animation, sheen is fabric)
+            if (morphTargetView.id != 0 && morphTargetSampler.id != 0)
+            {
+                bind.views[9] = morphTargetView;
+                bind.samplers[9] = morphTargetSampler;
+            }
+            else
+            {
+                // Even if not morphed, provide a default to avoid validation errors
+                bind.views[9] = defaultWhite.View;
+                bind.samplers[9] = defaultWhite.Sampler;
             }
 
             sg_apply_bindings(bind);

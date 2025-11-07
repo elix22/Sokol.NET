@@ -276,6 +276,7 @@ namespace Sokol
             var weights = primitive.GetVertexAccessor("WEIGHTS_0")?.AsVector4Array();
 
             bool hasSkinning = joints != null && weights != null;
+            bool hasMorphTargets = primitive.MorphTargetsCount > 0;
 
             if (positions == null)
             {
@@ -304,6 +305,7 @@ namespace Sokol
             Info($"  - Has texcoords: {texCoords0 != null}", "SharpGLTF");
             Info($"  - Has vertex colors: {colors != null}", "SharpGLTF");
             Info($"  - Has skinning: {hasSkinning}", "SharpGLTF");
+            Info($"  - Has morph targets: {hasMorphTargets} (count: {primitive.MorphTargetsCount})", "SharpGLTF");
 
             // Build vertices
             for (int i = 0; i < vertexCount; i++)
@@ -406,6 +408,15 @@ namespace Sokol
                 }
                 Info($"  - Indices: {indices16.Count} (16-bit for memory efficiency)", "SharpGLTF");
                 mesh = new Mesh(vertices.ToArray(), indices16.ToArray(), hasSkinning);
+            }
+
+            // Store morph target information
+            if (hasMorphTargets)
+            {
+                mesh.HasMorphTargets = true;
+                mesh.GltfPrimitive = primitive;
+                mesh.MorphTargetCount = primitive.MorphTargetsCount;
+                Info($"  - Morph targets stored: {mesh.MorphTargetCount} targets", "SharpGLTF");
             }
 
             // Process material

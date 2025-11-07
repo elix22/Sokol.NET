@@ -60,7 +60,8 @@ vec4 getSpecularSample(vec3 reflection, float lod)
     return textureSample;
 }
 
-
+// Charlie sheen functions disabled when MORPHING is enabled (they share texture bindings 8-9)
+#ifndef MORPHING
 vec4 getSheenSample(vec3 reflection, float lod)
 {
     vec3 rotatedReflection = mat3(u_EnvRotation) * reflection;
@@ -68,6 +69,7 @@ vec4 getSheenSample(vec3 reflection, float lod)
     textureSample.rgb *= u_EnvIntensity;
     return textureSample;
 }
+#endif
 
 vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWeight)
 {
@@ -162,6 +164,7 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
     return specularLight;
 }
 
+#ifndef MORPHING
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {
     float NdotV = clampedDot(n, v);
@@ -175,4 +178,5 @@ vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor
     vec3 sheenLight = sheenSample.rgb;
     return sheenLight * sheenColor * brdf;
 }
+#endif
 

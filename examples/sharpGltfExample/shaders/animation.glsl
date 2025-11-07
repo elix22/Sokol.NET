@@ -6,7 +6,8 @@
 // - Flags in rendering_flags (binding=7): int use_morphing; int has_morph_targets;
 // - Morph weights in vs_params (binding=0): vec4 u_morphWeights[2]; (8 weights as 2 vec4s)
 // - layout(binding=11) uniform texture2D u_jointsSampler_Tex; layout(binding=11) uniform sampler u_jointsSampler_Smp;
-// - layout(binding=12) uniform texture2DArray u_MorphTargetsSampler_Tex; layout(binding=12) uniform sampler u_MorphTargetsSampler_Smp;
+// - layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex; layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;
+// Note: Slot 9 is shared with CharlieLUT - morphing and Charlie sheen rarely used together
 
 #ifdef MORPHING
 // Helper to get morph weight at index i (u_morphWeights is vec4[2])

@@ -351,6 +351,163 @@ public static unsafe partial class SharpGLTFApp
         arr[offset + 12] = mat.M41; arr[offset + 13] = mat.M42; arr[offset + 14] = mat.M43; arr[offset + 15] = mat.M44;
     }
 
+    /// <summary>
+    /// Creates a morph target texture array for vertex displacement animation.
+    /// Stores position, normal, and tangent displacements for each morph target.
+    /// Uses texture2DArray with one layer per attribute per target.
+    /// </summary>
+    static unsafe void CreateMorphTargetTexture(SharpGltfModel model)
+    {
+        // Find the mesh with most morph targets to determine array size
+        int maxTargets = 0;
+        int maxVertices = 0;
+        
+        foreach (var mesh in model.Meshes)
+        {
+            if (mesh.HasMorphTargets && mesh.GltfPrimitive != null)
+            {
+                maxTargets = Math.Max(maxTargets, mesh.MorphTargetCount);
+                maxVertices = Math.Max(maxVertices, mesh.VertexCount);
+            }
+        }
+        
+        if (maxTargets == 0 || maxVertices == 0)
+        {
+            Info("[MorphTexture] No morph targets found, skipping texture creation");
+            return;
+        }
+        
+        // Calculate texture size based on vertex count
+        // Each vertex displacement is stored as vec4 (with padding for vec3 data)
+        int width = (int)Math.Ceiling(Math.Sqrt(maxVertices));
+        state.morphTextureWidth = width;
+        
+        // Calculate layer count: position, normal, tangent for each target
+        // Layer layout: [pos0, pos1, ..., posN, norm0, norm1, ..., normN, tan0, tan1, ..., tanN]
+        int layersPerAttributeType = maxTargets;
+        int totalLayers = layersPerAttributeType * 3; // position + normal + tangent
+        state.morphTextureLayerCount = totalLayers;
+        
+        Info($"[MorphTexture] Creating {width}x{width}x{totalLayers} RGBA32F texture array");
+        Info($"[MorphTexture] {maxTargets} targets, {maxVertices} max vertices");
+        Info($"[MorphTexture] Layer 0-{maxTargets-1}: positions, {maxTargets}-{maxTargets*2-1}: normals, {maxTargets*2}-{totalLayers-1}: tangents");
+        
+        // Create sampler with NEAREST filtering
+        if (state.morphTargetSampler.id == 0)
+        {
+            state.morphTargetSampler = sg_make_sampler(new sg_sampler_desc
+            {
+                min_filter = sg_filter.SG_FILTER_NEAREST,
+                mag_filter = sg_filter.SG_FILTER_NEAREST,
+                wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                label = "morph-target-sampler"
+            });
+        }
+        
+        // Allocate texture data
+        int texelsPerLayer = width * width;
+        int totalTexels = texelsPerLayer * totalLayers;
+        float[] textureData = new float[totalTexels * 4]; // RGBA32F
+        
+        // Initialize to zero (no displacement by default)
+        Array.Clear(textureData, 0, textureData.Length);
+        
+        // Process each mesh and populate its morph target data
+        foreach (var mesh in model.Meshes)
+        {
+            if (!mesh.HasMorphTargets || mesh.GltfPrimitive == null)
+                continue;
+                
+            var primitive = mesh.GltfPrimitive;
+            int targetCount = primitive.MorphTargetsCount;
+            
+            Info($"[MorphTexture] Processing mesh with {targetCount} targets, {mesh.VertexCount} vertices");
+            
+            // Extract displacement data for each target
+            for (int targetIdx = 0; targetIdx < targetCount; targetIdx++)
+            {
+                var morphTarget = primitive.GetMorphTargetAccessors(targetIdx);
+                
+                // Position displacements (layer = targetIdx)
+                if (morphTarget.ContainsKey("POSITION"))
+                {
+                    var positions = morphTarget["POSITION"].AsVector3Array();
+                    int layerOffset = targetIdx * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < positions.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = positions[i].X;
+                        textureData[offset + 1] = positions[i].Y;
+                        textureData[offset + 2] = positions[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+                
+                // Normal displacements (layer = maxTargets + targetIdx)
+                if (morphTarget.ContainsKey("NORMAL"))
+                {
+                    var normals = morphTarget["NORMAL"].AsVector3Array();
+                    int layerOffset = (maxTargets + targetIdx) * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < normals.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = normals[i].X;
+                        textureData[offset + 1] = normals[i].Y;
+                        textureData[offset + 2] = normals[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+                
+                // Tangent displacements (layer = maxTargets*2 + targetIdx)
+                if (morphTarget.ContainsKey("TANGENT"))
+                {
+                    var tangents = morphTarget["TANGENT"].AsVector3Array();
+                    int layerOffset = (maxTargets * 2 + targetIdx) * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < tangents.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = tangents[i].X;
+                        textureData[offset + 1] = tangents[i].Y;
+                        textureData[offset + 2] = tangents[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+            }
+        }
+        
+        // Create texture2DArray
+        fixed (float* ptr = textureData)
+        {
+            var imageData = new sg_image_data();
+            imageData.mip_levels[0].ptr = ptr;
+            imageData.mip_levels[0].size = (nuint)(textureData.Length * sizeof(float));
+            
+            state.morphTargetTexture = sg_make_image(new sg_image_desc
+            {
+                type = sg_image_type.SG_IMAGETYPE_ARRAY,
+                width = width,
+                height = width,
+                num_slices = totalLayers,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA32F,
+                data = imageData,
+                label = "morph-target-texture"
+            });
+        }
+        
+        // Create view for the morph texture
+        state.morphTargetView = sg_make_view(new sg_view_desc
+        {
+            texture = new sg_texture_view_desc { image = state.morphTargetTexture },
+            label = "morph-target-view"
+        });
+        
+        Info($"[MorphTexture] Texture created successfully (id: {state.morphTargetTexture.id}, view: {state.morphTargetView.id})");
+    }
+
     static void InitializeBloom()
     {
         // Get screen dimensions (we'll create bloom textures at 1/2 resolution for performance)
@@ -955,6 +1112,26 @@ public static unsafe partial class SharpGLTFApp
             state.jointMatrixSampler = default;
         }
         state.jointTextureWidth = 0;
+
+        // Cleanup morph target texture if it exists
+        if (state.morphTargetTexture.id != 0)
+        {
+            sg_uninit_image(state.morphTargetTexture);
+            state.morphTargetTexture = default;
+            Info("[MorphTexture] Cleaned up morph target texture");
+        }
+        if (state.morphTargetView.id != 0)
+        {
+            sg_uninit_view(state.morphTargetView);
+            state.morphTargetView = default;
+        }
+        if (state.morphTargetSampler.id != 0)
+        {
+            sg_uninit_sampler(state.morphTargetSampler);
+            state.morphTargetSampler = default;
+        }
+        state.morphTextureWidth = 0;
+        state.morphTextureLayerCount = 0;
 
         // Dispose the old model (after rendering has stopped using it)
         oldModel?.Dispose();

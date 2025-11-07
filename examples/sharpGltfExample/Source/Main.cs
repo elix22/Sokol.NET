@@ -25,6 +25,7 @@ public static unsafe partial class SharpGLTFApp
     static readonly string[] availableModels = new string[]
     {
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
+        "MorphStressTest/glTF/MorphStressTest.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
@@ -150,6 +151,13 @@ public static unsafe partial class SharpGLTFApp
         public sg_view jointMatrixView;
         public sg_sampler jointMatrixSampler;
         public int jointTextureWidth = 0;  // Calculated based on bone count
+
+        // Morph target texture (texture2DArray for vertex displacements)
+        public sg_image morphTargetTexture;
+        public sg_view morphTargetView;
+        public sg_sampler morphTargetSampler;
+        public int morphTextureWidth = 0;  // Calculated based on vertex count
+        public int morphTextureLayerCount = 0;  // Number of layers in texture array
 
         // Model browser
         public int currentModelIndex = 0;
