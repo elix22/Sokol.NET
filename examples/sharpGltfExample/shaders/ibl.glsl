@@ -6,8 +6,42 @@
 // - uniform float u_EnvIntensity
 // - uniform int u_MipCount
 // - uniform mat4 u_EnvRotation
-// - Combined samplers: u_GGXEnvSampler, u_LambertianEnvSampler, u_GGXLUT, etc.
+// - uniform ivec2 u_TransmissionFramebufferSize (for transmission)
+// - Combined samplers: u_GGXEnvSampler, u_LambertianEnvSampler, u_GGXLUT
+// - Combined samplers: u_CharlieEnvSampler, u_CharlieLUT (for sheen)
+// - Combined sampler: u_TransmissionFramebufferSampler (for transmission)
+// - Function: float applyIorToRoughness(float roughness, float ior)
 
+// Helper functions for volume transmission
+vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
+{
+    if (attenuationDistance == 0.0)
+    {
+        // Attenuation distance is +∞ (which we indicate by zero), i.e. the transmitted color is not attenuated at all.
+        return radiance;
+    }
+    else
+    {
+        // Compute light attenuation using Beer's law.
+        vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
+        return transmittance * radiance;
+    }
+}
+
+vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
+{
+    // Direction of refracted light.
+    vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
+
+    // Compute rotation-independant scaling of the model matrix.
+    vec3 modelScale;
+    modelScale.x = length(vec3(modelMatrix[0].xyz));
+    modelScale.y = length(vec3(modelMatrix[1].xyz));
+    modelScale.z = length(vec3(modelMatrix[2].xyz));
+
+    // The thickness is specified in local space.
+    return normalize(refractionVector) * thickness * modelScale;
+}
 
 vec3 getDiffuseLight(vec3 n)
 {
@@ -67,7 +101,6 @@ vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 }
 
 
-#ifdef MATERIAL_TRANSMISSION
 vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
 {
     float framebufferLod = log2(float(u_TransmissionFramebufferSize.x)) * applyIorToRoughness(roughness, ior);
@@ -75,14 +108,11 @@ vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
 
     return transmittedLight;
 }
-#endif
 
 
-#ifdef MATERIAL_TRANSMISSION
 vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 baseColor, vec3 position, mat4 modelMatrix,
     mat4 viewMatrix, mat4 projMatrix, float ior, float thickness, vec3 attenuationColor, float attenuationDistance, float dispersion)
 {
-#ifdef MATERIAL_DISPERSION
     // Dispersion will spread out the ior values for each r,g,b channel
     float halfSpread = (ior - 1.0) * 0.025 * dispersion;
     vec3 iors = vec3(ior - halfSpread, ior, ior + halfSpread);
@@ -105,29 +135,12 @@ vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 base
         // Sample framebuffer to get pixel the refracted ray hits for this color channel.
         transmittedLight[i] = getTransmissionSample(refractionCoords, perceptualRoughness, iors[i])[i];
     }
-#else
-    vec3 transmissionRay = getVolumeTransmissionRay(n, v, thickness, ior, modelMatrix);
-    float transmissionRayLength = length(transmissionRay);
-    vec3 refractedRayExit = position + transmissionRay;
 
-    // Project refracted vector on the framebuffer, while mapping to normalized device coordinates.
-    vec4 ndcPos = projMatrix * viewMatrix * vec4(refractedRayExit, 1.0);
-    vec2 refractionCoords = ndcPos.xy / ndcPos.w;
-    refractionCoords += 1.0;
-    refractionCoords /= 2.0;
-
-    // Sample framebuffer to get pixel the refracted ray hits.
-    vec3 transmittedLight = getTransmissionSample(refractionCoords, perceptualRoughness, ior);
-
-#endif // MATERIAL_DISPERSION
     vec3 attenuatedColor = applyVolumeAttenuation(transmittedLight, transmissionRayLength, attenuationColor, attenuationDistance);
 
     return attenuatedColor * baseColor;
 }
-#endif
 
-
-#ifdef MATERIAL_ANISOTROPY
 vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy, vec3 anisotropyDirection)
 {
     float NdotV = clampedDot(n, v);
@@ -148,8 +161,6 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 
     return specularLight;
 }
-#endif
-
 
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {

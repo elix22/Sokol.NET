@@ -82,6 +82,7 @@ layout(binding=5) uniform ibl_params {
     float u_EnvBlurNormalized;
     int u_MipCount;
     mat4 u_EnvRotation;
+    ivec2 u_TransmissionFramebufferSize;
 };
 
 // Texture samplers
@@ -116,12 +117,17 @@ layout(binding=8) uniform sampler u_CharlieEnvSampler_Raw;
 layout(binding=9) uniform texture2D u_CharlieLUTTexture;
 layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
 
+// Transmission framebuffer (for refraction/transparency)
+layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
+layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
+
 // Create combined samplers for IBL functions
 #define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
 #define u_LambertianEnvSampler samplerCube(u_LambertianEnvTexture, u_LambertianEnvSampler_Raw)
 #define u_GGXLUT sampler2D(u_GGXLUTTexture, u_GGXLUTSampler_Raw)
 #define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
 #define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
+#define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
 
 // Utility functions (must be defined before includes that use them)
 float clampedDot(vec3 x, vec3 y)
