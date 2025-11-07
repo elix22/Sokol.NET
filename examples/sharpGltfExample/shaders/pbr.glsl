@@ -24,27 +24,49 @@
 @vs vs_pbr
 precision highp float;
 
-// Vertex attributes
+// Vertex attributes (matching glTF primitive layout)
 layout(location=0) in vec3 position;
 layout(location=1) in vec3 normal;
-layout(location=2) in vec4 color;
-layout(location=3) in vec2 texcoord;
+layout(location=2) in vec4 tangent;     // w component is handedness (+1 or -1)
+layout(location=3) in vec2 texcoord_0;
+layout(location=4) in vec2 texcoord_1;
+layout(location=5) in vec4 color_0;
 
 // Uniforms
 @include vs_uniforms.glsl
 
+// Outputs
 out vec3 v_Position;
-out vec2 v_TexCoord0;
 out vec3 v_Normal;
+out vec4 v_Tangent;
+out vec2 v_TexCoord0;
+out vec2 v_TexCoord1;
+out vec4 v_Color;
+out mat3 v_TBN;  // Tangent-Bitangent-Normal matrix for normal mapping
 
 void main() {
     vec4 pos = model * vec4(position, 1.0);
-    v_Position = pos.xyz / pos.w;
-    v_TexCoord0 = texcoord;
+    v_Position = vec3(pos.xyz) / pos.w;
+    
+    // Texture coordinates
+    v_TexCoord0 = texcoord_0;
+    v_TexCoord1 = texcoord_1;
+    
+    // Vertex color
+    v_Color = color_0;
     
     // Transform normal to world space
     mat3 normalMatrix = transpose(inverse(mat3(model)));
-    v_Normal = normalize(normalMatrix * normal);
+    vec3 normalW = normalize(normalMatrix * normal);
+    v_Normal = normalW;
+    
+    // Transform tangent to world space and build TBN matrix
+    vec3 tangentW = normalize(vec3(model * vec4(tangent.xyz, 0.0)));
+    vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
+    bitangentW = normalize(bitangentW);
+    
+    v_Tangent = vec4(tangentW, tangent.w);
+    v_TBN = mat3(tangentW, bitangentW, normalW);
     
     gl_Position = view_proj * pos;
 }
@@ -62,8 +84,12 @@ precision highp float;
 
 // Inputs from vertex shader
 in vec3 v_Position;
-in vec2 v_TexCoord0;
 in vec3 v_Normal;
+in vec4 v_Tangent;
+in vec2 v_TexCoord0;
+in vec2 v_TexCoord1;
+in vec4 v_Color;
+in mat3 v_TBN;
 
 // Fragment output
 out vec4 frag_color;
@@ -154,26 +180,14 @@ float applyIorToRoughness(float roughness, float ior)
 vec3 getNormal() {
     vec3 n = normalize(v_Normal);
     
-    #ifdef HAS_NORMAL_MAP
     if (has_normal_tex > 0.5) {
-        // Sample normal map
+        // Sample normal map (tangent space)
         vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), v_TexCoord0).xyz * 2.0 - 1.0;
         tangentNormal.xy *= normal_map_scale;
         
-        // Derive tangent space from position and UV derivatives
-        vec3 pos_dx = dFdx(v_Position);
-        vec3 pos_dy = dFdy(v_Position);
-        vec2 tex_dx = dFdx(v_TexCoord0);
-        vec2 tex_dy = dFdy(v_TexCoord0);
-        
-        vec3 t = (tex_dy.y * pos_dx - tex_dx.y * pos_dy) / (tex_dx.x * tex_dy.y - tex_dy.x * tex_dx.y);
-        t = normalize(t - n * dot(n, t));
-        vec3 b = normalize(cross(n, t));
-        mat3 tbn = mat3(t, b, n);
-        
-        n = normalize(tbn * tangentNormal);
+        // Transform from tangent space to world space using TBN matrix
+        n = normalize(v_TBN * tangentNormal);
     }
-    #endif
     
     return n;
 }
