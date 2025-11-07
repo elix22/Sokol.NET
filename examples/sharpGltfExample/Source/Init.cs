@@ -58,35 +58,34 @@ public static unsafe partial class SharpGLTFApp
         // Initialize UI state - show model browser by default
         state.ui.model_browser_open = true;
 
-        // Initialize lighting system - Multi-light setup for both indoor and outdoor scenes
-        // INCREASED INTENSITIES: Without IBL, we need much brighter punctual lights
-        // Light 1: Main directional light (sun) - provides broad coverage for outdoor/large indoor spaces
+        // Initialize lighting system - Test with VERY low values
+        // Light 1: Main directional light
         state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(-0.3f, -0.7f, -0.5f),   // Direction (from upper right, angled down)
-            new Vector3(1.0f, 0.95f, 0.85f),    // Warm white (sun color)
-            5.0f                                 // Intensity (increased from 1.5 for no-IBL mode)
+            new Vector3(-0.3f, -0.7f, -0.5f),
+            new Vector3(1.0f, 0.95f, 0.85f),
+            2f                                 // Test: very low
         ));
 
-        // Light 2: Fill directional light - softens shadows and provides ambient-like fill
+        // Light 2: Fill light
         state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(0.5f, -0.3f, 0.3f),     // Direction (from opposite side, shallower angle)
-            new Vector3(0.6f, 0.7f, 0.9f),      // Cool blue-tinted (sky light)
-            2.0f                                 // Intensity (increased from 0.4 for no-IBL mode)
+            new Vector3(0.5f, -0.3f, 0.3f),
+            new Vector3(0.6f, 0.7f, 0.9f),
+            0.1f                                 // Test: very low
         ));
 
-        // Light 3: Point light - for localized indoor lighting or accent
+        // Light 3: Point light
         state.lights.Add(Light.CreatePointLight(
-            new Vector3(0.0f, 15.0f, 0.0f),     // Position - overhead
-            new Vector3(1.0f, 0.9f, 0.8f),      // Warm white
-            800.0f,                              // High intensity (increased from 300)
-            100.0f                               // Large range
+            new Vector3(0.0f, 15.0f, 0.0f),
+            new Vector3(1.0f, 0.9f, 0.8f),
+            4.0f,                               // Test: very low
+            100.0f
         ));
 
-        // Light 4: Back/rim light - adds depth and separation
+        // Light 4: Back light
         state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(0.2f, 0.1f, 0.8f),      // Direction (from behind)
-            new Vector3(0.8f, 0.85f, 1.0f),     // Slightly blue
-            1.5f                                 // Intensity (increased from 0.3 for no-IBL mode)
+            new Vector3(0.2f, 0.1f, 0.8f),
+            new Vector3(0.8f, 0.85f, 1.0f),
+            0.08f                                // Test: very low
         ));
 
         state.pass_action = default;
