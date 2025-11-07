@@ -624,6 +624,40 @@ public static unsafe partial class SharpGLTFApp
                         skinningLightParams.light_params_data[i] = lightParams.light_params_data[i];
                     }
                     sg_apply_uniforms(UB_skinning_light_params, SG_RANGE(ref skinningLightParams));
+                    
+                    // Camera params (required by pbr.glsl) - SKINNED VERSION
+                    skinning_camera_params_t cameraParams = new skinning_camera_params_t();
+                    cameraParams.u_Camera = state.camera.EyePos;
+                    sg_apply_uniforms(UB_skinning_camera_params, SG_RANGE(ref cameraParams));
+                    
+                    // IBL params (required by pbr.glsl) - SKINNED VERSION
+                    skinning_ibl_params_t iblParams = new skinning_ibl_params_t();
+                    iblParams.u_EnvIntensity = 0.3f;  // Reduced from 1.0
+                    iblParams.u_EnvBlurNormalized = 0.0f;
+                    iblParams.u_MipCount = 1;
+                    iblParams.u_EnvRotation = Matrix4x4.Identity;
+                    unsafe {
+                        iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
+                        iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
+                    }
+                    sg_apply_uniforms(UB_skinning_ibl_params, SG_RANGE(ref iblParams));
+                    
+                    // Tonemapping params (required by pbr.glsl) - SKINNED VERSION
+                    skinning_tonemapping_params_t tonemappingParams = new skinning_tonemapping_params_t();
+                    tonemappingParams.u_Exposure = 1.0f;
+                    sg_apply_uniforms(UB_skinning_tonemapping_params, SG_RANGE(ref tonemappingParams));
+                    
+                    // Rendering flags (required by pbr.glsl) - SKINNED VERSION
+                    skinning_rendering_flags_t renderingFlags = new skinning_rendering_flags_t();
+                    renderingFlags.use_ibl = 0; // Disabled IBL temporarily for debugging
+                    renderingFlags.use_punctual_lights = 1; // Enable punctual lights
+                    renderingFlags.use_tonemapping = 0; // Disabled for now
+                    renderingFlags.linear_output = 0;
+                    renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
+                    renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
+                    renderingFlags.use_morphing = 0;
+                    renderingFlags.has_morph_targets = 0;
+                    sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
                 }
                 else
                 {
@@ -694,7 +728,8 @@ public static unsafe partial class SharpGLTFApp
                     
                     // IBL params (required by pbr.glsl)
                     ibl_params_t iblParams = new ibl_params_t();
-                    iblParams.u_EnvIntensity = 1.0f;
+                    // Use very low intensity for white cubemap fallback to avoid overexposure
+                    iblParams.u_EnvIntensity = 0.3f;  // Reduced from 1.0
                     iblParams.u_EnvBlurNormalized = 0.0f;
                     iblParams.u_MipCount = 1;
                     iblParams.u_EnvRotation = Matrix4x4.Identity;
@@ -711,7 +746,8 @@ public static unsafe partial class SharpGLTFApp
                     
                     // Rendering flags (required by pbr.glsl)
                     rendering_flags_t renderingFlags = new rendering_flags_t();
-                    renderingFlags.use_ibl = 1; // Enable IBL (using white cubemaps as fallback)
+                    // Temporarily disable IBL to test if that's causing the white screen
+                    renderingFlags.use_ibl = 0; // Disabled IBL temporarily for debugging
                     renderingFlags.use_punctual_lights = 1; // Enable punctual lights
                     renderingFlags.use_tonemapping = 0; // Disabled for now
                     renderingFlags.linear_output = 0;

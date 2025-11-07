@@ -18,8 +18,6 @@ using static Sokol.SImgui;
 using Imgui;
 using static Imgui.ImguiNative;
 using SharpGLTF.Schema2;
-using static cgltf_sapp_shader_cs_cgltf.Shaders;
-using static cgltf_sapp_shader_skinning_cs_skinning.Shaders;
 
 public static unsafe partial class SharpGLTFApp
 {

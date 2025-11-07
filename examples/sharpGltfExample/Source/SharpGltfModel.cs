@@ -267,8 +267,10 @@ namespace Sokol
 
             // Get positions
             var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
-            var normals = primitive.GetVertexAccessor("NORMAL")?.AsVector3Array();
-            var texCoords = primitive.GetVertexAccessor("TEXCOORD_0")?.AsVector2Array();
+            var normals = primitive.GetVertexAccessor("NORMAL")?.AsVector4Array();
+            var tangents = primitive.GetVertexAccessor("TANGENT")?.AsVector4Array();
+            var texCoords0 = primitive.GetVertexAccessor("TEXCOORD_0")?.AsVector2Array();
+            var texCoords1 = primitive.GetVertexAccessor("TEXCOORD_1")?.AsVector2Array();
             var colors = primitive.GetVertexAccessor("COLOR_0")?.AsColorArray();
             var joints = primitive.GetVertexAccessor("JOINTS_0")?.AsVector4Array();
             var weights = primitive.GetVertexAccessor("WEIGHTS_0")?.AsVector4Array();
@@ -298,7 +300,8 @@ namespace Sokol
             Info($"  - Vertices: {vertexCount}", "SharpGLTF");
             Info($"  - Index type: {(needs32BitIndices ? "32-bit" : "16-bit")} (max vertex index: {vertexCount - 1})", "SharpGLTF");
             Info($"  - Has normals: {normals != null}", "SharpGLTF");
-            Info($"  - Has texcoords: {texCoords != null}", "SharpGLTF");
+            Info($"  - Has tangents: {tangents != null}", "SharpGLTF");
+            Info($"  - Has texcoords: {texCoords0 != null}", "SharpGLTF");
             Info($"  - Has vertex colors: {colors != null}", "SharpGLTF");
             Info($"  - Has skinning: {hasSkinning}", "SharpGLTF");
 
@@ -307,8 +310,24 @@ namespace Sokol
             {
                 Vertex vertex = new Vertex();
                 vertex.Position = positions[i];
-                vertex.Normal = normals != null && i < normals.Count ? normals[i] : Vector3.UnitY;
-                vertex.TexCoord = texCoords != null && i < texCoords.Count ? texCoords[i] : Vector2.Zero;
+                
+                // Normal (convert Vector4 to Vector3)
+                if (normals != null && i < normals.Count)
+                {
+                    var n = normals[i];
+                    vertex.Normal = new Vector3(n.X, n.Y, n.Z);
+                }
+                else
+                {
+                    vertex.Normal = Vector3.UnitY;
+                }
+                
+                // Tangent (vec4 with w = handedness)
+                vertex.Tangent = tangents != null && i < tangents.Count ? tangents[i] : new Vector4(1, 0, 0, 1);
+                
+                // Texture coordinates
+                vertex.TexCoord0 = texCoords0 != null && i < texCoords0.Count ? texCoords0[i] : Vector2.Zero;
+                vertex.TexCoord1 = texCoords1 != null && i < texCoords1.Count ? texCoords1[i] : Vector2.Zero;
                 
                 // Use vertex color if available, otherwise use material color
                 if (colors != null && i < colors.Count)
@@ -325,13 +344,13 @@ namespace Sokol
                     var joint = joints![i];
                     var weight = weights![i];
 
-                    // Set bone IDs as unsigned integers (matching shader uvec4)
-                    vertex.SetBoneIDs(new int[] { (int)joint.X, (int)joint.Y, (int)joint.Z, (int)joint.W });
+                    // Set bone IDs directly as vec4 (matching shader vec4 joints_0)
+                    vertex.Joints = joint;
                     vertex.BoneWeights = weight;
                 }
                 else
                 {
-                    vertex.SetBoneIDs(new int[] { 0, 0, 0, 0 });
+                    vertex.Joints = Vector4.Zero;
                     vertex.BoneWeights = Vector4.Zero;
                 }
 

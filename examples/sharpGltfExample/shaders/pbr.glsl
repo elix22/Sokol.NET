@@ -34,8 +34,8 @@ layout(location=5) in vec4 color_0;
 layout(location=6) in vec4 joints_0;    // Bone indices for skinning
 layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
-// Uniforms
-@include vs_uniforms.glsl
+// Uniforms (PBR-specific, separate from cgltf-sapp.glsl)
+@include pbr_vs_uniforms.glsl
 
 // Rendering feature flags (needed for morphing runtime checks)
 layout(binding=7) uniform rendering_flags {
@@ -162,8 +162,8 @@ in mat3 v_TBN;
 // Fragment output
 out vec4 frag_color;
 
-// Material uniforms
-@include fs_uniforms.glsl
+// Material uniforms (PBR-specific, separate from cgltf-sapp.glsl)
+@include pbr_fs_uniforms.glsl
 
 // Camera position
 layout(binding=4) uniform camera_params {
@@ -377,6 +377,11 @@ void main() {
         
         // Combine diffuse and specular
         color = diffuse + specular;
+    }
+    else {
+        // When IBL is disabled, add basic ambient contribution from ambient_strength
+        // This prevents completely black areas when no lights are present
+        color = diffuseColor * ambient_strength;
     }
     
     

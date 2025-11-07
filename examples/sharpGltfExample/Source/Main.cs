@@ -174,7 +174,7 @@ public static unsafe partial class SharpGLTFApp
 
         // Lighting system
         public List<Light> lights = new List<Light>();
-        public float ambientStrength = 0.03f;   // Ambient light strength (0.0 to 1.0)
+        public float ambientStrength = 0.8f;    // Increased ambient light strength for PBR shader without IBL (0.0 to 1.0)
         
         // Bloom post-processing
         public BloomPass bloom;

@@ -59,25 +59,26 @@ public static unsafe partial class SharpGLTFApp
         state.ui.model_browser_open = true;
 
         // Initialize lighting system - Multi-light setup for both indoor and outdoor scenes
+        // INCREASED INTENSITIES: Without IBL, we need much brighter punctual lights
         // Light 1: Main directional light (sun) - provides broad coverage for outdoor/large indoor spaces
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(-0.3f, -0.7f, -0.5f),   // Direction (from upper right, angled down)
             new Vector3(1.0f, 0.95f, 0.85f),    // Warm white (sun color)
-            1.5f                                 // Intensity
+            5.0f                                 // Intensity (increased from 1.5 for no-IBL mode)
         ));
 
         // Light 2: Fill directional light - softens shadows and provides ambient-like fill
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.5f, -0.3f, 0.3f),     // Direction (from opposite side, shallower angle)
             new Vector3(0.6f, 0.7f, 0.9f),      // Cool blue-tinted (sky light)
-            0.4f                                 // Lower intensity for fill
+            2.0f                                 // Intensity (increased from 0.4 for no-IBL mode)
         ));
 
         // Light 3: Point light - for localized indoor lighting or accent
         state.lights.Add(Light.CreatePointLight(
             new Vector3(0.0f, 15.0f, 0.0f),     // Position - overhead
             new Vector3(1.0f, 0.9f, 0.8f),      // Warm white
-            300.0f,                              // High intensity for large areas
+            800.0f,                              // High intensity (increased from 300)
             100.0f                               // Large range
         ));
 
@@ -85,7 +86,7 @@ public static unsafe partial class SharpGLTFApp
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.2f, 0.1f, 0.8f),      // Direction (from behind)
             new Vector3(0.8f, 0.85f, 1.0f),     // Slightly blue
-            0.3f                                 // Subtle intensity
+            1.5f                                 // Intensity (increased from 0.3 for no-IBL mode)
         ));
 
         state.pass_action = default;
