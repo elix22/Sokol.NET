@@ -174,6 +174,12 @@ public static unsafe partial class SharpGLTFApp
                     state.animator = new SharpGltfAnimator(state.model);
                     state.ui.animation_open = true;
                     Info("[SharpGLTF] Animator created for animated model");
+                    
+                    // Create joint matrix texture for skinning
+                    if (state.model.BoneCounter > 0)
+                    {
+                        CreateJointMatrixTexture(state.model.BoneCounter);
+                    }
                 }
                 else
                 {
@@ -322,6 +328,13 @@ public static unsafe partial class SharpGLTFApp
         if (state.animator != null)
         {
             state.animator.UpdateAnimation(deltaTime);
+            
+            // Update joint matrix texture with current bone transforms
+            if (state.jointMatrixTexture.id != 0)
+            {
+                var boneMatrices = state.animator.GetFinalBoneMatrices();
+                UpdateJointMatrixTexture(boneMatrices);
+            }
         }
 
         // Begin rendering
@@ -759,15 +772,23 @@ public static unsafe partial class SharpGLTFApp
                 }
 
                 // Draw the mesh with optional screen texture for refraction
+                // Pass joint matrix texture if we have skinning
+                sg_view jointView = useSkinning && state.jointMatrixView.id != 0 
+                    ? state.jointMatrixView
+                    : default;
+                sg_sampler jointSampler = useSkinning && state.jointMatrixSampler.id != 0 
+                    ? state.jointMatrixSampler 
+                    : default;
+                
                 if (useScreenTexture)
                 {
-                    // Pass pre-created screen view for refraction sampling
-                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler);
+                    // Pass pre-created screen view for refraction sampling + joint texture
+                    mesh.Draw(pipeline, state.transmission.screen_color_view, state.transmission.sampler, jointView, jointSampler);
                 }
                 else
                 {
-                    // Regular draw without screen texture
-                    mesh.Draw(pipeline);
+                    // Regular draw with joint texture if skinning
+                    mesh.Draw(pipeline, default, default, jointView, jointSampler);
                 }
             }
 

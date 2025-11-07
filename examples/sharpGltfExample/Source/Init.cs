@@ -222,6 +222,135 @@ public static unsafe partial class SharpGLTFApp
         Info("[Resize] Cleanup complete");
     }
 
+    /// <summary>
+    /// Creates a joint matrix texture for skinning animation.
+    /// Each joint stores 2 matrices (transform + normal) = 32 floats = 8 vec4 (RGBA)
+    /// </summary>
+    static void CreateJointMatrixTexture(int jointCount)
+    {
+        if (jointCount <= 0)
+        {
+            Info("[JointTexture] No joints, skipping texture creation");
+            return;
+        }
+
+        // Calculate texture size to hold all joint matrices
+        // Each joint needs 2 mat4 (transform + normal) = 32 floats = 8 vec4 (RGBA)
+        int width = (int)Math.Ceiling(Math.Sqrt(jointCount * 8));
+        state.jointTextureWidth = width;
+        
+        Info($"[JointTexture] Creating {width}x{width} RGBA32F texture for {jointCount} joints");
+        Info($"[JointTexture] Each joint uses 8 vec4 (32 floats): transform matrix at offset i*32, normal matrix at offset i*32+16");
+
+        // Create sampler with NEAREST filtering and CLAMP_TO_EDGE wrapping
+        if (state.jointMatrixSampler.id == 0)
+        {
+            state.jointMatrixSampler = sg_make_sampler(new sg_sampler_desc
+            {
+                min_filter = sg_filter.SG_FILTER_NEAREST,
+                mag_filter = sg_filter.SG_FILTER_NEAREST,
+                wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                label = "joint-matrix-sampler"
+            });
+        }
+
+        // Create texture with initial identity matrices
+        int texelCount = width * width;
+        
+        // Create empty stream texture (no initial data allowed with stream_update)
+        state.jointMatrixTexture = sg_make_image(new sg_image_desc
+        {
+            width = width,
+            height = width,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA32F,
+            usage = new sg_image_usage { stream_update = true }, // Allow per-frame updates
+            label = "joint-matrix-texture"
+        });
+        
+        // Create view once for the joint texture
+        state.jointMatrixView = sg_make_view(new sg_view_desc
+        {
+            texture = new sg_texture_view_desc { image = state.jointMatrixTexture },
+            label = "joint-matrix-view"
+        });
+        
+        Info($"[JointTexture] Texture created successfully (id: {state.jointMatrixTexture.id}, view: {state.jointMatrixView.id})");
+    }
+
+    /// <summary>
+    /// Updates the joint matrix texture with current bone matrices.
+    /// Packs transform and normal matrices for each joint into RGBA32F format.
+    /// </summary>
+    static unsafe void UpdateJointMatrixTexture(Matrix4x4[] boneMatrices)
+    {
+        if (state.jointMatrixTexture.id == 0 || boneMatrices == null || boneMatrices.Length == 0)
+        {
+            return;
+        }
+
+        int jointCount = boneMatrices.Length;
+        int width = state.jointTextureWidth;
+        
+        // Allocate float array: width² × 4 (RGBA)
+        int texelCount = width * width;
+        float[] textureData = new float[texelCount * 4];
+        
+        // Initialize to zero
+        Array.Clear(textureData, 0, textureData.Length);
+        
+        // Only update as many joints as we have space for
+        int maxJoints = Math.Min(jointCount, texelCount / 8);
+        for (int i = 0; i < maxJoints; i++)
+        {
+            Matrix4x4 jointMatrix = boneMatrices[i];
+            
+            // Calculate normal matrix: transpose(inverse(mat3(jointMatrix)))
+            // For skinning, this transforms normals correctly in the joint's local space
+            Matrix4x4 normalMatrix;
+            if (Matrix4x4.Invert(jointMatrix, out normalMatrix))
+            {
+                normalMatrix = Matrix4x4.Transpose(normalMatrix);
+            }
+            else
+            {
+                // Fallback to identity if inversion fails
+                normalMatrix = Matrix4x4.Identity;
+            }
+            
+            // Store transform matrix at offset i*32 (4 vec4 = 16 floats)
+            CopyMatrix4x4ToFloatArray(jointMatrix, textureData, i * 32);
+            
+            // Store normal matrix at offset i*32 + 16 (4 vec4 = 16 floats)
+            CopyMatrix4x4ToFloatArray(normalMatrix, textureData, i * 32 + 16);
+        }
+        
+        // Upload to GPU
+        fixed (float* ptr = textureData)
+        {
+            var imageData = new sg_image_data();
+            imageData.mip_levels[0].ptr = ptr;
+            imageData.mip_levels[0].size = (nuint)(textureData.Length * sizeof(float));
+            
+            sg_update_image(state.jointMatrixTexture, in imageData);
+        }
+    }
+
+    /// <summary>
+    /// Copies a Matrix4x4 into a float array in ROW-MAJOR order for texture storage.
+    /// Unlike uniforms which expect column-major, texture storage with texelFetch 
+    /// expects row-major data because the shader reads vec4s as matrix rows.
+    /// </summary>
+    static void CopyMatrix4x4ToFloatArray(Matrix4x4 mat, float[] arr, int offset)
+    {
+        // Row-major order (don't transpose) - texelFetch reads vec4 as matrix rows
+        // Store as: [M11,M12,M13,M14], [M21,M22,M23,M24], [M31,M32,M33,M34], [M41,M42,M43,M44]
+        arr[offset + 0] = mat.M11; arr[offset + 1] = mat.M12; arr[offset + 2] = mat.M13; arr[offset + 3] = mat.M14;
+        arr[offset + 4] = mat.M21; arr[offset + 5] = mat.M22; arr[offset + 6] = mat.M23; arr[offset + 7] = mat.M24;
+        arr[offset + 8] = mat.M31; arr[offset + 9] = mat.M32; arr[offset + 10] = mat.M33; arr[offset + 11] = mat.M34;
+        arr[offset + 12] = mat.M41; arr[offset + 13] = mat.M42; arr[offset + 14] = mat.M43; arr[offset + 15] = mat.M44;
+    }
+
     static void InitializeBloom()
     {
         // Get screen dimensions (we'll create bloom textures at 1/2 resolution for performance)
@@ -807,6 +936,25 @@ public static unsafe partial class SharpGLTFApp
         state.animator = null;
         state.modelLoaded = false;
         state.cameraInitialized = false;
+        
+        // Cleanup joint matrix texture if it exists
+        if (state.jointMatrixTexture.id != 0)
+        {
+            sg_uninit_image(state.jointMatrixTexture);
+            state.jointMatrixTexture = default;
+            Info("[JointTexture] Cleaned up joint matrix texture");
+        }
+        if (state.jointMatrixView.id != 0)
+        {
+            sg_uninit_view(state.jointMatrixView);
+            state.jointMatrixView = default;
+        }
+        if (state.jointMatrixSampler.id != 0)
+        {
+            sg_uninit_sampler(state.jointMatrixSampler);
+            state.jointMatrixSampler = default;
+        }
+        state.jointTextureWidth = 0;
 
         // Dispose the old model (after rendering has stopped using it)
         oldModel?.Dispose();

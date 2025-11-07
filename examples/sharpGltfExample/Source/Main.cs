@@ -25,6 +25,7 @@ public static unsafe partial class SharpGLTFApp
     static readonly string[] availableModels = new string[]
     {
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
+        "DancingGangster/glTF-Binary/DancingGangster.glb",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
@@ -42,7 +43,6 @@ public static unsafe partial class SharpGLTFApp
         "CompareIor/glTF/CompareIor.gltf",
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "CarConcept/glTF/CarConcept.gltf",
-        "DancingGangster/glTF-Binary/DancingGangster.glb",
         "CompareTransmission/glTF/CompareTransmission.gltf",
         "Lantern/glTF/Lantern.gltf",
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
@@ -144,6 +144,12 @@ public static unsafe partial class SharpGLTFApp
         public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
+
+        // Joint matrix texture for skinning (texture-based instead of uniforms)
+        public sg_image jointMatrixTexture;
+        public sg_view jointMatrixView;
+        public sg_sampler jointMatrixSampler;
+        public int jointTextureWidth = 0;  // Calculated based on bone count
 
         // Model browser
         public int currentModelIndex = 0;

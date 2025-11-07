@@ -224,7 +224,8 @@ namespace Sokol
             }
         }
 
-        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default)
+        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default, 
+                         sg_view jointMatrixView = default, sg_sampler jointMatrixSampler = default)
         {
             if (IndexCount == 0)
             {
@@ -302,6 +303,20 @@ namespace Sokol
             {
                 bind.views[10] = defaultWhite.View;
                 bind.samplers[10] = defaultWhite.Sampler;
+            }
+
+            // Binding 11: Joint matrix texture for skinning (u_jointsSampler)
+            // This is REQUIRED for skinned meshes - the shader expects this binding
+            if (jointMatrixView.id != 0 && jointMatrixSampler.id != 0)
+            {
+                bind.views[11] = jointMatrixView;
+                bind.samplers[11] = jointMatrixSampler;
+            }
+            else
+            {
+                // Even if not skinned, provide a default to avoid validation errors
+                bind.views[11] = defaultWhite.View;
+                bind.samplers[11] = defaultWhite.Sampler;
             }
 
             sg_apply_bindings(bind);
