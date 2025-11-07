@@ -48,6 +48,7 @@
       <ShaderFiles Include="shaders/cgltf-sapp.glsl" />
       <ShaderFiles Include="shaders/bloom.glsl" />
       <ShaderFiles Include="shaders/cubemap.glsl" />
+      <ShaderFiles Include="shaders/pbr.glsl" />
    </ItemGroup>
 
   <ItemGroup>

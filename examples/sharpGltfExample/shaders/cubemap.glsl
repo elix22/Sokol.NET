@@ -2,9 +2,9 @@
 @ctype vec4 System.Numerics.Vector4
 @ctype vec3 System.Numerics.Vector3
 
-
 @vs vs_cubmap
-layout(binding=0) uniform vs_params {
+
+layout(binding=0) uniform vs_cubemap_params {
  mat4 u_ViewProjectionMatrix;
  mat4 u_EnvRotation;
 };
@@ -29,7 +29,7 @@ void main()
 precision highp float;
 @include tonemapping.glsl
 
-layout(binding=1) uniform fs_params {
+layout(binding=1) uniform fs_cubemap_params {
  float u_EnvIntensity;
  float u_EnvBlurNormalized;
  int u_MipCount;
