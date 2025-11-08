@@ -468,8 +468,8 @@ void main() {
                 // Light intensity with attenuation
                 vec3 intensity = lightColor * lightIntensity * attenuation;
                 
-                // Diffuse BRDF (Lambertian) - use diffuseColor which is already baseColor * (1-metallic)
-                vec3 l_diffuse = intensity * NdotL * (diffuseColor / M_PI);
+                // Diffuse BRDF (Lambertian) - use baseColor (metallic factor handled in final mix)
+                vec3 l_diffuse = intensity * NdotL * (baseColor.rgb / M_PI);
                 
                 // Specular BRDF (GGX)
                 float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
