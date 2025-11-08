@@ -36,8 +36,8 @@ layout(binding=1) uniform metallic_params {
     // Normal map scale (strength of normal perturbation)
     float normal_map_scale;     // 1.0 = full strength, 0.2 = subtle
     // Debug view controls
-    int debug_view_enabled;     // 0 = disabled, 1 = enabled
-    int debug_view_mode;        // Which debug view to display (see DEBUG_* constants)
+    float debug_view_enabled;     // 0 = disabled, 1 = enabled
+    float debug_view_mode;        // Which debug view to display (see DEBUG_* constants)
 };
 
 // Light parameters (binding=2)

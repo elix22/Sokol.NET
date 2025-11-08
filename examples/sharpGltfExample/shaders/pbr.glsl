@@ -508,51 +508,54 @@ void main() {
     // Debug Views (bypass tone mapping/gamma for raw material visualization)
     // ========================================================================
     
-    if (debug_view_enabled != 0) {
+    if (debug_view_enabled > 0.5) {
+        // Convert float to int for robust comparison (avoids floating-point precision issues)
+        int mode = int(debug_view_mode + 0.5);
+        
         // UV coordinates
-        if (debug_view_mode == DEBUG_UV_0) {
+        if (mode == DEBUG_UV_0) {
             color = vec3(v_TexCoord0, 0.0);
         }
-        else if (debug_view_mode == DEBUG_UV_1) {
+        else if (mode == DEBUG_UV_1) {
             color = vec3(v_TexCoord1, 0.0);
         }
         // Normals
-        else if (debug_view_mode == DEBUG_NORMAL_TEXTURE) {
+        else if (mode == DEBUG_NORMAL_TEXTURE) {
             vec3 normalTex = texture(sampler2D(u_NormalTexture, u_NormalSampler), v_TexCoord0).rgb * 2.0 - 1.0;
             color = (normalTex + 1.0) / 2.0;
         }
-        else if (debug_view_mode == DEBUG_NORMAL_SHADING) {
+        else if (mode == DEBUG_NORMAL_SHADING) {
             color = (n + 1.0) / 2.0;
         }
-        else if (debug_view_mode == DEBUG_NORMAL_GEOMETRY) {
+        else if (mode == DEBUG_NORMAL_GEOMETRY) {
             vec3 ng = normalize(v_Normal);
             color = (ng + 1.0) / 2.0;
         }
-        else if (debug_view_mode == DEBUG_TANGENT) {
+        else if (mode == DEBUG_TANGENT) {
             vec3 t = normalize(v_Tangent.xyz);
             color = (t + 1.0) / 2.0;
         }
-        else if (debug_view_mode == DEBUG_BITANGENT) {
+        else if (mode == DEBUG_BITANGENT) {
             // Recalculate bitangent from normal and tangent like reference viewer does
             vec3 ng = normalize(v_Normal);
             vec3 t = normalize(v_Tangent.xyz);
             vec3 b = -cross(ng, t) * v_Tangent.w;
             color = (b + 1.0) / 2.0;
         }
-        else if (debug_view_mode == DEBUG_TANGENT_W) {
+        else if (mode == DEBUG_TANGENT_W) {
             // Tangent W is either +1 or -1, map to 0-1 range
             // Match glTF Sample Viewer: +1 (right-handed) = black, -1 (left-handed) = white
             float w = v_Tangent.w;
             color = vec3((1.0 - w) * 0.5);
         }
         // Material properties
-        else if (debug_view_mode == DEBUG_ALPHA) {
+        else if (mode == DEBUG_ALPHA) {
             color = vec3(baseColor.a);
         }
-        else if (debug_view_mode == DEBUG_OCCLUSION) {
+        else if (mode == DEBUG_OCCLUSION) {
             color = vec3(ao);
         }
-        else if (debug_view_mode == DEBUG_EMISSIVE) {
+        else if (mode == DEBUG_EMISSIVE) {
             // Show raw emissive texture/factor without strength multiplier
             vec3 emissive = emissive_factor;
             if (has_emissive_tex > 0.5) {
@@ -560,40 +563,41 @@ void main() {
             }
             color = emissive;
         }
-        else if (debug_view_mode == DEBUG_METALLIC) {
+        else if (mode == DEBUG_METALLIC) {
             color = vec3(metallic);
         }
-        else if (debug_view_mode == DEBUG_ROUGHNESS) {
+        else if (mode == DEBUG_ROUGHNESS) {
             color = vec3(perceptualRoughness);
         }
-        else if (debug_view_mode == DEBUG_BASE_COLOR) {
+        else if (mode == DEBUG_BASE_COLOR) {
             color = baseColor.rgb;
         }
         // Clearcoat
-        else if (debug_view_mode == DEBUG_CLEARCOAT_FACTOR) {
+        else if (mode == DEBUG_CLEARCOAT_FACTOR) {
             color = vec3(clearcoat_factor);
         }
-        else if (debug_view_mode == DEBUG_CLEARCOAT_ROUGHNESS) {
+        else if (mode == DEBUG_CLEARCOAT_ROUGHNESS) {
             color = vec3(clearcoat_roughness);
         }
         // Transmission
-        else if (debug_view_mode == DEBUG_TRANSMISSION_FACTOR) {
+        else if (mode == DEBUG_TRANSMISSION_FACTOR) {
             color = vec3(transmission_factor);
         }
-        else if (debug_view_mode == DEBUG_VOLUME_THICKNESS) {
+        else if (mode == DEBUG_VOLUME_THICKNESS) {
             color = vec3(thickness_factor / 10.0); // Normalize for visibility
         }
-        else if (debug_view_mode == DEBUG_IOR) {
+        else if (mode == DEBUG_IOR) {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
             color = vec3((ior - 1.0) / 1.5);
         }
-        else if (debug_view_mode == DEBUG_F0) {
+        else if (mode == DEBUG_F0) {
             // Show the F0 reflectance value
             vec3 f0 = mix(vec3(0.04), baseColor.rgb, metallic);
             color = f0;
         }
     }
-    else {
+    else 
+    {
         // Normal rendering path
         // Match reference: only apply toneMap when enabled
         // toneMap already includes linearTosRGB (gamma correction) at the end
