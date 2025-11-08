@@ -13,6 +13,10 @@ public static unsafe partial class SharpGLTFApp
 {
     static void InitApplication()
     {
+
+        // Initialize FileSystem
+        FileSystem.Instance.Initialize();
+        
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
@@ -91,8 +95,7 @@ public static unsafe partial class SharpGLTFApp
         // Initialize Image-Based Lighting (IBL)
         InitializeIBL();
 
-        // Initialize FileSystem
-        FileSystem.Instance.Initialize();
+
 
         // Load model asynchronously (FileSystem will handle platform-specific path conversion)
         FileSystem.Instance.LoadFile(filename, (path, buffer, status) =>
@@ -722,16 +725,32 @@ public static unsafe partial class SharpGLTFApp
 
         try
         {
-            // Create a test environment map for now
-            // TODO: Load proper pre-filtered environment maps from files
-            state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("test-environment");
+            // Load HDR environment map asynchronously
+            // The HDR file will be loaded via FileSystem and converted to cubemaps
+            EnvironmentMapLoader.LoadHDREnvironmentAsync("autumn_hill_view_1k.hdr", (envMap) =>
+            {
+                if (envMap != null && envMap.IsLoaded)
+                {
+                    state.environmentMap = envMap;
+                    Info($"[IBL] HDR environment map loaded successfully:");
+                    Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
+                    Info($"[IBL]   - Intensity: {state.iblIntensity}");
+                    Info($"[IBL]   - Enabled: {state.useIBL}");
+                }
+                else
+                {
+                    Warning("[IBL] Failed to load HDR, using procedural fallback");
+                    state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("fallback-environment");
+                    state.useIBL = state.environmentMap != null && state.environmentMap.IsLoaded;
+                }
+            });
 
+            // Create temporary procedural environment while HDR loads
+            state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("temp-environment");
+            
             if (state.environmentMap != null && state.environmentMap.IsLoaded)
             {
-                Info($"[IBL] Environment map loaded successfully:");
-                Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
-                Info($"[IBL]   - Intensity: {state.iblIntensity}");
-                Info($"[IBL]   - Enabled: {state.useIBL}");
+                Info($"[IBL] Temporary environment ready (will be replaced with HDR)");
             }
             else
             {

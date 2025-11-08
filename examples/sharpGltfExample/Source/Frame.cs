@@ -16,6 +16,44 @@ public static unsafe partial class SharpGLTFApp
     private static int morphWeightLogCount = 0;
     
     /// <summary>
+    /// Load IBL environment from glTF model if available.
+    /// Called after model is fully loaded.
+    /// </summary>
+    static void LoadIBLFromModel(SharpGLTF.Schema2.ModelRoot? modelRoot)
+    {
+        if (modelRoot == null)
+            return;
+
+        try
+        {
+            // Try to load IBL from the model (only if glTF has IBL extension)
+            var newEnvironmentMap = EnvironmentMapLoader.LoadFromGltfOrCreateTest(modelRoot, "model-environment");
+            
+            if (newEnvironmentMap != null && newEnvironmentMap.IsLoaded)
+            {
+                // Dispose old environment map
+                state.environmentMap?.Dispose();
+                
+                // Update with new environment map
+                state.environmentMap = newEnvironmentMap;
+                
+                Info($"[IBL] Updated environment map from model");
+                Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
+                Info($"[IBL]   - Intensity: {state.iblIntensity}");
+            }
+            else
+            {
+                // Keep existing HDR environment if model doesn't have IBL
+                Info($"[IBL] Model has no IBL, keeping existing environment map");
+            }
+        }
+        catch (Exception ex)
+        {
+            Warning($"[IBL] Failed to load IBL from model: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
     /// Applies glass material overrides if enabled, otherwise returns original values.
     /// </summary>
     static (float transmission, float ior, Vector3 attenuationColor, float attenuationDistance, float thickness) 
@@ -183,6 +221,9 @@ public static unsafe partial class SharpGLTFApp
                 {
                     CreateMorphTargetTexture(state.model);
                 }
+
+                // Try to load IBL from glTF if available
+                LoadIBLFromModel(state.pendingModelRoot);
 
                 state.modelLoaded = true;
                 state.isLoadingModel = false;
