@@ -147,22 +147,23 @@ precision highp float;
 #define DEBUG_NORMAL_GEOMETRY 5
 #define DEBUG_TANGENT 6
 #define DEBUG_BITANGENT 7
-#define DEBUG_ALPHA 8
-#define DEBUG_OCCLUSION 9
-#define DEBUG_EMISSIVE 10
-#define DEBUG_METALLIC 11
-#define DEBUG_ROUGHNESS 12
-#define DEBUG_BASE_COLOR 13
-#define DEBUG_CLEARCOAT_FACTOR 14
-#define DEBUG_CLEARCOAT_ROUGHNESS 15
-#define DEBUG_CLEARCOAT_NORMAL 16
-#define DEBUG_SHEEN_COLOR 17
-#define DEBUG_SHEEN_ROUGHNESS 18
-#define DEBUG_SPECULAR_FACTOR 19
-#define DEBUG_TRANSMISSION_FACTOR 20
-#define DEBUG_VOLUME_THICKNESS 21
-#define DEBUG_IOR 22
-#define DEBUG_F0 23
+#define DEBUG_TANGENT_W 8
+#define DEBUG_ALPHA 9
+#define DEBUG_OCCLUSION 10
+#define DEBUG_EMISSIVE 11
+#define DEBUG_METALLIC 12
+#define DEBUG_ROUGHNESS 13
+#define DEBUG_BASE_COLOR 14
+#define DEBUG_CLEARCOAT_FACTOR 15
+#define DEBUG_CLEARCOAT_ROUGHNESS 16
+#define DEBUG_CLEARCOAT_NORMAL 17
+#define DEBUG_SHEEN_COLOR 18
+#define DEBUG_SHEEN_ROUGHNESS 19
+#define DEBUG_SPECULAR_FACTOR 20
+#define DEBUG_TRANSMISSION_FACTOR 21
+#define DEBUG_VOLUME_THICKNESS 22
+#define DEBUG_IOR 23
+#define DEBUG_F0 24
 
 // Constants
 @include fs_constants.glsl
@@ -349,9 +350,6 @@ vec3 getEmissive() {
 // ============================================================================
 
 void main() {
-    // Helper function for sRGB conversion (used in debug views)
-    #define linearTosRGB(color) pow(color, vec3(1.0/2.2))
-    
     // Get material properties
     vec4 baseColor = getBaseColor();
     vec2 metallicRoughness = getMetallicRoughness();
@@ -489,7 +487,7 @@ void main() {
     
     
     // ========================================================================
-    // Debug Views (before tone mapping)
+    // Debug Views (bypass tone mapping/gamma for raw material visualization)
     // ========================================================================
     
     if (debug_view_enabled != 0) {
@@ -522,6 +520,12 @@ void main() {
             vec3 b = cross(ng, t) * v_Tangent.w;
             color = (b + 1.0) / 2.0;
         }
+        else if (debug_view_mode == DEBUG_TANGENT_W) {
+            // Tangent W is either +1 or -1, map to 0-1 range
+            // +1 (right-handed) = white, -1 (left-handed) = black
+            float w = v_Tangent.w;
+            color = vec3((w + 1.0) * 0.5);
+        }
         // Material properties
         else if (debug_view_mode == DEBUG_ALPHA) {
             color = vec3(baseColor.a);
@@ -530,7 +534,12 @@ void main() {
             color = vec3(ao);
         }
         else if (debug_view_mode == DEBUG_EMISSIVE) {
-            color = linearTosRGB(getEmissive());
+            // Show raw emissive texture/factor without strength multiplier
+            vec3 emissive = emissive_factor;
+            if (has_emissive_tex > 0.5) {
+                emissive *= texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), v_TexCoord0).rgb;
+            }
+            color = emissive;
         }
         else if (debug_view_mode == DEBUG_METALLIC) {
             color = vec3(metallic);
@@ -539,7 +548,7 @@ void main() {
             color = vec3(perceptualRoughness);
         }
         else if (debug_view_mode == DEBUG_BASE_COLOR) {
-            color = linearTosRGB(baseColor.rgb);
+            color = baseColor.rgb;
         }
         // Clearcoat
         else if (debug_view_mode == DEBUG_CLEARCOAT_FACTOR) {
@@ -565,19 +574,16 @@ void main() {
             color = f0;
         }
     }
-    
-    
-    // ========================================================================
-    // Tone mapping and output
-    // ========================================================================
-    
-    if (use_tonemapping > 0) {
-        color = toneMap(color);
-    }
-    
-    // Gamma correction (if not in linear output mode)
-    if (linear_output == 0) {
-        color = pow(color, vec3(1.0/2.2));
+    else {
+        // Normal rendering path: apply tone mapping and gamma correction
+        if (use_tonemapping > 0) {
+            color = toneMap(color);
+        }
+        
+        // Gamma correction (if not in linear output mode)
+        if (linear_output == 0) {
+            color = pow(color, vec3(1.0/2.2));
+        }
     }
     
     frag_color = vec4(color, baseColor.a);

@@ -304,6 +304,42 @@ namespace Sokol
             Info($"  - Has vertex colors: {colors != null}", "SharpGLTF");
             Info($"  - Has skinning: {hasSkinning}", "SharpGLTF");
             Info($"  - Has morph targets: {hasMorphTargets} (count: {primitive.MorphTargetsCount})", "SharpGLTF");
+            
+            // Debug: Check tangent W values
+            if (tangents != null && tangents.Count > 0)
+            {
+                var wValues = tangents.Take(Math.Min(10, tangents.Count)).Select(t => t.W).ToArray();
+                Info($"  - Tangent W values (first 10): [{string.Join(", ", wValues.Select(w => w.ToString("F2")))}]", "SharpGLTF");
+            }
+            
+            // Get indices first (needed for tangent calculation)
+            var indexAccessor = primitive.IndexAccessor;
+            List<uint> indexList = new List<uint>();
+            if (indexAccessor != null)
+            {
+                var indexArray = indexAccessor.AsIndicesArray();
+                foreach (var idx in indexArray)
+                {
+                    indexList.Add(idx);
+                }
+            }
+            else
+            {
+                // No indices - generate them
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    indexList.Add((uint)i);
+                }
+            }
+            
+            // Calculate tangents if missing (using simplified Lengyel method)
+            IList<Vector4>? calculatedTangents = null;
+            if (tangents == null && texCoords0 != null && normals != null)
+            {
+                Info($"  - Calculating missing tangents...", "SharpGLTF");
+                calculatedTangents = CalculateTangents(positions, normals, texCoords0, indexList);
+                Info($"  - Generated {calculatedTangents.Count} tangents", "SharpGLTF");
+            }
 
             // Build vertices
             for (int i = 0; i < vertexCount; i++)
@@ -323,7 +359,10 @@ namespace Sokol
                 }
                 
                 // Tangent (vec4 with w = handedness)
-                vertex.Tangent = tangents != null && i < tangents.Count ? tangents[i] : new Vector4(1, 0, 0, 1);
+                // Use calculated tangents if we generated them, otherwise use from glTF
+                vertex.Tangent = tangents != null && i < tangents.Count ? tangents[i] 
+                    : calculatedTangents != null && i < calculatedTangents.Count ? calculatedTangents[i]
+                    : new Vector4(1, 0, 0, 1);
                 
                 // Texture coordinates
                 vertex.TexCoord0 = texCoords0 != null && i < texCoords0.Count ? texCoords0[i] : Vector2.Zero;
@@ -359,50 +398,21 @@ namespace Sokol
 
             // Get indices - use 16-bit or 32-bit based on vertex count
             Mesh mesh;
-            var indexAccessor = primitive.IndexAccessor;
             
             if (needs32BitIndices)
             {
-                // Use 32-bit indices for large meshes
-                List<uint> indices32 = new List<uint>();
-                if (indexAccessor != null)
-                {
-                    var indexArray = indexAccessor.AsIndicesArray();
-                    foreach (var idx in indexArray)
-                    {
-                        indices32.Add(idx);
-                    }
-                }
-                else
-                {
-                    // No indices - generate them
-                    for (int i = 0; i < vertexCount; i++)
-                    {
-                        indices32.Add((uint)i);
-                    }
-                }
-                Info($"  - Indices: {indices32.Count} (32-bit for large mesh)", "SharpGLTF");
-                mesh = new Mesh(vertices.ToArray(), indices32.ToArray(), hasSkinning);
+                // Use 32-bit indices for large meshes (already extracted above)
+                Info($"  - Indices: {indexList.Count} (32-bit for large mesh)", "SharpGLTF");
+                mesh = new Mesh(vertices.ToArray(), indexList.ToArray(), hasSkinning);
             }
             else
             {
                 // Use 16-bit indices for smaller meshes (memory efficient)
+                // Convert from already-extracted 32-bit indices
                 List<ushort> indices16 = new List<ushort>();
-                if (indexAccessor != null)
+                foreach (var idx in indexList)
                 {
-                    var indexArray = indexAccessor.AsIndicesArray();
-                    foreach (var idx in indexArray)
-                    {
-                        indices16.Add((ushort)idx);
-                    }
-                }
-                else
-                {
-                    // No indices - generate them
-                    for (int i = 0; i < vertexCount; i++)
-                    {
-                        indices16.Add((ushort)i);
-                    }
+                    indices16.Add((ushort)idx);
                 }
                 Info($"  - Indices: {indices16.Count} (16-bit for memory efficiency)", "SharpGLTF");
                 mesh = new Mesh(vertices.ToArray(), indices16.ToArray(), hasSkinning);
@@ -658,25 +668,81 @@ namespace Sokol
                 return;
             }
 
-            var textureImage = channel.Value.Texture.PrimaryImage;
+            var gltfTexture = channel.Value.Texture;
+            var textureImage = gltfTexture.PrimaryImage;
             if (textureImage?.Content == null)
             {
                 mesh.Textures.Add(null);
                 return;
             }
 
-            // Create texture identifier matching what ImageDecoder created
-            // Use base identifier (just image index) so we reuse the pre-created texture
-            string textureId = $"image_{textureImage.LogicalIndex}";
+            // Extract sampler settings from glTF texture
+            var sampler = gltfTexture.Sampler;
+            var samplerSettings = ExtractSamplerSettings(sampler);
+
+            // Create texture identifier that includes sampler settings
+            // This ensures textures with different samplers are cached separately
+            string textureId = $"image_{textureImage.LogicalIndex}_sampler_{samplerSettings.GetHashCode()}";
 
             // All textures use RGBA8 format - manual srgb_to_linear() conversion in shader
             sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
 
-            // Look up texture in cache (should hit - ImageDecoder already created it)
-            // If not in cache (e.g., validation was skipped), create it now
+            // Look up texture in cache or create with proper sampler settings
             var imageData = textureImage.Content.Content.ToArray();
-            var texture = TextureCache.Instance.GetOrCreate(textureId, imageData, format);
+            var texture = TextureCache.Instance.GetOrCreate(textureId, imageData, format, samplerSettings);
             mesh.Textures.Add(texture);
+        }
+
+        private SamplerSettings ExtractSamplerSettings(SharpGLTF.Schema2.TextureSampler? sampler)
+        {
+            var settings = new SamplerSettings();
+            
+            if (sampler == null)
+            {
+                // Use glTF defaults
+                settings.MinFilter = sg_filter.SG_FILTER_LINEAR;
+                settings.MagFilter = sg_filter.SG_FILTER_LINEAR;
+                settings.WrapU = sg_wrap.SG_WRAP_REPEAT;
+                settings.WrapV = sg_wrap.SG_WRAP_REPEAT;
+                return settings;
+            }
+
+            // Map glTF sampler settings to Sokol
+            settings.MagFilter = sampler.MagFilter switch
+            {
+                SharpGLTF.Schema2.TextureInterpolationFilter.NEAREST => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureInterpolationFilter.LINEAR => sg_filter.SG_FILTER_LINEAR,
+                _ => sg_filter.SG_FILTER_LINEAR
+            };
+
+            settings.MinFilter = sampler.MinFilter switch
+            {
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR => sg_filter.SG_FILTER_LINEAR,
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_NEAREST => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_NEAREST => sg_filter.SG_FILTER_LINEAR,
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_LINEAR => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_LINEAR => sg_filter.SG_FILTER_LINEAR,
+                _ => sg_filter.SG_FILTER_LINEAR
+            };
+
+            settings.WrapU = sampler.WrapS switch
+            {
+                SharpGLTF.Schema2.TextureWrapMode.CLAMP_TO_EDGE => sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                SharpGLTF.Schema2.TextureWrapMode.MIRRORED_REPEAT => sg_wrap.SG_WRAP_MIRRORED_REPEAT,
+                SharpGLTF.Schema2.TextureWrapMode.REPEAT => sg_wrap.SG_WRAP_REPEAT,
+                _ => sg_wrap.SG_WRAP_REPEAT
+            };
+
+            settings.WrapV = sampler.WrapT switch
+            {
+                SharpGLTF.Schema2.TextureWrapMode.CLAMP_TO_EDGE => sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                SharpGLTF.Schema2.TextureWrapMode.MIRRORED_REPEAT => sg_wrap.SG_WRAP_MIRRORED_REPEAT,
+                SharpGLTF.Schema2.TextureWrapMode.REPEAT => sg_wrap.SG_WRAP_REPEAT,
+                _ => sg_wrap.SG_WRAP_REPEAT
+            };
+
+            return settings;
         }
 
         private void ProcessAnimations()
@@ -940,6 +1006,91 @@ namespace Sokol
             }
 
             return nodeData;
+        }
+        
+        /// <summary>
+        /// Calculate tangents using the Lengyel method (simplified version of MikkTSpace)
+        /// Reference: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#meshes
+        /// </summary>
+        private static IList<Vector4> CalculateTangents(
+            IReadOnlyList<Vector3> positions,
+            IReadOnlyList<Vector4> normals,
+            IReadOnlyList<Vector2> texCoords,
+            IList<uint> indices)
+        {
+            int vertexCount = positions.Count;
+            var tangents = new Vector4[vertexCount];
+            var tan1 = new Vector3[vertexCount];
+            var tan2 = new Vector3[vertexCount];
+
+            // Calculate tangent and bitangent for each triangle
+            for (int i = 0; i < indices.Count; i += 3)
+            {
+                int i1 = (int)indices[i];
+                int i2 = (int)indices[i + 1];
+                int i3 = (int)indices[i + 2];
+
+                Vector3 v1 = positions[i1];
+                Vector3 v2 = positions[i2];
+                Vector3 v3 = positions[i3];
+
+                Vector2 w1 = texCoords[i1];
+                Vector2 w2 = texCoords[i2];
+                Vector2 w3 = texCoords[i3];
+
+                float x1 = v2.X - v1.X;
+                float x2 = v3.X - v1.X;
+                float y1 = v2.Y - v1.Y;
+                float y2 = v3.Y - v1.Y;
+                float z1 = v2.Z - v1.Z;
+                float z2 = v3.Z - v1.Z;
+
+                float s1 = w2.X - w1.X;
+                float s2 = w3.X - w1.X;
+                float t1 = w2.Y - w1.Y;
+                float t2 = w3.Y - w1.Y;
+
+                float r = s1 * t2 - s2 * t1;
+                if (Math.Abs(r) < 0.000001f) r = 1.0f;
+                r = 1.0f / r;
+
+                Vector3 sdir = new Vector3(
+                    (t2 * x1 - t1 * x2) * r,
+                    (t2 * y1 - t1 * y2) * r,
+                    (t2 * z1 - t1 * z2) * r
+                );
+
+                Vector3 tdir = new Vector3(
+                    (s1 * x2 - s2 * x1) * r,
+                    (s1 * y2 - s2 * y1) * r,
+                    (s1 * z2 - s2 * z1) * r
+                );
+
+                tan1[i1] += sdir;
+                tan1[i2] += sdir;
+                tan1[i3] += sdir;
+
+                tan2[i1] += tdir;
+                tan2[i2] += tdir;
+                tan2[i3] += tdir;
+            }
+
+            // Orthogonalize and calculate handedness
+            for (int i = 0; i < vertexCount; i++)
+            {
+                Vector3 n = new Vector3(normals[i].X, normals[i].Y, normals[i].Z);
+                Vector3 t = tan1[i];
+
+                // Gram-Schmidt orthogonalize
+                Vector3 tangent = Vector3.Normalize(t - n * Vector3.Dot(n, t));
+
+                // Calculate handedness
+                float w = (Vector3.Dot(Vector3.Cross(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
+
+                tangents[i] = new Vector4(tangent.X, tangent.Y, tangent.Z, w);
+            }
+
+            return tangents.ToList();
         }
 
         public void Dispose()

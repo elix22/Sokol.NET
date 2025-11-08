@@ -147,7 +147,7 @@ namespace Sokol
             if (_defaultWhiteTexture == null)
             {
                 byte* whitePixel = stackalloc byte[4] { 255, 255, 255, 255 };
-                _defaultWhiteTexture = new Texture(whitePixel, 1, 1, "default-white-texture");
+                _defaultWhiteTexture = new Texture(whitePixel, 1, 1, "default-white-texture", SG.sg_pixel_format.SG_PIXELFORMAT_RGBA8);
             }
             return _defaultWhiteTexture;
         }
@@ -158,7 +158,7 @@ namespace Sokol
             {
                 // Normal map default: (0.5, 0.5, 1.0) in RGB = (128, 128, 255, 255)
                 byte* normalPixel = stackalloc byte[4] { 128, 128, 255, 255 };
-                _defaultNormalTexture = new Texture(normalPixel, 1, 1, "default-normal-texture");
+                _defaultNormalTexture = new Texture(normalPixel, 1, 1, "default-normal-texture", SG.sg_pixel_format.SG_PIXELFORMAT_RGBA8);
             }
             return _defaultNormalTexture;
         }
@@ -168,7 +168,7 @@ namespace Sokol
             if (_defaultBlackTexture == null)
             {
                 byte* blackPixel = stackalloc byte[4] { 0, 0, 0, 255 };
-                _defaultBlackTexture = new Texture(blackPixel, 1, 1, "default-black-texture");
+                _defaultBlackTexture = new Texture(blackPixel, 1, 1, "default-black-texture", SG.sg_pixel_format.SG_PIXELFORMAT_RGBA8);
             }
             return _defaultBlackTexture;
         }

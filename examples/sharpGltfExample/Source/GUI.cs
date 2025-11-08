@@ -872,27 +872,28 @@ public static unsafe partial class SharpGLTFApp
                 if (igRadioButton_IntPtr("Normal (Geometry)", ref state.ui.debug_view_mode, 5)) { }
                 if (igRadioButton_IntPtr("Tangent", ref state.ui.debug_view_mode, 6)) { }
                 if (igRadioButton_IntPtr("Bitangent", ref state.ui.debug_view_mode, 7)) { }
+                if (igRadioButton_IntPtr("Tangent W", ref state.ui.debug_view_mode, 8)) { }
                 
                 igNewLine();
                 igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Material Properties:");
-                if (igRadioButton_IntPtr("Alpha", ref state.ui.debug_view_mode, 8)) { }
-                if (igRadioButton_IntPtr("Occlusion", ref state.ui.debug_view_mode, 9)) { }
-                if (igRadioButton_IntPtr("Emissive", ref state.ui.debug_view_mode, 10)) { }
-                if (igRadioButton_IntPtr("Metallic", ref state.ui.debug_view_mode, 11)) { }
-                if (igRadioButton_IntPtr("Roughness", ref state.ui.debug_view_mode, 12)) { }
-                if (igRadioButton_IntPtr("Base Color", ref state.ui.debug_view_mode, 13)) { }
+                if (igRadioButton_IntPtr("Alpha", ref state.ui.debug_view_mode, 9)) { }
+                if (igRadioButton_IntPtr("Occlusion", ref state.ui.debug_view_mode, 10)) { }
+                if (igRadioButton_IntPtr("Emissive", ref state.ui.debug_view_mode, 11)) { }
+                if (igRadioButton_IntPtr("Metallic", ref state.ui.debug_view_mode, 12)) { }
+                if (igRadioButton_IntPtr("Roughness", ref state.ui.debug_view_mode, 13)) { }
+                if (igRadioButton_IntPtr("Base Color", ref state.ui.debug_view_mode, 14)) { }
                 
                 igNewLine();
                 igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Clearcoat:");
-                if (igRadioButton_IntPtr("Clearcoat Factor", ref state.ui.debug_view_mode, 14)) { }
-                if (igRadioButton_IntPtr("Clearcoat Roughness", ref state.ui.debug_view_mode, 15)) { }
+                if (igRadioButton_IntPtr("Clearcoat Factor", ref state.ui.debug_view_mode, 15)) { }
+                if (igRadioButton_IntPtr("Clearcoat Roughness", ref state.ui.debug_view_mode, 16)) { }
                 
                 igNewLine();
                 igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Transmission/Glass:");
-                if (igRadioButton_IntPtr("Transmission Factor", ref state.ui.debug_view_mode, 20)) { }
-                if (igRadioButton_IntPtr("Volume Thickness", ref state.ui.debug_view_mode, 21)) { }
-                if (igRadioButton_IntPtr("Index of Refraction (IOR)", ref state.ui.debug_view_mode, 22)) { }
-                if (igRadioButton_IntPtr("F0 (Fresnel at 0°)", ref state.ui.debug_view_mode, 23)) { }
+                if (igRadioButton_IntPtr("Transmission Factor", ref state.ui.debug_view_mode, 21)) { }
+                if (igRadioButton_IntPtr("Volume Thickness", ref state.ui.debug_view_mode, 22)) { }
+                if (igRadioButton_IntPtr("Index of Refraction (IOR)", ref state.ui.debug_view_mode, 23)) { }
+                if (igRadioButton_IntPtr("F0 (Fresnel at 0°)", ref state.ui.debug_view_mode, 24)) { }
             }
         }
         igEnd();

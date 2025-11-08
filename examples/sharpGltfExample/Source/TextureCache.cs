@@ -27,9 +27,9 @@ namespace Sokol
         }
 
         /// <summary>
-        /// Get or create a texture from raw data.
+        /// Get or create a texture from raw data with sampler settings.
         /// </summary>
-        public unsafe Texture GetOrCreate(string identifier, byte* data, int width, int height, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
+        public unsafe Texture GetOrCreate(string identifier, byte* data, int width, int height, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8, SamplerSettings? samplerSettings = null)
         {
             // Include format in cache key to handle different formats of same texture
             string cacheKey = $"{identifier}_{format}";
@@ -44,15 +44,15 @@ namespace Sokol
             _cacheMisses++;
             Info($"[TextureCache] Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})");
             
-            var texture = new Texture(data, width, height, identifier, format);
+            var texture = new Texture(data, width, height, identifier, format, samplerSettings);
             _cache[cacheKey] = texture;
             return texture;
         }
 
         /// <summary>
-        /// Get or create a texture from memory data.
+        /// Get or create a texture from memory data with sampler settings.
         /// </summary>
-        public Texture? GetOrCreate(string identifier, byte[] data, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
+        public Texture? GetOrCreate(string identifier, byte[] data, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8, SamplerSettings? samplerSettings = null)
         {
             // Include format in cache key to handle different formats of same texture
             string cacheKey = $"{identifier}_{format}";
@@ -67,7 +67,7 @@ namespace Sokol
             _cacheMisses++;
             Info($"Cache MISS for '{identifier}' (format: {format}) - creating new texture (Total hits: {_cacheHits}, misses: {_cacheMisses})", "TextureCache");
 
-            var texture = Texture.LoadFromMemory(data, identifier, format);
+            var texture = Texture.LoadFromMemory(data, identifier, format, samplerSettings);
             if (texture != null)
             {
                 _cache[cacheKey] = texture;

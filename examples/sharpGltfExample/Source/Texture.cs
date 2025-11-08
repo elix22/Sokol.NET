@@ -16,9 +16,11 @@ namespace Sokol
         private bool disposed;
         private string? _cacheKey; // Track the cache key for removal on dispose
 
-        public unsafe Texture(byte* pixels, int width, int height, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
+        public unsafe Texture(void* pixels, int width, int height, string label, sg_pixel_format format, SamplerSettings? samplerSettings = null)
         {
             _cacheKey = label; // Use label as cache key
+            
+            samplerSettings ??= new SamplerSettings(); // Use defaults if null
             
             // Create image
             var img_desc = new sg_image_desc
@@ -38,23 +40,23 @@ namespace Sokol
                 label = $"{label}-view"
             });
 
-            // Create sampler
+            // Create sampler with proper settings from glTF
             Sampler = sg_make_sampler(new sg_sampler_desc
             {
-                min_filter = sg_filter.SG_FILTER_LINEAR,
-                mag_filter = sg_filter.SG_FILTER_LINEAR,
-                wrap_u = sg_wrap.SG_WRAP_REPEAT,
-                wrap_v = sg_wrap.SG_WRAP_REPEAT,
+                min_filter = samplerSettings.MinFilter,
+                mag_filter = samplerSettings.MagFilter,
+                wrap_u = samplerSettings.WrapU,
+                wrap_v = samplerSettings.WrapV,
                 label = $"{label}-sampler"
             });
         }
 
-        public static unsafe Texture? LoadFromMemory(byte[] data, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8)
+        public static unsafe Texture? LoadFromMemory(byte[] data, string label, sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8, SamplerSettings? samplerSettings = null)
         {
             // Check if this is a basisu/basis file by checking magic bytes
             if (IsBasisImage(data))
             {
-                return LoadFromMemoryBasisU(data, label);
+                return LoadFromMemoryBasisU(data, label, samplerSettings);
             }
             
             // Regular PNG/JPEG loading via stb_image
@@ -71,7 +73,7 @@ namespace Sokol
             if (pixels == null)
                 return null;
 
-            var texture = new Texture(pixels, width, height, label, format);
+            var texture = new Texture(pixels, width, height, label, format, samplerSettings);
             stbi_image_free_csharp(pixels);
             return texture;
         }
@@ -86,10 +88,12 @@ namespace Sokol
             return true;
         }
 
-        private static unsafe Texture? LoadFromMemoryBasisU(byte[] data, string label)
+        private static unsafe Texture? LoadFromMemoryBasisU(byte[] data, string label, SamplerSettings? samplerSettings = null)
         {
             var texture = new Texture();
             texture._cacheKey = label;
+            
+            samplerSettings ??= new SamplerSettings(); // Use defaults if null
             
             // Create basisu image using sokol-basisu
             texture.Image = sbasisu_make_image(SG_RANGE(data));
@@ -103,21 +107,19 @@ namespace Sokol
                 texture = new sg_texture_view_desc { image = texture.Image },
                 label = $"{label}-view"
             });
-
-            // Create sampler
+            
+            // Create sampler with proper settings from glTF
             texture.Sampler = sg_make_sampler(new sg_sampler_desc
             {
-                min_filter = sg_filter.SG_FILTER_LINEAR,
-                mag_filter = sg_filter.SG_FILTER_LINEAR,
-                wrap_u = sg_wrap.SG_WRAP_REPEAT,
-                wrap_v = sg_wrap.SG_WRAP_REPEAT,
+                min_filter = samplerSettings.MinFilter,
+                mag_filter = samplerSettings.MagFilter,
+                wrap_u = samplerSettings.WrapU,
+                wrap_v = samplerSettings.WrapV,
                 label = $"{label}-sampler"
             });
             
             return texture;
-        }
-        
-        // Private parameterless constructor for basisu loading
+        }        // Private parameterless constructor for basisu loading
         private Texture() { }
 
         public void Dispose()
