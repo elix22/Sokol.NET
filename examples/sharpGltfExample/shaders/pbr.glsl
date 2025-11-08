@@ -121,7 +121,9 @@ void main() {
     
     // Transform tangent to world space and build TBN matrix
     vec3 tangentW = vec3(model * vec4(skinnedTangent, 0.0));
-    vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
+    // TBD ELI , not sure if it should be negated or not 
+    // Debug View , Recalculates bitangent from normal and tangent the same why
+    vec3 bitangentW = -cross(normalW, tangentW) * tangent.w;
     
     // Normalize after cross product, bitangent first then tangent (matches glTF Sample Viewer)
     bitangentW = normalize(bitangentW);

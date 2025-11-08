@@ -48,7 +48,7 @@ public static unsafe partial class SharpGLTFApp
         // Initialize lighting system - Test with VERY low values
         // Light 1: Main directional light
         state.lights.Add(Light.CreateDirectionalLight(
-            new Vector3(-0.3f, -0.7f, -0.5f),
+            new Vector3(-0.5f, 0.3f, -0.3f),
             new Vector3(1.0f, 0.95f, 0.85f),
             5f                                 // Test: very low
         ));
@@ -56,23 +56,23 @@ public static unsafe partial class SharpGLTFApp
         // Light 2: Fill light
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.5f, -0.3f, 0.3f),
-            new Vector3(0.6f, 0.7f, 0.9f),
-            4f                                 // Test: very low
+            new Vector3(1.0f, 1f, 1f),
+            2f                                 // Test: very low
         ));
 
-        // Light 3: Point light
-        state.lights.Add(Light.CreatePointLight(
-            new Vector3(0.0f, 15.0f, 0.0f),
-            new Vector3(1.0f, 0.9f, 0.8f),
-            4.0f,                               // Test: very low
-            100.0f
-        ));
+        // // Light 3: Point light
+        // state.lights.Add(Light.CreatePointLight(
+        //     new Vector3(0.0f, 15.0f, 0.0f),
+        //     new Vector3(1.0f, 0.9f, 0.8f),
+        //     4.0f,                               // Test: very low
+        //     100.0f
+        // ));
 
         // Light 4: Back light
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.2f, 0.1f, 0.8f),
             new Vector3(0.8f, 0.85f, 1.0f),
-            0.08f                                // Test: very low
+            2f                                // Test: very low
         ));
 
         state.pass_action = default;
