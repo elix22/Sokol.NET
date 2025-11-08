@@ -460,15 +460,29 @@ void main() {
             float VdotH = clampedDot(v, h);
             
             if (NdotL > 0.0 || NdotV > 0.0) {
-                // Calculate BRDF
-                vec3 F = F_Schlick(specularColor, f90, VdotH);
+                // Fresnel for dielectrics and metals
+                vec3 dielectric_fresnel = F_Schlick(f0, f90, abs(VdotH));
+                vec3 metal_fresnel = F_Schlick(baseColor.rgb, vec3(1.0), abs(VdotH));
+                
+                // Light intensity with attenuation
+                vec3 intensity = lightColor * lightIntensity * attenuation;
+                
+                // Diffuse BRDF (Lambertian)
+                vec3 l_diffuse = intensity * NdotL * (baseColor.rgb / M_PI);
+                
+                // Specular BRDF (GGX)
                 float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
                 float D = D_GGX(NdotH, alphaRoughness);
+                vec3 l_specular = intensity * NdotL * vec3(Vis * D);
                 
-                vec3 diffuseContrib = (1.0 - F) * diffuseColor / M_PI;
-                vec3 specContrib = F * Vis * D;
+                // Combine using Fresnel
+                vec3 l_metal_brdf = metal_fresnel * l_specular;
+                vec3 l_dielectric_brdf = mix(l_diffuse, l_specular, dielectric_fresnel);
                 
-                color += NdotL * lightColor * lightIntensity * attenuation * (diffuseContrib + specContrib);
+                // Final light contribution (mix between dielectric and metal based on metallic)
+                vec3 l_color = mix(l_dielectric_brdf, l_metal_brdf, metallic);
+                
+                color += l_color;
             }
         }
     }
@@ -579,14 +593,11 @@ void main() {
         }
     }
     else {
-        // Normal rendering path: apply tone mapping and gamma correction
+        // Normal rendering path
+        // Match reference: only apply toneMap when enabled
+        // toneMap already includes linearTosRGB (gamma correction) at the end
         if (use_tonemapping > 0) {
             color = toneMap(color);
-        }
-        
-        // Gamma correction (if not in linear output mode)
-        if (linear_output == 0) {
-            color = pow(color, vec3(1.0/2.2));
         }
     }
     
