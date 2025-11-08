@@ -1,10 +1,8 @@
-using System;
-using System.Collections.Generic;
+
 using System.Numerics;
 using static Sokol.SG;
 using static Sokol.Utils;
 using SharpGLTF.Schema2;
-using static pbr_shader_cs.Shaders;
 
 namespace Sokol
 {

@@ -1,4 +1,4 @@
-using System;
+
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Sokol;
@@ -6,7 +6,6 @@ using static Sokol.SG;
 using static Sokol.Utils;
 using static Sokol.SApp;
 using SharpGLTF.Schema2;
-using pbr_shader_cs;
 using static pbr_shader_skinning_morphing_cs_skinning_morphing.Shaders;
 
 public static unsafe partial class SharpGLTFApp

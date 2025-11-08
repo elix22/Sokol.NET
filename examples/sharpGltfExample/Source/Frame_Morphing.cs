@@ -1,12 +1,10 @@
-using System;
+
 using System.Numerics;
 using Sokol;
 using static Sokol.SG;
 using static Sokol.Utils;
 using static Sokol.SApp;
-using static Sokol.SLog;
 using SharpGLTF.Schema2;
-using pbr_shader_cs;
 using static pbr_shader_morphing_cs_morphing.Shaders;
 
 public static unsafe partial class SharpGLTFApp

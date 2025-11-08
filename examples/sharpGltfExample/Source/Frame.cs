@@ -1,23 +1,12 @@
-using System;
 using Sokol;
-using System.Runtime.InteropServices;
-using System.Runtime.CompilerServices;
 using System.Numerics;
 using static Sokol.SApp;
 using static Sokol.SG;
 using static Sokol.SGlue;
-using static Sokol.SG.sg_vertex_format;
-using static Sokol.SG.sg_index_type;
 using static Sokol.SG.sg_cull_mode;
-using static Sokol.SG.sg_compare_func;
 using static Sokol.Utils;
-using System.Diagnostics;
 using static Sokol.SLog;
-using static Sokol.SDebugUI;
 using static Sokol.SImgui;
-using Imgui;
-using static Imgui.ImguiNative;
-using SharpGLTF.Schema2;
 using static pbr_shader_cs.Shaders;
 using static bloom_shader_cs.Shaders;
 
@@ -780,5 +769,235 @@ public static unsafe partial class SharpGLTFApp
             
             sg_update_image(state.jointMatrixTexture, in imageData);
         }
+    }
+
+     /// <summary>
+    /// Creates a joint matrix texture for skinning animation.
+    /// Each joint stores 2 matrices (transform + normal) = 32 floats = 8 vec4 (RGBA)
+    /// </summary>
+    static void CreateJointMatrixTexture(int jointCount)
+    {
+        if (jointCount <= 0)
+        {
+            Info("[JointTexture] No joints, skipping texture creation");
+            return;
+        }
+
+        // Calculate texture size to hold all joint matrices
+        // Each joint needs 2 mat4 (transform + normal) = 32 floats = 8 vec4 (RGBA)
+        int width = (int)Math.Ceiling(Math.Sqrt(jointCount * 8));
+        state.jointTextureWidth = width;
+        
+        Info($"[JointTexture] Creating {width}x{width} RGBA32F texture for {jointCount} joints");
+        Info($"[JointTexture] Each joint uses 8 vec4 (32 floats): transform matrix at offset i*32, normal matrix at offset i*32+16");
+
+        // Create sampler with NEAREST filtering and CLAMP_TO_EDGE wrapping
+        if (state.jointMatrixSampler.id == 0)
+        {
+            state.jointMatrixSampler = sg_make_sampler(new sg_sampler_desc
+            {
+                min_filter = sg_filter.SG_FILTER_NEAREST,
+                mag_filter = sg_filter.SG_FILTER_NEAREST,
+                wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                label = "joint-matrix-sampler"
+            });
+        }
+
+        // Create texture with initial identity matrices
+        int texelCount = width * width;
+        
+        // Create empty stream texture (no initial data allowed with stream_update)
+        state.jointMatrixTexture = sg_make_image(new sg_image_desc
+        {
+            width = width,
+            height = width,
+            pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA32F,
+            usage = new sg_image_usage { stream_update = true }, // Allow per-frame updates
+            label = "joint-matrix-texture"
+        });
+        
+        // Create view once for the joint texture
+        state.jointMatrixView = sg_make_view(new sg_view_desc
+        {
+            texture = new sg_texture_view_desc { image = state.jointMatrixTexture },
+            label = "joint-matrix-view"
+        });
+        
+        Info($"[JointTexture] Texture created successfully (id: {state.jointMatrixTexture.id}, view: {state.jointMatrixView.id})");
+    }
+
+   
+
+    /// <summary>
+    /// Copies a Matrix4x4 into a float array in ROW-MAJOR order for texture storage.
+    /// Unlike uniforms which expect column-major, texture storage with texelFetch 
+    /// expects row-major data because the shader reads vec4s as matrix rows.
+    /// </summary>
+    static void CopyMatrix4x4ToFloatArray(Matrix4x4 mat, float[] arr, int offset)
+    {
+        // Row-major order (don't transpose) - texelFetch reads vec4 as matrix rows
+        // Store as: [M11,M12,M13,M14], [M21,M22,M23,M24], [M31,M32,M33,M34], [M41,M42,M43,M44]
+        arr[offset + 0] = mat.M11; arr[offset + 1] = mat.M12; arr[offset + 2] = mat.M13; arr[offset + 3] = mat.M14;
+        arr[offset + 4] = mat.M21; arr[offset + 5] = mat.M22; arr[offset + 6] = mat.M23; arr[offset + 7] = mat.M24;
+        arr[offset + 8] = mat.M31; arr[offset + 9] = mat.M32; arr[offset + 10] = mat.M33; arr[offset + 11] = mat.M34;
+        arr[offset + 12] = mat.M41; arr[offset + 13] = mat.M42; arr[offset + 14] = mat.M43; arr[offset + 15] = mat.M44;
+    }
+
+    /// <summary>
+    /// Creates a morph target texture array for vertex displacement animation.
+    /// Stores position, normal, and tangent displacements for each morph target.
+    /// Uses texture2DArray with one layer per attribute per target.
+    /// </summary>
+    static unsafe void CreateMorphTargetTexture(SharpGltfModel model)
+    {
+        // Find the mesh with most morph targets to determine array size
+        int maxTargets = 0;
+        int maxVertices = 0;
+        
+        foreach (var mesh in model.Meshes)
+        {
+            if (mesh.HasMorphTargets && mesh.GltfPrimitive != null)
+            {
+                maxTargets = Math.Max(maxTargets, mesh.MorphTargetCount);
+                maxVertices = Math.Max(maxVertices, mesh.VertexCount);
+            }
+        }
+        
+        if (maxTargets == 0 || maxVertices == 0)
+        {
+            Info("[MorphTexture] No morph targets found, skipping texture creation");
+            return;
+        }
+        
+        // Calculate texture size based on vertex count
+        // Each vertex displacement is stored as vec4 (with padding for vec3 data)
+        int width = (int)Math.Ceiling(Math.Sqrt(maxVertices));
+        state.morphTextureWidth = width;
+        
+        // Calculate layer count: position, normal, tangent for each target
+        // Layer layout: [pos0, pos1, ..., posN, norm0, norm1, ..., normN, tan0, tan1, ..., tanN]
+        int layersPerAttributeType = maxTargets;
+        int totalLayers = layersPerAttributeType * 3; // position + normal + tangent
+        state.morphTextureLayerCount = totalLayers;
+        
+        Info($"[MorphTexture] Creating {width}x{width}x{totalLayers} RGBA32F texture array");
+        Info($"[MorphTexture] {maxTargets} targets, {maxVertices} max vertices");
+        Info($"[MorphTexture] Layer 0-{maxTargets-1}: positions, {maxTargets}-{maxTargets*2-1}: normals, {maxTargets*2}-{totalLayers-1}: tangents");
+        
+        // Create sampler with NEAREST filtering
+        if (state.morphTargetSampler.id == 0)
+        {
+            state.morphTargetSampler = sg_make_sampler(new sg_sampler_desc
+            {
+                min_filter = sg_filter.SG_FILTER_NEAREST,
+                mag_filter = sg_filter.SG_FILTER_NEAREST,
+                wrap_u = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                wrap_v = sg_wrap.SG_WRAP_CLAMP_TO_EDGE,
+                label = "morph-target-sampler"
+            });
+        }
+        
+        // Allocate texture data
+        int texelsPerLayer = width * width;
+        int totalTexels = texelsPerLayer * totalLayers;
+        float[] textureData = new float[totalTexels * 4]; // RGBA32F
+        
+        // Initialize to zero (no displacement by default)
+        Array.Clear(textureData, 0, textureData.Length);
+        
+        // Process each mesh and populate its morph target data
+        foreach (var mesh in model.Meshes)
+        {
+            if (!mesh.HasMorphTargets || mesh.GltfPrimitive == null)
+                continue;
+                
+            var primitive = mesh.GltfPrimitive;
+            int targetCount = primitive.MorphTargetsCount;
+            
+            Info($"[MorphTexture] Processing mesh with {targetCount} targets, {mesh.VertexCount} vertices");
+            
+            // Extract displacement data for each target
+            for (int targetIdx = 0; targetIdx < targetCount; targetIdx++)
+            {
+                var morphTarget = primitive.GetMorphTargetAccessors(targetIdx);
+                
+                // Position displacements (layer = targetIdx)
+                if (morphTarget.ContainsKey("POSITION"))
+                {
+                    var positions = morphTarget["POSITION"].AsVector3Array();
+                    int layerOffset = targetIdx * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < positions.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = positions[i].X;
+                        textureData[offset + 1] = positions[i].Y;
+                        textureData[offset + 2] = positions[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+                
+                // Normal displacements (layer = maxTargets + targetIdx)
+                if (morphTarget.ContainsKey("NORMAL"))
+                {
+                    var normals = morphTarget["NORMAL"].AsVector3Array();
+                    int layerOffset = (maxTargets + targetIdx) * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < normals.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = normals[i].X;
+                        textureData[offset + 1] = normals[i].Y;
+                        textureData[offset + 2] = normals[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+                
+                // Tangent displacements (layer = maxTargets*2 + targetIdx)
+                if (morphTarget.ContainsKey("TANGENT"))
+                {
+                    var tangents = morphTarget["TANGENT"].AsVector3Array();
+                    int layerOffset = (maxTargets * 2 + targetIdx) * texelsPerLayer * 4;
+                    
+                    for (int i = 0; i < tangents.Count && i < mesh.VertexCount; i++)
+                    {
+                        int offset = layerOffset + i * 4;
+                        textureData[offset + 0] = tangents[i].X;
+                        textureData[offset + 1] = tangents[i].Y;
+                        textureData[offset + 2] = tangents[i].Z;
+                        textureData[offset + 3] = 0.0f; // Padding
+                    }
+                }
+            }
+        }
+        
+        // Create texture2DArray
+        fixed (float* ptr = textureData)
+        {
+            var imageData = new sg_image_data();
+            imageData.mip_levels[0].ptr = ptr;
+            imageData.mip_levels[0].size = (nuint)(textureData.Length * sizeof(float));
+            
+            state.morphTargetTexture = sg_make_image(new sg_image_desc
+            {
+                type = sg_image_type.SG_IMAGETYPE_ARRAY,
+                width = width,
+                height = width,
+                num_slices = totalLayers,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA32F,
+                data = imageData,
+                label = "morph-target-texture"
+            });
+        }
+        
+        // Create view for the morph texture
+        state.morphTargetView = sg_make_view(new sg_view_desc
+        {
+            texture = new sg_texture_view_desc { image = state.morphTargetTexture },
+            label = "morph-target-view"
+        });
+        
+        Info($"[MorphTexture] Texture created successfully (id: {state.morphTargetTexture.id}, view: {state.morphTargetView.id})");
     }
 }

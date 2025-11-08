@@ -6,7 +6,6 @@ using static Sokol.SG;
 using static Sokol.Utils;
 using static Sokol.SApp;
 using SharpGLTF.Schema2;
-using pbr_shader_cs;
 using static pbr_shader_skinning_cs_skinning.Shaders;
 
 public static unsafe partial class SharpGLTFApp
