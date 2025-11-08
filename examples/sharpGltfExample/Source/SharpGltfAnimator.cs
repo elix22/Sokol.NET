@@ -251,11 +251,11 @@ namespace Sokol
                 _animatedMorphWeights[morphAnim.NodeIndex] = weights;
                 
                 // Debug: Log first frame only
-                if (currentTime < 0.1f)
-                {
-                    string weightsStr = string.Join(", ", weights.Select(w => w.ToString("F3")));
-                    Info($"[MorphAnim] Node {morphAnim.NodeIndex} ({morphAnim.NodeName}) weights: [{weightsStr}]", "SharpGLTF");
-                }
+                // if (currentTime < 0.1f)
+                // {
+                //     string weightsStr = string.Join(", ", weights.Select(w => w.ToString("F3")));
+                //     Info($"[MorphAnim] Node {morphAnim.NodeIndex} ({morphAnim.NodeName}) weights: [{weightsStr}]", "SharpGLTF");
+                // }
             }
         }
         
