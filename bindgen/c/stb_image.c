@@ -28,3 +28,4 @@ void stbi_image_free_csharp(void* retval_from_stbi_load);
 
 // Get reason for last load failure
 const char* stbi_failure_reason_csharp(void);
+

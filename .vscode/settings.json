@@ -98,7 +98,8 @@
         "sokol_spine.h": "c",
         "ozzutil.h": "c",
         "__config": "cpp",
-        "imgui.h": "c"
+        "imgui.h": "c",
+        "tinyexr.h": "c"
     },
     "java.configuration.updateBuildConfiguration": "disabled",
     "liveServer.settings.port": 5503,

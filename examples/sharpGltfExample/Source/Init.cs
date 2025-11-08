@@ -725,14 +725,14 @@ public static unsafe partial class SharpGLTFApp
 
         try
         {
-            // Load HDR environment map asynchronously
-            // The HDR file will be loaded via FileSystem and converted to cubemaps
-            EnvironmentMapLoader.LoadHDREnvironmentAsync("autumn_hill_view_1k.hdr", (envMap) =>
+            // Load EXR environment map asynchronously
+            // EXR files load much faster than HDR since they can be pre-filtered offline
+            EnvironmentMapLoader.LoadEXREnvironmentAsync("autumn_hill_view_1k.exr", (envMap) =>
             {
                 if (envMap != null && envMap.IsLoaded)
                 {
                     state.environmentMap = envMap;
-                    Info($"[IBL] HDR environment map loaded successfully:");
+                    Info($"[IBL] EXR environment map loaded successfully:");
                     Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
                     Info($"[IBL]   - Intensity: {state.iblIntensity}");
                     Info($"[IBL]   - Enabled: {state.useIBL}");

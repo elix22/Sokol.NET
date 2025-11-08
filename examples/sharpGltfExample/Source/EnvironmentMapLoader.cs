@@ -4,6 +4,7 @@ using Sokol;
 using static Sokol.SG;
 using static Sokol.SLog;
 using static Sokol.StbImage;
+using static Sokol.TinyEXR;
 
 namespace Sokol
 {
@@ -81,6 +82,103 @@ namespace Sokol
                 }
             });
         }
+
+        /// <summary>
+        /// Load EXR environment map asynchronously from file.
+        /// Uses FileSystem for async loading, then converts EXR float data to cubemaps.
+        /// EXR files load much faster than HDR since they can be pre-filtered offline.
+        /// </summary>
+        public static unsafe void LoadEXREnvironmentAsync(string exrFileName, HDRLoadCallback onComplete)
+        {
+            Info($"[IBL] Starting async load of EXR: {exrFileName}");
+
+            FileSystem.Instance.LoadFile(exrFileName, (filePath, data, status) =>
+            {
+                if (status != FileLoadStatus.Success || data == null)
+                {
+                    Warning($"[IBL] Failed to load EXR file: {exrFileName} (status: {status})");
+                    onComplete?.Invoke(null);
+                    return;
+                }
+
+                Info($"[IBL] EXR file loaded ({data.Length} bytes), decoding...");
+
+                try
+                {
+                    // Decode EXR image using TinyEXR
+                    int width = 0, height = 0;
+                    float* rgbaData = null;
+                    IntPtr errPtr = IntPtr.Zero;
+                    
+                    fixed (byte* dataPtr = data)
+                    {
+                        int result = EXRLoadFromMemory(in *dataPtr, data.Length, ref width, ref height, out rgbaData, errPtr);
+                        
+                        if (result != 0)
+                        {
+                            string error = EXRGetFailureReason();
+                            if (string.IsNullOrEmpty(error))
+                            {
+                                error = "Unknown EXR decode error";
+                            }
+                            Warning($"[IBL] Failed to decode EXR image: {error}");
+                            onComplete?.Invoke(null);
+                            return;
+                        }
+                    }
+
+                    if (rgbaData == null)
+                    {
+                        Warning($"[IBL] Failed to decode EXR image: no data returned");
+                        onComplete?.Invoke(null);
+                        return;
+                    }
+
+                    Info($"[IBL] EXR decoded: {width}x{height} (RGBA float)");
+
+                    // Convert EXR float data to byte array for processing
+                    // EXR data is already linear HDR, so we can process it directly
+                    int pixelCount = width * height * 4;
+                    byte[] byteData = new byte[pixelCount];
+                    
+                    // Convert float HDR to LDR bytes for now (tone mapping)
+                    // TODO: Keep as float for true HDR processing
+                    for (int i = 0; i < pixelCount; i++)
+                    {
+                        float value = rgbaData[i];
+                        // Simple Reinhard tone mapping
+                        value = value / (1.0f + value);
+                        byteData[i] = (byte)Math.Clamp(value * 255.0f, 0, 255);
+                    }
+                    
+                    // Convert panorama to cubemaps
+                    fixed (byte* bytePtr = byteData)
+                    {
+                        var envMap = ConvertPanoramaToCubemap(bytePtr, width, height, "exr-environment");
+                        
+                        // Free EXR data
+                        EXRFreeImage(ref *rgbaData);
+                        
+                        if (envMap != null && envMap.IsLoaded)
+                        {
+                            Info("[IBL] Successfully created environment map from EXR");
+                            onComplete?.Invoke(envMap);
+                        }
+                        else
+                        {
+                            Warning("[IBL] Failed to create environment map from EXR");
+                            onComplete?.Invoke(null);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Warning($"[IBL] Error processing EXR: {ex.Message}");
+                    onComplete?.Invoke(null);
+                }
+            });
+        }
+
         /// <summary>
         /// Load IBL from glTF model if available, otherwise create procedural test environment.
         /// </summary>

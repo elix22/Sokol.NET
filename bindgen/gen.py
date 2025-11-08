@@ -21,6 +21,7 @@ tasks = [
     [ '../ext/fontstash/fontstash.h',        'fons',     [] ],
     [ '../ext/stb/stb_image.h',              'stbi_',    [] ],
     [ '../ext/ozzutil/ozzutil.h',            'ozz_',     ['sg_'] ],
+    [ '../ext/tinyexr/tinyexr.h',            'EXR',      [] ],
     
 ]
 

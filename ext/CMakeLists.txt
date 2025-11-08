@@ -42,9 +42,14 @@ set(IMGUI_SOURCE_FILES
         cimgui/imgui/imgui.cpp
 )
 
+set(TINYEXR_SOURCE_FILES
+        tinyexr_wrapper.cpp
+)
+
 if (NOT MSVC)
     set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
     set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+    set_source_files_properties(${TINYEXR_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
 endif()
 if (APPLE)
     # Use macOS/iOS specific file utility for both iOS and macOS (supports app bundles)
@@ -63,6 +68,7 @@ endif()
 add_library(sokol ${SOKOL_LIBRARY_TYPE}
 "sokol.c" 
 ${IMGUI_SOURCE_FILES} 
+${TINYEXR_SOURCE_FILES}
 ${FILEUTIL_SRCS}
 "basisu/sokol_basisu.cpp")
 
@@ -84,7 +90,7 @@ target_link_libraries(sokol)
 target_include_directories(sokol PRIVATE sokol ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add public include directory for consumers
-target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol/util ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
+target_include_directories(sokol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sokol ${CMAKE_CURRENT_SOURCE_DIR}/sokol/util ${CMAKE_CURRENT_SOURCE_DIR}/sokol_gp ${CMAKE_CURRENT_SOURCE_DIR}/cgltf ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr/deps/nanozlib ${CMAKE_CURRENT_SOURCE_DIR}/../bindgen/c)
 
 
 if (WIN32)

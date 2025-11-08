@@ -32,6 +32,7 @@ module_names = {
     'fons':     'Fontstash',
     'stbi_':    'StbImage',
     'ozz_':     'OzzUtil',
+    'EXR':      'TinyEXR',  # TinyEXR uses struct/type names without prefix
 }
 
 # Library names for DllImport statements
@@ -55,6 +56,7 @@ library_names = {
     'fons':     'sokol',
     'stbi_':    'sokol',
     'ozz_':     'ozzutil',
+    'EXR':      'sokol',  # TinyEXR compiled into sokol
 }
 
 
@@ -80,6 +82,7 @@ c_source_paths = {
     'fons':     'c/fontstash.c',
     'stbi_':    'c/stb_image.c',
     'ozz_':     'c/ozzutil.c',
+    'EXR':      'c/tinyexr.c',
 }
 
 name_ignores = [
@@ -167,7 +170,11 @@ prim_types = {
     'uint8_t *':   'byte*',
     'sgimgui_t *': 'IntPtr',
     'unsigned char': 'byte',
-    'unsigned char *': 'byte*'
+    'unsigned char *': 'byte*',
+    'EXRHeader *': 'IntPtr',
+    'const char ***': 'IntPtr',
+    'const EXRImage *': 'IntPtr',
+    'const char **': 'IntPtr',
 }
 
 
@@ -436,6 +443,10 @@ def as_csharp_arg_type(arg_prefix, arg_type, prefix):
         return f"cgltf_data *{pre}"
     elif arg_type.startswith("void **"):
         return f" out IntPtr{pre}"
+    elif arg_type.startswith("float **"):
+        return f" out float *{pre}"
+    elif arg_type.startswith("const char **"):
+        return f" out byte *{pre}"
     elif arg_type.startswith("const struct cgltf_memory_options*"):
         return f"in cgltf_memory_options{pre}"
     elif arg_type.startswith("const struct cgltf_file_options*"):
