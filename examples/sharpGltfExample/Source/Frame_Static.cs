@@ -26,7 +26,6 @@ public static unsafe partial class SharpGLTFApp
         vsParams.view_proj = state.camera.ViewProj;
         vsParams.eye_pos = state.camera.EyePos;
         vsParams.use_morphing = 0;
-        vsParams.has_morph_targets = 0;
 
         sg_apply_pipeline(pipeline);
         sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vsParams));
@@ -113,7 +112,6 @@ public static unsafe partial class SharpGLTFApp
         renderingFlags.alphamode = mesh.AlphaMode == AlphaMode.MASK ? 1 : (mesh.AlphaMode == AlphaMode.BLEND ? 2 : 0);
         renderingFlags.use_skinning = 0;
         renderingFlags.use_morphing = 0;
-        renderingFlags.has_morph_targets = 0;
         sg_apply_uniforms(UB_rendering_flags, SG_RANGE(ref renderingFlags));
 
         // Draw the mesh with optional screen texture for refraction

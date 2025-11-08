@@ -178,7 +178,6 @@ layout(binding=7) uniform rendering_flags {
     int alphamode;            // 0=opaque, 1=mask, 2=blend
     int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
     int use_morphing;         // 0 or 1 (not used in FS - only for consistency)
-    int has_morph_targets;    // 0 or 1 (not used in FS - only for consistency)
 };
 
 // Texture samplers

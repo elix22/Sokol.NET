@@ -128,7 +128,6 @@ public static unsafe partial class SharpGLTFApp
         renderingFlags.alphamode = mesh.AlphaMode == AlphaMode.MASK ? 1 : (mesh.AlphaMode == AlphaMode.BLEND ? 2 : 0);
         renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
         renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
-        renderingFlags.has_morph_targets = mesh.HasMorphTargets ? 1 : 0;
         sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
 
         // Draw the mesh with joint matrix texture and optional screen texture
