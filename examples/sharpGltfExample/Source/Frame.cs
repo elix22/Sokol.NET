@@ -726,13 +726,17 @@ public static unsafe partial class SharpGLTFApp
 
         int jointCount = boneMatrices.Length;
         int width = state.jointTextureWidth;
-        
+
         // Allocate float array: width² × 4 (RGBA)
         int texelCount = width * width;
-        float[] textureData = new float[texelCount * 4];
-        
+
+        if (state.jointTextureData == null || state.jointTextureData.Length != texelCount * 4)
+        {
+            state.jointTextureData = new float[texelCount * 4];
+        }
+
         // Initialize to zero
-        Array.Clear(textureData, 0, textureData.Length);
+        Array.Clear(state.jointTextureData, 0, state.jointTextureData.Length);
         
         // Only update as many joints as we have space for
         int maxJoints = Math.Min(jointCount, texelCount / 8);
@@ -754,18 +758,18 @@ public static unsafe partial class SharpGLTFApp
             }
             
             // Store transform matrix at offset i*32 (4 vec4 = 16 floats)
-            CopyMatrix4x4ToFloatArray(jointMatrix, textureData, i * 32);
+            CopyMatrix4x4ToFloatArray(jointMatrix, state.jointTextureData, i * 32);
             
             // Store normal matrix at offset i*32 + 16 (4 vec4 = 16 floats)
-            CopyMatrix4x4ToFloatArray(normalMatrix, textureData, i * 32 + 16);
+            CopyMatrix4x4ToFloatArray(normalMatrix, state.jointTextureData, i * 32 + 16);
         }
         
         // Upload to GPU
-        fixed (float* ptr = textureData)
+        fixed (float* ptr = state.jointTextureData)
         {
             var imageData = new sg_image_data();
             imageData.mip_levels[0].ptr = ptr;
-            imageData.mip_levels[0].size = (nuint)(textureData.Length * sizeof(float));
+            imageData.mip_levels[0].size = (nuint)(state.jointTextureData.Length * sizeof(float));
             
             sg_update_image(state.jointMatrixTexture, in imageData);
         }

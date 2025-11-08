@@ -140,6 +140,8 @@ public static unsafe partial class SharpGLTFApp
         public sg_sampler jointMatrixSampler;
         public int jointTextureWidth = 0;  // Calculated based on bone count
 
+        public float[] jointTextureData = null;
+
         // Morph target texture (texture2DArray for vertex displacements)
         public sg_image morphTargetTexture;
         public sg_view morphTargetView;
