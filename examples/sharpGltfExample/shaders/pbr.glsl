@@ -120,9 +120,12 @@ void main() {
     v_Normal = normalW;
     
     // Transform tangent to world space and build TBN matrix
-    vec3 tangentW = normalize(vec3(model * vec4(skinnedTangent, 0.0)));
+    vec3 tangentW = vec3(model * vec4(skinnedTangent, 0.0));
     vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
+    
+    // Normalize after cross product, bitangent first then tangent (matches glTF Sample Viewer)
     bitangentW = normalize(bitangentW);
+    tangentW = normalize(tangentW);
     
     v_Tangent = vec4(tangentW, tangent.w);
     v_TBN = mat3(tangentW, bitangentW, normalW);
@@ -515,16 +518,17 @@ void main() {
             color = (t + 1.0) / 2.0;
         }
         else if (debug_view_mode == DEBUG_BITANGENT) {
+            // Recalculate bitangent from normal and tangent like reference viewer does
             vec3 ng = normalize(v_Normal);
             vec3 t = normalize(v_Tangent.xyz);
-            vec3 b = cross(ng, t) * v_Tangent.w;
+            vec3 b = -cross(ng, t) * v_Tangent.w;
             color = (b + 1.0) / 2.0;
         }
         else if (debug_view_mode == DEBUG_TANGENT_W) {
             // Tangent W is either +1 or -1, map to 0-1 range
-            // +1 (right-handed) = white, -1 (left-handed) = black
+            // Match glTF Sample Viewer: +1 (right-handed) = black, -1 (left-handed) = white
             float w = v_Tangent.w;
-            color = vec3((w + 1.0) * 0.5);
+            color = vec3((1.0 - w) * 0.5);
         }
         // Material properties
         else if (debug_view_mode == DEBUG_ALPHA) {
