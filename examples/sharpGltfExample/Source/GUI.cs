@@ -75,6 +75,12 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.camera_controls_open = camera_controls_open != 0;
                 }
 
+                byte debug_view_open = state.ui.debug_view_open ? (byte)1 : (byte)0;
+                if (igMenuItem_BoolPtr("Debug View...", null, ref debug_view_open, true))
+                {
+                    state.ui.debug_view_open = debug_view_open != 0;
+                }
+
                 igEndMenu();
             }
 
@@ -178,6 +184,12 @@ public static unsafe partial class SharpGLTFApp
         if (state.ui.camera_controls_open)
         {
             DrawCameraControlsWindow(ref pos);
+        }
+
+        // Debug View Window
+        if (state.ui.debug_view_open)
+        {
+            DrawDebugViewWindow(ref pos);
         }
 
         // Help Window
@@ -816,6 +828,72 @@ public static unsafe partial class SharpGLTFApp
 
             igSeparator();
             igTextWrapped("Tip: All windows can be moved, resized, and closed. Use the Windows menu to reopen them.");
+        }
+        igEnd();
+    }
+
+    static void DrawDebugViewWindow(ref Vector2 pos)
+    {
+        igSetNextWindowSize(new Vector2(300, 500), ImGuiCond.Once);
+        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        byte open = 1;
+        if (igBegin("Debug View", ref open, ImGuiWindowFlags.None))
+        {
+            state.ui.debug_view_open = open != 0;
+
+            igText("PBR Material Debugger");
+            igSeparator();
+
+            // Enable/Disable debug view
+            byte debugEnabled = state.ui.debug_view_enabled != 0 ? (byte)1 : (byte)0;
+            if (igCheckbox("Enable Debug View", ref debugEnabled))
+            {
+                state.ui.debug_view_enabled = debugEnabled != 0 ? 1 : 0;
+            }
+
+            if (state.ui.debug_view_enabled != 0)
+            {
+                igNewLine();
+                igText("Select Debug Mode:");
+                igSeparator();
+
+                // Debug view mode selection
+                if (igRadioButton_IntPtr("None (Standard Rendering)", ref state.ui.debug_view_mode, 0)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "UV Coordinates:");
+                if (igRadioButton_IntPtr("UV Channel 0", ref state.ui.debug_view_mode, 1)) { }
+                if (igRadioButton_IntPtr("UV Channel 1", ref state.ui.debug_view_mode, 2)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Normals:");
+                if (igRadioButton_IntPtr("Normal Texture", ref state.ui.debug_view_mode, 3)) { }
+                if (igRadioButton_IntPtr("Normal (Shading)", ref state.ui.debug_view_mode, 4)) { }
+                if (igRadioButton_IntPtr("Normal (Geometry)", ref state.ui.debug_view_mode, 5)) { }
+                if (igRadioButton_IntPtr("Tangent", ref state.ui.debug_view_mode, 6)) { }
+                if (igRadioButton_IntPtr("Bitangent", ref state.ui.debug_view_mode, 7)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Material Properties:");
+                if (igRadioButton_IntPtr("Alpha", ref state.ui.debug_view_mode, 8)) { }
+                if (igRadioButton_IntPtr("Occlusion", ref state.ui.debug_view_mode, 9)) { }
+                if (igRadioButton_IntPtr("Emissive", ref state.ui.debug_view_mode, 10)) { }
+                if (igRadioButton_IntPtr("Metallic", ref state.ui.debug_view_mode, 11)) { }
+                if (igRadioButton_IntPtr("Roughness", ref state.ui.debug_view_mode, 12)) { }
+                if (igRadioButton_IntPtr("Base Color", ref state.ui.debug_view_mode, 13)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Clearcoat:");
+                if (igRadioButton_IntPtr("Clearcoat Factor", ref state.ui.debug_view_mode, 14)) { }
+                if (igRadioButton_IntPtr("Clearcoat Roughness", ref state.ui.debug_view_mode, 15)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Transmission/Glass:");
+                if (igRadioButton_IntPtr("Transmission Factor", ref state.ui.debug_view_mode, 20)) { }
+                if (igRadioButton_IntPtr("Volume Thickness", ref state.ui.debug_view_mode, 21)) { }
+                if (igRadioButton_IntPtr("Index of Refraction (IOR)", ref state.ui.debug_view_mode, 22)) { }
+                if (igRadioButton_IntPtr("F0 (Fresnel at 0°)", ref state.ui.debug_view_mode, 23)) { }
+            }
         }
         igEnd();
     }

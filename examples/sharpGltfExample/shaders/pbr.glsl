@@ -10,6 +10,7 @@
     - Occlusion
     - Emissive
     - Alpha modes (opaque, mask, blend)
+    - Debug views for material properties
 */
 
 @ctype mat4 System.Numerics.Matrix4x4
@@ -136,6 +137,32 @@ void main() {
 
 @fs fs_pbr
 precision highp float;
+
+// Debug view mode constants
+#define DEBUG_NONE 0
+#define DEBUG_UV_0 1
+#define DEBUG_UV_1 2
+#define DEBUG_NORMAL_TEXTURE 3
+#define DEBUG_NORMAL_SHADING 4
+#define DEBUG_NORMAL_GEOMETRY 5
+#define DEBUG_TANGENT 6
+#define DEBUG_BITANGENT 7
+#define DEBUG_ALPHA 8
+#define DEBUG_OCCLUSION 9
+#define DEBUG_EMISSIVE 10
+#define DEBUG_METALLIC 11
+#define DEBUG_ROUGHNESS 12
+#define DEBUG_BASE_COLOR 13
+#define DEBUG_CLEARCOAT_FACTOR 14
+#define DEBUG_CLEARCOAT_ROUGHNESS 15
+#define DEBUG_CLEARCOAT_NORMAL 16
+#define DEBUG_SHEEN_COLOR 17
+#define DEBUG_SHEEN_ROUGHNESS 18
+#define DEBUG_SPECULAR_FACTOR 19
+#define DEBUG_TRANSMISSION_FACTOR 20
+#define DEBUG_VOLUME_THICKNESS 21
+#define DEBUG_IOR 22
+#define DEBUG_F0 23
 
 // Constants
 @include fs_constants.glsl
@@ -322,6 +349,9 @@ vec3 getEmissive() {
 // ============================================================================
 
 void main() {
+    // Helper function for sRGB conversion (used in debug views)
+    #define linearTosRGB(color) pow(color, vec3(1.0/2.2))
+    
     // Get material properties
     vec4 baseColor = getBaseColor();
     vec2 metallicRoughness = getMetallicRoughness();
@@ -456,6 +486,85 @@ void main() {
     // ========================================================================
     
     color += getEmissive();
+    
+    
+    // ========================================================================
+    // Debug Views (before tone mapping)
+    // ========================================================================
+    
+    if (debug_view_enabled != 0) {
+        // UV coordinates
+        if (debug_view_mode == DEBUG_UV_0) {
+            color = vec3(v_TexCoord0, 0.0);
+        }
+        else if (debug_view_mode == DEBUG_UV_1) {
+            color = vec3(v_TexCoord1, 0.0);
+        }
+        // Normals
+        else if (debug_view_mode == DEBUG_NORMAL_TEXTURE) {
+            vec3 normalTex = texture(sampler2D(u_NormalTexture, u_NormalSampler), v_TexCoord0).rgb * 2.0 - 1.0;
+            color = (normalTex + 1.0) / 2.0;
+        }
+        else if (debug_view_mode == DEBUG_NORMAL_SHADING) {
+            color = (n + 1.0) / 2.0;
+        }
+        else if (debug_view_mode == DEBUG_NORMAL_GEOMETRY) {
+            vec3 ng = normalize(v_Normal);
+            color = (ng + 1.0) / 2.0;
+        }
+        else if (debug_view_mode == DEBUG_TANGENT) {
+            vec3 t = normalize(v_Tangent.xyz);
+            color = (t + 1.0) / 2.0;
+        }
+        else if (debug_view_mode == DEBUG_BITANGENT) {
+            vec3 ng = normalize(v_Normal);
+            vec3 t = normalize(v_Tangent.xyz);
+            vec3 b = cross(ng, t) * v_Tangent.w;
+            color = (b + 1.0) / 2.0;
+        }
+        // Material properties
+        else if (debug_view_mode == DEBUG_ALPHA) {
+            color = vec3(baseColor.a);
+        }
+        else if (debug_view_mode == DEBUG_OCCLUSION) {
+            color = vec3(ao);
+        }
+        else if (debug_view_mode == DEBUG_EMISSIVE) {
+            color = linearTosRGB(getEmissive());
+        }
+        else if (debug_view_mode == DEBUG_METALLIC) {
+            color = vec3(metallic);
+        }
+        else if (debug_view_mode == DEBUG_ROUGHNESS) {
+            color = vec3(perceptualRoughness);
+        }
+        else if (debug_view_mode == DEBUG_BASE_COLOR) {
+            color = linearTosRGB(baseColor.rgb);
+        }
+        // Clearcoat
+        else if (debug_view_mode == DEBUG_CLEARCOAT_FACTOR) {
+            color = vec3(clearcoat_factor);
+        }
+        else if (debug_view_mode == DEBUG_CLEARCOAT_ROUGHNESS) {
+            color = vec3(clearcoat_roughness);
+        }
+        // Transmission
+        else if (debug_view_mode == DEBUG_TRANSMISSION_FACTOR) {
+            color = vec3(transmission_factor);
+        }
+        else if (debug_view_mode == DEBUG_VOLUME_THICKNESS) {
+            color = vec3(thickness_factor / 10.0); // Normalize for visibility
+        }
+        else if (debug_view_mode == DEBUG_IOR) {
+            // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
+            color = vec3((ior - 1.0) / 1.5);
+        }
+        else if (debug_view_mode == DEBUG_F0) {
+            // Show the F0 reflectance value
+            vec3 f0 = mix(vec3(0.04), baseColor.rgb, metallic);
+            color = f0;
+        }
+    }
     
     
     // ========================================================================

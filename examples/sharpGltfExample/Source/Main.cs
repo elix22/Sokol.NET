@@ -119,7 +119,12 @@ public static unsafe partial class SharpGLTFApp
         public bool camera_info_open;
         public bool camera_controls_open;
         public bool help_open;
+        public bool debug_view_open;
         public int theme;
+        
+        // Debug view state
+        public int debug_view_enabled;  // 0 = disabled, 1 = enabled
+        public int debug_view_mode;     // Which debug view to display
     }
 
     class _state

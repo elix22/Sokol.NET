@@ -141,6 +141,10 @@ public static unsafe partial class SharpGLTFApp
         metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
         metallicParams.normal_map_scale = mesh.NormalMapScale;
 
+        // Debug view uniforms
+        metallicParams.debug_view_enabled = state.ui.debug_view_enabled;
+        metallicParams.debug_view_mode = state.ui.debug_view_mode;
+
         sg_apply_uniforms(UB_morphing_metallic_params, SG_RANGE(ref metallicParams));
 
         // Light uniforms - convert to morphing version
