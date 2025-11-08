@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using static Sokol.SLog;
 
@@ -12,6 +13,7 @@ namespace Sokol
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
         private SharpGLTF.Schema2.ModelRoot? _modelRoot;  // Reference to glTF model for updating nodes
         private Dictionary<int, List<Mesh>> _materialToMeshMap;  // Material index to mesh mapping for property animations
+        private Dictionary<int, float[]> _animatedMorphWeights = new Dictionary<int, float[]>();  // Node index to morph weights
         
         /// <summary>
         /// Playback speed multiplier. 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
@@ -83,6 +85,9 @@ namespace Sokol
                 
                 // NEW: Update material property animations (KHR_animation_pointer)
                 UpdateMaterialPropertyAnimations(_currentTime);
+                
+                // NEW: Update morph target weight animations
+                UpdateMorphWeightAnimations(_currentTime);
             }
         }
 
@@ -227,6 +232,39 @@ namespace Sokol
                         break;
                 }
             }
+        }
+        
+        /// <summary>
+        /// Update morph target weights from animation
+        /// </summary>
+        private void UpdateMorphWeightAnimations(float currentTime)
+        {
+            if (_currentAnimation == null || _currentAnimation.MorphAnimations.Count == 0 || _modelRoot == null)
+                return;
+
+            foreach (var morphAnim in _currentAnimation.MorphAnimations)
+            {
+                // Sample the weights at the current time
+                float[] weights = morphAnim.SampleWeightsAtTime(currentTime);
+                
+                // Store in our dictionary for Frame.cs to read
+                _animatedMorphWeights[morphAnim.NodeIndex] = weights;
+                
+                // Debug: Log first frame only
+                if (currentTime < 0.1f)
+                {
+                    string weightsStr = string.Join(", ", weights.Select(w => w.ToString("F3")));
+                    Info($"[MorphAnim] Node {morphAnim.NodeIndex} ({morphAnim.NodeName}) weights: [{weightsStr}]", "SharpGLTF");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Get the animated morph weights for a specific node index
+        /// </summary>
+        public float[]? GetAnimatedMorphWeights(int nodeIndex)
+        {
+            return _animatedMorphWeights.TryGetValue(nodeIndex, out var weights) ? weights : null;
         }
     }
 }

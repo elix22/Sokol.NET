@@ -738,6 +738,13 @@ namespace Sokol
                         continue;
                     }
                     
+                    // Check if this is a morph weight animation
+                    if (channel.TargetNodePath == SharpGLTF.Schema2.PropertyPath.weights)
+                    {
+                        ParseMorphWeightAnimation(channel, targetNode, animation);
+                        continue;
+                    }
+                    
                     string boneName = targetNode.Name ?? "Unnamed";
 
                     // Find or create bone
@@ -872,6 +879,50 @@ namespace Sokol
             }
 
             return true;
+        }
+
+        private void ParseMorphWeightAnimation(AnimationChannel channel, Node targetNode, SharpGltfAnimation animation)
+        {
+            // Get node index - IReadOnlyList doesn't have IndexOf, so find manually
+            int nodeIndex = -1;
+            var logicalNodes = _model.LogicalNodes;
+            for (int i = 0; i < logicalNodes.Count; i++)
+            {
+                if (logicalNodes[i] == targetNode)
+                {
+                    nodeIndex = i;
+                    break;
+                }
+            }
+            
+            if (nodeIndex < 0)
+                return;
+
+            // Create morph weight animation object
+            var morphAnim = new MorphWeightAnimation
+            {
+                NodeIndex = nodeIndex,
+                NodeName = targetNode.Name ?? "Unnamed"
+            };
+
+            // Extract keyframe data from the sampler
+            var sampler = channel._GetSampler();
+            if (sampler == null)
+                return;
+
+            // Morph weights are float arrays (one float per morph target)
+            var arraySampler = sampler as IAnimationSampler<float[]>;
+            if (arraySampler != null)
+            {
+                foreach (var (time, weights) in arraySampler.GetLinearKeys())
+                {
+                    morphAnim.Keyframes.Add(((float)time, weights));
+                }
+            }
+
+            // Add to animation
+            animation.MorphAnimations.Add(morphAnim);
+            Info($"  - Added morph weight animation for node '{morphAnim.NodeName}' with {morphAnim.Keyframes.Count} keyframes", "SharpGLTF");
         }
 
         private SharpGltfNodeData BuildNodeHierarchy(Node node)

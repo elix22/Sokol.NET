@@ -25,6 +25,9 @@ using static bloom_shader_cs.Shaders;
 
 public static unsafe partial class SharpGLTFApp
 {
+    // Debug counter for morph weight logging
+    private static int morphWeightLogCount = 0;
+    
     /// <summary>
     /// Applies glass material overrides if enabled, otherwise returns original values.
     /// </summary>
@@ -587,15 +590,44 @@ public static unsafe partial class SharpGLTFApp
                         var gltfNode = node.CachedGltfNode;
                         var gltfMesh = gltfNode.Mesh;
                         
-                        // Get weights from node or mesh (node weights override mesh weights)
+                        // Get weights - priority: animator > node > mesh
                         IReadOnlyList<float>? weights = null;
-                        if (gltfNode.MorphWeights != null && gltfNode.MorphWeights.Count > 0)
+                        
+                        // First check if animator has animated weights for this node
+                        if (state.animator != null)
                         {
-                            weights = gltfNode.MorphWeights;
+                            int nodeIndex = -1;
+                            var logicalNodes = state.model.ModelRoot.LogicalNodes;
+                            for (int i = 0; i < logicalNodes.Count; i++)
+                            {
+                                if (logicalNodes[i] == gltfNode)
+                                {
+                                    nodeIndex = i;
+                                    break;
+                                }
+                            }
+                            
+                            if (nodeIndex >= 0)
+                            {
+                                var animatedWeights = state.animator.GetAnimatedMorphWeights(nodeIndex);
+                                if (animatedWeights != null && animatedWeights.Length > 0)
+                                {
+                                    weights = animatedWeights;
+                                }
+                            }
                         }
-                        else if (gltfMesh != null && gltfMesh.MorphWeights != null && gltfMesh.MorphWeights.Count > 0)
+                        
+                        // Fall back to static weights if no animation
+                        if (weights == null)
                         {
-                            weights = gltfMesh.MorphWeights;
+                            if (gltfNode.MorphWeights != null && gltfNode.MorphWeights.Count > 0)
+                            {
+                                weights = gltfNode.MorphWeights;
+                            }
+                            else if (gltfMesh != null && gltfMesh.MorphWeights != null && gltfMesh.MorphWeights.Count > 0)
+                            {
+                                weights = gltfMesh.MorphWeights;
+                            }
                         }
                         
                         // Pack up to 8 weights into 2 vec4s
@@ -614,6 +646,17 @@ public static unsafe partial class SharpGLTFApp
                                     case 2: vec.Z = weights[i]; break;
                                     case 3: vec.W = weights[i]; break;
                                 }
+                            }
+                            
+                            // Debug: Log first 5 frames of packed weights to verify GPU receives animated values
+                            if (morphWeightLogCount < 5)
+                            {
+                                morphWeightLogCount++;
+                                string weightsStr = $"[{weights[0]:F3}";
+                                for (int i = 1; i < Math.Min(weights.Count, 8); i++)
+                                    weightsStr += $", {weights[i]:F3}";
+                                weightsStr += "]";
+                                Info($"[Frame #{morphWeightLogCount}] Morph weights sent to GPU: {weightsStr}", "Sokol App");
                             }
                         }
                     }
@@ -718,101 +761,183 @@ public static unsafe partial class SharpGLTFApp
                 }
                 else
                 {
-                    // Use static pipeline
-                    vs_params_t vsParams = new vs_params_t();
-                    vsParams.model = modelMatrix;
-                    vsParams.view_proj = state.camera.ViewProj;
-                    vsParams.eye_pos = state.camera.EyePos;
+                    // Use morphing or static pipeline depending on whether mesh has morph targets
+                    if (useMorphing)
+                    {
+                        // Morphing pipeline - use morphing_vs_params_t
+                        pbr_shader_morphing_cs_morphing.Shaders.morphing_vs_params_t vsParams = new pbr_shader_morphing_cs_morphing.Shaders.morphing_vs_params_t();
+                        vsParams.model = modelMatrix;
+                        vsParams.view_proj = state.camera.ViewProj;
+                        vsParams.eye_pos = state.camera.EyePos;
+                        vsParams.use_morphing = 1;  // Enable morphing in shader
+                        vsParams.has_morph_targets = 1;  // Mesh has morph targets
 
-                    sg_apply_pipeline(pipeline);
-                    sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vsParams));
+                        // Set morph weights if mesh has morph targets
+                        if (mesh.HasMorphTargets && node.CachedGltfNode != null)
+                        {
+                            var gltfNode = node.CachedGltfNode;
+                            var gltfMesh = gltfNode.Mesh;
+                            
+                            // Get weights - priority: animator > node > mesh
+                            IReadOnlyList<float>? weights = null;
+                            
+                            if (state.animator != null)
+                            {
+                                int nodeIndex = -1;
+                                var logicalNodes = state.model.ModelRoot.LogicalNodes;
+                                for (int i = 0; i < logicalNodes.Count; i++)
+                                {
+                                    if (logicalNodes[i] == gltfNode)
+                                    {
+                                        nodeIndex = i;
+                                        break;
+                                    }
+                                }
+                                
+                                if (nodeIndex >= 0)
+                                {
+                                    var animatedWeights = state.animator.GetAnimatedMorphWeights(nodeIndex);
+                                    if (animatedWeights != null && animatedWeights.Length > 0)
+                                    {
+                                        weights = animatedWeights;
+                                    }
+                                }
+                            }
+                            
+                            // Fall back to static weights if no animation
+                            if (weights == null)
+                            {
+                                if (gltfNode.MorphWeights != null && gltfNode.MorphWeights.Count > 0)
+                                {
+                                    weights = gltfNode.MorphWeights;
+                                }
+                                else if (gltfMesh != null && gltfMesh.MorphWeights != null && gltfMesh.MorphWeights.Count > 0)
+                                {
+                                    weights = gltfMesh.MorphWeights;
+                                }
+                            }
+                            
+                            // Pack up to 8 weights into 2 vec4s
+                            if (weights != null && weights.Count > 0)
+                            {
+                                for (int i = 0; i < Math.Min(weights.Count, 8); i++)
+                                {
+                                    int vec4Index = i / 4;  // 0 or 1
+                                    int componentIndex = i % 4;  // 0, 1, 2, or 3
+                                    
+                                    ref var vec = ref vsParams.u_morphWeights[vec4Index];
+                                    switch (componentIndex)
+                                    {
+                                        case 0: vec.X = weights[i]; break;
+                                        case 1: vec.Y = weights[i]; break;
+                                        case 2: vec.Z = weights[i]; break;
+                                        case 3: vec.W = weights[i]; break;
+                                    }
+                                }
+                                
+                                // Debug: Log first 5 frames of packed weights to verify GPU receives animated values
+                                if (morphWeightLogCount < 5)
+                                {
+                                    morphWeightLogCount++;
+                                    string weightsStr = $"[{weights[0]:F3}";
+                                    for (int i = 1; i < Math.Min(weights.Count, 8); i++)
+                                        weightsStr += $", {weights[i]:F3}";
+                                    weightsStr += "]";
+                                    Info($"[Frame #{morphWeightLogCount}] Morph weights sent to GPU: {weightsStr}", "Sokol App");
+                                }
+                            }
+                        }
 
-                    // Material uniforms
-                    metallic_params_t metallicParams = new metallic_params_t();
-                    metallicParams.base_color_factor = mesh.BaseColorFactor;
-                    metallicParams.metallic_factor = mesh.MetallicFactor;
-                    metallicParams.roughness_factor = mesh.RoughnessFactor;
-                    metallicParams.emissive_factor = mesh.EmissiveFactor;
+                        sg_apply_pipeline(pipeline);
+                        sg_apply_uniforms(pbr_shader_morphing_cs_morphing.Shaders.UB_morphing_vs_params, SG_RANGE(ref vsParams));
 
-                    // Set texture availability flags
-                    metallicParams.has_base_color_tex = mesh.Textures.Count > 0 && mesh.Textures[0] != null ? 1.0f : 0.0f;
-                    metallicParams.has_metallic_roughness_tex = mesh.Textures.Count > 1 && mesh.Textures[1] != null ? 1.0f : 0.0f;
-                    metallicParams.has_normal_tex = mesh.Textures.Count > 2 && mesh.Textures[2] != null ? 1.0f : 0.0f;
-                    metallicParams.has_occlusion_tex = mesh.Textures.Count > 3 && mesh.Textures[3] != null ? 1.0f : 0.0f;
-                    metallicParams.has_emissive_tex = mesh.Textures.Count > 4 && mesh.Textures[4] != null ? 1.0f : 0.0f;
+                        // Material uniforms
+                        pbr_shader_morphing_cs_morphing.Shaders.morphing_metallic_params_t metallicParams = new pbr_shader_morphing_cs_morphing.Shaders.morphing_metallic_params_t();
+                        metallicParams.base_color_factor = mesh.BaseColorFactor;
+                        metallicParams.metallic_factor = mesh.MetallicFactor;
+                        metallicParams.roughness_factor = mesh.RoughnessFactor;
+                        metallicParams.emissive_factor = mesh.EmissiveFactor;
 
-                    // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
-                    metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
+                        // Set texture availability flags
+                        metallicParams.has_base_color_tex = mesh.Textures.Count > 0 && mesh.Textures[0] != null ? 1.0f : 0.0f;
+                        metallicParams.has_metallic_roughness_tex = mesh.Textures.Count > 1 && mesh.Textures[1] != null ? 1.0f : 0.0f;
+                        metallicParams.has_normal_tex = mesh.Textures.Count > 2 && mesh.Textures[2] != null ? 1.0f : 0.0f;
+                        metallicParams.has_occlusion_tex = mesh.Textures.Count > 3 && mesh.Textures[3] != null ? 1.0f : 0.0f;
+                        metallicParams.has_emissive_tex = mesh.Textures.Count > 4 && mesh.Textures[4] != null ? 1.0f : 0.0f;
 
-                    // Set emissive strength (KHR_materials_emissive_strength extension)
-                    metallicParams.emissive_strength = mesh.EmissiveStrength;
+                        // Set alpha cutoff (0.0 for OPAQUE/BLEND, actual value for MASK)
+                        metallicParams.alpha_cutoff = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? mesh.AlphaCutoff : 0.0f;
 
-                    // Get glass material values (with overrides if enabled)
-                    var glassValues = GetGlassMaterialValues(mesh);
-                    
-                    // Set transmission parameters (KHR_materials_transmission extension)
-                    metallicParams.transmission_factor = glassValues.transmission;
-                    metallicParams.ior = glassValues.ior;
+                        // Set emissive strength (KHR_materials_emissive_strength extension)
+                        metallicParams.emissive_strength = mesh.EmissiveStrength;
 
-                    // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
-                    metallicParams.attenuation_color = glassValues.attenuationColor;
-                    metallicParams.attenuation_distance = glassValues.attenuationDistance;
-                    metallicParams.thickness_factor = glassValues.thickness;
+                        // Get glass material values (with overrides if enabled)
+                        var glassValues = GetGlassMaterialValues(mesh);
+                        
+                        // Set transmission parameters (KHR_materials_transmission extension)
+                        metallicParams.transmission_factor = glassValues.transmission;
+                        metallicParams.ior = glassValues.ior;
 
-                    // Set clearcoat parameters (KHR_materials_clearcoat extension)
-                    metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
-                    metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
+                        // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)
+                        metallicParams.attenuation_color = glassValues.attenuationColor;
+                        metallicParams.attenuation_distance = glassValues.attenuationDistance;
+                        metallicParams.thickness_factor = glassValues.thickness;
 
-                    // Set texture transform for normal map (KHR_texture_transform extension)
-                    unsafe {
-                        metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
-                        metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
-                        metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
-                        metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
+                        // Set clearcoat parameters (KHR_materials_clearcoat extension)
+                        metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
+                        metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
+
+                        // Set texture transform for normal map (KHR_texture_transform extension)
+                        unsafe {
+                            metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
+                            metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
+                            metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
+                            metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
+                        }
+                        metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
+                        metallicParams.normal_map_scale = mesh.NormalMapScale;
+
+                        sg_apply_uniforms(UB_metallic_params, SG_RANGE(ref metallicParams));
+
+                        // Light uniforms
+                        sg_apply_uniforms(UB_light_params, SG_RANGE(ref lightParams));
+                        
+                        // Camera params (required by pbr.glsl)
+                        camera_params_t cameraParams = new camera_params_t();
+                        cameraParams.u_Camera = state.camera.EyePos;
+                        sg_apply_uniforms(UB_camera_params, SG_RANGE(ref cameraParams));
+                        
+                        // IBL params (required by pbr.glsl)
+                        ibl_params_t iblParams = new ibl_params_t();
+                        // Use very low intensity for white cubemap fallback to avoid overexposure
+                        iblParams.u_EnvIntensity = 0.3f;  // Reduced from 1.0
+                        iblParams.u_EnvBlurNormalized = 0.0f;
+                        iblParams.u_MipCount = 1;
+                        iblParams.u_EnvRotation = Matrix4x4.Identity;
+                        unsafe {
+                            iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
+                            iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
+                        }
+                        sg_apply_uniforms(UB_ibl_params, SG_RANGE(ref iblParams));
+                        
+                        // Tonemapping params (required by pbr.glsl)
+                        tonemapping_params_t tonemappingParams = new tonemapping_params_t();
+                        tonemappingParams.u_Exposure = 1.0f;
+                        sg_apply_uniforms(UB_tonemapping_params, SG_RANGE(ref tonemappingParams));
+                        
+                        // Rendering flags (required by pbr.glsl)
+                        rendering_flags_t renderingFlags = new rendering_flags_t();
+                        // Temporarily disable IBL to test if that's causing the white screen
+                        renderingFlags.use_ibl = 0; // Disabled IBL temporarily for debugging
+                        renderingFlags.use_punctual_lights = 1; // Enable punctual lights
+                        renderingFlags.use_tonemapping = 0; // Disabled for now
+                        renderingFlags.linear_output = 0;
+                        renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
+                        renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
+                        renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
+                        renderingFlags.has_morph_targets = mesh.HasMorphTargets ? 1 : 0;
+                        sg_apply_uniforms(UB_rendering_flags, SG_RANGE(ref renderingFlags));
                     }
-                    metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
-                    metallicParams.normal_map_scale = mesh.NormalMapScale;
-
-                    sg_apply_uniforms(UB_metallic_params, SG_RANGE(ref metallicParams));
-
-                    // Light uniforms
-                    sg_apply_uniforms(UB_light_params, SG_RANGE(ref lightParams));
-                    
-                    // Camera params (required by pbr.glsl)
-                    camera_params_t cameraParams = new camera_params_t();
-                    cameraParams.u_Camera = state.camera.EyePos;
-                    sg_apply_uniforms(UB_camera_params, SG_RANGE(ref cameraParams));
-                    
-                    // IBL params (required by pbr.glsl)
-                    ibl_params_t iblParams = new ibl_params_t();
-                    // Use very low intensity for white cubemap fallback to avoid overexposure
-                    iblParams.u_EnvIntensity = 0.3f;  // Reduced from 1.0
-                    iblParams.u_EnvBlurNormalized = 0.0f;
-                    iblParams.u_MipCount = 1;
-                    iblParams.u_EnvRotation = Matrix4x4.Identity;
-                    unsafe {
-                        iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
-                        iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
-                    }
-                    sg_apply_uniforms(UB_ibl_params, SG_RANGE(ref iblParams));
-                    
-                    // Tonemapping params (required by pbr.glsl)
-                    tonemapping_params_t tonemappingParams = new tonemapping_params_t();
-                    tonemappingParams.u_Exposure = 1.0f;
-                    sg_apply_uniforms(UB_tonemapping_params, SG_RANGE(ref tonemappingParams));
-                    
-                    // Rendering flags (required by pbr.glsl)
-                    rendering_flags_t renderingFlags = new rendering_flags_t();
-                    // Temporarily disable IBL to test if that's causing the white screen
-                    renderingFlags.use_ibl = 0; // Disabled IBL temporarily for debugging
-                    renderingFlags.use_punctual_lights = 1; // Enable punctual lights
-                    renderingFlags.use_tonemapping = 0; // Disabled for now
-                    renderingFlags.linear_output = 0;
-                    renderingFlags.alphamode = mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND ? 2 : 0);
-                    renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
-                    renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
-                    renderingFlags.has_morph_targets = mesh.HasMorphTargets ? 1 : 0;
-                    sg_apply_uniforms(UB_rendering_flags, SG_RANGE(ref renderingFlags));
                 }
 
                 // Draw the mesh with optional screen texture for refraction

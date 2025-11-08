@@ -91,6 +91,52 @@ namespace Sokol
         }
     }
 
+    /// <summary>
+    /// Holds animation data for morph target weights on a specific node
+    /// </summary>
+    public class MorphWeightAnimation
+    {
+        public int NodeIndex { get; set; }
+        public string NodeName { get; set; } = "";
+        
+        // Keyframe data: time -> weights array
+        // Each keyframe contains all weights for all morph targets
+        public List<(float time, float[] weights)> Keyframes { get; set; } = new();
+
+        /// <summary>
+        /// Sample morph weights at given time using linear interpolation
+        /// </summary>
+        public float[] SampleWeightsAtTime(float time)
+        {
+            if (Keyframes.Count == 0) return Array.Empty<float>();
+            if (Keyframes.Count == 1) return Keyframes[0].weights;
+
+            // Find surrounding keyframes
+            for (int i = 0; i < Keyframes.Count - 1; i++)
+            {
+                if (time >= Keyframes[i].time && time <= Keyframes[i + 1].time)
+                {
+                    float t = (time - Keyframes[i].time) / 
+                             (Keyframes[i + 1].time - Keyframes[i].time);
+                    
+                    var weights1 = Keyframes[i].weights;
+                    var weights2 = Keyframes[i + 1].weights;
+                    var result = new float[weights1.Length];
+                    
+                    for (int w = 0; w < weights1.Length; w++)
+                    {
+                        result[w] = weights1[w] + t * (weights2[w] - weights1[w]);
+                    }
+                    
+                    return result;
+                }
+            }
+
+            // Before first or after last keyframe
+            return time < Keyframes[0].time ? Keyframes[0].weights : Keyframes[^1].weights;
+        }
+    }
+
     public class SharpGltfAnimation
     {
         public string Name { get; set; } = "";
@@ -102,6 +148,9 @@ namespace Sokol
         
         // KHR_animation_pointer support: material property animations
         public List<MaterialPropertyAnimation> MaterialAnimations { get; set; } = new();
+        
+        // Morph target weight animations
+        public List<MorphWeightAnimation> MorphAnimations { get; set; } = new();
 
         public SharpGltfAnimation(float duration, int ticksPerSecond, SharpGltfNodeData rootNode,
             Dictionary<string, BoneInfo> boneInfoMap)
