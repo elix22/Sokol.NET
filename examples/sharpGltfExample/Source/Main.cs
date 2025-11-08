@@ -12,6 +12,7 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "EnvironmentTest/glTF/EnvironmentTest.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "MorphStressTest/glTF/MorphStressTest.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
@@ -114,6 +115,7 @@ public static unsafe partial class SharpGLTFApp
         public bool lighting_open;
         public bool bloom_open;
         public bool glass_materials_open;
+        public bool ibl_open;                // IBL controls
         public bool culling_open;
         public bool statistics_open;
         public bool camera_info_open;
@@ -202,6 +204,12 @@ public static unsafe partial class SharpGLTFApp
         public Vector3 overrideAttenuationColor = new Vector3(1.0f, 1.0f, 1.0f);  // RGB color
         public float overrideAttenuationDistance = 1.0f;  // Distance for Beer's Law
         public float overrideThickness = 1.0f;         // Thickness multiplier
+
+        // Image-Based Lighting (IBL)
+        public EnvironmentMap? environmentMap;
+        public bool useIBL = true;                     // Enable/disable IBL
+        public float iblIntensity = 1.0f;              // IBL brightness multiplier
+        public float iblRotationDegrees = 0.0f;        // Environment rotation in degrees
 
         // UI state
         public UIState ui;

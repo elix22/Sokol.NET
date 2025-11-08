@@ -49,3 +49,12 @@ layout(binding=2) uniform light_params {
     vec4 light_colors[MAX_LIGHTS];      // w component: intensity
     vec4 light_params_data[MAX_LIGHTS]; // x: range, y: spot outer cutoff, z/w: unused
 };
+
+// IBL (Image-Based Lighting) parameters (binding=3)
+layout(binding=3) uniform ibl_params {
+    float u_EnvIntensity;           // Environment light intensity multiplier
+    float u_EnvBlurNormalized;      // Blur for skybox rendering (0 = sharp, 1 = max blur)
+    int u_MipCount;                 // Number of mip levels in specular cubemap
+    mat4 u_EnvRotation;             // 3x3 rotation matrix for environment (stored as mat4)
+    ivec2 u_TransmissionFramebufferSize; // For transmission sampling
+};

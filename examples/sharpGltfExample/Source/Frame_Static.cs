@@ -92,10 +92,20 @@ public static unsafe partial class SharpGLTFApp
         
         // IBL params (required by pbr.glsl)
         ibl_params_t iblParams = new ibl_params_t();
-        iblParams.u_EnvIntensity = 0.3f;
-        iblParams.u_EnvBlurNormalized = 0.0f;
-        iblParams.u_MipCount = 1;
-        iblParams.u_EnvRotation = Matrix4x4.Identity;
+        if (state.environmentMap != null && state.environmentMap.IsLoaded)
+        {
+            iblParams.u_EnvIntensity = state.environmentMap.Intensity;
+            iblParams.u_EnvBlurNormalized = 0.0f;
+            iblParams.u_MipCount = state.environmentMap.MipCount;
+            iblParams.u_EnvRotation = state.environmentMap.Rotation;
+        }
+        else
+        {
+            iblParams.u_EnvIntensity = 1.0f;
+            iblParams.u_EnvBlurNormalized = 0.0f;
+            iblParams.u_MipCount = 1;
+            iblParams.u_EnvRotation = Matrix4x4.Identity;
+        }
         unsafe {
             iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
             iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
@@ -109,7 +119,7 @@ public static unsafe partial class SharpGLTFApp
         
         // Rendering flags (required by pbr.glsl)
         rendering_flags_t renderingFlags = new rendering_flags_t();
-        renderingFlags.use_ibl = 0;
+        renderingFlags.use_ibl = (state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
         renderingFlags.use_tonemapping = 0;
         renderingFlags.linear_output = 0;
@@ -126,6 +136,6 @@ public static unsafe partial class SharpGLTFApp
             ? state.transmission.sampler
             : default;
         
-        mesh.Draw(pipeline, screenView, screenSampler);
+        mesh.Draw(pipeline, state.environmentMap, screenView, screenSampler);
     }
 }

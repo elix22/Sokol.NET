@@ -88,6 +88,9 @@ public static unsafe partial class SharpGLTFApp
         // Initialize transmission (glass/refraction) rendering
         InitializeTransmission();
 
+        // Initialize Image-Based Lighting (IBL)
+        InitializeIBL();
+
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
 
@@ -711,6 +714,37 @@ public static unsafe partial class SharpGLTFApp
         Info("[Transmission] Transmission system initialized successfully");
         Info("[Transmission] Two-pass rendering ready: Pass 1 (opaque objects → screen texture), Pass 2 (transparent with refraction)");
         Info("[Transmission] Screen texture available for refraction shader sampling");
+    }
+
+    static void InitializeIBL()
+    {
+        Info("[IBL] Initializing Image-Based Lighting...");
+
+        try
+        {
+            // Create a test environment map for now
+            // TODO: Load proper pre-filtered environment maps from files
+            state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("test-environment");
+
+            if (state.environmentMap != null && state.environmentMap.IsLoaded)
+            {
+                Info($"[IBL] Environment map loaded successfully:");
+                Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
+                Info($"[IBL]   - Intensity: {state.iblIntensity}");
+                Info($"[IBL]   - Enabled: {state.useIBL}");
+            }
+            else
+            {
+                Warning("[IBL] Environment map creation succeeded but not fully loaded");
+                state.useIBL = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Error($"[IBL] Failed to initialize IBL: {ex.Message}");
+            state.environmentMap = null;
+            state.useIBL = false;
+        }
     }
 
     /// <summary>

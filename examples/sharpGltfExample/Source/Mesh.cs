@@ -227,7 +227,8 @@ namespace Sokol
             }
         }
 
-        public void Draw(sg_pipeline pipeline, sg_view screenView = default, sg_sampler screenSampler = default, 
+        public void Draw(sg_pipeline pipeline, EnvironmentMap? environmentMap = null,
+                         sg_view screenView = default, sg_sampler screenSampler = default, 
                          sg_view jointMatrixView = default, sg_sampler jointMatrixSampler = default,
                          sg_view morphTargetView = default, sg_sampler morphTargetSampler = default)
         {
@@ -275,27 +276,86 @@ namespace Sokol
             // 8: Charlie environment cubemap
             // 9: Charlie LUT texture (2D)
             // 10: Transmission framebuffer texture (2D)
-            // For now, use default textures (no IBL lighting)
-            EnsureDefaultCubemap();
             
-            // Bindings 5-6: IBL cubemaps
-            bind.views[5] = _defaultWhiteCubemapView;
-            bind.samplers[5] = _defaultCubemapSampler;
-            bind.views[6] = _defaultWhiteCubemapView;
-            bind.samplers[6] = _defaultCubemapSampler;
+            // Bind IBL textures from EnvironmentMap, or use defaults
+            if (environmentMap != null && environmentMap.IsLoaded)
+            {
+                // Binding 5: GGX (specular) environment cubemap
+                bind.views[5] = environmentMap.SpecularCubemapView;
+                bind.samplers[5] = environmentMap.CubemapSampler;
+                
+                // Binding 6: Lambertian (diffuse) environment cubemap
+                bind.views[6] = environmentMap.DiffuseCubemapView;
+                bind.samplers[6] = environmentMap.CubemapSampler;
+                
+                // Binding 7: GGX BRDF LUT (2D texture)
+                bind.views[7] = environmentMap.GGX_LUTView;
+                bind.samplers[7] = environmentMap.LUTSampler;
+                
+                // Binding 8: Charlie environment cubemap (for sheen)
+                if (environmentMap.SheenCubemapView.id != 0)
+                {
+                    bind.views[8] = environmentMap.SheenCubemapView;
+                    bind.samplers[8] = environmentMap.CubemapSampler;
+                }
+                else
+                {
+                    EnsureDefaultCubemap();
+                    bind.views[8] = _defaultWhiteCubemapView;
+                    bind.samplers[8] = _defaultCubemapSampler;
+                }
+                
+                // Binding 9: Charlie LUT (2D texture) - will be overridden by morph targets if needed
+                if (morphTargetView.id != 0 && morphTargetSampler.id != 0)
+                {
+                    // Morphing has priority over Charlie LUT
+                    bind.views[9] = morphTargetView;
+                    bind.samplers[9] = morphTargetSampler;
+                }
+                else if (environmentMap.Charlie_LUTView.id != 0)
+                {
+                    bind.views[9] = environmentMap.Charlie_LUTView;
+                    bind.samplers[9] = environmentMap.LUTSampler;
+                }
+                else
+                {
+                    bind.views[9] = GetDefaultWhiteTexture().View;
+                    bind.samplers[9] = GetDefaultWhiteTexture().Sampler;
+                }
+            }
+            else
+            {
+                // No environment map - use default white cubemaps
+                EnsureDefaultCubemap();
+                
+                // Bindings 5-6: IBL cubemaps
+                bind.views[5] = _defaultWhiteCubemapView;
+                bind.samplers[5] = _defaultCubemapSampler;
+                bind.views[6] = _defaultWhiteCubemapView;
+                bind.samplers[6] = _defaultCubemapSampler;
+                
+                // Bindings 7: GGX LUT
+                var defaultWhite = GetDefaultWhiteTexture();
+                bind.views[7] = defaultWhite.View;
+                bind.samplers[7] = defaultWhite.Sampler;
+                
+                // Binding 8: Charlie environment cubemap
+                bind.views[8] = _defaultWhiteCubemapView;
+                bind.samplers[8] = _defaultCubemapSampler;
+                
+                // Binding 9: Charlie LUT or morph targets
+                if (morphTargetView.id != 0 && morphTargetSampler.id != 0)
+                {
+                    bind.views[9] = morphTargetView;
+                    bind.samplers[9] = morphTargetSampler;
+                }
+                else
+                {
+                    bind.views[9] = defaultWhite.View;
+                    bind.samplers[9] = defaultWhite.Sampler;
+                }
+            }
             
-            // Bindings 7, 9, 10: 2D textures (GGX LUT, Charlie LUT, Transmission)
-            var defaultWhite = GetDefaultWhiteTexture();
-            bind.views[7] = defaultWhite.View;
-            bind.samplers[7] = defaultWhite.Sampler;
-            
-            // Binding 8: Charlie environment cubemap
-            bind.views[8] = _defaultWhiteCubemapView;
-            bind.samplers[8] = _defaultCubemapSampler;
-            
-            // Binding 9: Charlie LUT
-            bind.views[9] = defaultWhite.View;
-            bind.samplers[9] = defaultWhite.Sampler;
             
             // Binding 10: Transmission framebuffer or default
             if (screenView.id != 0 && screenSampler.id != 0)
@@ -305,6 +365,7 @@ namespace Sokol
             }
             else
             {
+                var defaultWhite = GetDefaultWhiteTexture();
                 bind.views[10] = defaultWhite.View;
                 bind.samplers[10] = defaultWhite.Sampler;
             }
@@ -319,6 +380,7 @@ namespace Sokol
             else
             {
                 // Even if not skinned, provide a default to avoid validation errors
+                var defaultWhite = GetDefaultWhiteTexture();
                 bind.views[11] = defaultWhite.View;
                 bind.samplers[11] = defaultWhite.Sampler;
             }
@@ -331,9 +393,10 @@ namespace Sokol
                 bind.views[9] = morphTargetView;
                 bind.samplers[9] = morphTargetSampler;
             }
-            else
+            else if (environmentMap == null || !environmentMap.IsLoaded || environmentMap.Charlie_LUTView.id == 0)
             {
-                // Even if not morphed, provide a default to avoid validation errors
+                // No morph targets and no Charlie LUT - use default
+                var defaultWhite = GetDefaultWhiteTexture();
                 bind.views[9] = defaultWhite.View;
                 bind.samplers[9] = defaultWhite.Sampler;
             }

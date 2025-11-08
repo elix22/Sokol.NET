@@ -193,15 +193,6 @@ layout(binding=4) uniform camera_params {
     vec3 u_Camera;
 };
 
-// IBL uniforms
-layout(binding=5) uniform ibl_params {
-    float u_EnvIntensity;
-    float u_EnvBlurNormalized;
-    int u_MipCount;
-    mat4 u_EnvRotation;
-    ivec2 u_TransmissionFramebufferSize;
-};
-
 // Rendering feature flags
 layout(binding=7) uniform rendering_flags {
     int use_ibl;              // 0 or 1
