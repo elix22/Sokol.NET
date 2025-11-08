@@ -110,18 +110,25 @@ namespace Sokol
         {
             try
             {
-                Info($"[IBL] Converting {panoWidth}x{panoHeight} panorama to cubemap...");
+                Info($"[IBL] Converting {panoWidth}x{panoHeight} panorama to cubemap (multi-threaded)...");
 
                 const int diffuseSize = 64;   // Low-res for diffuse
                 const int specularSize = 256; // Higher-res for specular
                 int specularMipCount = (int)Math.Floor(Math.Log2(specularSize)) + 1;
                 specularMipCount = Math.Min(specularMipCount, 8);
 
+                var startTime = System.Diagnostics.Stopwatch.StartNew();
+
                 // Create diffuse cubemap (irradiance)
+                Info($"[IBL] Pre-filtering diffuse irradiance ({diffuseSize}x{diffuseSize}, 256 samples/pixel)...");
                 var diffuseCubemap = CreateDiffuseCubemapFromPanorama(panoramaPixels, panoWidth, panoHeight, diffuseSize);
+                Info($"[IBL] Diffuse complete in {startTime.ElapsedMilliseconds}ms");
                 
                 // Create specular cubemap with mipmaps (roughness levels)
+                startTime.Restart();
+                Info($"[IBL] Pre-filtering specular GGX ({specularSize}x{specularSize}, {specularMipCount} mips)...");
                 var (specularCubemap, mipCount) = CreateSpecularCubemapFromPanorama(panoramaPixels, panoWidth, panoHeight, specularSize);
+                Info($"[IBL] Specular complete in {startTime.ElapsedMilliseconds}ms");
                 
                 // Create BRDF LUT (same as procedural for now)
                 var ggxLut = CreateBRDFLUT(256);
@@ -203,10 +210,11 @@ namespace Sokol
             int totalSize = faceSize * 6;
             byte[] allFaces = new byte[totalSize];
 
-            // Sample count for diffuse convolution (more samples = better quality but slower)
-            const int sampleCount = 512;
+            // Reduced sample count for faster processing (256 is still good quality)
+            const int sampleCount = 256;
 
-            for (int face = 0; face < 6; face++)
+            // Process each face in parallel for much better performance
+            System.Threading.Tasks.Parallel.For(0, 6, face =>
             {
                 for (int y = 0; y < cubeSize; y++)
                 {
@@ -256,7 +264,7 @@ namespace Sokol
                         allFaces[idx + 3] = 255;
                     }
                 }
-            }
+            });
 
             var desc = new sg_image_desc
             {
@@ -306,10 +314,11 @@ namespace Sokol
                 int mipTotalSize = mipFaceSize * 6;
                 byte[] mipAllFaces = new byte[mipTotalSize];
 
-                // Sample count decreases with roughness (rough needs fewer samples)
-                int sampleCount = Math.Max(64, 512 >> mip);
+                // Reduced sample counts for faster processing
+                int sampleCount = mip == 0 ? 128 : Math.Max(32, 128 >> mip);
 
-                for (int face = 0; face < 6; face++)
+                // Process each face in parallel
+                System.Threading.Tasks.Parallel.For(0, 6, face =>
                 {
                     for (int y = 0; y < mipSize; y++)
                     {
@@ -370,7 +379,7 @@ namespace Sokol
                             mipAllFaces[idx + 3] = 255;
                         }
                     }
-                }
+                });
 
                 fixed (byte* ptr = mipAllFaces)
                 {
