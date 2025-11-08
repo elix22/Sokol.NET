@@ -577,10 +577,11 @@ public static unsafe partial class SharpGLTFApp
                     vsParams.model = modelMatrix;
                     vsParams.view_proj = state.camera.ViewProj;
                     vsParams.eye_pos = state.camera.EyePos;
+                    vsParams.use_morphing = useMorphing ? 1 : 0;  // Enable morphing if mesh has targets
+                    vsParams.has_morph_targets = useMorphing ? 1 : 0;  // Set morph target flag
 
                     // Copy bone matrices
                     var boneMatrices = state.animator.GetFinalBoneMatrices();
-
                     var destSpan = MemoryMarshal.CreateSpan(ref vsParams.finalBonesMatrices[0], AnimationConstants.MAX_BONES);
                     boneMatrices.AsSpan().CopyTo(destSpan);
 
