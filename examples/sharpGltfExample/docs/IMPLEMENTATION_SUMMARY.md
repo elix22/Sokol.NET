@@ -111,14 +111,54 @@ This implementation creates a complete SharpGLTF-based renderer with support for
 - Specialized pipelines for offscreen rendering (bloom, transmission)
 - Depth format and sample count configuration
 
-#### 12. **Bloom Post-Processing**
+#### 12. **Specialized Renderers (Frame_*.cs)**
+Four dedicated renderer files to avoid shader namespace collisions:
+
+- **Frame_Static.cs** → `pbr_shader_cs.Shaders`
+  - Static meshes (no skinning, no morphing)
+  - Handles: base PBR materials, textures, lighting
+  
+- **Frame_Skinning.cs** → `pbr_shader_skinning_cs_skinning.Shaders`
+  - Skinned meshes **without** morphing
+  - Handles: skeletal animation via joint matrix texture (slot 11)
+  - Supports up to 100 bones per mesh
+  
+- **Frame_Morphing.cs** → `pbr_shader_morphing_cs_morphing.Shaders`
+  - Morphing meshes **without** skinning
+  - Handles: morph target displacement via texture2DArray (slot 9)
+  - Supports up to 8 morph targets per mesh
+  
+- **Frame_SkinnedMorphing.cs** → `pbr_shader_skinning_morphing_cs_skinning_morphing.Shaders`
+  - **Combined** skinning + morphing meshes
+  - Handles: both joint textures and morph textures
+  - Applies morphing first, then skinning (per glTF spec)
+
+**Routing Logic (Frame.cs):**
+```csharp
+if (useSkinning && useMorphing)
+    RenderSkinnedMorphingMesh(...);  // Uses dedicated combined shader
+else if (useSkinning)
+    RenderSkinnedMesh(...);          // Skinning-only shader
+else if (useMorphing)
+    RenderMorphingMesh(...);         // Morphing-only shader
+else
+    RenderStaticMesh(...);           // Base PBR shader
+```
+
+**Benefits:**
+- No namespace collisions between shader variants
+- Each renderer imports only its specific shader namespace
+- Clean separation of concerns
+- Optimal uniform blocks per use case
+
+#### 13. **Bloom Post-Processing**
 - HDR bloom with multi-pass Gaussian blur
 - Passes: Scene → Bright extraction → Horizontal blur → Vertical blur → Composite
 - Configurable intensity (0.0-3.0) and threshold (0.1-5.0)
 - Tone mapping: Uncharted 2 / Reinhard with gamma correction
 - Manual sRGB conversion for correct color space handling
 
-#### 13. **Transmission/Refraction System**
+#### 14. **Transmission/Refraction System**
 - **Automatic activation**: Detects meshes with `transmission_factor > 0`
 - **Two-pass rendering**:
   - Pass 1 (Offscreen): Captures opaque background to texture
@@ -128,7 +168,7 @@ This implementation creates a complete SharpGLTF-based renderer with support for
 - Fresnel effect for realistic glass edges
 - Pipeline format matching for offscreen vs swapchain rendering
 
-#### 14. **Main Application (Main.cs, Frame.cs, Init.cs)**
+#### 15. **Main Application (Main.cs, Frame.cs, Init.cs)**
 - Complete rendering loop with multi-pass support
 - Priority system: Transmission > Bloom > Regular rendering
 - Frustum culling with statistics tracking
@@ -139,13 +179,13 @@ This implementation creates a complete SharpGLTF-based renderer with support for
 
 ### Additional Components
 
-#### 15. **TextureCache.cs**
+#### 16. **TextureCache.cs**
 - Singleton pattern for texture management
 - Prevents duplicate texture loading via key-based caching
 - Tracks cache hits/misses for performance monitoring
 - Thread-safe dictionary implementation
 
-#### 16. **GUI.cs**
+#### 17. **GUI.cs**
 - Comprehensive ImGui-based UI system
 - Multiple windows: Model Info, Animation, Lighting, Bloom, Glass Materials, Culling, Statistics, Camera Info, Camera Controls, Help
 - Theme support: Dark, Light, Classic
@@ -153,29 +193,50 @@ This implementation creates a complete SharpGLTF-based renderer with support for
 - Material override system with presets (Clear Glass, Amber, Water, Emerald, Ruby, Diamond)
 - Light control panel with up to 4 lights
 
-#### 17. **Lighting.cs**
+#### 18. **Lighting.cs**
 - Support for 3 light types: Directional, Point, Spot
 - Configurable properties: Position, Direction, Color, Intensity, Range
 - Spot light cone angles (inner/outer cutoff)
 - Up to 4 active lights simultaneously
 - Ambient light strength control
 
-#### 18. **FileSystem.cs**
+#### 19. **FileSystem.cs**
 - Async file loading using sokol-fetch
 - Automatic buffer resizing for large files
 - Progress tracking and error handling
 
 ## Shader Integration
 
-Uses pre-compiled shaders from `/Shaders/` directory:
-- **cgltf-sapp.glsl** (`cgltf_sapp_shader_cs_cgltf.Shaders`): Main PBR rendering with transmission/refraction
-- **cgltf-sapp-skinning.glsl** (`cgltf_sapp_shader_skinning_cs_skinning.Shaders`): Skinned mesh variant
-- **bloom-shaders.glsl**: Bright pass, Gaussian blur (H/V), composite
+### Shader Variants
+Four automatically compiled shader variants from `/shaders/compiled/osx/`:
 
-Shaders support:
+1. **pbr-shader.cs** (`pbr_shader_cs.Shaders`)
+   - Base PBR rendering for static meshes
+   - No skinning, no morphing
+   
+2. **pbr-shader-skinning.cs** (`pbr_shader_skinning_cs_skinning.Shaders`)
+   - PBR + skeletal animation
+   - Joint matrix texture sampling (slot 11)
+   - No morphing support
+   
+3. **pbr-shader-morphing.cs** (`pbr_shader_morphing_cs_morphing.Shaders`)
+   - PBR + morph target animation
+   - Morph displacement texture2DArray (slot 9)
+   - No skinning support
+   
+4. **pbr-shader-skinning-morphing.cs** (`pbr_shader_skinning_morphing_cs_skinning_morphing.Shaders`)
+   - PBR + skeletal animation + morph targets
+   - Both joint and morph textures
+   - Morphing applied first, then skinning (per glTF spec)
+
+5. **bloom-shader.cs**: Bright pass, Gaussian blur (H/V), composite
+
+### Shader Compilation
+Shaders are compiled automatically before build via `Directory.Build.props` using the `prepare-sharpGltfExample` task.
+
+### Common Features (All Variants)
 - **PBR metallic-roughness workflow** with full material system
 - **Multiple texture maps**: base color, metallic-roughness, normal, occlusion, emissive
-- **Vertex skinning** with up to 100 bones
 - **Screen-space refraction** with IOR-based ray bending (Snell's Law)
 - **Beer's Law volume absorption** for colored glass effects
 - **Fresnel effect** for realistic glass appearance
@@ -183,6 +244,11 @@ Shaders support:
 - **Manual sRGB conversion** for correct color space
 - **Alpha modes**: OPAQUE, BLEND, MASK
 - **Up to 4 dynamic lights** with distance attenuation
+
+### Variant-Specific Features
+- **Skinning variants**: Vertex skinning with up to 100 bones via texture sampling
+- **Morphing variants**: Up to 8 morph targets via texture2DArray displacement
+- **Combined variant**: Morphing applied to base geometry, then skinning transforms result
 
 ## Usage
 
