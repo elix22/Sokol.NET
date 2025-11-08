@@ -723,4 +723,62 @@ public static unsafe partial class SharpGLTFApp
         sg_draw(0, 3, 1);  // Fullscreen triangle
         // Don't end pass here - continue with UI rendering on same pass
     }
+
+     /// <summary>
+    /// Updates the joint matrix texture with current bone matrices.
+    /// Packs transform and normal matrices for each joint into RGBA32F format.
+    /// </summary>
+    static unsafe void UpdateJointMatrixTexture(Matrix4x4[] boneMatrices)
+    {
+        if (state.jointMatrixTexture.id == 0 || boneMatrices == null || boneMatrices.Length == 0)
+        {
+            return;
+        }
+
+        int jointCount = boneMatrices.Length;
+        int width = state.jointTextureWidth;
+        
+        // Allocate float array: width² × 4 (RGBA)
+        int texelCount = width * width;
+        float[] textureData = new float[texelCount * 4];
+        
+        // Initialize to zero
+        Array.Clear(textureData, 0, textureData.Length);
+        
+        // Only update as many joints as we have space for
+        int maxJoints = Math.Min(jointCount, texelCount / 8);
+        for (int i = 0; i < maxJoints; i++)
+        {
+            Matrix4x4 jointMatrix = boneMatrices[i];
+            
+            // Calculate normal matrix: transpose(inverse(mat3(jointMatrix)))
+            // For skinning, this transforms normals correctly in the joint's local space
+            Matrix4x4 normalMatrix;
+            if (Matrix4x4.Invert(jointMatrix, out normalMatrix))
+            {
+                normalMatrix = Matrix4x4.Transpose(normalMatrix);
+            }
+            else
+            {
+                // Fallback to identity if inversion fails
+                normalMatrix = Matrix4x4.Identity;
+            }
+            
+            // Store transform matrix at offset i*32 (4 vec4 = 16 floats)
+            CopyMatrix4x4ToFloatArray(jointMatrix, textureData, i * 32);
+            
+            // Store normal matrix at offset i*32 + 16 (4 vec4 = 16 floats)
+            CopyMatrix4x4ToFloatArray(normalMatrix, textureData, i * 32 + 16);
+        }
+        
+        // Upload to GPU
+        fixed (float* ptr = textureData)
+        {
+            var imageData = new sg_image_data();
+            imageData.mip_levels[0].ptr = ptr;
+            imageData.mip_levels[0].size = (nuint)(textureData.Length * sizeof(float));
+            
+            sg_update_image(state.jointMatrixTexture, in imageData);
+        }
+    }
 }
