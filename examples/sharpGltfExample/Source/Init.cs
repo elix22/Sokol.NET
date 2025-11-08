@@ -50,7 +50,7 @@ public static unsafe partial class SharpGLTFApp
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(-0.3f, -0.7f, -0.5f),
             new Vector3(1.0f, 0.95f, 0.85f),
-            2f                                 // Test: very low
+            5f                                 // Test: very low
         ));
 
         // Light 2: Fill light

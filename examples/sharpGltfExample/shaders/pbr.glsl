@@ -402,9 +402,10 @@ void main() {
         color = diffuse + specular;
     }
     else {
-        // When IBL is disabled, add basic ambient contribution from ambient_strength
-        // This prevents completely black areas when no lights are present
-        color = diffuseColor * ambient_strength;
+        // When IBL is disabled, add basic ambient contribution
+        // For dielectrics: use diffuse color
+        // For metals: use base color (since metals absorb diffuse and reflect specular)
+        color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength;
     }
     
     
@@ -467,8 +468,8 @@ void main() {
                 // Light intensity with attenuation
                 vec3 intensity = lightColor * lightIntensity * attenuation;
                 
-                // Diffuse BRDF (Lambertian)
-                vec3 l_diffuse = intensity * NdotL * (baseColor.rgb / M_PI);
+                // Diffuse BRDF (Lambertian) - use diffuseColor which is already baseColor * (1-metallic)
+                vec3 l_diffuse = intensity * NdotL * (diffuseColor / M_PI);
                 
                 // Specular BRDF (GGX)
                 float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
