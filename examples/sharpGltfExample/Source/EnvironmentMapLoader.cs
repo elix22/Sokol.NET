@@ -21,11 +21,30 @@ namespace Sokol
         public delegate void HDRLoadCallback(EnvironmentMap? environmentMap);
 
         /// <summary>
+        /// State for tracking 6-face cubemap loading
+        /// </summary>
+        private class CubemapFaceLoadState
+        {
+            public int LoadedFaces = 0;
+            public byte[][] FaceData = new byte[6][];
+            public int FaceSize = 0;
+            public bool Failed = false;
+            public HDRLoadCallback? Callback;
+            public string Name = "cubemap-environment";
+        }
+
+        /// <summary>
         /// Load HDR environment map asynchronously from file.
         /// Uses FileSystem for async loading, then converts panorama to cubemaps.
         /// </summary>
         public static unsafe void LoadHDREnvironmentAsync(string hdrFileName, HDRLoadCallback onComplete)
         {
+#if WEB
+            // HDR loading not supported on WebAssembly - fallback to procedural
+            Warning($"[IBL] HDR loading not supported on Web, using procedural environment");
+            onComplete?.Invoke(null);
+            return;
+#else
             Info($"[IBL] Starting async load of HDR: {hdrFileName}");
 
             FileSystem.Instance.LoadFile(hdrFileName, (filePath, data, status) =>
@@ -82,6 +101,7 @@ namespace Sokol
                     onComplete?.Invoke(null);
                 }
             });
+#endif
         }
 
         /// <summary>
@@ -100,6 +120,12 @@ namespace Sokol
         /// </summary>
         public static unsafe void LoadEXREnvironmentAsync(string exrFileName, HDRLoadCallback onComplete)
         {
+#if WEB
+            // EXR loading not supported on WebAssembly - fallback to procedural
+            Warning($"[IBL] EXR loading not supported on Web, using procedural environment");
+            onComplete?.Invoke(null);
+            return;
+#else
             Info($"[IBL] Starting async load of EXR: {exrFileName}");
 
             FileSystem.Instance.LoadFile(exrFileName, (filePath, data, status) =>
@@ -203,6 +229,266 @@ namespace Sokol
                     onComplete?.Invoke(null);
                 }
             });
+#endif
+        }
+
+        /// <summary>
+        /// Load pre-filtered IBL environment from 6 separate cubemap face images.
+        /// This is fast and works on all platforms including WebAssembly.
+        /// Faces are loaded asynchronously and the cubemap is created once all faces are loaded.
+        /// </summary>
+        /// <param name="faceFileNames">Array of 6 filenames in order: +X, -X, +Y, -Y, +Z, -Z</param>
+        /// <param name="onComplete">Callback when loading completes (or fails)</param>
+        /// <param name="name">Name for the environment map</param>
+        public static unsafe void LoadCubemapFacesAsync(string[] faceFileNames, HDRLoadCallback onComplete, string name = "cubemap-environment")
+        {
+            if (faceFileNames.Length != 6)
+            {
+                Error($"[IBL] LoadCubemapFacesAsync requires exactly 6 face filenames, got {faceFileNames.Length}");
+                onComplete?.Invoke(null);
+                return;
+            }
+
+            Info($"[IBL] Loading cubemap environment from 6 faces: {name}");
+
+            var loadState = new CubemapFaceLoadState
+            {
+                Callback = onComplete,
+                Name = name
+            };
+
+            // Load all 6 faces asynchronously
+            for (int face = 0; face < 6; face++)
+            {
+                int faceIndex = face; // Capture for closure
+                string fileName = faceFileNames[face];
+
+                FileSystem.Instance.LoadFile(fileName, (filePath, data, status) =>
+                {
+                    if (loadState.Failed)
+                        return; // Already failed, skip
+
+                    if (status != FileLoadStatus.Success || data == null)
+                    {
+                        Warning($"[IBL] Failed to load cubemap face {faceIndex}: {fileName} (status: {status})");
+                        loadState.Failed = true;
+                        loadState.Callback?.Invoke(null);
+                        return;
+                    }
+
+                    // Decode image using stb_image
+                    int width = 0, height = 0, channels = 0;
+                    byte* pixels;
+
+                    fixed (byte* dataPtr = data)
+                    {
+                        pixels = stbi_load_csharp(in *dataPtr, data.Length, ref width, ref height, ref channels, 4);
+                    }
+
+                    if (pixels == null)
+                    {
+                        string error = stbi_failure_reason_csharp();
+                        Warning($"[IBL] Failed to decode cubemap face {faceIndex}: {error}");
+                        loadState.Failed = true;
+                        loadState.Callback?.Invoke(null);
+                        return;
+                    }
+
+                    // Validate all faces are same size
+                    if (loadState.FaceSize == 0)
+                    {
+                        loadState.FaceSize = width;
+                        Info($"[IBL] Cubemap face size: {width}x{height}");
+                    }
+                    else if (width != loadState.FaceSize || height != loadState.FaceSize)
+                    {
+                        Warning($"[IBL] Cubemap face {faceIndex} size mismatch: {width}x{height}, expected {loadState.FaceSize}x{loadState.FaceSize}");
+                        stbi_image_free_csharp(pixels);
+                        loadState.Failed = true;
+                        loadState.Callback?.Invoke(null);
+                        return;
+                    }
+
+                    // Copy pixel data
+                    int faceDataSize = width * height * 4; // RGBA
+                    loadState.FaceData[faceIndex] = new byte[faceDataSize];
+                    
+                    fixed (byte* dest = loadState.FaceData[faceIndex])
+                    {
+                        Buffer.MemoryCopy(pixels, dest, faceDataSize, faceDataSize);
+                    }
+
+                    stbi_image_free_csharp(pixels);
+
+                    // Increment loaded count
+                    loadState.LoadedFaces++;
+                    Info($"[IBL] Loaded cubemap face {faceIndex}/6: {fileName}");
+
+                    // All faces loaded?
+                    if (loadState.LoadedFaces == 6)
+                    {
+                        Info($"[IBL] All 6 faces loaded, creating cubemap environment...");
+                        var envMap = CreateCubemapEnvironment(loadState.FaceData, loadState.FaceSize, loadState.Name);
+                        loadState.Callback?.Invoke(envMap);
+                    }
+                });
+            }
+        }
+
+        /// <summary>
+        /// Create environment map from pre-loaded 6 cubemap faces.
+        /// This assumes the faces are already pre-filtered (diffuse = low-res, specular = with mipmaps).
+        /// For simple cubemaps without pre-filtering, this creates a basic environment.
+        /// </summary>
+        private static unsafe EnvironmentMap CreateCubemapEnvironment(byte[][] faceData, int faceSize, string name)
+        {
+            try
+            {
+                // Combine all 6 faces into single buffer
+                int faceSizeBytes = faceSize * faceSize * 4; // RGBA
+                int totalSize = faceSizeBytes * 6;
+                byte[] allFaces = new byte[totalSize];
+
+                for (int face = 0; face < 6; face++)
+                {
+                    Array.Copy(faceData[face], 0, allFaces, face * faceSizeBytes, faceSizeBytes);
+                }
+
+                // Create diffuse cubemap (use loaded faces directly, or downscale if too large)
+                // For now, we'll use the loaded faces as-is for both diffuse and specular
+                sg_image diffuseCubemap;
+                
+                fixed (byte* ptr = allFaces)
+                {
+                    var desc = new sg_image_desc
+                    {
+                        type = sg_image_type.SG_IMAGETYPE_CUBE,
+                        width = faceSize,
+                        height = faceSize,
+                        num_slices = 6,
+                        num_mipmaps = 1,
+                        pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                        label = $"ibl-{name}-diffuse"
+                    };
+                    desc.data.mip_levels[0] = new sg_range { ptr = ptr, size = (nuint)totalSize };
+                    diffuseCubemap = sg_make_image(desc);
+                }
+
+                // Create specular cubemap with mipmaps
+                // Generate mipmaps from base level
+                int mipCount = (int)Math.Floor(Math.Log2(faceSize)) + 1;
+                mipCount = Math.Min(mipCount, 8);
+
+                var (specularCubemap, actualMipCount) = CreateMipmappedCubemapFromFaces(allFaces, faceSize, name);
+
+                // Create BRDF LUT
+                var ggxLut = CreateBRDFLUT(256);
+
+                var envMap = new EnvironmentMap(name);
+                envMap.Initialize(diffuseCubemap, specularCubemap, ggxLut, actualMipCount);
+
+                Info($"[IBL] Cubemap environment '{name}' created successfully: {faceSize}x{faceSize}, {actualMipCount} mips");
+                return envMap;
+            }
+            catch (Exception ex)
+            {
+                Error($"[IBL] Error creating cubemap environment: {ex.Message}");
+                return CreateTestEnvironment(name);
+            }
+        }
+
+        /// <summary>
+        /// Create mipmapped cubemap from base level faces by generating mip levels
+        /// </summary>
+        private static unsafe (sg_image, int) CreateMipmappedCubemapFromFaces(byte[] baseFaces, int baseSize, string name)
+        {
+            int mipCount = (int)Math.Floor(Math.Log2(baseSize)) + 1;
+            mipCount = Math.Min(mipCount, 8);
+
+            var desc = new sg_image_desc
+            {
+                type = sg_image_type.SG_IMAGETYPE_CUBE,
+                width = baseSize,
+                height = baseSize,
+                num_slices = 6,
+                num_mipmaps = mipCount,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                label = $"ibl-{name}-specular-mip"
+            };
+
+            // Mip 0: Use original faces
+            fixed (byte* ptr = baseFaces)
+            {
+                desc.data.mip_levels[0] = new sg_range { ptr = ptr, size = (nuint)baseFaces.Length };
+            }
+
+            // Generate additional mip levels by downsampling
+            for (int mip = 1; mip < mipCount; mip++)
+            {
+                int mipSize = Math.Max(1, baseSize >> mip);
+                int mipFaceSize = mipSize * mipSize * 4; // RGBA per face
+                int mipTotalSize = mipFaceSize * 6;
+                byte[] mipFaces = new byte[mipTotalSize];
+
+                int srcMipSize = Math.Max(1, baseSize >> (mip - 1));
+                
+                // Simple box filter downsampling for each face
+                for (int face = 0; face < 6; face++)
+                {
+                    DownsampleFace(baseFaces, face, srcMipSize, mipFaces, face, mipSize);
+                }
+
+                fixed (byte* ptr = mipFaces)
+                {
+                    desc.data.mip_levels[mip] = new sg_range { ptr = ptr, size = (nuint)mipTotalSize };
+                }
+            }
+
+            return (sg_make_image(desc), mipCount);
+        }
+
+        /// <summary>
+        /// Simple box filter downsampling for a cubemap face
+        /// </summary>
+        private static void DownsampleFace(byte[] srcData, int srcFace, int srcSize, byte[] dstData, int dstFace, int dstSize)
+        {
+            int srcFaceOffset = srcFace * srcSize * srcSize * 4;
+            int dstFaceOffset = dstFace * dstSize * dstSize * 4;
+
+            for (int y = 0; y < dstSize; y++)
+            {
+                for (int x = 0; x < dstSize; x++)
+                {
+                    // Sample 2x2 block from source
+                    int sx = x * 2;
+                    int sy = y * 2;
+
+                    Vector4 sum = Vector4.Zero;
+                    int samples = 0;
+
+                    for (int dy = 0; dy < 2 && (sy + dy) < srcSize; dy++)
+                    {
+                        for (int dx = 0; dx < 2 && (sx + dx) < srcSize; dx++)
+                        {
+                            int srcIdx = srcFaceOffset + ((sy + dy) * srcSize + (sx + dx)) * 4;
+                            sum.X += srcData[srcIdx + 0];
+                            sum.Y += srcData[srcIdx + 1];
+                            sum.Z += srcData[srcIdx + 2];
+                            sum.W += srcData[srcIdx + 3];
+                            samples++;
+                        }
+                    }
+
+                    // Average
+                    sum /= samples;
+
+                    int dstIdx = dstFaceOffset + (y * dstSize + x) * 4;
+                    dstData[dstIdx + 0] = (byte)Math.Clamp(sum.X, 0, 255);
+                    dstData[dstIdx + 1] = (byte)Math.Clamp(sum.Y, 0, 255);
+                    dstData[dstIdx + 2] = (byte)Math.Clamp(sum.Z, 0, 255);
+                    dstData[dstIdx + 3] = (byte)Math.Clamp(sum.W, 0, 255);
+                }
+            }
         }
 
         /// <summary>
