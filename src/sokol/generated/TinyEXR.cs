@@ -68,5 +68,40 @@ public static string EXRGetFailureReason()
     }
 }
 
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "EXRConvertPanoramaToDiffuseCubemap", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "EXRConvertPanoramaToDiffuseCubemap", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern byte* EXRConvertPanoramaToDiffuseCubemap(in float panorama_rgba, int pano_width, int pano_height, int cube_size, int sample_count);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "EXRConvertPanoramaToDiffuseCubemapFace", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "EXRConvertPanoramaToDiffuseCubemapFace", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern byte* EXRConvertPanoramaToDiffuseCubemapFace(in float panorama_rgba, int pano_width, int pano_height, int cube_size, int face_index, int sample_count);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "EXRConvertPanoramaToSpecularCubemap", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "EXRConvertPanoramaToSpecularCubemap", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern byte* EXRConvertPanoramaToSpecularCubemap(in float panorama_rgba, int pano_width, int pano_height, int cube_size, float roughness, int sample_count);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "EXRConvertPanoramaToSpecularCubemapFace", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "EXRConvertPanoramaToSpecularCubemapFace", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern byte* EXRConvertPanoramaToSpecularCubemapFace(in float panorama_rgba, int pano_width, int pano_height, int cube_size, int face_index, float roughness, int sample_count);
+
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "EXRFreeCubemapData", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "EXRFreeCubemapData", CallingConvention = CallingConvention.Cdecl)]
+#endif
+public static extern void EXRFreeCubemapData(byte* cubemap_data);
+
 }
 }

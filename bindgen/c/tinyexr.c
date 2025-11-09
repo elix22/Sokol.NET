@@ -51,3 +51,63 @@ void EXRFreeErrorMessage(const char* err);
 
 // Get failure reason for last error (for debugging)
 const char* EXRGetFailureReason(void);
+
+// ============================================================================
+// Panorama to Cubemap Conversion Functions (Cross-platform C++ implementation)
+// ============================================================================
+
+// Convert panorama to diffuse irradiance cubemap
+// Returns RGBA8 byte data (6 faces concatenated), must be freed with EXRFreeCubemapData
+// panorama_rgba: Input panorama as RGBA float data
+// pano_width, pano_height: Panorama dimensions
+// cube_size: Size of each cubemap face (e.g., 64)
+// sample_count: Number of hemisphere samples per pixel (e.g., 256)
+unsigned char* EXRConvertPanoramaToDiffuseCubemap(
+    const float* panorama_rgba,
+    int pano_width,
+    int pano_height,
+    int cube_size,
+    int sample_count);
+
+// Convert panorama to diffuse irradiance for SINGLE FACE (thread-safe, for parallel processing)
+// Returns RGBA8 byte data for one face only, must be freed with EXRFreeCubemapData
+// C# should call this in Parallel.For loop across 6 faces
+// face_index: Which cubemap face to process (0-5)
+unsigned char* EXRConvertPanoramaToDiffuseCubemapFace(
+    const float* panorama_rgba,
+    int pano_width,
+    int pano_height,
+    int cube_size,
+    int face_index,
+    int sample_count);
+
+// Convert panorama to specular GGX cubemap (one mip level)
+// Returns RGBA8 byte data (6 faces concatenated), must be freed with EXRFreeCubemapData
+// panorama_rgba: Input panorama as RGBA float data
+// pano_width, pano_height: Panorama dimensions
+// cube_size: Size of each cubemap face (e.g., 256, 128, 64, etc.)
+// roughness: Roughness level for this mip (0.0 = sharp, 1.0 = rough)
+// sample_count: Number of GGX samples per pixel (e.g., 128)
+unsigned char* EXRConvertPanoramaToSpecularCubemap(
+    const float* panorama_rgba,
+    int pano_width,
+    int pano_height,
+    int cube_size,
+    float roughness,
+    int sample_count);
+
+// Convert panorama to specular GGX for SINGLE FACE (thread-safe, for parallel processing)
+// Returns RGBA8 byte data for one face only, must be freed with EXRFreeCubemapData
+// C# should call this in Parallel.For loop across 6 faces for each mip level
+// face_index: Which cubemap face to process (0-5)
+unsigned char* EXRConvertPanoramaToSpecularCubemapFace(
+    const float* panorama_rgba,
+    int pano_width,
+    int pano_height,
+    int cube_size,
+    int face_index,
+    float roughness,
+    int sample_count);
+
+// Free cubemap data allocated by conversion functions
+void EXRFreeCubemapData(unsigned char* cubemap_data);
