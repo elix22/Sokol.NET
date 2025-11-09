@@ -391,8 +391,38 @@ void main() {
         vec3 iblFresnel = getIBLGGXFresnel(n, v, perceptualRoughness, specularColor, 1.0);
         vec3 specular = specularLight * iblFresnel;
         
-        // Combine diffuse and specular
-        color = diffuse + specular;
+        // ====================================================================
+        // WORKAROUND: Selective diffuse IBL for dielectrics vs metals
+        // ====================================================================
+        // ROOT CAUSE:
+        //   Environment cubemap mipmaps use box-filter downsampling instead of
+        //   GGX pre-filtering (see EnvironmentMapLoader.cs). This causes
+        //   getDiffuseLight() to return overly sharp environment samples that
+        //   create reflection-like artifacts on rough dielectric surfaces.
+        //
+        // SOLUTION:
+        //   - Dielectrics (metallic < 0.3): Use material albedo (diffuseColor)
+        //     instead of environment-sampled diffuse. They still get specular IBL.
+        //   - Metals (metallic ≥ 0.5): Use full environment lighting (diffuse + specular)
+        //
+        // TRADE-OFF:
+        //   Dielectrics lose environment-based diffuse lighting but retain
+        //   specular reflections. This is more physically plausible than
+        //   disabling IBL entirely, though not fully correct.
+        //
+        // PROPER FIX (TODO):
+        //   Implement GGX convolution in mipmap generation so getDiffuseLight()
+        //   returns properly pre-filtered irradiance without sharp artifacts.
+        //   See EnvironmentMapLoader.cs CreateMipmappedCubemapFromFaces().
+        // ====================================================================
+        
+        if (metallic < 0.3) {
+           color = mix(diffuseColor, baseColor.rgb, metallic)* ambient_strength;
+        }
+        else {
+            // Metals: full IBL (environment diffuse + specular)
+            color = diffuse + specular;
+        }
     }
     else {
         // When IBL is disabled, add basic ambient contribution
