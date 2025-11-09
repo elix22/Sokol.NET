@@ -385,3 +385,104 @@ Let me try Attempt 8: View-space refraction calculation.
 The "rotating interior" might be **CORRECT PHYSICAL BEHAVIOR**. When you rotate glass, the refraction changes because the surface orientation changes. This is how real glass works!
 
 **Need user to clarify**: What does the reference viewer show? Does it also rotate?
+
+---
+
+## Attempt 8: View-Space Refraction (FAILED)
+
+**Date**: November 9, 2025  
+**Theory**: View-space coordinates are camera-relative, so refraction should be independent of object rotation.
+
+**Implementation**:
+- Transform position and normal to view-space using `ViewMatrix`
+- Calculate view direction in view-space (camera at origin)
+- Perform refraction in view-space
+- Apply model scale to thickness
+- Project with `ProjectionMatrix` only (already in view-space)
+
+**Result**: ❌ **FAILED**  
+**User Report**: "Interior upside-side down again. Interior doesn't stay stationary when rotating the watch"
+
+**Analysis**: View-space approach was correct direction, but incomplete. When model rotates, the view matrix changes **relative to the model**. The view-space transformation doesn't compensate for the model's rotation.
+
+---
+
+## Attempt 9: Model-Rotation-Compensated View-Space Refraction (TESTING)
+
+**Date**: November 9, 2025  
+**Root Cause Identified**: When the model rotates, the view matrix changes relative to the model. The view-space calculations need to be done in a **model-relative view space** - essentially the view space as if the camera rotated WITH the model.
+
+**Key Insight from User**:
+> "when the model rotates, the view matrix changes in relation to the model, it behaves as expected only when the model is in front of the camera, so if the model rotates, the camera should rotate with him, around him in order to position the camera again in front of the model (the view matrix should be compensated by the model rotation) prior of calculating transmission"
+
+**Solution**:
+1. Extract model rotation from ModelMatrix (upper 3x3, normalized)
+2. Create model-compensated view rotation: `ViewRotation * transpose(ModelRotation)`
+   - Since rotation matrices are orthogonal, transpose = inverse
+   - This effectively cancels out the model's rotation from the view transformation
+3. Use compensated view rotation ONLY for normal transformation
+4. This makes the view space "rotate with" the model, keeping interior stationary
+
+**Implementation**:
+```glsl
+// Extract normalized rotation from model matrix
+mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
+                    normalize(u_ModelMatrix[1].xyz),
+                    normalize(u_ModelMatrix[2].xyz));
+
+// Create model-compensated view rotation: ViewRot * inverse(ModelRot)
+mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
+
+// Transform position to regular view space
+vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
+vec3 positionView = viewPos.xyz / viewPos.w;
+
+// Transform NORMAL using model-compensated view rotation
+vec3 normalView = normalize(modelCompensatedViewRot * n);
+vec3 viewDirView = normalize(-positionView);
+
+// Calculate refracted ray with compensated normal
+vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
+// ... rest of calculation unchanged ...
+```
+
+**Key Difference from Attempt 8**: Only the **normal** is transformed with the compensated view rotation. This makes the refraction calculation relative to the model's local orientation, not the world orientation.
+
+**Expected Result**: Interior should remain stationary when rotating the watch, because the refraction normal rotates WITH the model.
+
+**Status**: ✅ **SUCCESS!**
+
+**User Confirmation**: "now it works"
+
+**Final Fix Required**: Y-flip correction - need to flip for Metal/D3D (`#if !SOKOL_GLSL`) instead of OpenGL.
+
+**Final Implementation**:
+```glsl
+#if !SOKOL_GLSL
+// Metal/D3D: flip Y for texture coordinate system
+refractionCoords.y = 1.0 - refractionCoords.y;
+#endif
+// OpenGL: no flip needed
+```
+
+**Result**: ✅ **COMPLETE** - Interior stays stationary when rotating watch, correct orientation on all platforms.
+
+---
+
+## Final Solution Summary
+
+**Root Cause**: When the model rotates, the view matrix changes relative to the model's local coordinate system. Standard view-space transformations don't account for this model rotation.
+
+**Solution**: Model-rotation-compensated view-space refraction
+1. Extract model rotation matrix (normalized upper 3x3 of ModelMatrix)
+2. Create compensated view rotation: `ViewRotation × transpose(ModelRotation)`
+3. Apply compensated rotation only to surface normal
+4. Perform refraction in this "model-relative" view space
+
+**Why It Works**: By canceling the model's rotation from the view transformation, the refraction calculation becomes relative to the model's local orientation. This makes the interior appearance independent of the model's world-space rotation, while still correctly handling camera movement.
+
+**Platform Differences**:
+- **OpenGL**: No Y-flip needed for refraction coordinates
+- **Metal/D3D**: Y-flip required (`refractionCoords.y = 1.0 - refractionCoords.y`)
+
+
