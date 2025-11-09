@@ -463,42 +463,26 @@ void main() {
     }
     
     
-    // ========================================================================
-    // Transmission (KHR_materials_transmission)
-    // ========================================================================
-    
-    // Apply transmission if factor > 0 (sample refracted background from screen texture)
+    // === Transmission (Refraction through glass) ===
+    // DEBUG: Testing if framebuffer is correct by sampling at current fragment position
     if (transmission_factor > 0.0) {
-        // Compute refracted ray direction using Snell's law
-        // Refract the view direction through the surface based on IOR
-        vec3 refractedDirection = refract(-v, n, 1.0 / ior);
+        // Calculate current fragment's screen UV (no refraction)
+        // gl_FragCoord origin: OpenGL = bottom-left, Metal/WGSL = top-left
+        vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(u_TransmissionFramebufferSampler, 0));
         
-        // Project the exit point to screen space for sampling
-        vec3 refractedPosition = v_Position + refractedDirection * thickness_factor;
-        vec4 ndcPos = u_ProjectionMatrix * u_ViewMatrix * vec4(refractedPosition, 1.0);
-        vec2 screenUV = (ndcPos.xy / ndcPos.w) * 0.5 + 0.5;
+        #if SOKOL_GLSL
+        // OpenGL: flip Y because gl_FragCoord is bottom-left origin
+        screenUV.y = 1.0 - screenUV.y;
+        #endif
+        // Metal already has top-left origin matching texture, no flip needed
         
-        // Clamp UV to valid range to avoid sampling outside framebuffer
-        screenUV = clamp(screenUV, vec2(0.0), vec2(1.0));
-        
-        // Sample the transmission framebuffer (background behind this fragment)
+        // Sample the transmission framebuffer at current position (NO REFRACTION)
         vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, screenUV).rgb;
         
-        // Apply Beer's law volume attenuation (color tint through the material)
-        vec3 attenuatedTransmission = transmittedLight;
-        if (attenuation_distance < 1000000.0) { // Check if attenuation is not infinity
-            vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
-            vec3 transmittance = exp(-attenuationCoefficient * thickness_factor);
-            attenuatedTransmission = transmittedLight * transmittance;
-        }
-        
-        // Mix the attenuated refracted light with the current color based on transmission factor
-        // transmission_factor = 0.0: fully opaque (normal PBR)
-        // transmission_factor = 1.0: fully transparent (glass-like refraction)
-        color = mix(color, attenuatedTransmission * baseColor.rgb, transmission_factor);
-    }
-    
-    
+        // Mix with base color
+        vec3 transmission = transmittedLight * baseColor.rgb;
+        color = mix(color, transmission, transmission_factor);
+    }    
     // ========================================================================
     // Punctual Lights (optional)
     // ========================================================================
