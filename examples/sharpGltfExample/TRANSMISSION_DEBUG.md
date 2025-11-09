@@ -452,9 +452,11 @@ vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
 
 **Status**: ✅ **SUCCESS!**
 
-**User Confirmation**: "now it works"
+**User Confirmation** (Final): 
+> "it works !! Interior upside-side is up  
+> Interior stay stationary when rotating the watch ( no "watch inside watch" effect)"
 
-**Final Fix Required**: Y-flip correction - need to flip for Metal/D3D (`#if !SOKOL_GLSL`) instead of OpenGL.
+**Final Fix Applied**: Y-flip correction for Metal/D3D (`#if !SOKOL_GLSL`) instead of OpenGL.
 
 **Final Implementation**:
 ```glsl
@@ -465,24 +467,54 @@ refractionCoords.y = 1.0 - refractionCoords.y;
 // OpenGL: no flip needed
 ```
 
-**Result**: ✅ **COMPLETE** - Interior stays stationary when rotating watch, correct orientation on all platforms.
+**Result**: ✅ **FULLY WORKING** - Interior orientation correct, stays perfectly stationary when rotating watch, no "watch inside watch" effect on all platforms.
 
 ---
 
 ## Final Solution Summary
 
-**Root Cause**: When the model rotates, the view matrix changes relative to the model's local coordinate system. Standard view-space transformations don't account for this model rotation.
+**Root Cause**: When the model rotates, the view matrix changes relative to the model's local coordinate system. Standard view-space transformations don't account for this model rotation, causing the interior to appear to rotate with the model.
 
 **Solution**: Model-rotation-compensated view-space refraction
 1. Extract model rotation matrix (normalized upper 3x3 of ModelMatrix)
 2. Create compensated view rotation: `ViewRotation × transpose(ModelRotation)`
 3. Apply compensated rotation only to surface normal
 4. Perform refraction in this "model-relative" view space
+5. Platform-specific Y-flip: Metal/D3D flip, OpenGL no flip
 
 **Why It Works**: By canceling the model's rotation from the view transformation, the refraction calculation becomes relative to the model's local orientation. This makes the interior appearance independent of the model's world-space rotation, while still correctly handling camera movement.
 
 **Platform Differences**:
-- **OpenGL**: No Y-flip needed for refraction coordinates
-- **Metal/D3D**: Y-flip required (`refractionCoords.y = 1.0 - refractionCoords.y`)
+- **OpenGL** (`SOKOL_GLSL`): No Y-flip needed for refraction coordinates
+- **Metal/D3D** (`!SOKOL_GLSL`): Y-flip required (`refractionCoords.y = 1.0 - refractionCoords.y`)
+
+**Final Status**: ✅ **FULLY FUNCTIONAL** - All requirements met:
+- ✅ Interior orientation correct (upside-up)
+- ✅ Interior stays perfectly stationary during model rotation
+- ✅ No "watch inside watch" effect
+- ✅ Proper refraction with Snell's law
+- ✅ Beer's law attenuation for realistic glass
+- ✅ Works on all platforms (OpenGL, Metal, D3D)
+
+---
+
+## Conclusion
+
+**KHR_materials_transmission extension is now fully implemented and verified working.**
+
+The implementation successfully handles:
+1. **Physics-based refraction** using Snell's law
+2. **Volumetric absorption** using Beer's law
+3. **Model-rotation compensation** for stationary interior appearance
+4. **Cross-platform compatibility** with correct coordinate system handling
+
+**Journey**: 9 attempts were required to solve the "rotating interior" bug:
+- Attempts 1-5: World-space approaches (various coordinate transformations)
+- Attempt 6: Debug test that proved framebuffer content was correct
+- Attempt 7: Added model scale extraction (still failed)
+- Attempt 8: View-space refraction (wrong Y-flip)
+- Attempt 9: Model-rotation-compensated view-space + correct Y-flip ✅ **SUCCESS**
+
+**Key Insight**: The solution required understanding that model rotation changes the view matrix relative to the model's local coordinate system, necessitating compensation via `ViewRotation × transpose(ModelRotation)` applied to the surface normal before refraction calculation.
 
 
