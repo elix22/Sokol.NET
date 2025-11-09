@@ -464,22 +464,48 @@ void main() {
     
     
     // === Transmission (Refraction through glass) ===
-    // DEBUG: Testing if framebuffer is correct by sampling at current fragment position
+    // Attempt 7: Fixed implementation with proper model scale extraction
     if (transmission_factor > 0.0) {
-        // Calculate current fragment's screen UV (no refraction)
-        // gl_FragCoord origin: OpenGL = bottom-left, Metal/WGSL = top-left
-        vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(u_TransmissionFramebufferSampler, 0));
+        // 1. Calculate refracted ray direction using Snell's law
+        vec3 refractedRay = refract(-v, n, 1.0 / ior);
+        
+        // 2. Extract rotation-independent scale from model matrix
+        // This is CRITICAL - without this, rotation affects the refraction
+        vec3 modelScale;
+        modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
+        modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
+        modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
+        
+        // 3. Calculate transmission ray in world space
+        // Scale thickness by model scale for correct world-space distance
+        vec3 transmissionRay = normalize(refractedRay) * thickness_factor * modelScale;
+        
+        // 4. Calculate exit point where refracted ray exits the volume
+        vec3 refractedRayExit = v_Position + transmissionRay;
+        
+        // 5. Project exit point to screen space (NDC then [0,1])
+        vec4 ndcPos = u_ProjectionMatrix * u_ViewMatrix * vec4(refractedRayExit, 1.0);
+        vec2 refractionCoords = ndcPos.xy / ndcPos.w;
+        refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
         
         #if SOKOL_GLSL
-        // OpenGL: flip Y because gl_FragCoord is bottom-left origin
-        screenUV.y = 1.0 - screenUV.y;
+        // OpenGL: flip Y because NDC has bottom-left origin
+        refractionCoords.y = 1.0 - refractionCoords.y;
         #endif
-        // Metal already has top-left origin matching texture, no flip needed
+        // Metal already has top-left origin, no flip needed
         
-        // Sample the transmission framebuffer at current position (NO REFRACTION)
-        vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, screenUV).rgb;
+        // 6. Sample the transmission framebuffer at refracted position
+        vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
         
-        // Mix with base color
+        // 7. Apply Beer's law (light absorption through volume)
+        if (attenuation_distance > 0.0) {
+            float transmissionRayLength = length(transmissionRay);
+            vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
+            vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
+            transmittedLight *= attenuation;
+        }
+        
+        // 8. Mix transmitted light with base color and blend
         vec3 transmission = transmittedLight * baseColor.rgb;
         color = mix(color, transmission, transmission_factor);
     }    

@@ -147,6 +147,7 @@ public static unsafe partial class SharpGLTFApp
         // Set view and projection matrices for transmission refraction
         iblParams.u_ViewMatrix = state.camera.View;
         iblParams.u_ProjectionMatrix = state.camera.Proj;
+        iblParams.u_ModelMatrix = modelMatrix;
         sg_apply_uniforms(UB_skinning_ibl_params, SG_RANGE(ref iblParams));
         
         // Tonemapping params (required by pbr.glsl) - SKINNED VERSION

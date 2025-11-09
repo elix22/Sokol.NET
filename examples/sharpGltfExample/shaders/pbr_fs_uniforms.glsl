@@ -71,4 +71,5 @@ layout(binding=3) uniform ibl_params {
     ivec2 u_TransmissionFramebufferSize; // For transmission sampling
     mat4 u_ViewMatrix;              // View matrix for transmission refraction
     mat4 u_ProjectionMatrix;        // Projection matrix for transmission refraction
+    mat4 u_ModelMatrix;             // Model matrix for transmission refraction
 };
