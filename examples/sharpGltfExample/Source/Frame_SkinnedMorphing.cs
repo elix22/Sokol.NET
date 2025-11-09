@@ -138,15 +138,44 @@ public static unsafe partial class SharpGLTFApp
         metallicParams.clearcoat_factor = mesh.ClearcoatFactor;
         metallicParams.clearcoat_roughness = mesh.ClearcoatRoughness;
 
-        // Set texture transform for normal map (KHR_texture_transform extension)
+        // Set texture transforms for all texture types (KHR_texture_transform extension)
         unsafe {
+            // Base Color
+            metallicParams.base_color_tex_offset[0] = mesh.BaseColorTexOffset.X;
+            metallicParams.base_color_tex_offset[1] = mesh.BaseColorTexOffset.Y;
+            metallicParams.base_color_tex_scale[0] = mesh.BaseColorTexScale.X;
+            metallicParams.base_color_tex_scale[1] = mesh.BaseColorTexScale.Y;
+            metallicParams.base_color_tex_rotation = mesh.BaseColorTexRotation;
+            
+            // Metallic-Roughness
+            metallicParams.metallic_roughness_tex_offset[0] = mesh.MetallicRoughnessTexOffset.X;
+            metallicParams.metallic_roughness_tex_offset[1] = mesh.MetallicRoughnessTexOffset.Y;
+            metallicParams.metallic_roughness_tex_scale[0] = mesh.MetallicRoughnessTexScale.X;
+            metallicParams.metallic_roughness_tex_scale[1] = mesh.MetallicRoughnessTexScale.Y;
+            metallicParams.metallic_roughness_tex_rotation = mesh.MetallicRoughnessTexRotation;
+            
+            // Normal
             metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
             metallicParams.normal_tex_offset[1] = mesh.NormalTexOffset.Y;
             metallicParams.normal_tex_scale[0] = mesh.NormalTexScale.X;
             metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
+            metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
+            metallicParams.normal_map_scale = mesh.NormalMapScale;
+            
+            // Occlusion
+            metallicParams.occlusion_tex_offset[0] = mesh.OcclusionTexOffset.X;
+            metallicParams.occlusion_tex_offset[1] = mesh.OcclusionTexOffset.Y;
+            metallicParams.occlusion_tex_scale[0] = mesh.OcclusionTexScale.X;
+            metallicParams.occlusion_tex_scale[1] = mesh.OcclusionTexScale.Y;
+            metallicParams.occlusion_tex_rotation = mesh.OcclusionTexRotation;
+            
+            // Emissive
+            metallicParams.emissive_tex_offset[0] = mesh.EmissiveTexOffset.X;
+            metallicParams.emissive_tex_offset[1] = mesh.EmissiveTexOffset.Y;
+            metallicParams.emissive_tex_scale[0] = mesh.EmissiveTexScale.X;
+            metallicParams.emissive_tex_scale[1] = mesh.EmissiveTexScale.Y;
+            metallicParams.emissive_tex_rotation = mesh.EmissiveTexRotation;
         }
-        metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
-        metallicParams.normal_map_scale = mesh.NormalMapScale;
 
         // Debug view uniforms
         metallicParams.debug_view_enabled = state.ui.debug_view_enabled;
@@ -182,6 +211,9 @@ public static unsafe partial class SharpGLTFApp
             iblParams.u_TransmissionFramebufferSize[0] = sapp_width();
             iblParams.u_TransmissionFramebufferSize[1] = sapp_height();
         }
+        // Set view and projection matrices for transmission refraction
+        iblParams.u_ViewMatrix = state.camera.View;
+        iblParams.u_ProjectionMatrix = state.camera.Proj;
         sg_apply_uniforms(UB_skinning_morphing_ibl_params, SG_RANGE(ref iblParams));
         
         // Tonemapping params (required by pbr.glsl) - SKINNED_MORPHING VERSION

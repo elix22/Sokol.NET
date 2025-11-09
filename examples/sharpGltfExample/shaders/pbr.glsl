@@ -264,6 +264,30 @@ float applyIorToRoughness(float roughness, float ior)
     return roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0);
 }
 
+// Apply texture transform (KHR_texture_transform)
+// Transforms UV coordinates by scale, rotation, and offset
+vec2 applyTextureTransform(vec2 uv, vec2 offset, float rotation, vec2 scale)
+{
+    // Scale
+    vec2 transformed = uv * scale;
+    
+    // Rotation around (0.5, 0.5) pivot
+    if (rotation != 0.0)
+    {
+        transformed -= vec2(0.5);
+        float c = cos(rotation);
+        float s = sin(rotation);
+        mat2 rotMat = mat2(c, s, -s, c);
+        transformed = rotMat * transformed;
+        transformed += vec2(0.5);
+    }
+    
+    // Offset
+    transformed += offset;
+    
+    return transformed;
+}
+
 // Include core utilities and functions (after uniforms/samplers/utilities are defined)
 @include brdf.glsl
 @include ibl.glsl
@@ -278,8 +302,11 @@ vec3 getNormal() {
     vec3 n = normalize(v_Normal);
     
     if (has_normal_tex > 0.5) {
+        // Apply texture transform
+        vec2 uv = applyTextureTransform(v_TexCoord0, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
+        
         // Sample normal map (tangent space)
-        vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), v_TexCoord0).xyz * 2.0 - 1.0;
+        vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), uv).xyz * 2.0 - 1.0;
         tangentNormal.xy *= normal_map_scale;
         
         // Transform from tangent space to world space using TBN matrix
@@ -298,7 +325,8 @@ vec4 getBaseColor() {
     vec4 baseColor = base_color_factor;
     
     if (has_base_color_tex > 0.5) {
-        baseColor *= texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), v_TexCoord0);
+        vec2 uv = applyTextureTransform(v_TexCoord0, base_color_tex_offset, base_color_tex_rotation, base_color_tex_scale);
+        baseColor *= texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), uv);
     }
     
     return baseColor;
@@ -309,7 +337,8 @@ vec2 getMetallicRoughness() {
     float roughness = roughness_factor;
     
     if (has_metallic_roughness_tex > 0.5) {
-        vec4 mrSample = texture(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), v_TexCoord0);
+        vec2 uv = applyTextureTransform(v_TexCoord0, metallic_roughness_tex_offset, metallic_roughness_tex_rotation, metallic_roughness_tex_scale);
+        vec4 mrSample = texture(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), uv);
         // glTF spec: metallic is B channel, roughness is G channel
         metallic *= mrSample.b;
         roughness *= mrSample.g;
@@ -322,7 +351,8 @@ float getOcclusion() {
     float occlusion = 1.0;
     
     if (has_occlusion_tex > 0.5) {
-        occlusion = texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), v_TexCoord0).r;
+        vec2 uv = applyTextureTransform(v_TexCoord0, occlusion_tex_offset, occlusion_tex_rotation, occlusion_tex_scale);
+        occlusion = texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), uv).r;
     }
     
     return occlusion;
@@ -332,7 +362,8 @@ vec3 getEmissive() {
     vec3 emissive = emissive_factor;
     
     if (has_emissive_tex > 0.5) {
-        emissive *= texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), v_TexCoord0).rgb;
+        vec2 uv = applyTextureTransform(v_TexCoord0, emissive_tex_offset, emissive_tex_rotation, emissive_tex_scale);
+        emissive *= texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), uv).rgb;
     }
     
     emissive *= emissive_strength;
@@ -429,6 +460,42 @@ void main() {
         // For dielectrics: use diffuse color
         // For metals: use base color (since metals absorb diffuse and reflect specular)
         color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength;
+    }
+    
+    
+    // ========================================================================
+    // Transmission (KHR_materials_transmission)
+    // ========================================================================
+    
+    // Apply transmission if factor > 0 (sample refracted background from screen texture)
+    if (transmission_factor > 0.0) {
+        // Compute refracted ray direction using Snell's law
+        // Refract the view direction through the surface based on IOR
+        vec3 refractedDirection = refract(-v, n, 1.0 / ior);
+        
+        // Project the exit point to screen space for sampling
+        vec3 refractedPosition = v_Position + refractedDirection * thickness_factor;
+        vec4 ndcPos = u_ProjectionMatrix * u_ViewMatrix * vec4(refractedPosition, 1.0);
+        vec2 screenUV = (ndcPos.xy / ndcPos.w) * 0.5 + 0.5;
+        
+        // Clamp UV to valid range to avoid sampling outside framebuffer
+        screenUV = clamp(screenUV, vec2(0.0), vec2(1.0));
+        
+        // Sample the transmission framebuffer (background behind this fragment)
+        vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, screenUV).rgb;
+        
+        // Apply Beer's law volume attenuation (color tint through the material)
+        vec3 attenuatedTransmission = transmittedLight;
+        if (attenuation_distance < 1000000.0) { // Check if attenuation is not infinity
+            vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
+            vec3 transmittance = exp(-attenuationCoefficient * thickness_factor);
+            attenuatedTransmission = transmittedLight * transmittance;
+        }
+        
+        // Mix the attenuated refracted light with the current color based on transmission factor
+        // transmission_factor = 0.0: fully opaque (normal PBR)
+        // transmission_factor = 1.0: fully transparent (glass-like refraction)
+        color = mix(color, attenuatedTransmission * baseColor.rgb, transmission_factor);
     }
     
     

@@ -604,6 +604,39 @@ namespace Sokol
                 Info($"Material {material.LogicalIndex}: No clearcoat extension", "SharpGLTF");
             }
 
+            // Extract texture transforms (KHR_texture_transform) for all texture types
+            // Base Color
+            if (baseColorChannel.HasValue)
+            {
+                var textureTransform = baseColorChannel.Value.TextureTransform;
+                if (textureTransform != null)
+                {
+                    mesh.BaseColorTexOffset = textureTransform.Offset;
+                    mesh.BaseColorTexRotation = textureTransform.Rotation;
+                    mesh.BaseColorTexScale = textureTransform.Scale;
+                    Info($"Material {material.LogicalIndex}: BaseColor texture transform - " +
+                        $"Offset=({mesh.BaseColorTexOffset.X:F2}, {mesh.BaseColorTexOffset.Y:F2}), " +
+                        $"Rotation={mesh.BaseColorTexRotation:F2}rad, " +
+                        $"Scale=({mesh.BaseColorTexScale.X:F2}, {mesh.BaseColorTexScale.Y:F2})", "SharpGLTF");
+                }
+            }
+            
+            // Metallic-Roughness
+            if (metallicRoughnessChannel.HasValue)
+            {
+                var textureTransform = metallicRoughnessChannel.Value.TextureTransform;
+                if (textureTransform != null)
+                {
+                    mesh.MetallicRoughnessTexOffset = textureTransform.Offset;
+                    mesh.MetallicRoughnessTexRotation = textureTransform.Rotation;
+                    mesh.MetallicRoughnessTexScale = textureTransform.Scale;
+                    Info($"Material {material.LogicalIndex}: MetallicRoughness texture transform - " +
+                        $"Offset=({mesh.MetallicRoughnessTexOffset.X:F2}, {mesh.MetallicRoughnessTexOffset.Y:F2}), " +
+                        $"Rotation={mesh.MetallicRoughnessTexRotation:F2}rad, " +
+                        $"Scale=({mesh.MetallicRoughnessTexScale.X:F2}, {mesh.MetallicRoughnessTexScale.Y:F2})", "SharpGLTF");
+                }
+            }
+
             // Extract normal map scale and texture transform
             var normalChannel = material.FindChannel("Normal");
             if (normalChannel.HasValue && normalChannel.Value.Texture != null)
@@ -631,6 +664,39 @@ namespace Sokol
                 else
                 {
                     Info($"Material {material.LogicalIndex}: Normal texture has no transform", "SharpGLTF");
+                }
+            }
+            
+            // Occlusion
+            var occlusionChannel = material.FindChannel("Occlusion");
+            if (occlusionChannel.HasValue)
+            {
+                var textureTransform = occlusionChannel.Value.TextureTransform;
+                if (textureTransform != null)
+                {
+                    mesh.OcclusionTexOffset = textureTransform.Offset;
+                    mesh.OcclusionTexRotation = textureTransform.Rotation;
+                    mesh.OcclusionTexScale = textureTransform.Scale;
+                    Info($"Material {material.LogicalIndex}: Occlusion texture transform - " +
+                        $"Offset=({mesh.OcclusionTexOffset.X:F2}, {mesh.OcclusionTexOffset.Y:F2}), " +
+                        $"Rotation={mesh.OcclusionTexRotation:F2}rad, " +
+                        $"Scale=({mesh.OcclusionTexScale.X:F2}, {mesh.OcclusionTexScale.Y:F2})", "SharpGLTF");
+                }
+            }
+            
+            // Emissive
+            if (emissiveChannel.HasValue)
+            {
+                var textureTransform = emissiveChannel.Value.TextureTransform;
+                if (textureTransform != null)
+                {
+                    mesh.EmissiveTexOffset = textureTransform.Offset;
+                    mesh.EmissiveTexRotation = textureTransform.Rotation;
+                    mesh.EmissiveTexScale = textureTransform.Scale;
+                    Info($"Material {material.LogicalIndex}: Emissive texture transform - " +
+                        $"Offset=({mesh.EmissiveTexOffset.X:F2}, {mesh.EmissiveTexOffset.Y:F2}), " +
+                        $"Rotation={mesh.EmissiveTexRotation:F2}rad, " +
+                        $"Scale=({mesh.EmissiveTexScale.X:F2}, {mesh.EmissiveTexScale.Y:F2})", "SharpGLTF");
                 }
             }
 

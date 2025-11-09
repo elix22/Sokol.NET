@@ -29,10 +29,22 @@ layout(binding=1) uniform metallic_params {
     // Clearcoat parameters - KHR_materials_clearcoat
     float clearcoat_factor;     // 0.0 = no clearcoat, 1.0 = full clearcoat
     float clearcoat_roughness;  // Roughness of the clearcoat layer
-    // Normal texture transform - KHR_texture_transform
+    // Texture transforms - KHR_texture_transform (offset, rotation, scale)
+    vec2 base_color_tex_offset;
+    float base_color_tex_rotation;
+    vec2 base_color_tex_scale;
+    vec2 metallic_roughness_tex_offset;
+    float metallic_roughness_tex_rotation;
+    vec2 metallic_roughness_tex_scale;
     vec2 normal_tex_offset;
     float normal_tex_rotation;
     vec2 normal_tex_scale;
+    vec2 occlusion_tex_offset;
+    float occlusion_tex_rotation;
+    vec2 occlusion_tex_scale;
+    vec2 emissive_tex_offset;
+    float emissive_tex_rotation;
+    vec2 emissive_tex_scale;
     // Normal map scale (strength of normal perturbation)
     float normal_map_scale;     // 1.0 = full strength, 0.2 = subtle
     // Debug view controls
@@ -57,4 +69,6 @@ layout(binding=3) uniform ibl_params {
     int u_MipCount;                 // Number of mip levels in specular cubemap
     mat4 u_EnvRotation;             // 3x3 rotation matrix for environment (stored as mat4)
     ivec2 u_TransmissionFramebufferSize; // For transmission sampling
+    mat4 u_ViewMatrix;              // View matrix for transmission refraction
+    mat4 u_ProjectionMatrix;        // Projection matrix for transmission refraction
 };
