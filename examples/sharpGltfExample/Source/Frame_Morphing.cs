@@ -28,47 +28,30 @@ public static unsafe partial class SharpGLTFApp
         vsParams.use_morphing = 1;
 
         // Set morph weights if mesh has morph targets
-        if (mesh.HasMorphTargets && node.CachedGltfNode != null)
+        if (mesh.HasMorphTargets && node.NodeIndex >= 0)
         {
-            var gltfNode = node.CachedGltfNode;
-            var gltfMesh = gltfNode.Mesh;
-            
             // Get weights - priority: animator > node > mesh
             IReadOnlyList<float>? weights = null;
             
             if (state.animator != null)
             {
-                int nodeIndex = -1;
-                var logicalNodes = state.model.ModelRoot.LogicalNodes;
-                for (int i = 0; i < logicalNodes.Count; i++)
+                var animatedWeights = state.animator.GetAnimatedMorphWeights(node.NodeIndex);
+                if (animatedWeights != null && animatedWeights.Length > 0)
                 {
-                    if (logicalNodes[i] == gltfNode)
-                    {
-                        nodeIndex = i;
-                        break;
-                    }
-                }
-                
-                if (nodeIndex >= 0)
-                {
-                    var animatedWeights = state.animator.GetAnimatedMorphWeights(nodeIndex);
-                    if (animatedWeights != null && animatedWeights.Length > 0)
-                    {
-                        weights = animatedWeights;
-                    }
+                    weights = animatedWeights;
                 }
             }
             
             // Fall back to static weights if no animation
             if (weights == null)
             {
-                if (gltfNode.MorphWeights != null && gltfNode.MorphWeights.Count > 0)
+                if (node.NodeMorphWeights != null)
                 {
-                    weights = gltfNode.MorphWeights;
+                    weights = node.NodeMorphWeights;
                 }
-                else if (gltfMesh != null && gltfMesh.MorphWeights != null && gltfMesh.MorphWeights.Count > 0)
+                else if (node.MeshMorphWeights != null)
                 {
-                    weights = gltfMesh.MorphWeights;
+                    weights = node.MeshMorphWeights;
                 }
             }
             

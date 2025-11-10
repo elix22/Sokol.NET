@@ -484,17 +484,11 @@ public static unsafe partial class SharpGLTFApp
                 var mesh = state.model.Meshes[node.MeshIndex];
                 state.totalMeshes++;
 
-                Matrix4x4 nodeTransform;
-                if (state.animator != null && state.model.BoneCounter == 0 && node.HasAnimation && node.CachedGltfNode != null)
-                {
-                    // Use pre-cached animated node reference (optimized - no LINQ lookup needed)
-                    nodeTransform = node.CachedGltfNode.LocalMatrix * node.Transform;
-                }
-                else
-                {
-                    // Static node or skinned animation - use cached transform
-                    nodeTransform = node.Transform;
-                }
+                // Use the world transform from node hierarchy
+                // For non-skinned animated nodes: updated by animator via SetLocalTransform()
+                // For skinned nodes: stays at bind pose, animation handled by bone matrices
+                // For static nodes: calculated from initial local TRS + parent hierarchy
+                Matrix4x4 nodeTransform = node.WorldTransform;
 
                 // Apply Mixamo-specific transforms if needed
                 Matrix4x4 modelMatrix;
@@ -508,8 +502,8 @@ public static unsafe partial class SharpGLTFApp
                 else
                 {
                     // Both animated and static nodes use the same transform
-                    // nodeTransform is either the animated global transform or the static node.Transform
-                    // Both are in model-local space and need the user's model transform applied
+                    // nodeTransform is the world transform (calculated through hierarchy)
+                    // which is in model-local space and needs the user's model transform applied
                     modelMatrix = nodeTransform * model;
                 }
 

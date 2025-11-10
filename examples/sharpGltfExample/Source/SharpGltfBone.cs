@@ -90,5 +90,21 @@ namespace Sokol
             rotation = _lastRotation;
             scale = _lastScale;
         }
+        
+        /// <summary>
+        /// Get animated channels and their values, indicating which channels have actual animation data.
+        /// This is important for node animations where non-animated channels should preserve original values.
+        /// </summary>
+        public void GetAnimatedChannels(out bool hasTranslation, out bool hasRotation, out bool hasScale,
+                                        out Vector3 translation, out Quaternion rotation, out Vector3 scale)
+        {
+            hasTranslation = _translationSampler != null;
+            hasRotation = _rotationSampler != null;
+            hasScale = _scaleSampler != null;
+            
+            translation = _lastTranslation;
+            rotation = _lastRotation;
+            scale = _lastScale;
+        }
     }
 }

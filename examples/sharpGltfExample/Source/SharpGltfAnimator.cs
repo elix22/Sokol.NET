@@ -11,21 +11,25 @@ namespace Sokol
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
-        private SharpGLTF.Schema2.ModelRoot? _modelRoot;  // Reference to glTF model for updating nodes
         private Dictionary<int, List<Mesh>> _materialToMeshMap;  // Material index to mesh mapping for property animations
         private Dictionary<int, float[]> _animatedMorphWeights = new Dictionary<int, float[]>();  // Node index to morph weights
+        
+        // Fast lookup for non-skinned node animations - stores ALL nodes with the same name
+        private Dictionary<string, List<SharpGltfNode>> _nodesByName = new Dictionary<string, List<SharpGltfNode>>();
         
         /// <summary>
         /// Playback speed multiplier. 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
         /// </summary>
         public float PlaybackSpeed { get; set; } = 1.0f;
 
-        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, SharpGLTF.Schema2.ModelRoot? modelRoot = null)
+        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, List<SharpGltfNode> nodes)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
-            _modelRoot = modelRoot;
             _materialToMeshMap = materialToMeshMap;
+
+            // Build lookup for non-skinned animated nodes
+            BuildNodeLookup(nodes);
 
             // Initialize with identity matrices
             Array.Fill(_finalBoneMatrices, Matrix4x4.Identity);
@@ -42,8 +46,35 @@ namespace Sokol
         /// Convenient constructor that accepts a SharpGltfModel
         /// </summary>
         public SharpGltfAnimator(SharpGltfModel model)
-            : this(model.Animation, model.MaterialToMeshMap, model.ModelRoot)
+            : this(model.Animation, model.MaterialToMeshMap, model.Nodes)
         {
+        }
+        
+        /// <summary>
+        /// Build a fast lookup dictionary from node name to SharpGltfNode list.
+        /// Only includes NON-SKINNED nodes (for node transform animations).
+        /// Skinned nodes are handled via bone matrices and should not have their transforms updated.
+        /// Note: A single glTF node can have multiple primitives, resulting in multiple SharpGltfNode instances with the same name.
+        /// </summary>
+        private void BuildNodeLookup(List<SharpGltfNode> nodes)
+        {
+            _nodesByName.Clear();
+            int totalNodes = 0;
+            
+            foreach (var node in nodes)
+            {
+                // Only add non-skinned nodes with names
+                if (!string.IsNullOrEmpty(node.NodeName) && !node.IsSkinned)
+                {
+                    if (!_nodesByName.ContainsKey(node.NodeName))
+                    {
+                        _nodesByName[node.NodeName] = new List<SharpGltfNode>();
+                    }
+                    _nodesByName[node.NodeName].Add(node);
+                    totalNodes++;
+                }
+            }
+            Info($"Built node lookup with {_nodesByName.Count} unique names, {totalNodes} total non-skinned nodes", "SharpGLTF");
         }
 
         public void SetAnimation(SharpGltfAnimation? animation)
@@ -80,7 +111,7 @@ namespace Sokol
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
                 
-                // Apply animated values back to glTF nodes (for node animations)
+                // Apply animated transforms to non-skinned nodes
                 ApplyAnimationToNodes();
                 
                 // NEW: Update material property animations (KHR_animation_pointer)
@@ -91,23 +122,37 @@ namespace Sokol
             }
         }
 
-        // Apply animated transform values back to the glTF node properties
+        /// <summary>
+        /// Apply animated transform values to NON-SKINNED nodes only.
+        /// Skinned nodes are handled via bone matrices and should not have their local transforms modified.
+        /// For node animations: only update the components that are actually animated.
+        /// If a channel (T/R/S) is not animated, preserve the node's original value.
+        /// </summary>
         private void ApplyAnimationToNodes()
         {
-            if (_currentAnimation == null || _modelRoot == null) return;
+            if (_currentAnimation == null) return;
 
             var bones = _currentAnimation.GetBones();
             foreach (var bone in bones)
             {
-                // Find the corresponding glTF node
-                var gltfNode = _modelRoot.LogicalNodes.FirstOrDefault(n => n.Name == bone.Name);
-                if (gltfNode != null)
+                // Update ALL nodes with this name (handles multiple primitives per glTF node)
+                if (_nodesByName.TryGetValue(bone.Name, out var renderNodes))
                 {
-                    // Get the animated TRS from the bone
-                    bone.GetTRS(out Vector3 translation, out Quaternion rotation, out Vector3 scale);
+                    // Get which channels are animated and their values
+                    bone.GetAnimatedChannels(out bool hasTranslation, out bool hasRotation, out bool hasScale,
+                                             out Vector3 translation, out Quaternion rotation, out Vector3 scale);
                     
-                    // Update the glTF node's properties (this is what LocalMatrix reads from)
-                    gltfNode.LocalTransform = new SharpGLTF.Transforms.AffineTransform(scale, rotation, translation);
+                    // Apply to all nodes with this name
+                    foreach (var renderNode in renderNodes)
+                    {
+                        // Preserve original values for non-animated channels
+                        Vector3 finalTranslation = hasTranslation ? translation : renderNode.Position;
+                        Quaternion finalRotation = hasRotation ? rotation : renderNode.Rotation;
+                        Vector3 finalScale = hasScale ? scale : renderNode.Scale;
+                        
+                        // Update the node's local transform (this marks it and children as dirty)
+                        renderNode.SetLocalTransform(finalTranslation, finalRotation, finalScale);
+                    }
                 }
             }
         }
@@ -239,7 +284,7 @@ namespace Sokol
         /// </summary>
         private void UpdateMorphWeightAnimations(float currentTime)
         {
-            if (_currentAnimation == null || _currentAnimation.MorphAnimations.Count == 0 || _modelRoot == null)
+            if (_currentAnimation == null || _currentAnimation.MorphAnimations.Count == 0)
                 return;
 
             foreach (var morphAnim in _currentAnimation.MorphAnimations)

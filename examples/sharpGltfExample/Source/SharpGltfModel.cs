@@ -22,6 +22,9 @@ namespace Sokol
         
         // Material index to mesh mapping for KHR_animation_pointer support
         public Dictionary<int, List<Mesh>> MaterialToMeshMap = new Dictionary<int, List<Mesh>>();
+        
+        // Track skinned node names (joints in skeletons)
+        private HashSet<string> _skinnedNodeNames = new HashSet<string>();
 
         public int GetAnimationCount() => Animations.Count;
         
@@ -88,32 +91,53 @@ namespace Sokol
                 meshMap[mesh] = meshStartIndex;
             }
 
-            // Third pass: Process scene nodes with transforms
+            // Third pass: Build node index map for morph weight lookups
+            Dictionary<Node, int> nodeIndexMap = new Dictionary<Node, int>();
+            var logicalNodes = _model.LogicalNodes;
+            for (int i = 0; i < logicalNodes.Count; i++)
+            {
+                nodeIndexMap[logicalNodes[i]] = i;
+            }
+
+            // Fourth pass: Process scene nodes with transforms
             var defaultScene = _model.DefaultScene;
             if (defaultScene != null)
             {
                 foreach (var node in defaultScene.VisualChildren)
                 {
-                    ProcessNode(node, Matrix4x4.Identity, meshMap);
+                    ProcessNode(node, Matrix4x4.Identity, meshMap, nodeIndexMap);
                 }
             }
 
-            // Fourth pass: Process animations
+            // Fifth pass: Process animations
             ProcessAnimations();
 
-            // Fifth pass: Cache animation info for rendering optimization (must be done after ProcessAnimations)
+            // Sixth pass: Cache animation info for rendering optimization (must be done after ProcessAnimations)
             CacheAnimationInfo();
 
             Info($"Model loaded: {Nodes.Count} nodes, {Meshes.Count} meshes, {BoneCounter} bones, {(HasAnimations ? "with" : "without")} animation", "SharpGLTF");
         }
 
-        private void ProcessNode(Node node, Matrix4x4 parentTransform, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap)
+        private void ProcessNode(Node node, Matrix4x4 parentTransform, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap, Dictionary<Node, int> nodeIndexMap)
         {
-            // Get node's local transform
+            ProcessNodeWithParent(node, null, meshMap, nodeIndexMap);
+        }
+        
+        private void ProcessNodeWithParent(Node node, SharpGltfNode? parentRenderNode, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap, Dictionary<Node, int> nodeIndexMap)
+        {
+            // Get node's local transform from glTF node
             var localMatrix = node.LocalMatrix;
+            Matrix4x4.Decompose(localMatrix, out var scale, out var rotation, out var position);
+
+            SharpGltfNode? currentRenderNode = null;
             
-            // Combine with parent transform
-            Matrix4x4 worldTransform = localMatrix * parentTransform;
+            // Get node index and morph weights from glTF
+            int nodeIndex = nodeIndexMap.ContainsKey(node) ? nodeIndexMap[node] : -1;
+            IReadOnlyList<float>? nodeMorphWeights = node.MorphWeights?.Count > 0 ? node.MorphWeights : null;
+            IReadOnlyList<float>? meshMorphWeights = node.Mesh?.MorphWeights?.Count > 0 ? node.Mesh.MorphWeights : null;
+            
+            // Check if this node is part of a skin (joint in skeleton)
+            bool isSkinned = !string.IsNullOrEmpty(node.Name) && _skinnedNodeNames.Contains(node.Name);
 
             // If this node has a mesh, create a SharpGltfNode for rendering
             if (node.Mesh != null && meshMap.ContainsKey(node.Mesh))
@@ -125,20 +149,50 @@ namespace Sokol
                 {
                     var renderNode = new SharpGltfNode
                     {
-                        Transform = worldTransform,
+                        Position = position,
+                        Rotation = rotation,
+                        Scale = scale,
                         MeshIndex = meshIndex + i,
-                        NodeName = node.Name,  // Store node name for animation matching
-                        CachedGltfNode = node,  // Cache glTF node reference directly (no lookup needed!)
-                        HasAnimation = false  // Will be set later after animations are processed
+                        NodeName = node.Name,
+                        HasAnimation = false,
+                        IsSkinned = isSkinned,  // Mark if this is a skinned node
+                        Parent = parentRenderNode,  // Set parent relationship
+                        NodeIndex = nodeIndex,  // Store node index for morph weight animation lookup
+                        NodeMorphWeights = nodeMorphWeights,  // Node-level weights
+                        MeshMorphWeights = meshMorphWeights   // Mesh-level weights (fallback)
                     };
                     Nodes.Add(renderNode);
+                    
+                    // Use first render node as parent for children
+                    if (currentRenderNode == null)
+                        currentRenderNode = renderNode;
+                }
+            }
+            else
+            {
+                // Node without mesh - create a transform-only node if it has children
+                if (node.VisualChildren.Count() > 0)
+                {
+                    currentRenderNode = new SharpGltfNode
+                    {
+                        Position = position,
+                        Rotation = rotation,
+                        Scale = scale,
+                        MeshIndex = -1,  // No mesh
+                        NodeName = node.Name,
+                        HasAnimation = false,
+                        IsSkinned = isSkinned,  // Mark if this is a skinned node
+                        Parent = parentRenderNode,
+                        NodeIndex = nodeIndex  // Store even for transform-only nodes
+                    };
+                    Nodes.Add(currentRenderNode);
                 }
             }
 
-            // Recursively process children
+            // Recursively process children with proper parent
             foreach (var child in node.VisualChildren)
             {
-                ProcessNode(child, worldTransform, meshMap);
+                ProcessNodeWithParent(child, currentRenderNode ?? parentRenderNode, meshMap, nodeIndexMap);
             }
         }
 
@@ -173,6 +227,9 @@ namespace Sokol
 
         private void ProcessSkinning()
         {
+            // Track all nodes that are part of a skin (joints)
+            HashSet<string> skinnedNodeNames = new HashSet<string>();
+            
             foreach (var skin in _model.LogicalSkins)
             {
                 var joints = skin.JointsCount;
@@ -186,6 +243,12 @@ namespace Sokol
                     Matrix4x4 inverseBindMatrix = joint.InverseBindMatrix;
 
                     string boneName = joint.Joint.Name ?? $"Joint_{i}";
+                    
+                    // Mark this node as skinned
+                    if (!string.IsNullOrEmpty(boneName))
+                    {
+                        skinnedNodeNames.Add(boneName);
+                    }
 
                     if (!BoneInfoMap.ContainsKey(boneName))
                     {
@@ -199,6 +262,9 @@ namespace Sokol
                     }
                 }
             }
+            
+            // Store skinned node names for later use
+            _skinnedNodeNames = skinnedNodeNames;
         }
 
         private void ProcessMesh(MeshPrimitive primitive)
