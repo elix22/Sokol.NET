@@ -144,6 +144,7 @@ public static unsafe partial class SharpGLTFApp
             metallicParams.occlusion_tex_scale[0] = mesh.OcclusionTexScale.X;
             metallicParams.occlusion_tex_scale[1] = mesh.OcclusionTexScale.Y;
             metallicParams.occlusion_tex_rotation = mesh.OcclusionTexRotation;
+            metallicParams.occlusion_texcoord = mesh.OcclusionTexCoord;
             
             // Emissive
             metallicParams.emissive_tex_offset[0] = mesh.EmissiveTexOffset.X;
