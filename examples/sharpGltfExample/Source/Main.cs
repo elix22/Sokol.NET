@@ -9,18 +9,20 @@ using SharpGLTF.Schema2;
 
 public static unsafe partial class SharpGLTFApp
 {
+   //  "BusterDrone/scene.gltf",
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "ChronographWatch/glTF/ChronographWatch.gltf",
+        "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
+        "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
         "MorphStressTest/glTF/MorphStressTest.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
-        "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
-        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
@@ -29,7 +31,6 @@ public static unsafe partial class SharpGLTFApp
         "WaterBottle/glTF/WaterBottle.gltf",
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
-        "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
         "FlightHelmet/glTF/FlightHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "CompareIor/glTF/CompareIor.gltf",
