@@ -50,6 +50,9 @@ public static unsafe partial class SharpGLTFApp
         // Set emissive strength (KHR_materials_emissive_strength extension)
         metallicParams.emissive_strength = mesh.EmissiveStrength;
 
+        // Set occlusion strength (controls how much AO affects the final color)
+        metallicParams.occlusion_strength = mesh.OcclusionStrength;
+
         // Get glass material values (with overrides if enabled)
         var glassValues = GetGlassMaterialValues(mesh);
         

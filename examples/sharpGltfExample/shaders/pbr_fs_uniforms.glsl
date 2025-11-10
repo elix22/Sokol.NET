@@ -19,6 +19,8 @@ layout(binding=1) uniform metallic_params {
     float alpha_cutoff;
     // Emissive strength (KHR_materials_emissive_strength extension)
     float emissive_strength;
+    // Occlusion strength (controls how much AO affects the final color, 1.0 = full effect)
+    float occlusion_strength;
     // Transmission (glass/refraction) parameters - KHR_materials_transmission
     float transmission_factor;  // 0.0 = opaque, 1.0 = fully transparent with refraction
     float ior;                  // Index of Refraction (1.0 = air, 1.5 = glass, 1.55 = amber)

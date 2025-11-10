@@ -120,14 +120,14 @@ void main() {
     v_Normal = normalW;
     
     // Transform tangent to world space and build TBN matrix
-    vec3 tangentW = vec3(model * vec4(skinnedTangent, 0.0));
-    // TBD ELI , not sure if it should be negated or not 
-    // Debug View , Recalculates bitangent from normal and tangent the same why
-    vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
+    vec3 tangentW = normalize(vec3(model * vec4(skinnedTangent, 0.0)));
     
-    // Normalize after cross product, bitangent first then tangent (matches glTF Sample Viewer)
-    bitangentW = normalize(bitangentW);
-    tangentW = normalize(tangentW);
+    // Gram-Schmidt re-orthogonalization to ensure tangent is perpendicular to normal
+    tangentW = normalize(tangentW - dot(tangentW, normalW) * normalW);
+    
+    // Calculate bitangent using cross product with handedness
+    // glTF spec: bitangent = cross(normal, tangent) * tangent.w
+    vec3 bitangentW = cross(normalW, tangentW) * tangent.w;
     
     v_Tangent = vec4(tangentW, tangent.w);
     v_TBN = mat3(tangentW, bitangentW, normalW);
@@ -307,9 +307,15 @@ vec3 getNormal() {
         
         // Sample normal map (tangent space)
         vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), uv).xyz * 2.0 - 1.0;
+        
+        // Apply normal map scale (only to XY, not Z)
         tangentNormal.xy *= normal_map_scale;
         
+        // Normalize the tangent-space normal after scaling
+        tangentNormal = normalize(tangentNormal);
+        
         // Transform from tangent space to world space using TBN matrix
+        // The TBN matrix is already properly constructed in the vertex shader
         n = normalize(v_TBN * tangentNormal);
     }
     
@@ -578,29 +584,26 @@ void main() {
             float VdotH = clampedDot(v, h);
             
             if (NdotL > 0.0 || NdotV > 0.0) {
-                // Fresnel for dielectrics and metals
-                vec3 dielectric_fresnel = F_Schlick(f0, f90, abs(VdotH));
-                vec3 metal_fresnel = F_Schlick(baseColor.rgb, vec3(1.0), abs(VdotH));
+                // Calculate the Fresnel term
+                vec3 F = F_Schlick(specularColor, f90, VdotH);
                 
-                // Light intensity with attenuation
-                vec3 intensity = lightColor * lightIntensity * attenuation;
-                
-                // Diffuse BRDF (Lambertian) - use baseColor (metallic factor handled in final mix)
-                vec3 l_diffuse = intensity * NdotL * (baseColor.rgb / M_PI);
-                
-                // Specular BRDF (GGX)
+                // Calculate the visibility term (G / (4 * NdotL * NdotV))
                 float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
+                
+                // Calculate the microfacet distribution term
                 float D = D_GGX(NdotH, alphaRoughness);
-                vec3 l_specular = intensity * NdotL * vec3(Vis * D);
                 
-                // Combine using Fresnel
-                vec3 l_metal_brdf = metal_fresnel * l_specular;
-                vec3 l_dielectric_brdf = mix(l_diffuse, l_specular, dielectric_fresnel);
+                // Specular BRDF = F * Vis * D
+                vec3 f_specular = F * Vis * D;
                 
-                // Final light contribution (mix between dielectric and metal based on metallic)
-                vec3 l_color = mix(l_dielectric_brdf, l_metal_brdf, metallic);
+                // Diffuse BRDF = (1 - F) * diffuseColor / π
+                // The (1 - F) term accounts for energy conservation
+                vec3 f_diffuse = (vec3(1.0) - F) * (diffuseColor / M_PI);
                 
-                color += l_color;
+                // Combined lighting contribution
+                vec3 lightContribution = NdotL * attenuation * lightIntensity * lightColor * (f_diffuse + f_specular);
+                
+                color += lightContribution;
             }
         }
     }
@@ -611,7 +614,10 @@ void main() {
     // ========================================================================
     
     float ao = getOcclusion();
-    color = mix(color, color * ao, 1.0); // Apply AO
+    // Apply occlusion with strength parameter: color * (1 + strength * (ao - 1))
+    // When strength = 0, result = color (no effect)
+    // When strength = 1, result = color * ao (full occlusion effect)
+    color = color * (1.0 + occlusion_strength * (ao - 1.0));
     
     
     // ========================================================================

@@ -28,6 +28,7 @@ namespace Sokol
         public float RoughnessFactor = 1.0f;
         public Vector3 EmissiveFactor = Vector3.Zero;
         public float EmissiveStrength = 1.0f;  // KHR_materials_emissive_strength extension
+        public float OcclusionStrength = 1.0f;  // Occlusion texture strength (1.0 = full effect, 0.0 = no effect)
         
         // Alpha properties
         public AlphaMode AlphaMode = AlphaMode.OPAQUE;

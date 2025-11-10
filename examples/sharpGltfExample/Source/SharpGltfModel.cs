@@ -688,6 +688,14 @@ namespace Sokol
             var occlusionChannel = material.FindChannel("Occlusion");
             if (occlusionChannel.HasValue)
             {
+                // Get occlusion strength from the channel parameters
+                var occlusionStrengthParam = occlusionChannel.Value.Parameters.FirstOrDefault(p => p.Name == "OcclusionStrength");
+                if (occlusionStrengthParam != null)
+                {
+                    mesh.OcclusionStrength = Convert.ToSingle(occlusionStrengthParam.Value);
+                    Info($"Material {material.LogicalIndex}: Occlusion strength = {mesh.OcclusionStrength:F2}", "SharpGLTF");
+                }
+                
                 var textureTransform = occlusionChannel.Value.TextureTransform;
                 if (textureTransform != null)
                 {
