@@ -54,7 +54,7 @@ public static unsafe partial class SharpGLTFApp
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(-0.5f, 0.3f, -0.3f),
             new Vector3(1.0f, 0.95f, 0.85f),
-            2f                                 // Test: very low
+            3f                                 // Test: very low
         ));
 
         // Light 2: Fill light
@@ -729,7 +729,7 @@ public static unsafe partial class SharpGLTFApp
             // Option 1: Load from 6 cubemap faces (fast, works on all platforms including Web)
             // Option 2: Load from EXR panorama (slow ~300ms, Desktop/Mobile only)
             
-            bool useCubemapFaces = false; // Set to false to use EXR panorama
+            bool useCubemapFaces = true; // Set to false to use EXR panorama
             
             if (useCubemapFaces)
             {

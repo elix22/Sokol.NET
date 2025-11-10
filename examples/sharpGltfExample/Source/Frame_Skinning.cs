@@ -79,6 +79,7 @@ public static unsafe partial class SharpGLTFApp
             metallicParams.base_color_tex_scale[0] = mesh.BaseColorTexScale.X;
             metallicParams.base_color_tex_scale[1] = mesh.BaseColorTexScale.Y;
             metallicParams.base_color_tex_rotation = mesh.BaseColorTexRotation;
+            metallicParams.base_color_texcoord = mesh.BaseColorTexCoord;
             
             // Metallic-Roughness
             metallicParams.metallic_roughness_tex_offset[0] = mesh.MetallicRoughnessTexOffset.X;
@@ -86,6 +87,7 @@ public static unsafe partial class SharpGLTFApp
             metallicParams.metallic_roughness_tex_scale[0] = mesh.MetallicRoughnessTexScale.X;
             metallicParams.metallic_roughness_tex_scale[1] = mesh.MetallicRoughnessTexScale.Y;
             metallicParams.metallic_roughness_tex_rotation = mesh.MetallicRoughnessTexRotation;
+            metallicParams.metallic_roughness_texcoord = mesh.MetallicRoughnessTexCoord;
             
             // Normal
             metallicParams.normal_tex_offset[0] = mesh.NormalTexOffset.X;
@@ -94,6 +96,7 @@ public static unsafe partial class SharpGLTFApp
             metallicParams.normal_tex_scale[1] = mesh.NormalTexScale.Y;
             metallicParams.normal_tex_rotation = mesh.NormalTexRotation;
             metallicParams.normal_map_scale = mesh.NormalMapScale;
+            metallicParams.normal_texcoord = mesh.NormalTexCoord;
             
             // Occlusion
             metallicParams.occlusion_tex_offset[0] = mesh.OcclusionTexOffset.X;
@@ -109,6 +112,7 @@ public static unsafe partial class SharpGLTFApp
             metallicParams.emissive_tex_scale[0] = mesh.EmissiveTexScale.X;
             metallicParams.emissive_tex_scale[1] = mesh.EmissiveTexScale.Y;
             metallicParams.emissive_tex_rotation = mesh.EmissiveTexRotation;
+            metallicParams.emissive_texcoord = mesh.EmissiveTexCoord;
         }
 
         // Debug view uniforms

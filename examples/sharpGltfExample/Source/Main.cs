@@ -187,7 +187,7 @@ public static unsafe partial class SharpGLTFApp
 
         // Lighting system
         public List<Light> lights = new List<Light>();
-        public float ambientStrength = 0.2f;    // Test: very low ambient
+        public float ambientStrength = 0.8f;    // Test: very low ambient
         
         // Bloom post-processing
         public BloomPass bloom;

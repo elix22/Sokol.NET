@@ -302,8 +302,10 @@ vec3 getNormal() {
     vec3 n = normalize(v_Normal);
     
     if (has_normal_tex > 0.5) {
+        // Select UV channel based on normal_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (normal_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
         // Apply texture transform
-        vec2 uv = applyTextureTransform(v_TexCoord0, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
+        vec2 uv = applyTextureTransform(baseUV, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
         
         // Sample normal map (tangent space)
         vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), uv).xyz * 2.0 - 1.0;
@@ -331,7 +333,9 @@ vec4 getBaseColor() {
     vec4 baseColor = base_color_factor;
     
     if (has_base_color_tex > 0.5) {
-        vec2 uv = applyTextureTransform(v_TexCoord0, base_color_tex_offset, base_color_tex_rotation, base_color_tex_scale);
+        // Select UV channel based on base_color_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (base_color_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        vec2 uv = applyTextureTransform(baseUV, base_color_tex_offset, base_color_tex_rotation, base_color_tex_scale);
         baseColor *= texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), uv);
     }
     
@@ -343,7 +347,9 @@ vec2 getMetallicRoughness() {
     float roughness = roughness_factor;
     
     if (has_metallic_roughness_tex > 0.5) {
-        vec2 uv = applyTextureTransform(v_TexCoord0, metallic_roughness_tex_offset, metallic_roughness_tex_rotation, metallic_roughness_tex_scale);
+        // Select UV channel based on metallic_roughness_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (metallic_roughness_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        vec2 uv = applyTextureTransform(baseUV, metallic_roughness_tex_offset, metallic_roughness_tex_rotation, metallic_roughness_tex_scale);
         vec4 mrSample = texture(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), uv);
         // glTF spec: metallic is B channel, roughness is G channel
         metallic *= mrSample.b;
@@ -370,7 +376,9 @@ vec3 getEmissive() {
     vec3 emissive = emissive_factor;
     
     if (has_emissive_tex > 0.5) {
-        vec2 uv = applyTextureTransform(v_TexCoord0, emissive_tex_offset, emissive_tex_rotation, emissive_tex_scale);
+        // Select UV channel based on emissive_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (emissive_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        vec2 uv = applyTextureTransform(baseUV, emissive_tex_offset, emissive_tex_rotation, emissive_tex_scale);
         emissive *= texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), uv).rgb;
     }
     

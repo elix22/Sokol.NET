@@ -50,7 +50,11 @@ layout(binding=1) uniform metallic_params {
     // Normal map scale (strength of normal perturbation)
     float normal_map_scale;     // 1.0 = full strength, 0.2 = subtle
     // Texture coordinate set indices (which UV channel each texture uses)
-    float occlusion_texcoord;   // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float base_color_texcoord;          // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float metallic_roughness_texcoord;  // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float normal_texcoord;              // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float occlusion_texcoord;           // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float emissive_texcoord;            // 0 = TEXCOORD_0, 1 = TEXCOORD_1
     // Debug view controls
     float debug_view_enabled;     // 0 = disabled, 1 = enabled
     float debug_view_mode;        // Which debug view to display (see DEBUG_* constants)
