@@ -49,35 +49,41 @@ public static unsafe partial class SharpGLTFApp
         // Initialize UI state - show model browser by default
         state.ui.model_browser_open = true;
 
-        // Initialize lighting system - Test with VERY low values
+        // Initialize lighting system
+        // Note: Maximum lights is limited to RenderingConstants.MAX_LIGHTS
         // Light 1: Main directional light
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(-0.5f, 0.3f, -0.3f),
             new Vector3(1.0f, 0.95f, 0.85f),
-            3f                                 // Test: very low
+            3f
         ));
 
         // Light 2: Fill light
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.5f, -0.3f, 0.3f),
             new Vector3(1.0f, 1f, 1f),
-            1f                                 // Test: very low
+            1f
         ));
 
-        // // Light 3: Point light
+        // Light 3: Point light
         state.lights.Add(Light.CreatePointLight(
             new Vector3(0.0f, 15.0f, 0.0f),
             new Vector3(1.0f, 0.9f, 0.8f),
-            4.0f,                               // Test: very low
-            100.0f
+            4.0f,      // intensity
+            100.0f     // range
         ));
 
         // Light 4: Back light
         state.lights.Add(Light.CreateDirectionalLight(
             new Vector3(0.2f, 0.1f, 0.8f),
             new Vector3(0.8f, 0.85f, 1.0f),
-            0.5f                                // Test: very low
+            0.5f
         ));
+
+        if (state.lights.Count > RenderingConstants.MAX_LIGHTS)
+        {
+            Warning($"[Init] Warning: {state.lights.Count} lights defined but only {RenderingConstants.MAX_LIGHTS} will be used. Consider reducing initial lights or increasing MAX_LIGHTS.");
+        }
 
         state.pass_action = default;
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;

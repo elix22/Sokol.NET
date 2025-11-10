@@ -54,6 +54,230 @@ public static unsafe partial class SharpGLTFApp
     }
     
     /// <summary>
+    /// Set up default scene lights when model has no punctual lights.
+    /// </summary>
+    static void SetupDefaultLights()
+    {
+        state.lights.Clear();
+        
+        // Light 1: Main directional light
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(-0.5f, 0.3f, -0.3f),
+            new Vector3(1.0f, 0.95f, 0.85f),
+            3f
+        ));
+
+        // Light 2: Fill light
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.5f, -0.3f, 0.3f),
+            new Vector3(1.0f, 1f, 1f),
+            1f
+        ));
+
+        // Light 3: Point light
+        state.lights.Add(Light.CreatePointLight(
+            new Vector3(0.0f, 15.0f, 0.0f),
+            new Vector3(1.0f, 0.9f, 0.8f),
+            4.0f,      // intensity
+            100.0f     // range
+        ));
+
+        // Light 4: Back light
+        state.lights.Add(Light.CreateDirectionalLight(
+            new Vector3(0.2f, 0.1f, 0.8f),
+            new Vector3(0.8f, 0.85f, 1.0f),
+            0.5f
+        ));
+        
+        // Reset ambient to default
+        state.ambientStrength = 0.8f;
+        
+        Info($"[Lights] Set up {state.lights.Count} default scene lights");
+    }
+    
+    /// <summary>
+    /// Load punctual lights from glTF model (KHR_lights_punctual extension).
+    /// Called after model is fully loaded.
+    /// </summary>
+    static void LoadLightsFromModel(SharpGLTF.Schema2.ModelRoot? modelRoot)
+    {
+        if (modelRoot == null)
+            return;
+
+        try
+        {
+            var punctualLights = modelRoot.LogicalPunctualLights;
+            
+            // Always clear existing lights when loading a new model
+            state.lights.Clear();
+            state.lightNodes.Clear();
+            
+            if (punctualLights == null || punctualLights.Count == 0)
+            {
+                Info($"[Lights] Model has no punctual lights - using default scene lights");
+                SetupDefaultLights();
+                return;
+            }
+
+            Info($"[Lights] Found {punctualLights.Count} punctual lights in model");
+
+            // Calculate how many lights we can fit from the model
+            int availableSlots = RenderingConstants.MAX_LIGHTS;
+            int modelLightsToLoad = Math.Min(punctualLights.Count, availableSlots);
+            
+            // Reduce ambient light significantly so model lights are visible
+            state.ambientStrength = 0.05f;
+            
+            Info($"[Lights] Loading {modelLightsToLoad} model lights (max: {availableSlots})");
+            Info($"[Lights] Reduced ambient strength to {state.ambientStrength} to make point lights visible");
+
+            // Store references to light nodes for animation updates
+            state.lightNodes.Clear();
+
+            // Find nodes with lights attached and create Light instances
+            foreach (var node in modelRoot.LogicalNodes)
+            {
+                var punctualLight = node.PunctualLight;
+                if (punctualLight == null)
+                    continue;
+
+                // Get light properties
+                var lightType = punctualLight.LightType;
+                var color = new Vector3(punctualLight.Color.X, punctualLight.Color.Y, punctualLight.Color.Z);
+                float intensity = punctualLight.Intensity;
+                float range = punctualLight.Range; // Already a float, includes default of PositiveInfinity
+                
+                // Boost intensity MASSIVELY for very dim lights (like fireflies at 0.05)
+                // Many glTF lights are authored for physically-based renderers and need significant boosting
+                float intensityBoost = 100.0f; // Aggressive boost for visibility
+                float originalIntensity = intensity;
+                intensity *= intensityBoost;
+                Info($"[Lights] Boosted intensity from {originalIntensity} to {intensity} (boost: {intensityBoost}x)");
+
+                // Get world transform for the light node
+                var worldTransform = node.WorldMatrix;
+                var position = new Vector3(worldTransform.M41, worldTransform.M42, worldTransform.M43);
+                var direction = Vector3.TransformNormal(new Vector3(0, 0, -1), worldTransform);
+                direction = Vector3.Normalize(direction);
+
+                // Create Light object based on type
+                Light light;
+                switch (lightType)
+                {
+                    case SharpGLTF.Schema2.PunctualLightType.Point:
+                        light = Light.CreatePointLight(position, color, intensity, range);
+                        Info($"[Lights] Created point light: {node.Name ?? "unnamed"} at {position}, color={color}, intensity={intensity}, range={range}");
+                        break;
+
+                    case SharpGLTF.Schema2.PunctualLightType.Directional:
+                        light = Light.CreateDirectionalLight(direction, color, intensity);
+                        Info($"[Lights] Created directional light: {node.Name ?? "unnamed"} dir={direction}, color={color}, intensity={intensity}");
+                        break;
+
+                    case SharpGLTF.Schema2.PunctualLightType.Spot:
+                        float innerConeAngle = (float)(punctualLight.InnerConeAngle * 180.0 / Math.PI);
+                        float outerConeAngle = (float)(punctualLight.OuterConeAngle * 180.0 / Math.PI);
+                        light = Light.CreateSpotLight(position, direction, color, intensity, range, innerConeAngle, outerConeAngle);
+                        Info($"[Lights] Created spot light: {node.Name ?? "unnamed"} at {position}, dir={direction}, color={color}, intensity={intensity}, range={range}");
+                        break;
+
+                    default:
+                        Warning($"[Lights] Unknown light type: {lightType}");
+                        continue;
+                }
+
+                // Check if we've reached the maximum number of lights
+                if (state.lights.Count >= RenderingConstants.MAX_LIGHTS)
+                {
+                    Warning($"[Lights] Maximum light count ({RenderingConstants.MAX_LIGHTS}) reached. Skipping remaining lights from model.");
+                    Warning($"[Lights] To increase light count, update MAX_LIGHTS in RenderingConstants.cs and pbr_fs_uniforms.glsl, then recompile shaders.");
+                    break;
+                }
+
+                // Add to lights list
+                state.lights.Add(light);
+
+                // Find the corresponding SharpGltfNode wrapper for animation updates
+                // We need the wrapper because that's what gets updated by the animator
+                // Match by node name since SharpGltfNode stores the original glTF node name
+                
+                // Debug: Log all available node names for troubleshooting
+                Info($"[Lights] Looking for wrapper node '{node.Name}' among {state.model?.Nodes.Count ?? 0} nodes");
+                if (state.model != null && state.model.Nodes.Count > 0)
+                {
+                    Info($"[Lights] Available node names: {string.Join(", ", state.model.Nodes.Where(n => n.NodeName != null).Select(n => $"'{n.NodeName}'"))}");
+                }
+                
+                var wrapperNode = state.model?.Nodes.FirstOrDefault(n => n.NodeName == node.Name);
+                if (wrapperNode != null)
+                {
+                    // Store wrapper node reference for animation updates
+                    state.lightNodes.Add((wrapperNode, state.lights.Count - 1));
+                    Info($"[Lights] Registered light node '{node.Name}' (wrapper found) for animation updates");
+                }
+                else
+                {
+                    Warning($"[Lights] Could not find wrapper node for light '{node.Name}' - light will not animate");
+                }
+            }
+
+            Info($"[Lights] Loaded {state.lightNodes.Count} animated light nodes from model (Total lights: {state.lights.Count}/{RenderingConstants.MAX_LIGHTS})");
+            
+            // Log active light configuration for debugging
+            Info($"[Lights] Active lights breakdown:");
+            for (int i = 0; i < state.lights.Count; i++)
+            {
+                var light = state.lights[i];
+                Info($"[Lights]   Light {i}: Type={light.Type}, Enabled={light.Enabled}, Pos={light.Position}, Color={light.Color}, Intensity={light.Intensity}, Range={light.Range}");
+            }
+            Info($"[Lights] Ambient strength: {state.ambientStrength}");
+        }
+        catch (Exception ex)
+        {
+            Warning($"[Lights] Failed to load lights from model: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Update light positions from animated nodes.
+    /// Called every frame when animation is active.
+    /// </summary>
+    static void UpdateLightPositions()
+    {
+        if (state.lightNodes == null || state.lightNodes.Count == 0)
+            return;
+
+        foreach (var (node, lightIndex) in state.lightNodes)
+        {
+            if (lightIndex >= state.lights.Count)
+                continue;
+
+            var light = state.lights[lightIndex];
+            
+            // Get current world transform for the node (WorldTransform on SharpGltfNode)
+            var worldTransform = node.WorldTransform;
+            var position = new Vector3(worldTransform.M41, worldTransform.M42, worldTransform.M43);
+            var direction = Vector3.TransformNormal(new Vector3(0, 0, -1), worldTransform);
+            direction = Vector3.Normalize(direction);
+
+            // Update light position/direction based on type
+            if (light.Type == LightType.Point)
+            {
+                light.Position = position;
+            }
+            else if (light.Type == LightType.Directional)
+            {
+                light.Direction = direction;
+            }
+            else if (light.Type == LightType.Spot)
+            {
+                light.Position = position;
+                light.Direction = direction;
+            }
+        }
+    }
+    
+    /// <summary>
     /// Applies glass material overrides if enabled, otherwise returns original values.
     /// </summary>
     static (float transmission, float ior, Vector3 attenuationColor, float attenuationDistance, float thickness) 
@@ -225,6 +449,9 @@ public static unsafe partial class SharpGLTFApp
                 // Try to load IBL from glTF if available
                 LoadIBLFromModel(state.pendingModelRoot);
 
+                // Try to load punctual lights from glTF if available
+                LoadLightsFromModel(state.pendingModelRoot);
+
                 state.modelLoaded = true;
                 state.isLoadingModel = false;
                 state.pendingModelRoot = null;
@@ -373,6 +600,9 @@ public static unsafe partial class SharpGLTFApp
                 var boneMatrices = state.animator.GetFinalBoneMatrices();
                 UpdateJointMatrixTexture(boneMatrices);
             }
+            
+            // Update light positions from animated nodes
+            UpdateLightPositions();
         }
 
         // Begin rendering
@@ -422,11 +652,11 @@ public static unsafe partial class SharpGLTFApp
             // Build light parameters from the lights list
             light_params_t lightParams = new light_params_t();
 
-            // Count enabled lights (max 4 supported by shader)
+            // Count enabled lights (max supported by shader defined in RenderingConstants.MAX_LIGHTS)
             int enabledLightCount = 0;
             foreach (var light in state.lights)
             {
-                if (!light.Enabled || enabledLightCount >= 4)
+                if (!light.Enabled || enabledLightCount >= RenderingConstants.MAX_LIGHTS)
                     continue;
 
                 int idx = enabledLightCount;

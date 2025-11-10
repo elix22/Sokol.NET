@@ -47,7 +47,7 @@ namespace Sokol
             };
         }
 
-        public static Light CreatePointLight(Vector3 position, Vector3 color, float range, float intensity = 1.0f)
+        public static Light CreatePointLight(Vector3 position, Vector3 color, float intensity, float range)
         {
             return new Light
             {

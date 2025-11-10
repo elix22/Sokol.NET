@@ -1,6 +1,8 @@
 // PBR Fragment Shader Uniforms
 // Dedicated uniforms for pbr.glsl shader (separate from cgltf-sapp.glsl)
 
+// IMPORTANT: This value must match RenderingConstants.MAX_LIGHTS in C# code!
+// If you change this, you must also update RenderingConstants.cs and recompile the application.
 #define MAX_LIGHTS 4
 
 // Material parameters (binding=1)

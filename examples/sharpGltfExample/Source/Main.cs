@@ -13,16 +13,17 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+         "DamagedHelmet/glTF/DamagedHelmet.gltf",
+        "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "CarConcept/glTF/CarConcept.gltf",
+        "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
-        "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
         "MorphStressTest/glTF/MorphStressTest.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
-        "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
@@ -32,7 +33,6 @@ public static unsafe partial class SharpGLTFApp
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
         "FlightHelmet/glTF/FlightHelmet.gltf",
-        "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "CompareIor/glTF/CompareIor.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "CompareTransmission/glTF/CompareTransmission.gltf",
@@ -194,6 +194,10 @@ public static unsafe partial class SharpGLTFApp
         // Lighting system
         public List<Light> lights = new List<Light>();
         public float ambientStrength = 0.8f;    // Test: very low ambient
+        
+        // Light nodes from glTF (for animation updates)
+        // Using SharpGltfNode wrapper (not Schema2.Node) because animator updates wrapper transforms
+        public List<(SharpGltfNode node, int lightIndex)> lightNodes = new List<(SharpGltfNode, int)>();
         
         // Bloom post-processing
         public BloomPass bloom;

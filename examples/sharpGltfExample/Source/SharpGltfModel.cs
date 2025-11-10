@@ -170,8 +170,12 @@ namespace Sokol
             }
             else
             {
-                // Node without mesh - create a transform-only node if it has children
-                if (node.VisualChildren.Count() > 0)
+                // Node without mesh - create a transform-only node if it has children OR if it might be animated/used for lights
+                // We need to keep leaf nodes (no children, no mesh) if they could be animated or have lights attached
+                bool hasChildren = node.VisualChildren.Count() > 0;
+                bool mightBeAnimated = !string.IsNullOrEmpty(node.Name); // Animated nodes need names
+                
+                if (hasChildren || mightBeAnimated)
                 {
                     currentRenderNode = new SharpGltfNode
                     {
