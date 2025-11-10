@@ -469,14 +469,26 @@ public static unsafe partial class SharpGLTFApp
                 PipelineType.Standard, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
             state.bloom.scene_skinned_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.Skinned, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.Morphing, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.SkinnedMorphing, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
             state.bloom.scene_standard_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.StandardBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
             state.bloom.scene_skinned_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.SkinnedBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_morphing_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.MorphingBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_morphing_blend_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.SkinnedMorphingBlend, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
             state.bloom.scene_standard_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.StandardMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
             state.bloom.scene_skinned_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
                 PipelineType.SkinnedMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_morphing_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.MorphingMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
+            state.bloom.scene_skinned_morphing_mask_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.SkinnedMorphingMask, colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8, depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH, sampleCount: 1);
         }
 
         // Create fullscreen quad vertices for post-processing passes

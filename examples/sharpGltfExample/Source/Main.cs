@@ -64,10 +64,16 @@ public static unsafe partial class SharpGLTFApp
         // Model rendering pipelines for offscreen scene pass (sample_count = 1)
         public sg_pipeline scene_standard_pipeline;
         public sg_pipeline scene_skinned_pipeline;
+        public sg_pipeline scene_morphing_pipeline;
+        public sg_pipeline scene_skinned_morphing_pipeline;
         public sg_pipeline scene_standard_blend_pipeline;
         public sg_pipeline scene_skinned_blend_pipeline;
+        public sg_pipeline scene_morphing_blend_pipeline;
+        public sg_pipeline scene_skinned_morphing_blend_pipeline;
         public sg_pipeline scene_standard_mask_pipeline;
         public sg_pipeline scene_skinned_mask_pipeline;
+        public sg_pipeline scene_morphing_mask_pipeline;
+        public sg_pipeline scene_skinned_morphing_mask_pipeline;
         
         // Bloom post-processing pipelines
         public sg_pipeline bright_pipeline;

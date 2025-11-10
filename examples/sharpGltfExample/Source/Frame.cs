@@ -579,11 +579,17 @@ public static unsafe partial class SharpGLTFApp
                     {
                         PipelineType.Standard => state.bloom.scene_standard_pipeline,
                         PipelineType.Skinned => state.bloom.scene_skinned_pipeline,
+                        PipelineType.Morphing => state.bloom.scene_morphing_pipeline,
+                        PipelineType.SkinnedMorphing => state.bloom.scene_skinned_morphing_pipeline,
                         PipelineType.StandardBlend => state.bloom.scene_standard_blend_pipeline,
                         PipelineType.SkinnedBlend => state.bloom.scene_skinned_blend_pipeline,
+                        PipelineType.MorphingBlend => state.bloom.scene_morphing_blend_pipeline,
+                        PipelineType.SkinnedMorphingBlend => state.bloom.scene_skinned_morphing_blend_pipeline,
                         PipelineType.StandardMask => state.bloom.scene_standard_mask_pipeline,
                         PipelineType.SkinnedMask => state.bloom.scene_skinned_mask_pipeline,
-                        _ => PipeLineManager.GetOrCreatePipeline(pipelineType)
+                        PipelineType.MorphingMask => state.bloom.scene_morphing_mask_pipeline,
+                        PipelineType.SkinnedMorphingMask => state.bloom.scene_skinned_morphing_mask_pipeline,
+                        _ => PipeLineManager.GetOrCreatePipeline(pipelineType, cullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1)
                     };
                 }
                 else
