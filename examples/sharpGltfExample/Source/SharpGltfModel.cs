@@ -7,55 +7,6 @@ using static Sokol.SLog;
 
 namespace Sokol
 {
-    public struct BoundingBox
-    {
-        public Vector3 Min;
-        public Vector3 Max;
-        
-        public BoundingBox(Vector3 min, Vector3 max)
-        {
-            Min = min;
-            Max = max;
-        }
-        
-        // Transform bounding box by a matrix
-        public BoundingBox Transform(Matrix4x4 matrix)
-        {
-            // Transform all 8 corners of the box
-            Vector3[] corners = new Vector3[8]
-            {
-                new Vector3(Min.X, Min.Y, Min.Z),
-                new Vector3(Max.X, Min.Y, Min.Z),
-                new Vector3(Min.X, Max.Y, Min.Z),
-                new Vector3(Max.X, Max.Y, Min.Z),
-                new Vector3(Min.X, Min.Y, Max.Z),
-                new Vector3(Max.X, Min.Y, Max.Z),
-                new Vector3(Min.X, Max.Y, Max.Z),
-                new Vector3(Max.X, Max.Y, Max.Z)
-            };
-            
-            Vector3 newMin = new Vector3(float.MaxValue);
-            Vector3 newMax = new Vector3(float.MinValue);
-            
-            foreach (var corner in corners)
-            {
-                Vector3 transformed = Vector3.Transform(corner, matrix);
-                newMin = Vector3.Min(newMin, transformed);
-                newMax = Vector3.Max(newMax, transformed);
-            }
-            
-            return new BoundingBox(newMin, newMax);
-        }
-    }
-
-    public class SharpGltfNode
-    {
-        public Matrix4x4 Transform;
-        public int MeshIndex = -1;  // Index into SharpGltfModel.Meshes
-        public string? NodeName = null;  // Name of the original glTF node (for matching with animations)
-        public SharpGLTF.Schema2.Node? CachedGltfNode = null;  // Cached reference to glTF node (for animation optimization)
-        public bool HasAnimation = false;  // Pre-calculated flag to avoid expensive LINQ calls
-    }
 
     public class SharpGltfModel
     {
