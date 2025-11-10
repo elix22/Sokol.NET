@@ -78,6 +78,13 @@ namespace Sokol
         // Normal map scale (strength of normal perturbation)
         public float NormalMapScale = 1.0f;  // 1.0 = full strength, 0.2 = subtle (like car paint)
 
+        // Texture coordinate set indices (which UV set each texture uses)
+        public int BaseColorTexCoord = 0;  // TEXCOORD_0 by default
+        public int MetallicRoughnessTexCoord = 0;
+        public int NormalTexCoord = 0;
+        public int OcclusionTexCoord = 0;
+        public int EmissiveTexCoord = 0;
+
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
         private static Texture? _defaultBlackTexture;

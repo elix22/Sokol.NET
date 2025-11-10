@@ -767,6 +767,30 @@ namespace Sokol
                 return;
             }
 
+            // Extract texture coordinate set index (which UV channel to use)
+            int texCoord = channel.Value.TextureCoordinate;
+            
+            // Store texCoord index for this texture type
+            switch (channelName)
+            {
+                case "BaseColor":
+                    mesh.BaseColorTexCoord = texCoord;
+                    break;
+                case "MetallicRoughness":
+                    mesh.MetallicRoughnessTexCoord = texCoord;
+                    break;
+                case "Normal":
+                    mesh.NormalTexCoord = texCoord;
+                    break;
+                case "Occlusion":
+                    mesh.OcclusionTexCoord = texCoord;
+                    Info($"Material {material.LogicalIndex}: Occlusion texture uses TEXCOORD_{texCoord}", "SharpGLTF");
+                    break;
+                case "Emissive":
+                    mesh.EmissiveTexCoord = texCoord;
+                    break;
+            }
+
             // Extract sampler settings from glTF texture
             var sampler = gltfTexture.Sampler;
             var samplerSettings = ExtractSamplerSettings(sampler);
@@ -775,8 +799,18 @@ namespace Sokol
             // This ensures textures with different samplers are cached separately
             string textureId = $"image_{textureImage.LogicalIndex}_sampler_{samplerSettings.GetHashCode()}";
 
-            // All textures use RGBA8 format - manual srgb_to_linear() conversion in shader
-            sg_pixel_format format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
+            // Determine pixel format based on texture type per glTF spec:
+            // - BaseColor (index 0), Emissive (index 4): sRGB color space
+            // - Others (Metallic-Roughness, Normal, Occlusion): Linear non-color data
+            sg_pixel_format format = (channelName == "BaseColor" || channelName == "Emissive") 
+                ? sg_pixel_format.SG_PIXELFORMAT_SRGB8A8 
+                : sg_pixel_format.SG_PIXELFORMAT_RGBA8;
+
+            // Debug: Log texture image index for occlusion
+            if (channelName == "Occlusion")
+            {
+                Info($"Material {material.LogicalIndex}: Occlusion texture uses image index {textureImage.LogicalIndex}", "SharpGLTF");
+            }
 
             // Look up texture in cache or create with proper sampler settings
             var imageData = textureImage.Content.Content.ToArray();

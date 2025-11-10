@@ -357,7 +357,9 @@ float getOcclusion() {
     float occlusion = 1.0;
     
     if (has_occlusion_tex > 0.5) {
-        vec2 uv = applyTextureTransform(v_TexCoord0, occlusion_tex_offset, occlusion_tex_rotation, occlusion_tex_scale);
+        // Select UV channel based on occlusion_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (occlusion_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        vec2 uv = applyTextureTransform(baseUV, occlusion_tex_offset, occlusion_tex_rotation, occlusion_tex_scale);
         occlusion = texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), uv).r;
     }
     
