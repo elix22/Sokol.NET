@@ -131,6 +131,11 @@ namespace Sokol
         private void ApplyAnimationToNodes()
         {
             if (_currentAnimation == null) return;
+            
+            // PERFORMANCE: Early exit if there are no non-skinned animated nodes
+            // For skinned characters (like DancingGangster), all nodes are skinned,
+            // so this loop would wastefully iterate through all bones finding no matches
+            if (_nodesByName.Count == 0) return;
 
             var bones = _currentAnimation.GetBones();
             foreach (var bone in bones)

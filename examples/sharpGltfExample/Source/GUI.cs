@@ -359,6 +359,28 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.animator.PlaybackSpeed = 1.0f;
                 }
+                
+                // Skinning mode selection
+                igSeparator();
+                igText("Skinning Mode:");
+                int skinningMode = (int)state.skinningMode;
+                string[] skinningModeNames = new[] { "Uniform-Based (Fast)", "Texture-Based (Unlimited)" };
+                if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
+                {
+                    state.skinningMode = (SkinningMode)skinningMode;
+                }
+                
+                // Show info about current mode
+                if (state.skinningMode == SkinningMode.UniformBased)
+                {
+                    igTextColored(new Vector4(0, 1, 0, 1), "Fast (60 FPS on mobile)");
+                    igText("Max 85 bones");
+                }
+                else
+                {
+                    igTextColored(new Vector4(1, 1, 0, 1), "Slower (30 FPS on mobile)");
+                    igText("Unlimited bones");
+                }
             }
             else
             {

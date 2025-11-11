@@ -13,6 +13,7 @@ layout(binding=0, std140) uniform vs_params {
     layout(offset=128) highp vec3 eye_pos;          // offset 128, size 12 (but std140 pads to 16)
     layout(offset=144) vec4 u_morphWeights[2];      // offset 144 (8 morph weights as 2 vec4s)
     layout(offset=176) int use_morphing;            // offset 176 (0 or 1, for runtime morph checks)
+    layout(offset=180) int use_uniform_skinning;    // offset 180 (0=texture-based, 1=uniform-based)
 #ifdef SKINNING
     layout(offset=192) highp mat4 finalBonesMatrices[MAX_BONES];  // offset 192 (adjusted for new ints)
 #endif

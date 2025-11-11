@@ -635,10 +635,20 @@ namespace Sokol
                     mesh.BaseColorTexOffset = textureTransform.Offset;
                     mesh.BaseColorTexRotation = textureTransform.Rotation;
                     mesh.BaseColorTexScale = textureTransform.Scale;
-                    Info($"Material {material.LogicalIndex}: BaseColor texture transform - " +
-                        $"Offset=({mesh.BaseColorTexOffset.X:F2}, {mesh.BaseColorTexOffset.Y:F2}), " +
-                        $"Rotation={mesh.BaseColorTexRotation:F2}rad, " +
-                        $"Scale=({mesh.BaseColorTexScale.X:F2}, {mesh.BaseColorTexScale.Y:F2})", "SharpGLTF");
+                    
+                    // Check if this is NOT an identity transform (optimization flag)
+                    mesh.HasBaseColorTexTransform = 
+                        textureTransform.Offset != Vector2.Zero ||
+                        textureTransform.Rotation != 0.0f ||
+                        textureTransform.Scale != Vector2.One;
+                    
+                    if (mesh.HasBaseColorTexTransform)
+                    {
+                        Info($"Material {material.LogicalIndex}: BaseColor texture transform - " +
+                            $"Offset=({mesh.BaseColorTexOffset.X:F2}, {mesh.BaseColorTexOffset.Y:F2}), " +
+                            $"Rotation={mesh.BaseColorTexRotation:F2}rad, " +
+                            $"Scale=({mesh.BaseColorTexScale.X:F2}, {mesh.BaseColorTexScale.Y:F2})", "SharpGLTF");
+                    }
                 }
             }
             
@@ -651,10 +661,20 @@ namespace Sokol
                     mesh.MetallicRoughnessTexOffset = textureTransform.Offset;
                     mesh.MetallicRoughnessTexRotation = textureTransform.Rotation;
                     mesh.MetallicRoughnessTexScale = textureTransform.Scale;
-                    Info($"Material {material.LogicalIndex}: MetallicRoughness texture transform - " +
-                        $"Offset=({mesh.MetallicRoughnessTexOffset.X:F2}, {mesh.MetallicRoughnessTexOffset.Y:F2}), " +
-                        $"Rotation={mesh.MetallicRoughnessTexRotation:F2}rad, " +
-                        $"Scale=({mesh.MetallicRoughnessTexScale.X:F2}, {mesh.MetallicRoughnessTexScale.Y:F2})", "SharpGLTF");
+                    
+                    // Check if this is NOT an identity transform (optimization flag)
+                    mesh.HasMetallicRoughnessTexTransform = 
+                        textureTransform.Offset != Vector2.Zero ||
+                        textureTransform.Rotation != 0.0f ||
+                        textureTransform.Scale != Vector2.One;
+                    
+                    if (mesh.HasMetallicRoughnessTexTransform)
+                    {
+                        Info($"Material {material.LogicalIndex}: MetallicRoughness texture transform - " +
+                            $"Offset=({mesh.MetallicRoughnessTexOffset.X:F2}, {mesh.MetallicRoughnessTexOffset.Y:F2}), " +
+                            $"Rotation={mesh.MetallicRoughnessTexRotation:F2}rad, " +
+                            $"Scale=({mesh.MetallicRoughnessTexScale.X:F2}, {mesh.MetallicRoughnessTexScale.Y:F2})", "SharpGLTF");
+                    }
                 }
             }
 
@@ -677,10 +697,20 @@ namespace Sokol
                     mesh.NormalTexOffset = textureTransform.Offset;
                     mesh.NormalTexRotation = textureTransform.Rotation;
                     mesh.NormalTexScale = textureTransform.Scale;
-                    Info($"Material {material.LogicalIndex}: Normal texture transform - " +
-                        $"Offset=({mesh.NormalTexOffset.X:F2}, {mesh.NormalTexOffset.Y:F2}), " +
-                        $"Rotation={mesh.NormalTexRotation:F2}rad, " +
-                        $"Scale=({mesh.NormalTexScale.X:F2}, {mesh.NormalTexScale.Y:F2})", "SharpGLTF");
+                    
+                    // Check if this is NOT an identity transform (optimization flag)
+                    mesh.HasNormalTexTransform = 
+                        textureTransform.Offset != Vector2.Zero ||
+                        textureTransform.Rotation != 0.0f ||
+                        textureTransform.Scale != Vector2.One;
+                    
+                    if (mesh.HasNormalTexTransform)
+                    {
+                        Info($"Material {material.LogicalIndex}: Normal texture transform - " +
+                            $"Offset=({mesh.NormalTexOffset.X:F2}, {mesh.NormalTexOffset.Y:F2}), " +
+                            $"Rotation={mesh.NormalTexRotation:F2}rad, " +
+                            $"Scale=({mesh.NormalTexScale.X:F2}, {mesh.NormalTexScale.Y:F2})", "SharpGLTF");
+                    }
                 }
                 else
                 {
@@ -706,10 +736,20 @@ namespace Sokol
                     mesh.OcclusionTexOffset = textureTransform.Offset;
                     mesh.OcclusionTexRotation = textureTransform.Rotation;
                     mesh.OcclusionTexScale = textureTransform.Scale;
-                    Info($"Material {material.LogicalIndex}: Occlusion texture transform - " +
-                        $"Offset=({mesh.OcclusionTexOffset.X:F2}, {mesh.OcclusionTexOffset.Y:F2}), " +
-                        $"Rotation={mesh.OcclusionTexRotation:F2}rad, " +
-                        $"Scale=({mesh.OcclusionTexScale.X:F2}, {mesh.OcclusionTexScale.Y:F2})", "SharpGLTF");
+                    
+                    // Check if this is NOT an identity transform (optimization flag)
+                    mesh.HasOcclusionTexTransform = 
+                        textureTransform.Offset != Vector2.Zero ||
+                        textureTransform.Rotation != 0.0f ||
+                        textureTransform.Scale != Vector2.One;
+                    
+                    if (mesh.HasOcclusionTexTransform)
+                    {
+                        Info($"Material {material.LogicalIndex}: Occlusion texture transform - " +
+                            $"Offset=({mesh.OcclusionTexOffset.X:F2}, {mesh.OcclusionTexOffset.Y:F2}), " +
+                            $"Rotation={mesh.OcclusionTexRotation:F2}rad, " +
+                            $"Scale=({mesh.OcclusionTexScale.X:F2}, {mesh.OcclusionTexScale.Y:F2})", "SharpGLTF");
+                    }
                 }
             }
             
@@ -722,10 +762,20 @@ namespace Sokol
                     mesh.EmissiveTexOffset = textureTransform.Offset;
                     mesh.EmissiveTexRotation = textureTransform.Rotation;
                     mesh.EmissiveTexScale = textureTransform.Scale;
-                    Info($"Material {material.LogicalIndex}: Emissive texture transform - " +
-                        $"Offset=({mesh.EmissiveTexOffset.X:F2}, {mesh.EmissiveTexOffset.Y:F2}), " +
-                        $"Rotation={mesh.EmissiveTexRotation:F2}rad, " +
-                        $"Scale=({mesh.EmissiveTexScale.X:F2}, {mesh.EmissiveTexScale.Y:F2})", "SharpGLTF");
+                    
+                    // Check if this is NOT an identity transform (optimization flag)
+                    mesh.HasEmissiveTexTransform = 
+                        textureTransform.Offset != Vector2.Zero ||
+                        textureTransform.Rotation != 0.0f ||
+                        textureTransform.Scale != Vector2.One;
+                    
+                    if (mesh.HasEmissiveTexTransform)
+                    {
+                        Info($"Material {material.LogicalIndex}: Emissive texture transform - " +
+                            $"Offset=({mesh.EmissiveTexOffset.X:F2}, {mesh.EmissiveTexOffset.Y:F2}), " +
+                            $"Rotation={mesh.EmissiveTexRotation:F2}rad, " +
+                            $"Scale=({mesh.EmissiveTexScale.X:F2}, {mesh.EmissiveTexScale.Y:F2})", "SharpGLTF");
+                    }
                 }
             }
 

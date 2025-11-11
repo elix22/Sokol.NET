@@ -432,10 +432,19 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.animation_open = true;
                     Info("[SharpGLTF] Animator created for animated model");
                     
-                    // Create joint matrix texture for skinning
-                    if (state.model.BoneCounter > 0)
+                    // Create joint matrix texture only for texture-based skinning mode
+                    if (state.skinningMode == SkinningMode.TextureBased && state.model.BoneCounter > 0)
                     {
                         CreateJointMatrixTexture(state.model.BoneCounter);
+                        Info($"[Skinning] Using TEXTURE-BASED skinning ({state.model.BoneCounter} bones)");
+                    }
+                    else if (state.model.BoneCounter > 0)
+                    {
+                        Info($"[Skinning] Using UNIFORM-BASED skinning ({state.model.BoneCounter} bones, max 85)");
+                        if (state.model.BoneCounter > AnimationConstants.MAX_BONES)
+                        {
+                            Warning($"[Skinning] Model has {state.model.BoneCounter} bones but uniform-based skinning only supports {AnimationConstants.MAX_BONES}. Consider switching to texture-based mode.");
+                        }
                     }
                 }
                 else
@@ -599,8 +608,21 @@ public static unsafe partial class SharpGLTFApp
         {
             state.animator.UpdateAnimation(deltaTime);
             
-            // Update joint matrix texture with current bone transforms
-            if (state.jointMatrixTexture.id != 0)
+            // Create joint texture if switching to texture-based mode and texture doesn't exist
+            if (state.skinningMode == SkinningMode.TextureBased && 
+                state.jointMatrixTexture.id == 0 && 
+                state.model != null && 
+                state.model.BoneCounter > 0)
+            {
+                CreateJointMatrixTexture(state.model.BoneCounter);
+                Info($"[Skinning] Switched to TEXTURE-BASED skinning ({state.model.BoneCounter} bones)");
+            }
+            
+            // PERFORMANCE: Only update joint texture for texture-based skinning mode
+            // Uniform-based skinning passes matrices directly via uniforms (no texture upload needed)
+            if (state.skinningMode == SkinningMode.TextureBased && 
+                state.jointMatrixTexture.id != 0 && 
+                state.animator.GetCurrentAnimation() != null)
             {
                 var boneMatrices = state.animator.GetFinalBoneMatrices();
                 UpdateJointMatrixTexture(boneMatrices);
@@ -1020,24 +1042,12 @@ public static unsafe partial class SharpGLTFApp
         {
             Matrix4x4 jointMatrix = boneMatrices[i];
             
-            // Calculate normal matrix: transpose(inverse(mat3(jointMatrix)))
-            // For skinning, this transforms normals correctly in the joint's local space
-            Matrix4x4 normalMatrix;
-            if (Matrix4x4.Invert(jointMatrix, out normalMatrix))
-            {
-                normalMatrix = Matrix4x4.Transpose(normalMatrix);
-            }
-            else
-            {
-                // Fallback to identity if inversion fails
-                normalMatrix = Matrix4x4.Identity;
-            }
-            
             // Store transform matrix at offset i*32 (4 vec4 = 16 floats)
             CopyMatrix4x4ToFloatArray(jointMatrix, state.jointTextureData, i * 32);
             
-            // Store normal matrix at offset i*32 + 16 (4 vec4 = 16 floats)
-            CopyMatrix4x4ToFloatArray(normalMatrix, state.jointTextureData, i * 32 + 16);
+            // Store same matrix for normals at offset i*32 + 16 (uniform-based uses same matrix)
+            // This matches the behavior of uniform-based skinning
+            CopyMatrix4x4ToFloatArray(jointMatrix, state.jointTextureData, i * 32 + 16);
         }
         
         // Upload to GPU

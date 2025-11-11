@@ -7,6 +7,24 @@ using static Sokol.SG;
 using static Sokol.SLog;
 using SharpGLTF.Schema2;
 
+/// <summary>
+/// Skinning system mode for animated meshes
+/// </summary>
+public enum SkinningMode
+{
+    /// <summary>
+    /// Uniform-based skinning (main branch): Fast on mobile, passes bone matrices via shader uniforms.
+    /// Limited to ~85 bones but very efficient. Best for mobile/low-end devices.
+    /// </summary>
+    UniformBased,
+    
+    /// <summary>
+    /// Texture-based skinning (pbr-transition): Supports unlimited bones via texture lookup.
+    /// Requires GPU texture upload every frame - slower on mobile but no bone limit.
+    /// </summary>
+    TextureBased
+}
+
 public static unsafe partial class SharpGLTFApp
 {
    //  "BusterDrone/scene.gltf",
@@ -149,13 +167,16 @@ public static unsafe partial class SharpGLTFApp
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
 
-        // Joint matrix texture for skinning (texture-based instead of uniforms)
+        // Skinning system configuration
+        public SkinningMode skinningMode = SkinningMode.UniformBased;  // Default to fast uniform-based skinning
+
+        // Joint matrix texture for skinning (texture-based mode only)
         public sg_image jointMatrixTexture;
         public sg_view jointMatrixView;
         public sg_sampler jointMatrixSampler;
         public int jointTextureWidth = 0;  // Calculated based on bone count
 
-        public float[] jointTextureData = null;
+        public float[]? jointTextureData = null;
 
         // Morph target texture (texture2DArray for vertex displacements)
         public sg_image morphTargetTexture;
