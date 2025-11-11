@@ -23,6 +23,10 @@ unsigned char* stbi_load_csharp(const unsigned char* buffer, int len, int* x, in
 //   desired_channels: requested number of channels (0=auto, 1=grey, 2=grey+alpha, 3=rgb, 4=rgba)
 unsigned char* stbi_load_flipped_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
 
+
+float* stbi_loadf_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
+float* stbi_loadf_flipped_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
+
 // Free image data returned by stbi_load_csharp
 void stbi_image_free_csharp(void* retval_from_stbi_load);
 

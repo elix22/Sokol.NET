@@ -60,13 +60,13 @@ namespace Sokol
 
                 try
                 {
-                    // Decode HDR image using stb_image
+                    // Decode HDR image using stb_image (float version for HDR)
                     int width = 0, height = 0, channels = 0;
-                    byte* pixels;
+                    float* pixels;
                     
                     fixed (byte* dataPtr = data)
                     {
-                        pixels = stbi_load_csharp(in *dataPtr, data.Length, ref width, ref height, ref channels, 4);
+                        pixels = stbi_loadf_csharp(in *dataPtr, data.Length, ref width, ref height, ref channels, 4);
                     }
 
                     if (pixels == null)
@@ -79,10 +79,10 @@ namespace Sokol
 
                     Info($"[IBL] HDR decoded: {width}x{height}, {channels} channels");
 
-                    // Convert panorama to cubemaps
+                    // Convert panorama to cubemaps (now using float data directly)
                     var envMap = ConvertPanoramaToCubemap(pixels, width, height, "hdr-environment");
                     
-                    stbi_image_free_csharp(pixels);
+                    stbi_image_free_csharp((byte*)pixels);
                     
                     if (envMap != null && envMap.IsLoaded)
                     {
@@ -188,39 +188,21 @@ namespace Sokol
 
                     Info($"[IBL] EXR decoded: {width}x{height} (RGBA float)");
 
-                    // Convert EXR float data to byte array for processing
-                    // EXR data is already linear HDR, so we can process it directly
-                    int pixelCount = width * height * 4;
-                    byte[] byteData = new byte[pixelCount];
+                    // Convert panorama to cubemaps (using float data directly, no conversion needed)
+                    var envMap = ConvertPanoramaToCubemap(rgbaData, width, height, "exr-environment");
                     
-                    // Convert float HDR to LDR bytes for now (tone mapping)
-                    // TODO: Keep as float for true HDR processing
-                    for (int i = 0; i < pixelCount; i++)
+                    // Free EXR data
+                    EXRFreeImage(ref *rgbaData);
+                    
+                    if (envMap != null && envMap.IsLoaded)
                     {
-                        float value = rgbaData[i];
-                        // Simple Reinhard tone mapping
-                        value = value / (1.0f + value);
-                        byteData[i] = (byte)Math.Clamp(value * 255.0f, 0, 255);
+                        Info("[IBL] Successfully created environment map from EXR");
+                        onComplete?.Invoke(envMap);
                     }
-                    
-                    // Convert panorama to cubemaps
-                    fixed (byte* bytePtr = byteData)
+                    else
                     {
-                        var envMap = ConvertPanoramaToCubemap(bytePtr, width, height, "exr-environment");
-                        
-                        // Free EXR data
-                        EXRFreeImage(ref *rgbaData);
-                        
-                        if (envMap != null && envMap.IsLoaded)
-                        {
-                            Info("[IBL] Successfully created environment map from EXR");
-                            onComplete?.Invoke(envMap);
-                        }
-                        else
-                        {
-                            Warning("[IBL] Failed to create environment map from EXR");
-                            onComplete?.Invoke(null);
-                        }
+                        Warning("[IBL] Failed to create environment map from EXR");
+                        onComplete?.Invoke(null);
                     }
                 }
                 catch (Exception ex)
@@ -517,7 +499,7 @@ namespace Sokol
         /// Convert HDR panorama (equirectangular) to cubemap with pre-filtering for IBL.
         /// Uses native C++ conversion for massive performance improvement (10x-100x faster).
         /// </summary>
-        private static unsafe EnvironmentMap? ConvertPanoramaToCubemap(byte* panoramaPixels, int panoWidth, int panoHeight, string name)
+        private static unsafe EnvironmentMap? ConvertPanoramaToCubemap(float* panoramaPixels, int panoWidth, int panoHeight, string name)
         {
             try
             {
@@ -530,27 +512,16 @@ namespace Sokol
 
                 var startTime = System.Diagnostics.Stopwatch.StartNew();
 
-                // Convert byte* panorama to float* for C++ functions
-                int pixelCount = panoWidth * panoHeight * 4;
-                float* panoramaFloat = (float*)System.Runtime.InteropServices.Marshal.AllocHGlobal(pixelCount * sizeof(float));
-                for (int i = 0; i < pixelCount; i++)
-                {
-                    panoramaFloat[i] = panoramaPixels[i] / 255.0f;
-                }
-
                 // Create diffuse cubemap (irradiance) using C++
                 Info($"[IBL] Pre-filtering diffuse irradiance ({diffuseSize}x{diffuseSize}, 256 samples/pixel)...");
-                var diffuseCubemap = CreateDiffuseCubemapFromPanorama(panoramaFloat, panoWidth, panoHeight, diffuseSize);
+                var diffuseCubemap = CreateDiffuseCubemapFromPanorama(panoramaPixels, panoWidth, panoHeight, diffuseSize);
                 Info($"[IBL] Diffuse complete in {startTime.ElapsedMilliseconds}ms");
                 
                 // Create specular cubemap with mipmaps (roughness levels) using C++
                 startTime.Restart();
                 Info($"[IBL] Pre-filtering specular GGX ({specularSize}x{specularSize}, {specularMipCount} mips)...");
-                var (specularCubemap, mipCount) = CreateSpecularCubemapFromPanorama(panoramaFloat, panoWidth, panoHeight, specularSize);
+                var (specularCubemap, mipCount) = CreateSpecularCubemapFromPanorama(panoramaPixels, panoWidth, panoHeight, specularSize);
                 Info($"[IBL] Specular complete in {startTime.ElapsedMilliseconds}ms");
-                
-                // Free panorama float data
-                System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)panoramaFloat);
                 
                 // Create BRDF LUT (same as procedural for now)
                 var ggxLut = CreateBRDFLUT(256);
@@ -1028,7 +999,7 @@ namespace Sokol
             string diffusePattern,
             string specularMipPattern,
             string ggxLutPath,
-            string charlieLutPath = null)
+            string? charlieLutPath = null)
         {
             // TODO: Implement file loading using StbImage
             // For now, return test environment

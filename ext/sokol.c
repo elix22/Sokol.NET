@@ -142,6 +142,16 @@ SOKOL_API_IMPL unsigned char* stbi_load_flipped_csharp(const unsigned char* buff
     return stbi_load_from_memory(buffer, len, x, y, channels_in_file, desired_channels);
 }
 
+//stbi_loadf_from_memory
+SOKOL_API_IMPL float* stbi_loadf_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels) {
+    return stbi_loadf_from_memory(buffer, len, x, y, channels_in_file, desired_channels);
+}
+
+SOKOL_API_IMPL float* stbi_loadf_flipped_csharp(const unsigned char* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels) {
+    
+    stbi_set_flip_vertically_on_load(true);
+    return stbi_loadf_from_memory(buffer, len, x, y, channels_in_file, desired_channels);
+}
 
 
 // stbi_image_free wrapper

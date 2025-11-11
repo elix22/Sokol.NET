@@ -747,7 +747,7 @@ public static unsafe partial class SharpGLTFApp
             // Option 1: Load from 6 cubemap faces (fast, works on all platforms including Web)
             // Option 2: Load from EXR panorama (slow ~300ms, Desktop/Mobile only)
             
-            bool useCubemapFaces = true; // Set to false to use EXR panorama
+            bool useCubemapFaces = false; // Set to false to use EXR panorama
             
             if (useCubemapFaces)
             {
