@@ -124,9 +124,9 @@ public static unsafe partial class SharpGLTFApp
             // Calculate how many lights we can fit from the model
             int availableSlots = RenderingConstants.MAX_LIGHTS;
             int modelLightsToLoad = Math.Min(punctualLights.Count, availableSlots);
-            
-            // Reduce ambient light significantly so model lights are visible
-            state.ambientStrength = 0.05f;
+
+            // increase ambient light significantly so model lights are visible
+            state.ambientStrength = 1f;
             
             Info($"[Lights] Loading {modelLightsToLoad} model lights (max: {availableSlots})");
             Info($"[Lights] Reduced ambient strength to {state.ambientStrength} to make point lights visible");
@@ -146,6 +146,11 @@ public static unsafe partial class SharpGLTFApp
                 var color = new Vector3(punctualLight.Color.X, punctualLight.Color.Y, punctualLight.Color.Z);
                 float intensity = punctualLight.Intensity;
                 float range = punctualLight.Range; // Already a float, includes default of PositiveInfinity
+                if (float.IsInfinity(range) || range <= 0)
+                {
+                    // Set a default range for lights without a specified range
+                    range = 1.0f;
+                }
                 
                 // Boost intensity MASSIVELY for very dim lights (like fireflies at 0.05)
                 // Many glTF lights are authored for physically-based renderers and need significant boosting
