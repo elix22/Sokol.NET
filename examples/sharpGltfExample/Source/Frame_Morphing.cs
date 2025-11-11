@@ -205,7 +205,7 @@ public static unsafe partial class SharpGLTFApp
         
         // Rendering flags (required by pbr.glsl) - MORPHING VERSION
         morphing_rendering_flags_t renderingFlags = new morphing_rendering_flags_t();
-        renderingFlags.use_ibl = (state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
+        renderingFlags.use_ibl = (state.useIBL && state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
         renderingFlags.use_tonemapping = 0;
         renderingFlags.linear_output = 0;
@@ -228,6 +228,6 @@ public static unsafe partial class SharpGLTFApp
             ? state.morphTargetSampler 
             : default;
         
-        mesh.Draw(pipeline, state.environmentMap, screenView, screenSampler, default, default, morphView, morphSampler);
+        mesh.Draw(pipeline, state.useIBL ? state.environmentMap : null, state.useIBL, screenView, screenSampler, default, default, morphView, morphSampler);
     }
 }

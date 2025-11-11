@@ -162,7 +162,7 @@ public static unsafe partial class SharpGLTFApp
         
         // Rendering flags (required by pbr.glsl) - SKINNED VERSION
         skinning_rendering_flags_t renderingFlags = new skinning_rendering_flags_t();
-        renderingFlags.use_ibl = (state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
+        renderingFlags.use_ibl = (state.useIBL && state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
         renderingFlags.use_tonemapping = 0;
         renderingFlags.linear_output = 0;
@@ -185,6 +185,6 @@ public static unsafe partial class SharpGLTFApp
             ? state.jointMatrixSampler 
             : default;
         
-        mesh.Draw(pipeline, state.environmentMap, screenView, screenSampler, jointView, jointSampler, default, default);
+        mesh.Draw(pipeline, state.useIBL ? state.environmentMap : null, state.useIBL, screenView, screenSampler, jointView, jointSampler, default, default);
     }
 }

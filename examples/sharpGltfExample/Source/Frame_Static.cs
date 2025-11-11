@@ -129,7 +129,7 @@ public static unsafe partial class SharpGLTFApp
         
         // IBL params (required by pbr.glsl)
         ibl_params_t iblParams = new ibl_params_t();
-        if (state.environmentMap != null && state.environmentMap.IsLoaded)
+        if (state.useIBL && state.environmentMap != null && state.environmentMap.IsLoaded)
         {
             iblParams.u_EnvIntensity = state.environmentMap.Intensity;
             iblParams.u_EnvBlurNormalized = 0.0f;
@@ -160,7 +160,7 @@ public static unsafe partial class SharpGLTFApp
         
         // Rendering flags (required by pbr.glsl)
         rendering_flags_t renderingFlags = new rendering_flags_t();
-        renderingFlags.use_ibl = (state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
+        renderingFlags.use_ibl = (state.useIBL && state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
         renderingFlags.use_tonemapping = 0;
         renderingFlags.linear_output = 0;
@@ -176,7 +176,7 @@ public static unsafe partial class SharpGLTFApp
         sg_sampler screenSampler = useScreenTexture && state.transmission.sampler.id != 0
             ? state.transmission.sampler
             : default;
-        
-        mesh.Draw(pipeline, state.environmentMap, screenView, screenSampler);
+
+        mesh.Draw(pipeline, state.useIBL ? state.environmentMap : null, state.useIBL, screenView, screenSampler);
     }
 }

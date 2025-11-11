@@ -370,12 +370,22 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawLightingWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(280, 300), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(280, 350), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Lighting", ref open, ImGuiWindowFlags.None))
         {
             state.ui.lighting_open = open != 0;
+
+            // IBL (Image-Based Lighting) toggle
+            igText("Image-Based Lighting:");
+            byte iblEnabled = (byte)(state.useIBL ? 1 : 0);
+            if (igCheckbox("Enable IBL", ref iblEnabled))
+            {
+                state.useIBL = iblEnabled != 0;
+            }
+            
+            igSeparator();
 
             // Ambient light slider
             igText("Ambient Light:");

@@ -251,7 +251,7 @@ namespace Sokol
             }
         }
 
-        public void Draw(sg_pipeline pipeline, EnvironmentMap? environmentMap = null,
+        public void Draw(sg_pipeline pipeline, EnvironmentMap? environmentMap = null, bool useIBL = true,
                          sg_view screenView = default, sg_sampler screenSampler = default, 
                          sg_view jointMatrixView = default, sg_sampler jointMatrixSampler = default,
                          sg_view morphTargetView = default, sg_sampler morphTargetSampler = default)
@@ -302,7 +302,8 @@ namespace Sokol
             // 10: Transmission framebuffer texture (2D)
             
             // Bind IBL textures from EnvironmentMap, or use defaults
-            if (environmentMap != null && environmentMap.IsLoaded)
+            // Check both the useIBL flag AND if environment map is loaded
+            if (useIBL && environmentMap != null && environmentMap.IsLoaded)
             {
                 // Binding 5: GGX (specular) environment cubemap
                 bind.views[5] = environmentMap.SpecularCubemapView;
