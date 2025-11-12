@@ -238,9 +238,11 @@ layout(binding=9) uniform texture2D u_CharlieLUTTexture;
 layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
 #endif
 
+#ifdef TRANSMISSION
 // Transmission framebuffer (for refraction/transparency)
 layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
 layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
+#endif
 
 // Create combined samplers for IBL functions
 #define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
@@ -250,7 +252,9 @@ layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
 #define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
 #define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
 #endif
+#ifdef TRANSMISSION
 #define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
+#endif
 
 // Utility functions (must be defined before includes that use them)
 float clampedDot(vec3 x, vec3 y)
@@ -478,6 +482,7 @@ void main() {
         color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength;
     }
     
+#ifdef TRANSMISSION
     // === Transmission (Refraction through glass) ===
     // Attempt 9: Model-rotation-compensated view-space refraction
     // Key insight: When model rotates, view space changes relative to model.
@@ -541,7 +546,9 @@ void main() {
         // 12. Mix transmitted light with base color and blend
         vec3 transmission = transmittedLight * baseColor.rgb;
         color = mix(color, transmission, transmission_factor);
-    }    
+    }
+#endif // TRANSMISSION
+    
     // ========================================================================
     // Punctual Lights (optional)
     // ========================================================================
@@ -712,6 +719,7 @@ void main() {
         else if (mode == DEBUG_CLEARCOAT_ROUGHNESS) {
             color = vec3(clearcoat_roughness);
         }
+#ifdef TRANSMISSION
         // Transmission
         else if (mode == DEBUG_TRANSMISSION_FACTOR) {
             color = vec3(transmission_factor);
@@ -723,6 +731,7 @@ void main() {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
             color = vec3((ior - 1.0) / 1.5);
         }
+#endif // TRANSMISSION
         else if (mode == DEBUG_F0) {
             // Show the F0 reflectance value
             vec3 f0 = mix(vec3(0.04), baseColor.rgb, metallic);

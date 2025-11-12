@@ -474,7 +474,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaque:
                 // Standard mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_static = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_static = sg_make_shader(transmission_pbr_program_shader_desc(sg_query_backend()));
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
@@ -498,7 +498,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaqueSkinned:
                 // Skinned mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_skinned = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_skinned = sg_make_shader(transmission_skinning_pbr_program_shader_desc(sg_query_backend()));
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;

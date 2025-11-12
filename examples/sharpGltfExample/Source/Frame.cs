@@ -824,9 +824,9 @@ public static unsafe partial class SharpGLTFApp
                 
                 // Get appropriate pipeline based on rendering mode
                 sg_pipeline pipeline;
-                if (renderToOffscreen && useTransmission)
+                if ((renderToOffscreen || useScreenTexture) && useTransmission)
                 {
-                    // Rendering opaque object to transmission offscreen pass (Pass 1)
+                    // Rendering with transmission shaders (Pass 1: opaque to offscreen, Pass 2: transparent with refraction)
                     // Use PipelineManager to get the correct pipeline (handles 32-bit indices automatically)
                     // Map the regular pipeline type to transmission pipeline type
                     PipelineType transmissionPipelineType = pipelineType switch
@@ -841,7 +841,15 @@ public static unsafe partial class SharpGLTFApp
                         PipelineType.SkinnedMorphing32 => PipelineType.TransmissionOpaqueSkinnedMorphing32,
                         _ => PipelineType.TransmissionOpaque  // Fallback for blend/mask (shouldn't happen in opaque pass)
                     };
-                    pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, cullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1);
+                    // Use offscreen format for Pass 1, swapchain format for Pass 2
+                    if (renderToOffscreen)
+                    {
+                        pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, cullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1);
+                    }
+                    else
+                    {
+                        pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, cullMode);
+                    }
                 }
                 else if (useBloom)
                 {

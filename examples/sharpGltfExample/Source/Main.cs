@@ -31,12 +31,12 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "ChronographWatch/glTF/ChronographWatch.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
-        "ChronographWatch/glTF/ChronographWatch.gltf",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
