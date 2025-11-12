@@ -3,7 +3,6 @@
 // Features controlled by SKINNING and MORPHING preprocessor defines
 
 // NOTE: These uniforms must be defined in the main shader before including this file:
-// - Flags in rendering_flags (binding=7): int use_morphing; 
 // - Morph weights in vs_params (binding=0): vec4 u_morphWeights[2]; (8 weights as 2 vec4s)
 // - layout(binding=11) uniform texture2D u_jointsSampler_Tex; layout(binding=11) uniform sampler u_jointsSampler_Smp;
 // - layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex; layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;

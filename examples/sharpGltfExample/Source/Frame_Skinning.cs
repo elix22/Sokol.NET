@@ -189,8 +189,6 @@ public static unsafe partial class SharpGLTFApp
         renderingFlags.use_tonemapping = 0;
         renderingFlags.linear_output = 0;
         renderingFlags.alphamode = mesh.AlphaMode == AlphaMode.MASK ? 1 : (mesh.AlphaMode == AlphaMode.BLEND ? 2 : 0);
-        renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
-        renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
         sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
 
         // Draw the mesh with joint matrix texture and optional screen texture
@@ -379,8 +377,6 @@ public static unsafe partial class SharpGLTFApp
         renderingFlags.use_tonemapping = 1;
         renderingFlags.linear_output = 0;
         renderingFlags.alphamode = (int)mesh.AlphaMode;
-        renderingFlags.use_skinning = mesh.HasSkinning ? 1 : 0;
-        renderingFlags.use_morphing = mesh.HasMorphTargets ? 1 : 0;
         sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
 
         // Draw the mesh with optional screen texture (NO joint texture needed - using uniforms!)

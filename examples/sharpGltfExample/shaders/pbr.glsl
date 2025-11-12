@@ -36,7 +36,6 @@ layout(location=6) in vec4 joints_0;    // Bone indices for skinning
 layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
 // Uniforms (PBR-specific, separate from cgltf-sapp.glsl)
-// Note: vs_params includes use_morphing and has_morph_targets flags
 @include pbr_vs_uniforms.glsl
 
 // Animation texture samplers (use high bindings to avoid FS conflicts)
@@ -65,25 +64,19 @@ void main() {
     // Apply morph targets to position
     vec3 morphedPosition = position;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedPosition += getTargetPosition(gl_VertexIndex, 8);
-    }
+    morphedPosition += getTargetPosition(gl_VertexIndex, 8);
 #endif
     
     // Apply morph targets to normal
     vec3 morphedNormal = normal;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedNormal += getTargetNormal(gl_VertexIndex, 8, 8);  // Assuming normal offset = 8
-    }
+    morphedNormal += getTargetNormal(gl_VertexIndex, 8, 8);  // Assuming normal offset = 8
 #endif
     
     // Apply morph targets to tangent
     vec3 morphedTangent = tangent.xyz;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedTangent += getTargetTangent(gl_VertexIndex, 8, 16);  // Assuming tangent offset = 16
-    }
+    morphedTangent += getTargetTangent(gl_VertexIndex, 8, 16);  // Assuming tangent offset = 16
 #endif
     
     // Apply skinning to position
@@ -200,8 +193,6 @@ layout(binding=7) uniform rendering_flags {
     int use_tonemapping;      // 0 or 1
     int linear_output;        // 0 or 1
     int alphamode;            // 0=opaque, 1=mask, 2=blend
-    int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
-    int use_morphing;         // 0 or 1 (not used in FS - only for consistency)
 };
 
 // Texture samplers
