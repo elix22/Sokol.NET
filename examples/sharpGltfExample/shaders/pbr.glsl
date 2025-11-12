@@ -487,66 +487,65 @@ void main() {
     // Attempt 9: Model-rotation-compensated view-space refraction
     // Key insight: When model rotates, view space changes relative to model.
     // Solution: Cancel out model rotation from view matrix to get model-relative view space.
-    if (transmission_factor > 0.0) {
-        // 1. Extract normalized rotation from model matrix (upper 3x3)
-        mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
-                            normalize(u_ModelMatrix[1].xyz),
-                            normalize(u_ModelMatrix[2].xyz));
-        
-        // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
-        // Since modelRot is orthogonal, transpose = inverse
-        // This makes view space rotate WITH the model, keeping interior stationary
-        mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
-        
-        // 3. Transform position to regular view space
-        vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
-        vec3 positionView = viewPos.xyz / viewPos.w;
-        
-        // 4. Transform normal using model-compensated view rotation
-        vec3 normalView = normalize(modelCompensatedViewRot * n);
-        vec3 viewDirView = normalize(-positionView);
-        
-        // 5. Calculate refracted ray direction in compensated space using Snell's law
-        vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
-        
-        // 6. Extract model scale (rotation-independent)
-        vec3 modelScale;
-        modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
-        modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
-        modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
-        
-        // 7. Calculate transmission ray with scaled thickness
-        vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
-        
-        // 8. Calculate exit point in view space
-        vec3 refractedRayExitView = positionView + transmissionRayView;
-        
-        // 9. Project exit point to screen space (NDC then [0,1])
-        vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
-        vec2 refractionCoords = ndcPos.xy / ndcPos.w;
-        refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
-        
-        #if !SOKOL_GLSL
-        // Metal/D3D: flip Y for texture coordinate system
-        refractionCoords.y = 1.0 - refractionCoords.y;
-        #endif
-        // OpenGL: no flip needed
-        
-        // 10. Sample the transmission framebuffer at refracted position
-        vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
-        
-        // 11. Apply Beer's law (light absorption through volume)
-        if (attenuation_distance > 0.0) {
-            float transmissionRayLength = length(transmissionRayView);
-            vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
-            vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
-            transmittedLight *= attenuation;
-        }
-        
-        // 12. Mix transmitted light with base color and blend
-        vec3 transmission = transmittedLight * baseColor.rgb;
-        color = mix(color, transmission, transmission_factor);
+    
+    // 1. Extract normalized rotation from model matrix (upper 3x3)
+    mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
+                        normalize(u_ModelMatrix[1].xyz),
+                        normalize(u_ModelMatrix[2].xyz));
+    
+    // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
+    // Since modelRot is orthogonal, transpose = inverse
+    // This makes view space rotate WITH the model, keeping interior stationary
+    mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
+    
+    // 3. Transform position to regular view space
+    vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
+    vec3 positionView = viewPos.xyz / viewPos.w;
+    
+    // 4. Transform normal using model-compensated view rotation
+    vec3 normalView = normalize(modelCompensatedViewRot * n);
+    vec3 viewDirView = normalize(-positionView);
+    
+    // 5. Calculate refracted ray direction in compensated space using Snell's law
+    vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
+    
+    // 6. Extract model scale (rotation-independent)
+    vec3 modelScale;
+    modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
+    modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
+    modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
+    
+    // 7. Calculate transmission ray with scaled thickness
+    vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
+    
+    // 8. Calculate exit point in view space
+    vec3 refractedRayExitView = positionView + transmissionRayView;
+    
+    // 9. Project exit point to screen space (NDC then [0,1])
+    vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
+    vec2 refractionCoords = ndcPos.xy / ndcPos.w;
+    refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
+    
+    #if !SOKOL_GLSL
+    // Metal/D3D: flip Y for texture coordinate system
+    refractionCoords.y = 1.0 - refractionCoords.y;
+    #endif
+    // OpenGL: no flip needed
+    
+    // 10. Sample the transmission framebuffer at refracted position
+    vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
+    
+    // 11. Apply Beer's law (light absorption through volume)
+    if (attenuation_distance > 0.0) {
+        float transmissionRayLength = length(transmissionRayView);
+        vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
+        vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
+        transmittedLight *= attenuation;
     }
+    
+    // 12. Mix transmitted light with base color and blend
+    vec3 transmission = transmittedLight * baseColor.rgb;
+    color = mix(color, transmission, transmission_factor);
 #endif // TRANSMISSION
     
     // ========================================================================
