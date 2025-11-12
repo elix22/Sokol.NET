@@ -12,6 +12,10 @@ public static unsafe partial class SharpGLTFApp
         // Print texture cache statistics before cleanup
         Info("[SharpGLTF] Cleanup - Texture Cache Statistics:");
         TextureCache.Instance.PrintStats();
+        
+        // Print view tracker statistics
+        Info("[SharpGLTF] Cleanup - View Tracker Statistics:");
+        ViewTracker.PrintStats();
 
         state.model?.Dispose();
 

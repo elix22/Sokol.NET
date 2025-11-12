@@ -42,6 +42,7 @@ namespace Sokol
                 texture = new sg_texture_view_desc { image = Image },
                 label = $"{label}-view"
             });
+            ViewTracker.TrackViewCreation(View, $"{label}-view");
 
             // Create sampler with proper settings from glTF
             Sampler = sg_make_sampler(new sg_sampler_desc
@@ -111,6 +112,7 @@ namespace Sokol
                 texture = new sg_texture_view_desc { image = texture.Image },
                 label = $"{label}-view"
             });
+            ViewTracker.TrackViewCreation(texture.View, $"{label}-view");
             
             // Create sampler with proper settings from glTF
             texture.Sampler = sg_make_sampler(new sg_sampler_desc
@@ -146,6 +148,7 @@ namespace Sokol
                 // Destroy sokol graphics resources
                 if (Image.id != 0)
                 {
+                    ViewTracker.TrackViewDestruction(View);
                     sg_destroy_sampler(Sampler);
                     sg_destroy_view(View);
                     sg_destroy_image(Image);
