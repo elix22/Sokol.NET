@@ -50,6 +50,10 @@ namespace Sokol
         public float ThicknessFactor = 0.0f;  // Thickness of volume in world units
         public int ThicknessTextureIndex = -1;  // Index into Textures list, -1 = no texture
         public int ThicknessTexCoord = 0;  // Which UV channel to use (TEXCOORD_0 or TEXCOORD_1)
+        
+        // Runtime-determined binding slot for thickness texture (calculated in Draw())
+        // This allows thickness to use any free slot (0-11) to avoid conflicts with other textures
+        public int ThicknessBindingSlot = -1;  // -1 = not bound, 0-11 = actual slot
 
         // Clearcoat properties (KHR_materials_clearcoat)
         public float ClearcoatFactor = 0.0f;  // 0.0 = no clearcoat, 1.0 = full clearcoat
@@ -287,14 +291,8 @@ namespace Sokol
             bind.views[1] = metallicRoughnessTex.View;
             bind.samplers[1] = metallicRoughnessTex.Sampler;
 
-            // 2: normal_tex (or thickness texture if present - thickness takes priority for transmission materials)
-            // For transmission materials with thickness texture, bind thickness to slot 2
+            // 2: normal_tex
             var normalTex = Textures.Count > 2 && Textures[2] != null ? Textures[2] : GetDefaultNormalTexture();
-            if (ThicknessTextureIndex >= 0 && ThicknessTextureIndex < Textures.Count && Textures[ThicknessTextureIndex] != null)
-            {
-                // Bind thickness texture to slot 2, overriding normal texture for transmission materials
-                normalTex = Textures[ThicknessTextureIndex];
-            }
             bind.views[2] = normalTex.View;
             bind.samplers[2] = normalTex.Sampler;
 
@@ -308,11 +306,27 @@ namespace Sokol
             bind.views[4] = emissiveTex.View;
             bind.samplers[4] = emissiveTex.Sampler;
 
-            // 5-6: IBL cubemap textures (GGX and Lambertian environment maps)
+            // Track which slots are already in use for dynamic thickness texture binding
+            bool[] slotUsed = new bool[12]; // Slots 0-11
+            slotUsed[0] = true; // BaseColor
+            slotUsed[1] = true; // MetallicRoughness
+            slotUsed[2] = true; // Normal
+            slotUsed[3] = true; // Occlusion
+            slotUsed[4] = true; // Emissive
+            slotUsed[5] = useIBL; // GGX env (only used if IBL is enabled)
+            slotUsed[6] = useIBL; // Lambertian env (only used if IBL is enabled)
+            slotUsed[7] = useIBL; // GGX LUT (only used if IBL is enabled)
+            slotUsed[8] = false; // Charlie env or Transmission texture (will be set later)
+            slotUsed[9] = morphTargetView.id != 0; // Charlie LUT or morph targets
+            slotUsed[10] = screenView.id != 0; // Transmission framebuffer (only if transmission is used)
+            slotUsed[11] = jointMatrixView.id != 0; // Joints (only if skinning is enabled)
+
+            // 5-8: IBL cubemap textures (GGX and Lambertian environment maps)
             // 7: GGX LUT texture (2D)
-            // 8: Charlie environment cubemap
-            // 9: Charlie LUT texture (2D)
+            // 8: Charlie environment cubemap or Transmission texture
+            // 9: Charlie LUT texture (2D) or Morph targets (vertex shader)
             // 10: Transmission framebuffer texture (2D)
+            // 11: Joints (vertex shader)
             
             // Bind IBL textures from EnvironmentMap, or use defaults
             // Check both the useIBL flag AND if environment map is loaded
@@ -400,6 +414,7 @@ namespace Sokol
             {
                 bind.views[10] = screenView;
                 bind.samplers[10] = screenSampler;
+                slotUsed[10] = true;
             }
             else
             {
@@ -408,18 +423,66 @@ namespace Sokol
                 bind.samplers[10] = defaultWhite.Sampler;
             }
 
+            // Mark slot 8 if transmission texture will be bound there (happens later in code)
+            if (TransmissionTextureIndex >= 0 && TransmissionTextureIndex < Textures.Count && Textures[TransmissionTextureIndex] != null)
+            {
+                slotUsed[8] = true;  // Transmission texture uses slot 8
+            }
+
+            // Dynamic thickness texture binding - find first available slot
+            // KHR_materials_volume: thickness texture for Beer's law volume attenuation
+            ThicknessBindingSlot = -1;  // Reset
+            if (ThicknessTextureIndex >= 0 && ThicknessTextureIndex < Textures.Count && Textures[ThicknessTextureIndex] != null)
+            {
+                // Find first free slot
+                // IMPORTANT: Avoid slots 5-6 (cubemap slots), prefer 2D texture slots
+                // Safe 2D texture slots: 7 (GGX LUT), 8 (Transmission/Charlie), 9 (Charlie LUT), 10 (Transmission FB), 0-4 (standard PBR)
+                int[] preferredSlots = { 7, 8, 9, 10, 11, 0, 1, 2, 3, 4 };
+                foreach (int slot in preferredSlots)
+                {
+                    if (!slotUsed[slot])
+                    {
+                        ThicknessBindingSlot = slot;
+                        slotUsed[slot] = true;
+                        break;
+                    }
+                }
+
+                if (ThicknessBindingSlot >= 0)
+                {
+                    var thicknessTex = Textures[ThicknessTextureIndex]!;
+                    bind.views[ThicknessBindingSlot] = thicknessTex.View;
+                    bind.samplers[ThicknessBindingSlot] = thicknessTex.Sampler;
+                    
+                    // Debug logging - always print for first frame
+                    // Console.WriteLine($"[THICKNESS DEBUG]");
+                    // Console.WriteLine($"  Thickness texture index: {ThicknessTextureIndex}");
+                    // Console.WriteLine($"  Assigned to slot: {ThicknessBindingSlot}");
+                    // Console.WriteLine($"  Transmission texture index: {TransmissionTextureIndex}");
+                    // Console.WriteLine($"  Has transmission texture: {(TransmissionTextureIndex >= 0 && TransmissionTextureIndex < Textures.Count && Textures[TransmissionTextureIndex] != null)}");
+                    // Console.WriteLine($"  Attenuation distance: {AttenuationDistance}");
+                    // Console.WriteLine($"  Attenuation color: {AttenuationColor}");
+                }
+            }
+
             // Binding 8: Transmission texture (per-pixel transmission mask, RED channel)
             // Used by KHR_materials_transmission for selective transparency
             // Uses binding 8 (shared with Charlie for sheen - rarely used together)
+            // NOTE: If thickness texture is already bound to slot 8, don't overwrite it!
             if (TransmissionTextureIndex >= 0 && TransmissionTextureIndex < Textures.Count && Textures[TransmissionTextureIndex] != null)
             {
-                var transmissionTex = Textures[TransmissionTextureIndex]!;
-                bind.views[8] = transmissionTex.View;
-                bind.samplers[8] = transmissionTex.Sampler;
+                // Only bind if slot 8 is not already used by thickness
+                if (ThicknessBindingSlot != 8)
+                {
+                    var transmissionTex = Textures[TransmissionTextureIndex]!;
+                    bind.views[8] = transmissionTex.View;
+                    bind.samplers[8] = transmissionTex.Sampler;
+                }
             }
-            else if (environmentMap == null || !environmentMap.IsLoaded || environmentMap.Charlie_LUTView.id == 0)
+            else if (ThicknessBindingSlot != 8 && (environmentMap == null || !environmentMap.IsLoaded || environmentMap.Charlie_LUTView.id == 0))
             {
                 // No transmission texture and no Charlie LUT - use default
+                // But only if thickness is not using slot 8
                 var defaultWhite = GetDefaultWhiteTexture();
                 bind.views[8] = defaultWhite.View;
                 bind.samplers[8] = defaultWhite.Sampler;

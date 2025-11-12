@@ -67,18 +67,18 @@ public static unsafe partial class SharpGLTFApp
         metallicParams.thickness_factor = glassValues.thickness;
         
         // Set thickness texture parameters
-        // Determine which texture slot contains thickness data:
-        // - If dedicated thickness texture exists and no normal map, bind to slot 2 (Normal)
-        // - Otherwise, thickness might be packed in another texture (future optimization)
+        // Thickness texture for KHR_materials_volume (Beer's law absorption)
+        // The slot is dynamically determined in Mesh.Draw() to avoid conflicts
         bool hasThicknessTex = mesh.ThicknessTextureIndex >= 0 && 
                                mesh.ThicknessTextureIndex < mesh.Textures.Count && 
                                mesh.Textures[mesh.ThicknessTextureIndex] != null;
         metallicParams.has_thickness_tex = hasThicknessTex ? 1.0f : 0.0f;
         metallicParams.thickness_texcoord = mesh.ThicknessTexCoord;
         
-        // thickness_tex_index: which existing texture slot (0-4) contains thickness
-        // Slot 2 is used when thickness texture is bound (see Mesh.Draw for binding logic)
-        metallicParams.thickness_tex_index = hasThicknessTex ? 2.0f : 0.0f;
+        // thickness_tex_index: Pass the actual binding slot (0-11) determined in Mesh.Draw()
+        // This allows thickness to coexist with all other textures without conflicts
+        // Note: Mesh.Draw() must be called first to populate ThicknessBindingSlot
+        metallicParams.thickness_tex_index = mesh.ThicknessBindingSlot >= 0 ? (float)mesh.ThicknessBindingSlot : 0.0f;
 
         // Set clearcoat parameters (KHR_materials_clearcoat extension)
         metallicParams.clearcoat_factor = mesh.ClearcoatFactor;

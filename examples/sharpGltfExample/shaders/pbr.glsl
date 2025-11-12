@@ -399,30 +399,53 @@ float getThickness() {
         // Select UV channel based on thickness_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
         vec2 baseUV = (thickness_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
         
-        // Sample from the appropriate texture based on thickness_tex_index
+        // Sample from the dynamically-assigned texture slot based on thickness_tex_index
+        // The C# code finds the first available slot (0-11) and binds thickness there
         // glTF spec: thickness is stored in GREEN channel of the texture
         int texIndex = int(thickness_tex_index + 0.5);
         float thicknessValue = 0.0;
         
+        // Sample from slots 0-4 (standard PBR textures - all 2D)
         if (texIndex == 0) {
-            // BaseColor texture
             thicknessValue = texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), baseUV).g;
         }
         else if (texIndex == 1) {
-            // MetallicRoughness texture
             thicknessValue = texture(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), baseUV).g;
         }
         else if (texIndex == 2) {
-            // Normal texture
             thicknessValue = texture(sampler2D(u_NormalTexture, u_NormalSampler), baseUV).g;
         }
         else if (texIndex == 3) {
-            // Occlusion texture
             thicknessValue = texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), baseUV).g;
         }
         else if (texIndex == 4) {
-            // Emissive texture
             thicknessValue = texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), baseUV).g;
+        }
+        // Slots 5-7 typically contain IBL data (cubemaps/LUTs) - not valid for thickness
+        // Slot 7 is GGX LUT (2D texture)
+        else if (texIndex == 7) {
+            thicknessValue = texture(sampler2D(u_GGXLUTTexture, u_GGXLUTSampler_Raw), baseUV).g;
+        }
+        // Slot 8 depends on shader variant:
+        // - With TRANSMISSION: u_TransmissionTexture (2D texture)
+        // - Without TRANSMISSION, without MORPHING: u_CharlieEnvTexture (cubemap - not valid)
+        else if (texIndex == 8) {
+            #ifdef TRANSMISSION
+            thicknessValue = texture(sampler2D(u_TransmissionTexture, u_TransmissionSampler_Raw), baseUV).g;
+            #endif
+            // Note: Charlie is a cubemap, can't sample with 2D UVs
+        }
+        // Slot 9 depends on shader variant:
+        // - Without MORPHING: u_CharlieLUTTexture (2D texture)
+        // - With MORPHING: morph target data (vertex shader only)
+        #ifndef MORPHING
+        else if (texIndex == 9) {
+            thicknessValue = texture(sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw), baseUV).g;
+        }
+        #endif
+        // Slot 10 is transmission framebuffer (2D texture)
+        else if (texIndex == 10) {
+            thicknessValue = texture(sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw), baseUV).g;
         }
         
         thickness *= thicknessValue;
