@@ -565,12 +565,24 @@ namespace Sokol
                 mesh.TransmissionFactor = transmissionExt.TransmissionFactor;
                 Info($"Material {material.LogicalIndex}: TransmissionFactor = {mesh.TransmissionFactor} (0.0 = opaque, 1.0 = fully transparent)", "SharpGLTF");
                 
-                // TODO: Transmission texture support (MaterialChannel "Transmission" from GetChannels)
-                // Will be implemented when texture coordinate mapping is needed
+                // Load transmission texture if present (RED channel mask for per-pixel transmission)
+                var transmissionChannel = material.FindChannel("Transmission");
+                if (transmissionChannel != null && transmissionChannel.Value.Texture != null)
+                {
+                    // Mark that we have a transmission texture - will be loaded after standard textures
+                    // Set to a temp value, will be updated after loading
+                    mesh.TransmissionTextureIndex = 998;  // Temp marker that transmission texture exists
+                    Info($"Material {material.LogicalIndex}: Transmission texture found", "SharpGLTF");
+                }
+                else
+                {
+                    mesh.TransmissionTextureIndex = -1;
+                }
             }
             else
             {
                 mesh.TransmissionFactor = 0.0f; // Default: opaque (no refraction)
+                mesh.TransmissionTextureIndex = -1;
                 Info($"Material {material.LogicalIndex}: using default TransmissionFactor = 0.0 (opaque)", "SharpGLTF");
             }
 
@@ -818,6 +830,19 @@ namespace Sokol
                 mesh.ThicknessTextureIndex = -1;  // No thickness texture
             }
             
+            // Load transmission texture if present (KHR_materials_transmission)
+            // Check for temp marker 998 which means transmission texture was found
+            if (mesh.TransmissionTextureIndex == 998)
+            {
+                mesh.TransmissionTextureIndex = mesh.Textures.Count;  // Set to actual index (should be 5 or 6)
+                LoadTexture(material, "Transmission", mesh, mesh.Textures.Count);
+                Info($"Material {material.LogicalIndex}: Loaded transmission texture at index {mesh.TransmissionTextureIndex}", "SharpGLTF");
+            }
+            else
+            {
+                mesh.TransmissionTextureIndex = -1;  // No transmission texture
+            }
+            
             // Map material index to mesh for KHR_animation_pointer support
             int materialIndex = material.LogicalIndex;
             if (!MaterialToMeshMap.ContainsKey(materialIndex))
@@ -869,6 +894,10 @@ namespace Sokol
                 case "VolumeThickness":
                     // ThicknessTexCoord already set during volume extension processing
                     Info($"Material {material.LogicalIndex}: Thickness texture uses TEXCOORD_{texCoord}", "SharpGLTF");
+                    break;
+                case "Transmission":
+                    mesh.TransmissionTexCoord = texCoord;
+                    Info($"Material {material.LogicalIndex}: Transmission texture uses TEXCOORD_{texCoord}", "SharpGLTF");
                     break;
             }
 

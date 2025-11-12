@@ -95,6 +95,7 @@ namespace Sokol
         public int NormalTexCoord = 0;
         public int OcclusionTexCoord = 0;
         public int EmissiveTexCoord = 0;
+        public int TransmissionTexCoord = 0;  // Which UV channel transmission texture uses
 
         private static Texture? _defaultWhiteTexture;
         private static Texture? _defaultNormalTexture;
