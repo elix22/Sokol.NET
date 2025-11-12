@@ -110,6 +110,14 @@ public static unsafe partial class SharpGLTFApp
         metallicParams.attenuation_color = glassValues.attenuationColor;
         metallicParams.attenuation_distance = glassValues.attenuationDistance;
         metallicParams.thickness_factor = glassValues.thickness;
+        
+        // Set thickness texture parameters
+        bool hasThicknessTex = mesh.ThicknessTextureIndex >= 0 && 
+                               mesh.ThicknessTextureIndex < mesh.Textures.Count && 
+                               mesh.Textures[mesh.ThicknessTextureIndex] != null;
+        metallicParams.has_thickness_tex = hasThicknessTex ? 1.0f : 0.0f;
+        metallicParams.thickness_texcoord = mesh.ThicknessTexCoord;
+        metallicParams.thickness_tex_index = hasThicknessTex ? 2.0f : 0.0f;
 
         // Set clearcoat parameters (KHR_materials_clearcoat extension)
         metallicParams.clearcoat_factor = mesh.ClearcoatFactor;

@@ -32,6 +32,9 @@ layout(binding=1) uniform metallic_params {
     vec3 attenuation_color;     // RGB color filter (e.g., orange for amber)
     float attenuation_distance; // Distance at which light reaches attenuation_color intensity
     float thickness_factor;     // Thickness of the volume in world units
+    float has_thickness_tex;    // 1.0 = texture available, 0.0 = use uniform only
+    float thickness_texcoord;   // 0 = TEXCOORD_0, 1 = TEXCOORD_1
+    float thickness_tex_index;  // Which texture slot contains thickness: 0=BaseColor, 1=MetallicRoughness, 2=Normal, 3=Occlusion, 4=Emissive
     // Clearcoat parameters - KHR_materials_clearcoat
     float clearcoat_factor;     // 0.0 = no clearcoat, 1.0 = full clearcoat
     float clearcoat_roughness;  // Roughness of the clearcoat layer

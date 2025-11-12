@@ -583,6 +583,22 @@ namespace Sokol
                 mesh.AttenuationDistance = volumeExt.AttenuationDistance;
                 mesh.AttenuationColor = volumeExt.AttenuationColor;
                 
+                // Load thickness texture if present
+                var volumeThicknessChannel = material.FindChannel("VolumeThickness");
+                if (volumeThicknessChannel != null && volumeThicknessChannel.Value.Texture != null)
+                {
+                    // Mark that we have a thickness texture - will be loaded after standard textures
+                    mesh.ThicknessTexCoord = volumeThicknessChannel.Value.TextureCoordinate;
+                    // Set to a temp value, will be updated after loading
+                    mesh.ThicknessTextureIndex = 999;  // Temp marker that thickness texture exists
+                    Info($"Material {material.LogicalIndex}: VolumeThickness texture found, using TEXCOORD_{mesh.ThicknessTexCoord}", "SharpGLTF");
+                }
+                else
+                {
+                    mesh.ThicknessTextureIndex = -1;
+                    mesh.ThicknessTexCoord = 0;
+                }
+                
                 Info($"Material {material.LogicalIndex}: Volume - Thickness={mesh.ThicknessFactor:F2}, " +
                     $"AttenuationColor=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2}), " +
                     $"AttenuationDistance={(float.IsPositiveInfinity(mesh.AttenuationDistance) ? "Infinity" : mesh.AttenuationDistance.ToString("F2"))}", "SharpGLTF");
@@ -789,6 +805,19 @@ namespace Sokol
             LoadTexture(material, "Occlusion", mesh, 3);
             LoadTexture(material, "Emissive", mesh, 4);
             
+            // Load thickness texture if present (KHR_materials_volume)
+            // Check for temp marker 999 which means thickness texture was found
+            if (mesh.ThicknessTextureIndex == 999)
+            {
+                mesh.ThicknessTextureIndex = mesh.Textures.Count;  // Set to actual index (should be 5)
+                LoadTexture(material, "VolumeThickness", mesh, 5);
+                Info($"Material {material.LogicalIndex}: Loaded thickness texture at index {mesh.ThicknessTextureIndex}", "SharpGLTF");
+            }
+            else
+            {
+                mesh.ThicknessTextureIndex = -1;  // No thickness texture
+            }
+            
             // Map material index to mesh for KHR_animation_pointer support
             int materialIndex = material.LogicalIndex;
             if (!MaterialToMeshMap.ContainsKey(materialIndex))
@@ -837,6 +866,10 @@ namespace Sokol
                 case "Emissive":
                     mesh.EmissiveTexCoord = texCoord;
                     break;
+                case "VolumeThickness":
+                    // ThicknessTexCoord already set during volume extension processing
+                    Info($"Material {material.LogicalIndex}: Thickness texture uses TEXCOORD_{texCoord}", "SharpGLTF");
+                    break;
             }
 
             // Extract sampler settings from glTF texture
@@ -849,7 +882,7 @@ namespace Sokol
 
             // Determine pixel format based on texture type per glTF spec:
             // - BaseColor (index 0), Emissive (index 4): sRGB color space
-            // - Others (Metallic-Roughness, Normal, Occlusion): Linear non-color data
+            // - Others (Metallic-Roughness, Normal, Occlusion, VolumeThickness): Linear non-color data
             sg_pixel_format format = (channelName == "BaseColor" || channelName == "Emissive") 
                 ? sg_pixel_format.SG_PIXELFORMAT_SRGB8A8 
                 : sg_pixel_format.SG_PIXELFORMAT_RGBA8;

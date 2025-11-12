@@ -48,6 +48,8 @@ namespace Sokol
         public Vector3 AttenuationColor = new Vector3(1.0f, 1.0f, 1.0f);  // RGB color, white = no tint
         public float AttenuationDistance = float.MaxValue;  // Distance at which color reaches AttenuationColor
         public float ThicknessFactor = 0.0f;  // Thickness of volume in world units
+        public int ThicknessTextureIndex = -1;  // Index into Textures list, -1 = no texture
+        public int ThicknessTexCoord = 0;  // Which UV channel to use (TEXCOORD_0 or TEXCOORD_1)
 
         // Clearcoat properties (KHR_materials_clearcoat)
         public float ClearcoatFactor = 0.0f;  // 0.0 = no clearcoat, 1.0 = full clearcoat
@@ -285,8 +287,14 @@ namespace Sokol
             bind.views[1] = metallicRoughnessTex.View;
             bind.samplers[1] = metallicRoughnessTex.Sampler;
 
-            // 2: normal_tex
+            // 2: normal_tex (or thickness texture if present - thickness takes priority for transmission materials)
+            // For transmission materials with thickness texture, bind thickness to slot 2
             var normalTex = Textures.Count > 2 && Textures[2] != null ? Textures[2] : GetDefaultNormalTexture();
+            if (ThicknessTextureIndex >= 0 && ThicknessTextureIndex < Textures.Count && Textures[ThicknessTextureIndex] != null)
+            {
+                // Bind thickness texture to slot 2, overriding normal texture for transmission materials
+                normalTex = Textures[ThicknessTextureIndex];
+            }
             bind.views[2] = normalTex.View;
             bind.samplers[2] = normalTex.Sampler;
 

@@ -65,6 +65,20 @@ public static unsafe partial class SharpGLTFApp
         metallicParams.attenuation_color = glassValues.attenuationColor;
         metallicParams.attenuation_distance = glassValues.attenuationDistance;
         metallicParams.thickness_factor = glassValues.thickness;
+        
+        // Set thickness texture parameters
+        // Determine which texture slot contains thickness data:
+        // - If dedicated thickness texture exists and no normal map, bind to slot 2 (Normal)
+        // - Otherwise, thickness might be packed in another texture (future optimization)
+        bool hasThicknessTex = mesh.ThicknessTextureIndex >= 0 && 
+                               mesh.ThicknessTextureIndex < mesh.Textures.Count && 
+                               mesh.Textures[mesh.ThicknessTextureIndex] != null;
+        metallicParams.has_thickness_tex = hasThicknessTex ? 1.0f : 0.0f;
+        metallicParams.thickness_texcoord = mesh.ThicknessTexCoord;
+        
+        // thickness_tex_index: which existing texture slot (0-4) contains thickness
+        // Slot 2 is used when thickness texture is bound (see Mesh.Draw for binding logic)
+        metallicParams.thickness_tex_index = hasThicknessTex ? 2.0f : 0.0f;
 
         // Set clearcoat parameters (KHR_materials_clearcoat extension)
         metallicParams.clearcoat_factor = mesh.ClearcoatFactor;

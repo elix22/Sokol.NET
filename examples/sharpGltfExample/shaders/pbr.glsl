@@ -392,6 +392,47 @@ vec3 getEmissive() {
 }
 
 #ifdef TRANSMISSION
+float getThickness() {
+    float thickness = thickness_factor;
+    
+    if (has_thickness_tex > 0.5) {
+        // Select UV channel based on thickness_texcoord (0 = TEXCOORD_0, 1 = TEXCOORD_1)
+        vec2 baseUV = (thickness_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        
+        // Sample from the appropriate texture based on thickness_tex_index
+        // glTF spec: thickness is stored in GREEN channel of the texture
+        int texIndex = int(thickness_tex_index + 0.5);
+        float thicknessValue = 0.0;
+        
+        if (texIndex == 0) {
+            // BaseColor texture
+            thicknessValue = texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), baseUV).g;
+        }
+        else if (texIndex == 1) {
+            // MetallicRoughness texture
+            thicknessValue = texture(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), baseUV).g;
+        }
+        else if (texIndex == 2) {
+            // Normal texture
+            thicknessValue = texture(sampler2D(u_NormalTexture, u_NormalSampler), baseUV).g;
+        }
+        else if (texIndex == 3) {
+            // Occlusion texture
+            thicknessValue = texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), baseUV).g;
+        }
+        else if (texIndex == 4) {
+            // Emissive texture
+            thicknessValue = texture(sampler2D(u_EmissiveTexture, u_EmissiveSampler), baseUV).g;
+        }
+        
+        thickness *= thicknessValue;
+    }
+    
+    return thickness;
+}
+#endif
+
+#ifdef TRANSMISSION
 // Global variables to store transmission intermediate values for debugging
 vec2 g_refractionCoords = vec2(0.0);
 vec3 g_transmittedLightRaw = vec3(0.0);
@@ -418,8 +459,11 @@ vec3 getTransmissionIBL(vec3 n, vec3 v, vec3 baseColor) {
     modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
     modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
     
-    // 5. Calculate transmission ray in world space (thickness is in local space)
-    vec3 transmissionRay = normalize(refractionVector) * thickness_factor * modelScale;
+    // 5. Get thickness from texture or uniform
+    float thickness = getThickness();
+    
+    // 6. Calculate transmission ray in world space (thickness is in local space)
+    vec3 transmissionRay = normalize(refractionVector) * thickness * modelScale;
     
     // 6. Calculate exit point in world space
     vec3 refractedRayExit = position + transmissionRay;
@@ -862,10 +906,11 @@ void main() {
             color = vec3(transmission_factor);
         }
         else if (mode == DEBUG_VOLUME_THICKNESS) {
-            // Show raw thickness value normalized for visibility
-            // Typical range: 0.1 to 2.0 (with 1.0 being common)
-            // Clamp to reasonable range and normalize to 0-1
-            color = vec3(clamp(thickness_factor / 2.0, 0.0, 1.0));
+            // Show thickness value (from texture or uniform)
+            // Display as grayscale: black = 0, white = max thickness
+            // Use getThickness() to get the actual per-pixel thickness value
+            float thickness = getThickness();
+            color = vec3(clamp(thickness / 2.0, 0.0, 1.0));
         }
         else if (mode == DEBUG_IOR) {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
