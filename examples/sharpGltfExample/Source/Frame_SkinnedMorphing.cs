@@ -109,6 +109,8 @@ public static unsafe partial class SharpGLTFApp
         
         // Set transmission parameters (KHR_materials_transmission extension)
         metallicParams.transmission_factor = glassValues.transmission;
+        metallicParams.has_transmission_tex = (mesh.TransmissionTextureIndex >= 0 && mesh.TransmissionTextureIndex < mesh.Textures.Count && mesh.Textures[mesh.TransmissionTextureIndex] != null) ? 1.0f : 0.0f;
+        metallicParams.transmission_texcoord = 0.0f;  // Always use TEXCOORD_0 for now (glTF default)
         metallicParams.ior = glassValues.ior;
 
         // Set volume absorption parameters (KHR_materials_volume extension - Beer's Law)

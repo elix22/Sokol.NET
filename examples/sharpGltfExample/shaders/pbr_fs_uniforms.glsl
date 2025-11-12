@@ -25,6 +25,8 @@ layout(binding=1) uniform metallic_params {
     float occlusion_strength;
     // Transmission (glass/refraction) parameters - KHR_materials_transmission
     float transmission_factor;  // 0.0 = opaque, 1.0 = fully transparent with refraction
+    float has_transmission_tex; // 1.0 = texture available, 0.0 = use uniform only
+    float transmission_texcoord;// 0 = TEXCOORD_0, 1 = TEXCOORD_1
     float ior;                  // Index of Refraction (1.0 = air, 1.5 = glass, 1.55 = amber)
     // Volume absorption parameters - KHR_materials_volume (Beer's Law)
     vec3 attenuation_color;     // RGB color filter (e.g., orange for amber)

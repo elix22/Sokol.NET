@@ -400,6 +400,23 @@ namespace Sokol
                 bind.samplers[10] = defaultWhite.Sampler;
             }
 
+            // Binding 8: Transmission texture (per-pixel transmission mask, RED channel)
+            // Used by KHR_materials_transmission for selective transparency
+            // Uses binding 8 (shared with Charlie for sheen - rarely used together)
+            if (TransmissionTextureIndex >= 0 && TransmissionTextureIndex < Textures.Count && Textures[TransmissionTextureIndex] != null)
+            {
+                var transmissionTex = Textures[TransmissionTextureIndex]!;
+                bind.views[8] = transmissionTex.View;
+                bind.samplers[8] = transmissionTex.Sampler;
+            }
+            else if (environmentMap == null || !environmentMap.IsLoaded || environmentMap.Charlie_LUTView.id == 0)
+            {
+                // No transmission texture and no Charlie LUT - use default
+                var defaultWhite = GetDefaultWhiteTexture();
+                bind.views[8] = defaultWhite.View;
+                bind.samplers[8] = defaultWhite.Sampler;
+            }
+
             // Binding 11: Joint matrix texture for skinning (u_jointsSampler)
             // This is REQUIRED for skinned meshes - the shader expects this binding
             if (jointMatrixView.id != 0 && jointMatrixSampler.id != 0)

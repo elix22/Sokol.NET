@@ -254,6 +254,11 @@ layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
 // Transmission framebuffer (for refraction/transparency)
 layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
 layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
+
+// Transmission texture (RED channel mask for per-pixel transmission)
+// Uses binding 8 (shared with Charlie environment for sheen - rarely used together)
+layout(binding=8) uniform texture2D u_TransmissionTexture;
+layout(binding=8) uniform sampler u_TransmissionSampler_Raw;
 #endif
 
 // Create combined samplers for IBL functions
@@ -266,6 +271,7 @@ layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
 #endif
 #ifdef TRANSMISSION
 #define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
+#define u_TransmissionSampler sampler2D(u_TransmissionTexture, u_TransmissionSampler_Raw)
 #endif
 
 // Utility functions (must be defined before includes that use them)
@@ -518,6 +524,9 @@ void main() {
     vec3 v = normalize(u_Camera - v_Position);
     float NdotV = clampedDot(n, v);
     
+    // Transmission value (calculated later in TRANSMISSION block, declared here for wider scope)
+    float transmission = 0.0;
+    
     // Calculate F0 (reflectance at normal incidence)
     vec3 f0 = vec3(0.04); // Dielectric F0
     
@@ -600,14 +609,22 @@ void main() {
     // Store surface color before transmission mixing (for debug)
     g_surfaceColorBeforeMix = color;
     
+    // Sample transmission texture if available (RED channel contains per-pixel mask)
+    // 0.0 = opaque (no transmission), 1.0 = transparent (full transmission)
+    transmission = transmission_factor;
+    if (has_transmission_tex > 0.5) {
+        vec2 baseUV = (transmission_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        transmission *= texture(u_TransmissionSampler, baseUV).r;
+    }
+    
     // Calculate transmission refraction
     vec3 f_specular_transmission = getTransmissionIBL(n, v, baseColor.rgb);
     
-    // Mix current color with transmission (transmission_factor controls blend)
-    // When transmission_factor = 0.0: fully opaque (use color)
-    // When transmission_factor = 1.0: fully transparent (use refraction)
+    // Mix current color with transmission (transmission controls blend)
+    // When transmission = 0.0: fully opaque (use color)
+    // When transmission = 1.0: fully transparent (use refraction)
     #if ENABLE_TRANSMISSION_MIX
-    color = mix(color, f_specular_transmission, transmission_factor);
+    color = mix(color, f_specular_transmission, transmission);
     #else
     // DEBUG: Show pure transmission without mixing with surface
     color = f_specular_transmission;
@@ -714,7 +731,8 @@ void main() {
     float finalAlpha = baseColor.a;
 #ifdef TRANSMISSION
     #if ENABLE_TRANSMISSION_ALPHA
-    finalAlpha *= (1.0 - transmission_factor);
+    // Use the sampled transmission value (already calculated above)
+    finalAlpha *= (1.0 - transmission);
     #endif
 #endif
     
