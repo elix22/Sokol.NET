@@ -421,39 +421,29 @@ vec3 g_surfaceColorBeforeMix = vec3(0.0);
 
 // Get transmission/refraction contribution for IBL
 vec3 getTransmissionIBL(vec3 n, vec3 v, vec3 baseColor) {
-    // 1. Extract normalized rotation from model matrix (upper 3x3)
-    mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
-                        normalize(u_ModelMatrix[1].xyz),
-                        normalize(u_ModelMatrix[2].xyz));
+    // 1. Calculate world-space position (from fragment shader)
+    vec3 position = v_Position;  // Already in world space from vertex shader
     
-    // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
-    mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
+    // 2. Calculate world-space view direction
+    vec3 v_dir = normalize(u_Camera - position);
     
-    // 3. Transform position to regular view space
-    vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
-    vec3 positionView = viewPos.xyz / viewPos.w;
+    // 3. Calculate refracted ray direction in world space using Snell's law
+    vec3 refractionVector = refract(-v_dir, normalize(n), 1.0 / ior);
     
-    // 4. Transform normal using model-compensated view rotation
-    vec3 normalView = normalize(modelCompensatedViewRot * n);
-    vec3 viewDirView = normalize(-positionView);
-    
-    // 5. Calculate refracted ray direction using Snell's law
-    vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
-    
-    // 6. Extract model scale
+    // 4. Extract model scale (rotation-independent)
     vec3 modelScale;
     modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
     modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
     modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
     
-    // 7. Calculate transmission ray with scaled thickness
-    vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
+    // 5. Calculate transmission ray in world space (thickness is in local space)
+    vec3 transmissionRay = normalize(refractionVector) * thickness_factor * modelScale;
     
-    // 8. Calculate exit point in view space
-    vec3 refractedRayExitView = positionView + transmissionRayView;
+    // 6. Calculate exit point in world space
+    vec3 refractedRayExit = position + transmissionRay;
     
-    // 9. Project exit point to screen space
-    vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
+    // 7. Project exit point to NDC (transform world space to clip space)
+    vec4 ndcPos = u_ProjectionMatrix * u_ViewMatrix * vec4(refractedRayExit, 1.0);
     vec2 refractionCoords = ndcPos.xy / ndcPos.w;
     refractionCoords = refractionCoords * 0.5 + 0.5;
     
@@ -464,16 +454,16 @@ vec3 getTransmissionIBL(vec3 n, vec3 v, vec3 baseColor) {
     // Store for debug views
     g_refractionCoords = refractionCoords;
     
-    // 10. Sample the transmission framebuffer
+    // 8. Sample the transmission framebuffer
     vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
     
     // Store raw sampled value for debug
     g_transmittedLightRaw = transmittedLight;
     
-    // 11. Apply Beer's law volume attenuation
+    // 9. Apply Beer's law volume attenuation
     #if ENABLE_BEER_LAW_ATTENUATION
     if (attenuation_distance > 0.0) {
-        float transmissionRayLength = length(transmissionRayView);
+        float transmissionRayLength = length(transmissionRay);
         vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
         vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
         transmittedLight *= attenuation;
@@ -550,18 +540,57 @@ void main() {
     // Image-Based Lighting (IBL)
     // ========================================================================
     
-    vec3 color = vec3(0.0);
+    vec3 f_diffuse_ibl = vec3(0.0);
+    vec3 f_specular_ibl = vec3(0.0);
     
     if (use_ibl > 0) {
         // Diffuse contribution
         vec3 irradiance = getDiffuseLight(n);
-        vec3 diffuse = irradiance * diffuseColor;
+        f_diffuse_ibl = irradiance * diffuseColor;
         
         // Specular contribution
         vec3 specularLight = getIBLRadianceGGX(n, v, perceptualRoughness);
         vec3 iblFresnel = getIBLGGXFresnel(n, v, perceptualRoughness, specularColor, 1.0);
-        vec3 specular = specularLight * iblFresnel;
-        
+        f_specular_ibl = specularLight * iblFresnel;
+    }
+    
+#ifdef TRANSMISSION
+    // ========================================================================
+    // Transmission (Glass/Refraction)
+    // ========================================================================
+    // Sample transmission texture if available (RED channel contains per-pixel mask)
+    // 0.0 = opaque (no transmission), 1.0 = transparent (full transmission)
+    transmission = transmission_factor;
+    if (has_transmission_tex > 0.5) {
+        vec2 baseUV = (transmission_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+        transmission *= texture(u_TransmissionSampler, baseUV).r;
+    }
+    
+    // Calculate transmission refraction
+    vec3 f_specular_transmission = getTransmissionIBL(n, v, baseColor.rgb);
+    
+    // CRITICAL: Mix transmission with diffuse ONLY, not specular!
+    // This preserves surface reflections (Fresnel) on glass materials
+    // Reference: glTF Sample Viewer pbr.frag line 184
+    #if ENABLE_TRANSMISSION_MIX
+    f_diffuse_ibl = mix(f_diffuse_ibl, f_specular_transmission, transmission);
+    #else
+    // DEBUG: Show pure transmission without mixing
+    f_diffuse_ibl = f_specular_transmission;
+    #endif
+#endif
+    
+    // ====================================================================
+    // Combine diffuse and specular (AFTER transmission mixing)
+    // ====================================================================
+    vec3 color = vec3(0.0);
+    
+#ifdef TRANSMISSION
+    // Store surface color before transmission mixing (for debug)
+    g_surfaceColorBeforeMix = f_diffuse_ibl + f_specular_ibl;
+#endif
+    
+    if (use_ibl > 0) {
         // ====================================================================
         // WORKAROUND: Selective diffuse IBL for dielectrics vs metals
         // ====================================================================
@@ -588,48 +617,31 @@ void main() {
         // ====================================================================
         
         if (metallic < 0.3) {
-           color = mix(diffuseColor, baseColor.rgb, metallic)* ambient_strength;
+#ifdef TRANSMISSION
+            // For transmission materials, use the mixed diffuse (which includes transmission)
+            // but still add specular reflections for surface Fresnel
+            color = f_diffuse_ibl + f_specular_ibl;
+#else
+            // Non-transmission dielectrics: use simple diffuse + specular
+            color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength + f_specular_ibl;
+#endif
         }
         else {
             // Metals: full IBL (environment diffuse + specular)
-            color = diffuse + specular;
+            color = f_diffuse_ibl + f_specular_ibl;
         }
     }
     else {
         // When IBL is disabled, add basic ambient contribution
+#ifdef TRANSMISSION
+        // For transmission materials without IBL, still use the transmission result
+        color = f_diffuse_ibl;
+#else
         // For dielectrics: use diffuse color
         // For metals: use base color (since metals absorb diffuse and reflect specular)
         color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength;
-    }
-    
-#ifdef TRANSMISSION
-    // ========================================================================
-    // Transmission (Glass/Refraction) - applies whether IBL is on or off
-    // ========================================================================
-    // Store surface color before transmission mixing (for debug)
-    g_surfaceColorBeforeMix = color;
-    
-    // Sample transmission texture if available (RED channel contains per-pixel mask)
-    // 0.0 = opaque (no transmission), 1.0 = transparent (full transmission)
-    transmission = transmission_factor;
-    if (has_transmission_tex > 0.5) {
-        vec2 baseUV = (transmission_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
-        transmission *= texture(u_TransmissionSampler, baseUV).r;
-    }
-    
-    // Calculate transmission refraction
-    vec3 f_specular_transmission = getTransmissionIBL(n, v, baseColor.rgb);
-    
-    // Mix current color with transmission (transmission controls blend)
-    // When transmission = 0.0: fully opaque (use color)
-    // When transmission = 1.0: fully transparent (use refraction)
-    #if ENABLE_TRANSMISSION_MIX
-    color = mix(color, f_specular_transmission, transmission);
-    #else
-    // DEBUG: Show pure transmission without mixing with surface
-    color = f_specular_transmission;
-    #endif
 #endif
+    }
     
     // ========================================================================
     // Punctual Lights (optional)

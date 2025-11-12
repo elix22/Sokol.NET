@@ -31,6 +31,7 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "TransmissionTest/glTF/TransmissionTest.gltf",
         "CompareIor/glTF/CompareIor.gltf",
         "CompareTransmission/glTF/CompareTransmission.gltf",
         "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
