@@ -35,21 +35,6 @@ layout(location=5) in vec4 color_0;
 layout(location=6) in vec4 joints_0;    // Bone indices for skinning
 layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
-// Uniforms (PBR-specific, separate from cgltf-sapp.glsl)
-@include pbr_vs_uniforms.glsl
-
-// Animation texture samplers (use high bindings to avoid FS conflicts)
-// Note: u_morphWeights is defined in vs_params (vs_uniforms.glsl)
-// Note: Morph targets share slot 9 with CharlieLUT - they're unlikely to be used together
-// (morphing is for character animation, Charlie sheen is for fabric materials)
-layout(binding=11) uniform texture2D u_jointsSampler_Tex;
-layout(binding=11) uniform sampler u_jointsSampler_Smp;
-
-layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex;
-layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;
-
-// Animation support (uses uniforms defined above)
-@include animation.glsl
 
 // Outputs
 out vec3 v_Position;
@@ -59,6 +44,14 @@ out vec2 v_TexCoord0;
 out vec2 v_TexCoord1;
 out vec4 v_Color;
 out mat3 v_TBN;  // Tangent-Bitangent-Normal matrix for normal mapping
+
+
+// Uniforms 
+@include pbr_vs_uniforms.glsl
+
+// Animation support (uses uniforms defined above)
+@include animation.glsl
+
 
 void main() {
     // Apply morph targets to position
@@ -202,77 +195,7 @@ out vec4 frag_color;
 // Material uniforms (PBR-specific, separate from cgltf-sapp.glsl)
 @include pbr_fs_uniforms.glsl
 
-// Camera position
-layout(binding=4) uniform camera_params {
-    vec3 u_Camera;
-};
 
-// Rendering feature flags
-layout(binding=7) uniform rendering_flags {
-    int use_ibl;              // 0 or 1
-    int use_punctual_lights;  // 0 or 1
-    int use_tonemapping;      // 0 or 1
-    int linear_output;        // 0 or 1
-    int alphamode;            // 0=opaque, 1=mask, 2=blend
-};
-
-// Texture samplers
-layout(binding=0) uniform texture2D u_BaseColorTexture;
-layout(binding=0) uniform sampler u_BaseColorSampler;
-
-layout(binding=1) uniform texture2D u_MetallicRoughnessTexture;
-layout(binding=1) uniform sampler u_MetallicRoughnessSampler;
-
-layout(binding=2) uniform texture2D u_NormalTexture;
-layout(binding=2) uniform sampler u_NormalSampler;
-
-layout(binding=3) uniform texture2D u_OcclusionTexture;
-layout(binding=3) uniform sampler u_OcclusionSampler;
-
-layout(binding=4) uniform texture2D u_EmissiveTexture;
-layout(binding=4) uniform sampler u_EmissiveSampler;
-
-// IBL textures (separate texture and sampler)
-layout(binding=5) uniform textureCube u_GGXEnvTexture;
-layout(binding=5) uniform sampler u_GGXEnvSampler_Raw;
-
-layout(binding=6) uniform textureCube u_LambertianEnvTexture;
-layout(binding=6) uniform sampler u_LambertianEnvSampler_Raw;
-
-layout(binding=7) uniform texture2D u_GGXLUTTexture;
-layout(binding=7) uniform sampler u_GGXLUTSampler_Raw;
-
-#ifndef MORPHING
-layout(binding=8) uniform textureCube u_CharlieEnvTexture;
-layout(binding=8) uniform sampler u_CharlieEnvSampler_Raw;
-
-layout(binding=9) uniform texture2D u_CharlieLUTTexture;
-layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
-#endif
-
-#ifdef TRANSMISSION
-// Transmission framebuffer (for refraction/transparency)
-layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
-layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
-
-// Transmission texture (RED channel mask for per-pixel transmission)
-// Uses binding 8 (shared with Charlie environment for sheen - rarely used together)
-layout(binding=8) uniform texture2D u_TransmissionTexture;
-layout(binding=8) uniform sampler u_TransmissionSampler_Raw;
-#endif
-
-// Create combined samplers for IBL functions
-#define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
-#define u_LambertianEnvSampler samplerCube(u_LambertianEnvTexture, u_LambertianEnvSampler_Raw)
-#define u_GGXLUT sampler2D(u_GGXLUTTexture, u_GGXLUTSampler_Raw)
-#ifndef MORPHING
-#define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
-#define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
-#endif
-#ifdef TRANSMISSION
-#define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
-#define u_TransmissionSampler sampler2D(u_TransmissionTexture, u_TransmissionSampler_Raw)
-#endif
 
 // Utility functions (must be defined before includes that use them)
 float clampedDot(vec3 x, vec3 y)

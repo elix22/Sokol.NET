@@ -17,3 +17,15 @@ layout(binding=0, std140) uniform vs_params {
     layout(offset=192) highp mat4 finalBonesMatrices[MAX_BONES];  // offset 192 (adjusted for removed int)
 #endif
 };
+
+
+
+// Animation texture samplers (use high bindings to avoid FS conflicts)
+// Note: u_morphWeights is defined in vs_params (vs_uniforms.glsl)
+// Note: Morph targets share slot 9 with CharlieLUT - they're unlikely to be used together
+// (morphing is for character animation, Charlie sheen is for fabric materials)
+layout(binding=11) uniform texture2D u_jointsSampler_Tex;
+layout(binding=11) uniform sampler u_jointsSampler_Smp;
+
+layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex;
+layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;
