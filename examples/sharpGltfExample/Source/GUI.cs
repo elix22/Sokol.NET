@@ -707,7 +707,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawStatisticsWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(240, 250), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(240, 280), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Statistics", ref open, ImGuiWindowFlags.None))
@@ -735,6 +735,10 @@ public static unsafe partial class SharpGLTFApp
                 igText($"  Hits: {hits}");
                 igText($"  Misses: {misses}");
                 igText($"  Hit Rate: {hitRate:F1}%%");
+                
+                igSeparator();
+                igText("Shader Cache:");
+                igText($"  Shaders: {PipeLineManager.ShaderCount}");
             }
         }
         igEnd();

@@ -5,6 +5,7 @@ using static Sokol.SG.sg_vertex_format;
 using static Sokol.SG.sg_index_type;
 using static Sokol.SG.sg_cull_mode;
 using static Sokol.SG.sg_compare_func;
+using static Sokol.SLog;
 using static pbr_shader_cs.Shaders;
 using static pbr_shader_skinning_cs_skinning.Shaders;
 using static pbr_shader_morphing_cs_morphing.Shaders;
@@ -65,6 +66,27 @@ public enum PipelineType
 
 public static class PipeLineManager
 {
+    // Shader type enum to identify unique shaders
+    private enum ShaderType
+    {
+        Standard,              // pbr_program_shader_desc
+        Skinning,              // skinning_pbr_program_shader_desc
+        Morphing,              // morphing_pbr_program_shader_desc
+        SkinningMorphing,      // skinning_morphing_pbr_program_shader_desc
+        Transmission,          // transmission_pbr_program_shader_desc
+        TransmissionSkinning,  // transmission_skinning_pbr_program_shader_desc
+        TransmissionMorphing,  // transmission_morphing_pbr_program_shader_desc
+        TransmissionSkinningMorphing, // transmission_skinning_morphing_pbr_program_shader_desc
+        BloomBright,           // bright_pass_shader_desc
+        BloomBlurHorizontal,   // blur_horizontal_shader_desc
+        BloomBlurVertical,     // blur_vertical_shader_desc
+        BloomComposite         // bloom_composite_shader_desc
+    }
+
+    public static int ShaderCount { get; private set; } = 0;
+    // Shader cache - stores unique shader instances
+    private static Dictionary<ShaderType, sg_shader> _shaderCache = new Dictionary<ShaderType, sg_shader>();
+    
     // Pipeline cache with cull mode support (key: (type, cullMode))
     private static Dictionary<(PipelineType, sg_cull_mode), sg_pipeline> _pipelines = new Dictionary<(PipelineType, sg_cull_mode), sg_pipeline>();
     
@@ -73,13 +95,47 @@ public static class PipeLineManager
         new Dictionary<(PipelineType, sg_pixel_format, sg_pixel_format, int, sg_cull_mode), sg_pipeline>();
 
     /// <summary>
-    /// Clear all pipeline caches. Call this when destroying all resources (e.g., on window resize).
-    /// This ensures pipelines will be recreated on next use.
+    /// Get or create a cached shader based on shader type
+    /// </summary>
+    private static sg_shader GetOrCreateShader(ShaderType type)
+    {
+        if (_shaderCache.TryGetValue(type, out sg_shader cachedShader))
+        {
+            return cachedShader;
+        }
+
+        sg_shader shader = type switch
+        {
+            ShaderType.Standard => sg_make_shader(pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.Skinning => sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.Morphing => sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.SkinningMorphing => sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.Transmission => sg_make_shader(transmission_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.TransmissionSkinning => sg_make_shader(transmission_skinning_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.TransmissionMorphing => sg_make_shader(transmission_morphing_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.TransmissionSkinningMorphing => sg_make_shader(transmission_skinning_morphing_pbr_program_shader_desc(sg_query_backend())),
+            ShaderType.BloomBright => sg_make_shader(bright_pass_shader_desc(sg_query_backend())),
+            ShaderType.BloomBlurHorizontal => sg_make_shader(blur_horizontal_shader_desc(sg_query_backend())),
+            ShaderType.BloomBlurVertical => sg_make_shader(blur_vertical_shader_desc(sg_query_backend())),
+            ShaderType.BloomComposite => sg_make_shader(bloom_shader_cs.Shaders.bloom_composite_shader_desc(sg_query_backend())),
+            _ => throw new ArgumentException($"Unknown shader type: {type}")
+        };
+
+        _shaderCache[type] = shader;
+        ShaderCount++;
+        Info($"Created shader of type {type}, total shaders: {ShaderCount}");
+        return shader;
+    }
+
+    /// <summary>
+    /// Clear all pipeline and shader caches. Call this when destroying all resources (e.g., on window resize).
+    /// This ensures pipelines and shaders will be recreated on next use.
     /// </summary>
     public static void ClearCaches()
     {
         _pipelines.Clear();
         _customPassPipelines.Clear();
+        _shaderCache.Clear();
     }
 
 
@@ -140,7 +196,7 @@ public static class PipeLineManager
         switch (type)
         {
             case PipelineType.Standard:
-                sg_shader shader_static = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_static = GetOrCreateShader(ShaderType.Standard);
                 // Create pipeline for static meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -163,7 +219,7 @@ public static class PipeLineManager
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
             case PipelineType.Skinned:
-                sg_shader shader_skinned = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned = GetOrCreateShader(ShaderType.Skinning);
                 // Create pipeline for skinned meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -187,7 +243,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.Morphing:
-                sg_shader shader_morphing = sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_morphing = GetOrCreateShader(ShaderType.Morphing);
                 // Create pipeline for morphing meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -211,7 +267,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedMorphing:
-                sg_shader shader_skinned_morphing = sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_morphing = GetOrCreateShader(ShaderType.SkinningMorphing);
                 // Create pipeline for skinned + morphing meshes
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -235,7 +291,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.StandardBlend:
-                sg_shader shader_static_blend = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_static_blend = GetOrCreateShader(ShaderType.Standard);
                 // Create pipeline for static meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -265,7 +321,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedBlend:
-                sg_shader shader_skinned_blend = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_blend = GetOrCreateShader(ShaderType.Skinning);
                 // Create pipeline for skinned meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -295,7 +351,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.MorphingBlend:
-                sg_shader shader_morphing_blend = sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_morphing_blend = GetOrCreateShader(ShaderType.Morphing);
                 // Create pipeline for morphing meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -325,7 +381,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedMorphingBlend:
-                sg_shader shader_skinned_morphing_blend = sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_morphing_blend = GetOrCreateShader(ShaderType.SkinningMorphing);
                 // Create pipeline for skinned + morphing meshes with alpha blending
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -355,7 +411,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.StandardMask:
-                sg_shader shader_static_mask = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_static_mask = GetOrCreateShader(ShaderType.Standard);
                 // Create pipeline for static meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -379,7 +435,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedMask:
-                sg_shader shader_skinned_mask = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_mask = GetOrCreateShader(ShaderType.Skinning);
                 // Create pipeline for skinned meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -403,7 +459,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.MorphingMask:
-                sg_shader shader_morphing_mask = sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_morphing_mask = GetOrCreateShader(ShaderType.Morphing);
                 // Create pipeline for morphing meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -427,7 +483,7 @@ public static class PipeLineManager
                 break;
 
             case PipelineType.SkinnedMorphingMask:
-                sg_shader shader_skinned_morphing_mask = sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_skinned_morphing_mask = GetOrCreateShader(ShaderType.SkinningMorphing);
                 // Create pipeline for skinned + morphing meshes with alpha masking (cutout)
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
@@ -474,7 +530,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaque:
                 // Standard mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_static = sg_make_shader(transmission_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_static = GetOrCreateShader(ShaderType.Transmission);
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Standard, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
@@ -498,7 +554,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaqueSkinned:
                 // Skinned mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_skinned = sg_make_shader(transmission_skinning_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_skinned = GetOrCreateShader(ShaderType.TransmissionSkinning);
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Skinned, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
@@ -522,7 +578,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaqueMorphing:
                 // Morphing mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_morphing = sg_make_shader(transmission_morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_morphing = GetOrCreateShader(ShaderType.TransmissionMorphing);
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
@@ -546,7 +602,7 @@ public static class PipeLineManager
 
             case PipelineType.TransmissionOpaqueSkinnedMorphing:
                 // Skinned + morphing mesh pipeline rendering to transmission opaque pass
-                sg_shader shader_transmission_skinned_morphing = sg_make_shader(transmission_skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                sg_shader shader_transmission_skinned_morphing = GetOrCreateShader(ShaderType.TransmissionSkinningMorphing);
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
                 pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
@@ -571,7 +627,7 @@ public static class PipeLineManager
             case PipelineType.BloomBright:
                 // Bright pass pipeline for bloom effect (fullscreen quad)
                 pipeline_desc.layout.attrs[ATTR_bright_pass_position].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.shader = sg_make_shader(bright_pass_shader_desc(sg_query_backend()));
+                pipeline_desc.shader = GetOrCreateShader(ShaderType.BloomBright);
                 pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
                 pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
                 pipeline_desc.cull_mode = cullMode;
@@ -588,7 +644,7 @@ public static class PipeLineManager
             case PipelineType.BloomBlurHorizontal:
                 // Horizontal blur pipeline for bloom effect (fullscreen quad)
                 pipeline_desc.layout.attrs[ATTR_blur_horizontal_position].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.shader = sg_make_shader(blur_horizontal_shader_desc(sg_query_backend()));
+                pipeline_desc.shader = GetOrCreateShader(ShaderType.BloomBlurHorizontal);
                 pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
                 pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
                 pipeline_desc.cull_mode = cullMode;
@@ -605,7 +661,7 @@ public static class PipeLineManager
             case PipelineType.BloomBlurVertical:
                 // Vertical blur pipeline for bloom effect (fullscreen quad)
                 pipeline_desc.layout.attrs[ATTR_blur_vertical_position].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.shader = sg_make_shader(blur_vertical_shader_desc(sg_query_backend()));
+                pipeline_desc.shader = GetOrCreateShader(ShaderType.BloomBlurVertical);
                 pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
                 pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
                 pipeline_desc.cull_mode = cullMode;
@@ -622,7 +678,7 @@ public static class PipeLineManager
             case PipelineType.BloomComposite:
                 // Composite pipeline for bloom effect (renders to swapchain)
                 pipeline_desc.layout.attrs[ATTR_bloom_composite_position].format = SG_VERTEXFORMAT_FLOAT2;
-                pipeline_desc.shader = sg_make_shader(bloom_shader_cs.Shaders.bloom_composite_shader_desc(sg_query_backend()));
+                pipeline_desc.shader = GetOrCreateShader(ShaderType.BloomComposite);
                 pipeline_desc.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
                 pipeline_desc.index_type = sg_index_type.SG_INDEXTYPE_NONE;
                 pipeline_desc.cull_mode = cullMode;
@@ -661,31 +717,31 @@ public static class PipeLineManager
         var baseType = GetBasePipelineType(type);
         var pipeline_desc = default(sg_pipeline_desc);
         
-        // Determine shader based on base type
+        // Determine shader based on base type using cached shaders
         sg_shader shader;
         if (baseType == PipelineType.SkinnedMorphing || baseType == PipelineType.SkinnedMorphingBlend || baseType == PipelineType.SkinnedMorphingMask || baseType == PipelineType.TransmissionOpaqueSkinnedMorphing)
         {
             shader = baseType == PipelineType.TransmissionOpaqueSkinnedMorphing 
-                ? sg_make_shader(transmission_skinning_morphing_pbr_program_shader_desc(sg_query_backend()))
-                : sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                ? GetOrCreateShader(ShaderType.TransmissionSkinningMorphing)
+                : GetOrCreateShader(ShaderType.SkinningMorphing);
         }
         else if (baseType == PipelineType.Skinned || baseType == PipelineType.SkinnedBlend || baseType == PipelineType.SkinnedMask || baseType == PipelineType.TransmissionOpaqueSkinned)
         {
             shader = baseType == PipelineType.TransmissionOpaqueSkinned
-                ? sg_make_shader(transmission_skinning_pbr_program_shader_desc(sg_query_backend()))
-                : sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+                ? GetOrCreateShader(ShaderType.TransmissionSkinning)
+                : GetOrCreateShader(ShaderType.Skinning);
         }
         else if (baseType == PipelineType.Morphing || baseType == PipelineType.MorphingBlend || baseType == PipelineType.MorphingMask || baseType == PipelineType.TransmissionOpaqueMorphing)
         {
             shader = baseType == PipelineType.TransmissionOpaqueMorphing
-                ? sg_make_shader(transmission_morphing_pbr_program_shader_desc(sg_query_backend()))
-                : sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend()));
+                ? GetOrCreateShader(ShaderType.TransmissionMorphing)
+                : GetOrCreateShader(ShaderType.Morphing);
         }
         else
         {
             shader = baseType == PipelineType.TransmissionOpaque
-                ? sg_make_shader(transmission_pbr_program_shader_desc(sg_query_backend()))
-                : sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+                ? GetOrCreateShader(ShaderType.Transmission)
+                : GetOrCreateShader(ShaderType.Standard);
         }
         
         // Common setup for all variants
