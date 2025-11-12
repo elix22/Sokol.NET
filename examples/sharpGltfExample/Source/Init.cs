@@ -714,7 +714,7 @@ public static unsafe partial class SharpGLTFApp
         // 2. Copy/blit the swapchain's background before rendering to transmission framebuffer
         // 3. Use a skybox/environment background that's rendered to both passes
         // For now, transmission materials will refract a solid gray background instead of checkerboard.
-        opaque_action.colors[0].clear_value = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1f };
+        opaque_action.colors[0].clear_value = new sg_color { r = 1f, g = 1f, b = 1f, a = 0.2f };
         opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.depth.clear_value = 1.0f;
 

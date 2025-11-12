@@ -31,6 +31,9 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "ClearCoatCarPaint/glTF/ClearCoatCarPaint.gltf",
+        "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
+        "CarConcept/glTF/CarConcept.gltf",
         "ChairDamaskPurplegold/glTF/ChairDamaskPurplegold.gltf",
         "CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
         "TransmissionTest/glTF/TransmissionTest.gltf",
@@ -38,7 +41,6 @@ public static unsafe partial class SharpGLTFApp
         "CompareTransmission/glTF/CompareTransmission.gltf",
         "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
         "MorphStressTest/glTF/MorphStressTest.gltf",
-        "CarConcept/glTF/CarConcept.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
@@ -48,7 +50,6 @@ public static unsafe partial class SharpGLTFApp
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
-        "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
         "PotOfCoals/glTF/PotOfCoals.gltf",
@@ -57,7 +58,6 @@ public static unsafe partial class SharpGLTFApp
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
         "FlightHelmet/glTF/FlightHelmet.gltf",
-        "CarConcept/glTF/CarConcept.gltf",
         "Lantern/glTF/Lantern.gltf",
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
@@ -65,7 +65,6 @@ public static unsafe partial class SharpGLTFApp
         "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
         "AttenuationTest/glTF-Binary/AttenuationTest.glb",
         "BoomBox/glTF-Binary/BoomBox.glb",
-        "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb",
         "ClearcoatRing/glTF/ClearcoatRing.gltf",
         "IridescenceLamp/glTF-Binary/IridescenceLamp.glb"
     };

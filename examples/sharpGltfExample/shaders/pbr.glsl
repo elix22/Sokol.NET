@@ -256,7 +256,13 @@ vec3 getNormal() {
         vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), uv).xyz * 2.0 - 1.0;
         
         // Apply normal map scale (only to XY, not Z)
-        tangentNormal.xy *= normal_map_scale;
+        // The scale parameter controls the strength of the normal perturbation
+        // IMPORTANT: When texture is tiled (scale > 1), we need to reduce the normal strength
+        // to compensate for increased detail frequency. Otherwise tiled normals look too grainy.
+        // This matches the visual appearance of the glTF Sample Viewer.
+        float tileScale = max(normal_tex_scale.x, normal_tex_scale.y);
+        float effectiveScale = normal_map_scale / max(1.0, tileScale);
+        tangentNormal.xy *= effectiveScale;
         
         // Normalize the tangent-space normal after scaling
         tangentNormal = normalize(tangentNormal);
@@ -644,6 +650,111 @@ void main() {
     
     
     // ========================================================================
+    // Clearcoat Layer (KHR_materials_clearcoat)
+    // ========================================================================
+    // The clearcoat layer adds an extra specular reflection on top of the base material.
+    // It's modeled as a smooth dielectric layer (like car paint or lacquer).
+    // Reference: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat
+    // Implementation based on glTF Sample Viewer
+    
+    if (clearcoat_factor > 0.0) {
+        // Clearcoat uses geometric normal (smooth surface), NOT the base material's perturbed normal
+        // This ensures the clearcoat layer is glossy and smooth, even if the base has a detailed normal map
+        vec3 clearcoatNormal = normalize(v_Normal);
+        
+        // Clearcoat roughness (usually very low for glossy coating)
+        float clearcoatRoughness = clearcoat_roughness;
+        float clearcoatAlphaRoughness = clearcoatRoughness * clearcoatRoughness;
+        
+        // Clearcoat is always dielectric (F0 = 0.04 for most clear coatings)
+        vec3 clearcoatF0 = vec3(0.04);
+        vec3 clearcoatF90 = vec3(1.0);
+        
+        // Calculate clearcoat Fresnel at the current view angle
+        // This determines how much clearcoat reflection vs base material to show
+        vec3 clearcoatFresnel = F_Schlick(clearcoatF0, clearcoatF90, clampedDot(clearcoatNormal, v));
+        
+        // Calculate clearcoat IBL contribution
+        vec3 clearcoat_brdf = vec3(0.0);
+        if (use_ibl > 0) {
+            clearcoat_brdf = getIBLRadianceGGX(clearcoatNormal, v, clearcoatRoughness);
+        }
+        
+        // Calculate clearcoat contribution from punctual lights
+        vec3 clearcoat_punctual = vec3(0.0);
+        if (use_punctual_lights > 0) {
+            for (int i = 0; i < num_lights; i++) {
+                vec3 lightPos = light_positions[i].xyz;
+                vec3 lightDir = light_directions[i].xyz;
+                vec3 lightColor = light_colors[i].rgb;
+                float lightIntensity = light_colors[i].w;
+                int lightType = int(light_positions[i].w);
+                
+                vec3 l; // Light direction
+                float attenuation = 1.0;
+                
+                // Directional light
+                if (lightType == 0) {
+                    l = normalize(-lightDir);
+                }
+                // Point light
+                else if (lightType == 1) {
+                    vec3 pointToLight = lightPos - v_Position;
+                    l = normalize(pointToLight);
+                    float distance = length(pointToLight);
+                    float range = light_params_data[i].x;
+                    attenuation = max(0.0, 1.0 - (distance / range));
+                    attenuation *= attenuation;
+                }
+                // Spot light
+                else if (lightType == 2) {
+                    vec3 pointToLight = lightPos - v_Position;
+                    l = normalize(pointToLight);
+                    float distance = length(pointToLight);
+                    float range = light_params_data[i].x;
+                    attenuation = max(0.0, 1.0 - (distance / range));
+                    attenuation *= attenuation;
+                    
+                    // Spot cone
+                    float angle = dot(l, normalize(-lightDir));
+                    float innerCutoff = light_directions[i].w;
+                    float outerCutoff = light_params_data[i].y;
+                    float epsilon = innerCutoff - outerCutoff;
+                    float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
+                    attenuation *= spotIntensity;
+                }
+                
+                vec3 h = normalize(l + v);
+                float NdotL = clampedDot(clearcoatNormal, l);
+                float NdotH = clampedDot(clearcoatNormal, h);
+                float NdotV_clearcoat = clampedDot(clearcoatNormal, v);
+                float VdotH = clampedDot(v, h);
+                
+                if (NdotL > 0.0 || NdotV_clearcoat > 0.0) {
+                    // Clearcoat BRDF (specular only, no diffuse)
+                    vec3 F_clearcoat = F_Schlick(clearcoatF0, clearcoatF90, VdotH);
+                    float Vis_clearcoat = V_GGX(NdotL, NdotV_clearcoat, clearcoatAlphaRoughness);
+                    float D_clearcoat = D_GGX(NdotH, clearcoatAlphaRoughness);
+                    
+                    vec3 clearcoatSpecular = F_clearcoat * Vis_clearcoat * D_clearcoat;
+                    vec3 clearcoatContribution = NdotL * attenuation * lightIntensity * lightColor * clearcoatSpecular;
+                    
+                    clearcoat_punctual += clearcoatContribution;
+                }
+            }
+        }
+        
+        // Combine clearcoat IBL and punctual lighting
+        clearcoat_brdf += clearcoat_punctual;
+        
+        // Mix clearcoat with base color using Fresnel weighting (physically correct)
+        // At grazing angles, more clearcoat reflection is visible
+        // This matches the glTF Sample Viewer implementation
+        color = mix(color, clearcoat_brdf, clearcoat_factor * clearcoatFresnel);
+    }
+    
+    
+    // ========================================================================
     // Ambient occlusion
     // ========================================================================
     
@@ -688,7 +799,15 @@ void main() {
         }
         // Normals
         else if (mode == DEBUG_NORMAL_TEXTURE) {
-            vec3 normalTex = texture(sampler2D(u_NormalTexture, u_NormalSampler), v_TexCoord0).rgb * 2.0 - 1.0;
+            // Show the normal texture AS USED by the shader (with transform and scale applied)
+            vec2 baseUV = (normal_texcoord < 0.5) ? v_TexCoord0 : v_TexCoord1;
+            vec2 uv = applyTextureTransform(baseUV, normal_tex_offset, normal_tex_rotation, normal_tex_scale);
+            vec3 normalTex = texture(sampler2D(u_NormalTexture, u_NormalSampler), uv).rgb * 2.0 - 1.0;
+            // Apply normal map scale with tiling compensation to match what getNormal() does
+            float tileScale = max(normal_tex_scale.x, normal_tex_scale.y);
+            float effectiveScale = normal_map_scale / max(1.0, tileScale);
+            normalTex.xy *= effectiveScale;
+            normalTex = normalize(normalTex);
             color = (normalTex + 1.0) / 2.0;
         }
         else if (mode == DEBUG_NORMAL_SHADING) {
@@ -745,6 +864,12 @@ void main() {
         }
         else if (mode == DEBUG_CLEARCOAT_ROUGHNESS) {
             color = vec3(clearcoat_roughness);
+        }
+        else if (mode == DEBUG_CLEARCOAT_NORMAL) {
+            // Show clearcoat normal (geometric normal, not base material's perturbed normal)
+            // Clearcoat should be smooth even when base material has detailed normal maps
+            vec3 clearcoatNormal = normalize(v_Normal);
+            color = (clearcoatNormal + 1.0) / 2.0;
         }
 #ifdef TRANSMISSION
         // Transmission

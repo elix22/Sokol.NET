@@ -923,6 +923,7 @@ public static unsafe partial class SharpGLTFApp
                 igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Clearcoat:");
                 if (igRadioButton_IntPtr("Clearcoat Factor", ref state.ui.debug_view_mode, 15)) { }
                 if (igRadioButton_IntPtr("Clearcoat Roughness", ref state.ui.debug_view_mode, 16)) { }
+                if (igRadioButton_IntPtr("ClearCoat Normal", ref state.ui.debug_view_mode, 17)) { }
                 
                 igNewLine();
                 igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Transmission/Glass:");

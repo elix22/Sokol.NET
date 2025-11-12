@@ -22,12 +22,15 @@ namespace Sokol
             
             samplerSettings ??= new SamplerSettings(); // Use defaults if null
             
-            // Create image
+            // Create image with mipmaps
+            // Setting num_mipmaps = 0 tells Sokol to auto-calculate the mip count based on dimensions
+            // and auto-generate the mipmap chain on the GPU
             var img_desc = new sg_image_desc
             {
                 width = width,
                 height = height,
                 pixel_format = format,
+                num_mipmaps = 0,  // 0 = auto-calculate and generate mipmaps
                 data = { mip_levels = { [0] = new sg_range { ptr = pixels, size = (nuint)(width * height * 4) } } },
                 label = label
             };
@@ -45,6 +48,7 @@ namespace Sokol
             {
                 min_filter = samplerSettings.MinFilter,
                 mag_filter = samplerSettings.MagFilter,
+                mipmap_filter = samplerSettings.MipmapFilter,
                 wrap_u = samplerSettings.WrapU,
                 wrap_v = samplerSettings.WrapV,
                 label = $"{label}-sampler"
@@ -113,6 +117,7 @@ namespace Sokol
             {
                 min_filter = samplerSettings.MinFilter,
                 mag_filter = samplerSettings.MagFilter,
+                mipmap_filter = samplerSettings.MipmapFilter,
                 wrap_u = samplerSettings.WrapU,
                 wrap_v = samplerSettings.WrapV,
                 label = $"{label}-sampler"

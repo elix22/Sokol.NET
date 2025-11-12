@@ -872,15 +872,16 @@ namespace Sokol
             
             if (sampler == null)
             {
-                // Use glTF defaults
+                // Use glTF defaults: LINEAR filtering with mipmaps
                 settings.MinFilter = sg_filter.SG_FILTER_LINEAR;
                 settings.MagFilter = sg_filter.SG_FILTER_LINEAR;
+                settings.MipmapFilter = sg_filter.SG_FILTER_LINEAR;
                 settings.WrapU = sg_wrap.SG_WRAP_REPEAT;
                 settings.WrapV = sg_wrap.SG_WRAP_REPEAT;
                 return settings;
             }
 
-            // Map glTF sampler settings to Sokol
+            // Map glTF magFilter (no mipmap info, just LINEAR or NEAREST)
             settings.MagFilter = sampler.MagFilter switch
             {
                 SharpGLTF.Schema2.TextureInterpolationFilter.NEAREST => sg_filter.SG_FILTER_NEAREST,
@@ -888,14 +889,39 @@ namespace Sokol
                 _ => sg_filter.SG_FILTER_LINEAR
             };
 
+            // Map glTF minFilter (includes mipmap mode)
+            // glTF combines base filter + mipmap filter into one enum
+            // We need to split it into Sokol's separate min_filter and mipmap_filter
             settings.MinFilter = sampler.MinFilter switch
             {
+                // No mipmaps
                 SharpGLTF.Schema2.TextureMipMapFilter.NEAREST => sg_filter.SG_FILTER_NEAREST,
                 SharpGLTF.Schema2.TextureMipMapFilter.LINEAR => sg_filter.SG_FILTER_LINEAR,
+                
+                // With mipmaps - base filter
                 SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_NEAREST => sg_filter.SG_FILTER_NEAREST,
                 SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_NEAREST => sg_filter.SG_FILTER_LINEAR,
                 SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_LINEAR => sg_filter.SG_FILTER_NEAREST,
                 SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_LINEAR => sg_filter.SG_FILTER_LINEAR,
+                
+                _ => sg_filter.SG_FILTER_LINEAR
+            };
+
+            // Extract mipmap filter from glTF's combined minFilter enum
+            settings.MipmapFilter = sampler.MinFilter switch
+            {
+                // No mipmaps - set to NEAREST (will be ignored if texture has no mipmaps)
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR => sg_filter.SG_FILTER_NEAREST,
+                
+                // NEAREST mipmap interpolation (sharp transitions between mip levels)
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_NEAREST => sg_filter.SG_FILTER_NEAREST,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_NEAREST => sg_filter.SG_FILTER_NEAREST,
+                
+                // LINEAR mipmap interpolation (trilinear - smooth between mip levels)
+                SharpGLTF.Schema2.TextureMipMapFilter.NEAREST_MIPMAP_LINEAR => sg_filter.SG_FILTER_LINEAR,
+                SharpGLTF.Schema2.TextureMipMapFilter.LINEAR_MIPMAP_LINEAR => sg_filter.SG_FILTER_LINEAR,
+                
                 _ => sg_filter.SG_FILTER_LINEAR
             };
 
