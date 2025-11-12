@@ -58,22 +58,27 @@ namespace Sokol
         public Vector2 BaseColorTexOffset = Vector2.Zero;
         public float BaseColorTexRotation = 0.0f;
         public Vector2 BaseColorTexScale = Vector2.One;
+        public bool HasBaseColorTexTransform = false;  // Optimization: skip transform if identity
         
         public Vector2 MetallicRoughnessTexOffset = Vector2.Zero;
         public float MetallicRoughnessTexRotation = 0.0f;
         public Vector2 MetallicRoughnessTexScale = Vector2.One;
+        public bool HasMetallicRoughnessTexTransform = false;  // Optimization: skip transform if identity
         
         public Vector2 NormalTexOffset = Vector2.Zero;
         public float NormalTexRotation = 0.0f;  // Rotation in radians
         public Vector2 NormalTexScale = Vector2.One;
+        public bool HasNormalTexTransform = false;  // Optimization: skip transform if identity
         
         public Vector2 OcclusionTexOffset = Vector2.Zero;
         public float OcclusionTexRotation = 0.0f;
         public Vector2 OcclusionTexScale = Vector2.One;
+        public bool HasOcclusionTexTransform = false;  // Optimization: skip transform if identity
         
         public Vector2 EmissiveTexOffset = Vector2.Zero;
         public float EmissiveTexRotation = 0.0f;
         public Vector2 EmissiveTexScale = Vector2.One;
+        public bool HasEmissiveTexTransform = false;  // Optimization: skip transform if identity
         
         // Normal map scale (strength of normal perturbation)
         public float NormalMapScale = 1.0f;  // 1.0 = full strength, 0.2 = subtle (like car paint)

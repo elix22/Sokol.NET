@@ -359,6 +359,28 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.animator.PlaybackSpeed = 1.0f;
                 }
+                
+                // Skinning mode selection
+                igSeparator();
+                igText("Skinning Mode:");
+                int skinningMode = (int)state.skinningMode;
+                string[] skinningModeNames = new[] { "Uniform-Based (Fast)", "Texture-Based (Unlimited)" };
+                if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
+                {
+                    state.skinningMode = (SkinningMode)skinningMode;
+                }
+                
+                // Show info about current mode
+                if (state.skinningMode == SkinningMode.UniformBased)
+                {
+                    igTextColored(new Vector4(0, 1, 0, 1), "Fast (60 FPS on mobile)");
+                    igText("Max 85 bones");
+                }
+                else
+                {
+                    igTextColored(new Vector4(1, 1, 0, 1), "Slower (30 FPS on mobile)");
+                    igText("Unlimited bones");
+                }
             }
             else
             {
@@ -685,7 +707,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawStatisticsWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(240, 250), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(240, 280), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Statistics", ref open, ImGuiWindowFlags.None))
@@ -713,6 +735,10 @@ public static unsafe partial class SharpGLTFApp
                 igText($"  Hits: {hits}");
                 igText($"  Misses: {misses}");
                 igText($"  Hit Rate: {hitRate:F1}%%");
+                
+                igSeparator();
+                igText("Shader Cache:");
+                igText($"  Shaders: {PipeLineManager.ShaderCount}");
             }
         }
         igEnd();

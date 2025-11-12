@@ -102,7 +102,7 @@ vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
     return specularLight;
 }
 
-
+#ifdef TRANSMISSION
 vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
 {
     float framebufferLod = log2(float(u_TransmissionFramebufferSize.x)) * applyIorToRoughness(roughness, ior);
@@ -142,6 +142,7 @@ vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 base
 
     return attenuatedColor * baseColor;
 }
+#endif // TRANSMISSION
 
 vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy, vec3 anisotropyDirection)
 {

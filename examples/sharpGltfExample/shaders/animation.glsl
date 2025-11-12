@@ -3,7 +3,6 @@
 // Features controlled by SKINNING and MORPHING preprocessor defines
 
 // NOTE: These uniforms must be defined in the main shader before including this file:
-// - Flags in rendering_flags (binding=7): int use_morphing; 
 // - Morph weights in vs_params (binding=0): vec4 u_morphWeights[2]; (8 weights as 2 vec4s)
 // - layout(binding=11) uniform texture2D u_jointsSampler_Tex; layout(binding=11) uniform sampler u_jointsSampler_Smp;
 // - layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex; layout(binding=9) uniform sampler u_MorphTargetsSampler_Smp;
@@ -45,11 +44,27 @@ mat4 getMatrixFromTexture(texture2D tex, sampler smp, int index)
 // Get skinning matrix (blended from joint matrices)
 mat4 getSkinningMatrix(vec4 joints_0, vec4 weights_0)
 {
-    mat4 skin = 
-        weights_0.x * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.x) * 2) +
-        weights_0.y * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.y) * 2) +
-        weights_0.z * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.z) * 2) +
-        weights_0.w * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.w) * 2);
+    mat4 skin;
+    
+    // Choose skinning method based on flag (0=texture-based, 1=uniform-based)
+    if (use_uniform_skinning == 1)
+    {
+        // Uniform-based skinning: use finalBonesMatrices array
+        skin = 
+            weights_0.x * finalBonesMatrices[int(joints_0.x)] +
+            weights_0.y * finalBonesMatrices[int(joints_0.y)] +
+            weights_0.z * finalBonesMatrices[int(joints_0.z)] +
+            weights_0.w * finalBonesMatrices[int(joints_0.w)];
+    }
+    else
+    {
+        // Texture-based skinning: use joint texture sampler
+        skin = 
+            weights_0.x * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.x) * 2) +
+            weights_0.y * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.y) * 2) +
+            weights_0.z * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.z) * 2) +
+            weights_0.w * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.w) * 2);
+    }
     
     if (skin == mat4(0)) { 
         return mat4(1); 
@@ -60,11 +75,27 @@ mat4 getSkinningMatrix(vec4 joints_0, vec4 weights_0)
 // Get skinning normal matrix (for transforming normals)
 mat4 getSkinningNormalMatrix(vec4 joints_0, vec4 weights_0)
 {
-    mat4 skin = 
-        weights_0.x * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.x) * 2 + 1) +
-        weights_0.y * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.y) * 2 + 1) +
-        weights_0.z * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.z) * 2 + 1) +
-        weights_0.w * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.w) * 2 + 1);
+    mat4 skin;
+    
+    // Choose skinning method based on flag (0=texture-based, 1=uniform-based)
+    if (use_uniform_skinning == 1)
+    {
+        // Uniform-based skinning: use finalBonesMatrices array (same matrices for normals)
+        skin = 
+            weights_0.x * finalBonesMatrices[int(joints_0.x)] +
+            weights_0.y * finalBonesMatrices[int(joints_0.y)] +
+            weights_0.z * finalBonesMatrices[int(joints_0.z)] +
+            weights_0.w * finalBonesMatrices[int(joints_0.w)];
+    }
+    else
+    {
+        // Texture-based skinning: use joint texture sampler (same even indices as positions)
+        skin = 
+            weights_0.x * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.x) * 2) +
+            weights_0.y * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.y) * 2) +
+            weights_0.z * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.z) * 2) +
+            weights_0.w * getMatrixFromTexture(u_jointsSampler_Tex, u_jointsSampler_Smp, int(joints_0.w) * 2);
+    }
     
     if (skin == mat4(0)) { 
         return mat4(1); 

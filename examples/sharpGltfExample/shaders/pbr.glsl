@@ -36,7 +36,6 @@ layout(location=6) in vec4 joints_0;    // Bone indices for skinning
 layout(location=7) in vec4 weights_0;   // Bone weights for skinning
 
 // Uniforms (PBR-specific, separate from cgltf-sapp.glsl)
-// Note: vs_params includes use_morphing and has_morph_targets flags
 @include pbr_vs_uniforms.glsl
 
 // Animation texture samplers (use high bindings to avoid FS conflicts)
@@ -65,25 +64,19 @@ void main() {
     // Apply morph targets to position
     vec3 morphedPosition = position;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedPosition += getTargetPosition(gl_VertexIndex, 8);
-    }
+    morphedPosition += getTargetPosition(gl_VertexIndex, 8);
 #endif
     
     // Apply morph targets to normal
     vec3 morphedNormal = normal;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedNormal += getTargetNormal(gl_VertexIndex, 8, 8);  // Assuming normal offset = 8
-    }
+    morphedNormal += getTargetNormal(gl_VertexIndex, 8, 8);  // Assuming normal offset = 8
 #endif
     
     // Apply morph targets to tangent
     vec3 morphedTangent = tangent.xyz;
 #ifdef MORPHING
-    if (use_morphing > 0) {
-        morphedTangent += getTargetTangent(gl_VertexIndex, 8, 16);  // Assuming tangent offset = 16
-    }
+    morphedTangent += getTargetTangent(gl_VertexIndex, 8, 16);  // Assuming tangent offset = 16
 #endif
     
     // Apply skinning to position
@@ -200,8 +193,6 @@ layout(binding=7) uniform rendering_flags {
     int use_tonemapping;      // 0 or 1
     int linear_output;        // 0 or 1
     int alphamode;            // 0=opaque, 1=mask, 2=blend
-    int use_skinning;         // 0 or 1 (not used - SKINNING define used instead)
-    int use_morphing;         // 0 or 1 (not used in FS - only for consistency)
 };
 
 // Texture samplers
@@ -238,9 +229,11 @@ layout(binding=9) uniform texture2D u_CharlieLUTTexture;
 layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
 #endif
 
+#ifdef TRANSMISSION
 // Transmission framebuffer (for refraction/transparency)
 layout(binding=10) uniform texture2D u_TransmissionFramebufferTexture;
 layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
+#endif
 
 // Create combined samplers for IBL functions
 #define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
@@ -250,7 +243,9 @@ layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
 #define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
 #define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
 #endif
+#ifdef TRANSMISSION
 #define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
+#endif
 
 // Utility functions (must be defined before includes that use them)
 float clampedDot(vec3 x, vec3 y)
@@ -478,70 +473,72 @@ void main() {
         color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength;
     }
     
+#ifdef TRANSMISSION
     // === Transmission (Refraction through glass) ===
     // Attempt 9: Model-rotation-compensated view-space refraction
     // Key insight: When model rotates, view space changes relative to model.
     // Solution: Cancel out model rotation from view matrix to get model-relative view space.
-    if (transmission_factor > 0.0) {
-        // 1. Extract normalized rotation from model matrix (upper 3x3)
-        mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
-                            normalize(u_ModelMatrix[1].xyz),
-                            normalize(u_ModelMatrix[2].xyz));
-        
-        // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
-        // Since modelRot is orthogonal, transpose = inverse
-        // This makes view space rotate WITH the model, keeping interior stationary
-        mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
-        
-        // 3. Transform position to regular view space
-        vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
-        vec3 positionView = viewPos.xyz / viewPos.w;
-        
-        // 4. Transform normal using model-compensated view rotation
-        vec3 normalView = normalize(modelCompensatedViewRot * n);
-        vec3 viewDirView = normalize(-positionView);
-        
-        // 5. Calculate refracted ray direction in compensated space using Snell's law
-        vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
-        
-        // 6. Extract model scale (rotation-independent)
-        vec3 modelScale;
-        modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
-        modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
-        modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
-        
-        // 7. Calculate transmission ray with scaled thickness
-        vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
-        
-        // 8. Calculate exit point in view space
-        vec3 refractedRayExitView = positionView + transmissionRayView;
-        
-        // 9. Project exit point to screen space (NDC then [0,1])
-        vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
-        vec2 refractionCoords = ndcPos.xy / ndcPos.w;
-        refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
-        
-        #if !SOKOL_GLSL
-        // Metal/D3D: flip Y for texture coordinate system
-        refractionCoords.y = 1.0 - refractionCoords.y;
-        #endif
-        // OpenGL: no flip needed
-        
-        // 10. Sample the transmission framebuffer at refracted position
-        vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
-        
-        // 11. Apply Beer's law (light absorption through volume)
-        if (attenuation_distance > 0.0) {
-            float transmissionRayLength = length(transmissionRayView);
-            vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
-            vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
-            transmittedLight *= attenuation;
-        }
-        
-        // 12. Mix transmitted light with base color and blend
-        vec3 transmission = transmittedLight * baseColor.rgb;
-        color = mix(color, transmission, transmission_factor);
-    }    
+    
+    // 1. Extract normalized rotation from model matrix (upper 3x3)
+    mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
+                        normalize(u_ModelMatrix[1].xyz),
+                        normalize(u_ModelMatrix[2].xyz));
+    
+    // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
+    // Since modelRot is orthogonal, transpose = inverse
+    // This makes view space rotate WITH the model, keeping interior stationary
+    mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
+    
+    // 3. Transform position to regular view space
+    vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
+    vec3 positionView = viewPos.xyz / viewPos.w;
+    
+    // 4. Transform normal using model-compensated view rotation
+    vec3 normalView = normalize(modelCompensatedViewRot * n);
+    vec3 viewDirView = normalize(-positionView);
+    
+    // 5. Calculate refracted ray direction in compensated space using Snell's law
+    vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
+    
+    // 6. Extract model scale (rotation-independent)
+    vec3 modelScale;
+    modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
+    modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
+    modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
+    
+    // 7. Calculate transmission ray with scaled thickness
+    vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
+    
+    // 8. Calculate exit point in view space
+    vec3 refractedRayExitView = positionView + transmissionRayView;
+    
+    // 9. Project exit point to screen space (NDC then [0,1])
+    vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
+    vec2 refractionCoords = ndcPos.xy / ndcPos.w;
+    refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
+    
+    #if !SOKOL_GLSL
+    // Metal/D3D: flip Y for texture coordinate system
+    refractionCoords.y = 1.0 - refractionCoords.y;
+    #endif
+    // OpenGL: no flip needed
+    
+    // 10. Sample the transmission framebuffer at refracted position
+    vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
+    
+    // 11. Apply Beer's law (light absorption through volume)
+    if (attenuation_distance > 0.0) {
+        float transmissionRayLength = length(transmissionRayView);
+        vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
+        vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
+        transmittedLight *= attenuation;
+    }
+    
+    // 12. Mix transmitted light with base color and blend
+    vec3 transmission = transmittedLight * baseColor.rgb;
+    color = mix(color, transmission, transmission_factor);
+#endif // TRANSMISSION
+    
     // ========================================================================
     // Punctual Lights (optional)
     // ========================================================================
@@ -712,6 +709,7 @@ void main() {
         else if (mode == DEBUG_CLEARCOAT_ROUGHNESS) {
             color = vec3(clearcoat_roughness);
         }
+#ifdef TRANSMISSION
         // Transmission
         else if (mode == DEBUG_TRANSMISSION_FACTOR) {
             color = vec3(transmission_factor);
@@ -723,6 +721,7 @@ void main() {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
             color = vec3((ior - 1.0) / 1.5);
         }
+#endif // TRANSMISSION
         else if (mode == DEBUG_F0) {
             // Show the F0 reflectance value
             vec3 f0 = mix(vec3(0.04), baseColor.rgb, metallic);

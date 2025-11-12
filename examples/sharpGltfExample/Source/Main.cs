@@ -7,23 +7,41 @@ using static Sokol.SG;
 using static Sokol.SLog;
 using SharpGLTF.Schema2;
 
+/// <summary>
+/// Skinning system mode for animated meshes
+/// </summary>
+public enum SkinningMode
+{
+    /// <summary>
+    /// Uniform-based skinning (main branch): Fast on mobile, passes bone matrices via shader uniforms.
+    /// Limited to ~85 bones but very efficient. Best for mobile/low-end devices.
+    /// </summary>
+    UniformBased,
+    
+    /// <summary>
+    /// Texture-based skinning (pbr-transition): Supports unlimited bones via texture lookup.
+    /// Requires GPU texture upload every frame - slower on mobile but no bone limit.
+    /// </summary>
+    TextureBased
+}
+
 public static unsafe partial class SharpGLTFApp
 {
    //  "BusterDrone/scene.gltf",
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+         "MorphStressTest/glTF/MorphStressTest.gltf",
+        "CarConcept/glTF/CarConcept.gltf",
+        "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
+        "ChronographWatch/glTF/ChronographWatch.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
-        "CarConcept/glTF/CarConcept.gltf",
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
-        "ChronographWatch/glTF/ChronographWatch.gltf",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
-        "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
-        "MorphStressTest/glTF/MorphStressTest.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
@@ -104,6 +122,8 @@ public static unsafe partial class SharpGLTFApp
         // Pipelines for opaque rendering (captures scene behind transparent objects)
         public sg_pipeline opaque_standard_pipeline;
         public sg_pipeline opaque_skinned_pipeline;
+        public sg_pipeline opaque_morphing_pipeline;
+        public sg_pipeline opaque_skinned_morphing_pipeline;
         public sg_pipeline opaque_standard_blend_pipeline;
         public sg_pipeline opaque_skinned_blend_pipeline;
         public sg_pipeline opaque_standard_mask_pipeline;
@@ -149,13 +169,16 @@ public static unsafe partial class SharpGLTFApp
         public Vector3 modelBoundsMin;
         public Vector3 modelBoundsMax;
 
-        // Joint matrix texture for skinning (texture-based instead of uniforms)
+        // Skinning system configuration
+        public SkinningMode skinningMode = SkinningMode.UniformBased;  // Default to fast uniform-based skinning
+
+        // Joint matrix texture for skinning (texture-based mode only)
         public sg_image jointMatrixTexture;
         public sg_view jointMatrixView;
         public sg_sampler jointMatrixSampler;
         public int jointTextureWidth = 0;  // Calculated based on bone count
 
-        public float[] jointTextureData = null;
+        public float[]? jointTextureData = null;
 
         // Morph target texture (texture2DArray for vertex displacements)
         public sg_image morphTargetTexture;

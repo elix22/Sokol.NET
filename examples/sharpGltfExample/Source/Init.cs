@@ -20,6 +20,7 @@ public static unsafe partial class SharpGLTFApp
         sg_setup(new sg_desc()
         {
             environment = sglue_environment(),
+            shader_pool_size = 64,
             buffer_pool_size = 4096 * 2,//increased to handle very large scene graphs
             sampler_pool_size = 512, // Reduced from 2048 - texture cache prevents duplicate samplers
             uniform_buffer_size = 64 * 1024 * 1024, // 64 MB - increased to handle very large scene graphs (2500+ nodes)
@@ -729,7 +730,19 @@ public static unsafe partial class SharpGLTFApp
                 depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                 sampleCount: 1
             );
-            Info("[Transmission] Opaque pipelines created (standard + skinned)");
+            state.transmission.opaque_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.TransmissionOpaqueMorphing,
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
+            );
+            state.transmission.opaque_skinned_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
+                PipelineType.TransmissionOpaqueSkinnedMorphing,
+                colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                sampleCount: 1
+            );
+            Info("[Transmission] Opaque pipelines created (standard, skinned, morphing, skinned+morphing)");
         }
 
         Info("[Transmission] Transmission system initialized successfully");
