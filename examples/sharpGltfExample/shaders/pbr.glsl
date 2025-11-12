@@ -907,10 +907,12 @@ void main() {
         }
         else if (mode == DEBUG_VOLUME_THICKNESS) {
             // Show thickness value (from texture or uniform)
-            // Display as grayscale: black = 0, white = max thickness
+            // Display as grayscale: black = 0 (thin), white = 1 (thick)
             // Use getThickness() to get the actual per-pixel thickness value
+            // Note: thickness_factor is typically 1.0, texture values are 0.0-1.0
+            // Amplify for better visibility (multiply by 3.0 to make gradient more obvious)
             float thickness = getThickness();
-            color = vec3(clamp(thickness / 2.0, 0.0, 1.0));
+            color = vec3(clamp(thickness * 3.0, 0.0, 1.0));
         }
         else if (mode == DEBUG_IOR) {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
