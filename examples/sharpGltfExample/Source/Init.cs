@@ -670,6 +670,28 @@ public static unsafe partial class SharpGLTFApp
             label = "transmission-sampler"
         });
 
+        // Create fullscreen quad vertex buffer for checkerboard background (only once)
+        if (state.transmission.checkerboard_bindings.vertex_buffers[0].id == 0)
+        {
+            // Fullscreen quad in NDC coordinates: two triangles covering [-1,-1] to [1,1]
+            float[] quad_vertices = new float[] { 
+                -1.0f, -1.0f,   // Bottom-left
+                 1.0f, -1.0f,   // Bottom-right
+                -1.0f,  1.0f,   // Top-left
+                 1.0f,  1.0f    // Top-right
+            };
+            
+            fixed (float* ptr = quad_vertices)
+            {
+                state.transmission.checkerboard_bindings.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
+                {
+                    data = new sg_range { ptr = ptr, size = (nuint)(quad_vertices.Length * sizeof(float)) },
+                    label = "checkerboard-vertices"
+                });
+            }
+            Info("[Transmission] Created checkerboard fullscreen quad vertex buffer");
+        }
+
         // Allocate/initialize view for screen texture (create once, reuse every frame)
         if (state.transmission.screen_color_view.id == 0)
         {
@@ -706,7 +728,15 @@ public static unsafe partial class SharpGLTFApp
 
         sg_pass_action opaque_action = default;
         opaque_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        opaque_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        // TODO: TRANSMISSION BACKGROUND ISSUE
+        // Currently clears to gray (0.5) which is an average of the checkerboard pattern.
+        // The transmission framebuffer needs the actual checkerboard pattern (or scene background)
+        // for proper refraction. Options to fix:
+        // 1. Render a fullscreen checkerboard quad as first step in opaque pass
+        // 2. Copy/blit the swapchain's background before rendering to transmission framebuffer
+        // 3. Use a skybox/environment background that's rendered to both passes
+        // For now, transmission materials will refract a solid gray background instead of checkerboard.
+        opaque_action.colors[0].clear_value = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1f };
         opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.depth.clear_value = 1.0f;
 

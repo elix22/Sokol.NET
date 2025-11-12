@@ -136,6 +136,17 @@ void main() {
 @fs fs_pbr
 precision highp float;
 
+// ============================================================================
+// TRANSMISSION DEBUG TOGGLES - Enable/disable parts of transmission code
+// ============================================================================
+// Set to 0 to disable specific features, 1 to enable
+// NOTE: The transmission framebuffer currently contains only a gray clear color,
+// not the actual checkerboard background. See Init.cs:707 for details on fixing this.
+#define ENABLE_TRANSMISSION_MIX 1        // Mix transmission with surface color
+#define ENABLE_TRANSMISSION_ALPHA 1      // Modulate alpha by transmission factor
+#define ENABLE_BEER_LAW_ATTENUATION 1    // Apply Beer's law volume attenuation
+#define ENABLE_BASE_COLOR_TINT 1         // Tint transmission by base color
+
 // Debug view mode constants
 #define DEBUG_NONE 0
 #define DEBUG_UV_0 1
@@ -162,6 +173,16 @@ precision highp float;
 #define DEBUG_VOLUME_THICKNESS 22
 #define DEBUG_IOR 23
 #define DEBUG_F0 24
+#define DEBUG_ATTENUATION_DISTANCE 25
+#define DEBUG_ATTENUATION_COLOR 26
+#define DEBUG_TRANSMISSION_RESULT 27
+#define DEBUG_REFRACTION_FRAMEBUFFER 28
+#define DEBUG_REFRACTION_COORDS 29
+#define DEBUG_FINAL_ALPHA 30
+#define DEBUG_BEER_LAW_ATTENUATION 31
+#define DEBUG_TRANSMISSION_BEFORE_TINT 32
+#define DEBUG_BASE_COLOR_FOR_TINT 33
+#define DEBUG_SURFACE_COLOR_BEFORE_MIX 34
 
 // Constants
 @include fs_constants.glsl
@@ -382,6 +403,96 @@ vec3 getEmissive() {
     return emissive;
 }
 
+#ifdef TRANSMISSION
+// Global variables to store transmission intermediate values for debugging
+vec2 g_refractionCoords = vec2(0.0);
+vec3 g_transmittedLightRaw = vec3(0.0);
+vec3 g_transmissionResult = vec3(0.0);
+vec3 g_beerLawAttenuation = vec3(1.0);
+vec3 g_transmissionBeforeTint = vec3(0.0);
+vec3 g_baseColorForTint = vec3(1.0);
+vec3 g_surfaceColorBeforeMix = vec3(0.0);
+
+// Get transmission/refraction contribution for IBL
+vec3 getTransmissionIBL(vec3 n, vec3 v, vec3 baseColor) {
+    // 1. Extract normalized rotation from model matrix (upper 3x3)
+    mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
+                        normalize(u_ModelMatrix[1].xyz),
+                        normalize(u_ModelMatrix[2].xyz));
+    
+    // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
+    mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
+    
+    // 3. Transform position to regular view space
+    vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
+    vec3 positionView = viewPos.xyz / viewPos.w;
+    
+    // 4. Transform normal using model-compensated view rotation
+    vec3 normalView = normalize(modelCompensatedViewRot * n);
+    vec3 viewDirView = normalize(-positionView);
+    
+    // 5. Calculate refracted ray direction using Snell's law
+    vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
+    
+    // 6. Extract model scale
+    vec3 modelScale;
+    modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
+    modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
+    modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
+    
+    // 7. Calculate transmission ray with scaled thickness
+    vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
+    
+    // 8. Calculate exit point in view space
+    vec3 refractedRayExitView = positionView + transmissionRayView;
+    
+    // 9. Project exit point to screen space
+    vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
+    vec2 refractionCoords = ndcPos.xy / ndcPos.w;
+    refractionCoords = refractionCoords * 0.5 + 0.5;
+    
+    #if !SOKOL_GLSL
+    refractionCoords.y = 1.0 - refractionCoords.y;
+    #endif
+    
+    // Store for debug views
+    g_refractionCoords = refractionCoords;
+    
+    // 10. Sample the transmission framebuffer
+    vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
+    
+    // Store raw sampled value for debug
+    g_transmittedLightRaw = transmittedLight;
+    
+    // 11. Apply Beer's law volume attenuation
+    #if ENABLE_BEER_LAW_ATTENUATION
+    if (attenuation_distance > 0.0) {
+        float transmissionRayLength = length(transmissionRayView);
+        vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
+        vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
+        transmittedLight *= attenuation;
+        g_beerLawAttenuation = attenuation;  // Store for debug
+    }
+    #endif
+    
+    // Store after Beer's law but before tinting
+    g_transmissionBeforeTint = transmittedLight;
+    g_baseColorForTint = baseColor;
+    
+    // 12. Modulate by base color
+    #if ENABLE_BASE_COLOR_TINT
+    vec3 result = transmittedLight * baseColor;
+    #else
+    vec3 result = transmittedLight;
+    #endif
+    
+    // Store final transmission result (before mixing with surface)
+    g_transmissionResult = result;
+    
+    return result;
+}
+#endif
+
 
 // ============================================================================
 // Main PBR shading
@@ -409,6 +520,15 @@ void main() {
     
     // Calculate F0 (reflectance at normal incidence)
     vec3 f0 = vec3(0.04); // Dielectric F0
+    
+#ifdef TRANSMISSION
+    // For transmission materials, F0 should be calculated from IOR
+    // F0 = ((ior - 1) / (ior + 1))^2
+    // This gives proper Fresnel reflection strength for glass/transparent materials
+    float f0_ior = pow((ior - 1.0) / (ior + 1.0), 2.0);
+    f0 = vec3(f0_ior);
+#endif
+    
     vec3 diffuseColor = baseColor.rgb * (1.0 - metallic);
     vec3 specularColor = mix(f0, baseColor.rgb, metallic);
     
@@ -474,70 +594,25 @@ void main() {
     }
     
 #ifdef TRANSMISSION
-    // === Transmission (Refraction through glass) ===
-    // Attempt 9: Model-rotation-compensated view-space refraction
-    // Key insight: When model rotates, view space changes relative to model.
-    // Solution: Cancel out model rotation from view matrix to get model-relative view space.
+    // ========================================================================
+    // Transmission (Glass/Refraction) - applies whether IBL is on or off
+    // ========================================================================
+    // Store surface color before transmission mixing (for debug)
+    g_surfaceColorBeforeMix = color;
     
-    // 1. Extract normalized rotation from model matrix (upper 3x3)
-    mat3 modelRot = mat3(normalize(u_ModelMatrix[0].xyz),
-                        normalize(u_ModelMatrix[1].xyz),
-                        normalize(u_ModelMatrix[2].xyz));
+    // Calculate transmission refraction
+    vec3 f_specular_transmission = getTransmissionIBL(n, v, baseColor.rgb);
     
-    // 2. Create model-compensated view rotation: ViewRot * inverse(ModelRot)
-    // Since modelRot is orthogonal, transpose = inverse
-    // This makes view space rotate WITH the model, keeping interior stationary
-    mat3 modelCompensatedViewRot = mat3(u_ViewMatrix) * transpose(modelRot);
-    
-    // 3. Transform position to regular view space
-    vec4 viewPos = u_ViewMatrix * vec4(v_Position, 1.0);
-    vec3 positionView = viewPos.xyz / viewPos.w;
-    
-    // 4. Transform normal using model-compensated view rotation
-    vec3 normalView = normalize(modelCompensatedViewRot * n);
-    vec3 viewDirView = normalize(-positionView);
-    
-    // 5. Calculate refracted ray direction in compensated space using Snell's law
-    vec3 refractedRayView = refract(-viewDirView, normalView, 1.0 / ior);
-    
-    // 6. Extract model scale (rotation-independent)
-    vec3 modelScale;
-    modelScale.x = length(vec3(u_ModelMatrix[0].xyz));
-    modelScale.y = length(vec3(u_ModelMatrix[1].xyz));
-    modelScale.z = length(vec3(u_ModelMatrix[2].xyz));
-    
-    // 7. Calculate transmission ray with scaled thickness
-    vec3 transmissionRayView = normalize(refractedRayView) * thickness_factor * modelScale;
-    
-    // 8. Calculate exit point in view space
-    vec3 refractedRayExitView = positionView + transmissionRayView;
-    
-    // 9. Project exit point to screen space (NDC then [0,1])
-    vec4 ndcPos = u_ProjectionMatrix * vec4(refractedRayExitView, 1.0);
-    vec2 refractionCoords = ndcPos.xy / ndcPos.w;
-    refractionCoords = refractionCoords * 0.5 + 0.5; // [-1,1] -> [0,1]
-    
-    #if !SOKOL_GLSL
-    // Metal/D3D: flip Y for texture coordinate system
-    refractionCoords.y = 1.0 - refractionCoords.y;
+    // Mix current color with transmission (transmission_factor controls blend)
+    // When transmission_factor = 0.0: fully opaque (use color)
+    // When transmission_factor = 1.0: fully transparent (use refraction)
+    #if ENABLE_TRANSMISSION_MIX
+    color = mix(color, f_specular_transmission, transmission_factor);
+    #else
+    // DEBUG: Show pure transmission without mixing with surface
+    color = f_specular_transmission;
     #endif
-    // OpenGL: no flip needed
-    
-    // 10. Sample the transmission framebuffer at refracted position
-    vec3 transmittedLight = texture(u_TransmissionFramebufferSampler, refractionCoords).rgb;
-    
-    // 11. Apply Beer's law (light absorption through volume)
-    if (attenuation_distance > 0.0) {
-        float transmissionRayLength = length(transmissionRayView);
-        vec3 attenuationCoefficient = -log(attenuation_color) / attenuation_distance;
-        vec3 attenuation = exp(-attenuationCoefficient * transmissionRayLength);
-        transmittedLight *= attenuation;
-    }
-    
-    // 12. Mix transmitted light with base color and blend
-    vec3 transmission = transmittedLight * baseColor.rgb;
-    color = mix(color, transmission, transmission_factor);
-#endif // TRANSMISSION
+#endif
     
     // ========================================================================
     // Punctual Lights (optional)
@@ -633,6 +708,15 @@ void main() {
     
     color += getEmissive();
     
+    // ========================================================================
+    // Calculate final alpha (before debug views so it can be displayed)
+    // ========================================================================
+    float finalAlpha = baseColor.a;
+#ifdef TRANSMISSION
+    #if ENABLE_TRANSMISSION_ALPHA
+    finalAlpha *= (1.0 - transmission_factor);
+    #endif
+#endif
     
     // ========================================================================
     // Debug Views (bypass tone mapping/gamma for raw material visualization)
@@ -715,11 +799,59 @@ void main() {
             color = vec3(transmission_factor);
         }
         else if (mode == DEBUG_VOLUME_THICKNESS) {
-            color = vec3(thickness_factor / 10.0); // Normalize for visibility
+            // Show raw thickness value normalized for visibility
+            // Typical range: 0.1 to 2.0 (with 1.0 being common)
+            // Clamp to reasonable range and normalize to 0-1
+            color = vec3(clamp(thickness_factor / 2.0, 0.0, 1.0));
         }
         else if (mode == DEBUG_IOR) {
             // Normalize IOR to 0-1 range (1.0-2.5 -> 0.0-1.0)
             color = vec3((ior - 1.0) / 1.5);
+        }
+        else if (mode == DEBUG_ATTENUATION_DISTANCE) {
+            // Show attenuation distance (typically 0.1 to 10.0)
+            // Normalize to 0-1 range for better visibility
+            color = vec3(clamp(attenuation_distance / 5.0, 0.0, 1.0));
+        }
+        else if (mode == DEBUG_ATTENUATION_COLOR) {
+            // Show the attenuation color directly (RGB absorption tint)
+            color = attenuation_color;
+        }
+        else if (mode == DEBUG_TRANSMISSION_RESULT) {
+            // Show the transmission result BEFORE mixing with surface color
+            // This is what getTransmissionIBL() returns
+            color = g_transmissionResult;
+        }
+        else if (mode == DEBUG_REFRACTION_FRAMEBUFFER) {
+            // Show raw framebuffer sample (what the camera sees through the glass)
+            color = g_transmittedLightRaw;
+        }
+        else if (mode == DEBUG_REFRACTION_COORDS) {
+            // Show refraction texture coordinates as RG color
+            // Red = X coordinate, Green = Y coordinate
+            color = vec3(g_refractionCoords, 0.0);
+        }
+        else if (mode == DEBUG_FINAL_ALPHA) {
+            // Show final alpha value (grayscale)
+            color = vec3(finalAlpha);
+        }
+        else if (mode == DEBUG_BEER_LAW_ATTENUATION) {
+            // Show Beer's law attenuation factor (how much light survives volume absorption)
+            // White = no attenuation, darker = more absorption
+            color = g_beerLawAttenuation;
+        }
+        else if (mode == DEBUG_TRANSMISSION_BEFORE_TINT) {
+            // Show transmission after Beer's law but before base color tinting
+            color = g_transmissionBeforeTint;
+        }
+        else if (mode == DEBUG_BASE_COLOR_FOR_TINT) {
+            // Show the base color used for tinting transmission
+            color = g_baseColorForTint;
+        }
+        else if (mode == DEBUG_SURFACE_COLOR_BEFORE_MIX) {
+            // Show the surface color before mixing with transmission
+            // This is what would be rendered for an opaque material
+            color = g_surfaceColorBeforeMix;
         }
 #endif // TRANSMISSION
         else if (mode == DEBUG_F0) {
@@ -738,7 +870,9 @@ void main() {
         }
     }
     
-    frag_color = vec4(color, baseColor.a);
+    // finalAlpha already calculated before debug views
+    
+    frag_color = vec4(color, finalAlpha);
 }
 @end
 

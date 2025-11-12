@@ -930,6 +930,20 @@ public static unsafe partial class SharpGLTFApp
                 if (igRadioButton_IntPtr("Volume Thickness", ref state.ui.debug_view_mode, 22)) { }
                 if (igRadioButton_IntPtr("Index of Refraction (IOR)", ref state.ui.debug_view_mode, 23)) { }
                 if (igRadioButton_IntPtr("F0 (Fresnel at 0°)", ref state.ui.debug_view_mode, 24)) { }
+                if (igRadioButton_IntPtr("Attenuation Distance", ref state.ui.debug_view_mode, 25)) { }
+                if (igRadioButton_IntPtr("Attenuation Color", ref state.ui.debug_view_mode, 26)) { }
+                if (igRadioButton_IntPtr("Transmission Result (Before Mix)", ref state.ui.debug_view_mode, 27)) { }
+                if (igRadioButton_IntPtr("Refraction Framebuffer (Raw)", ref state.ui.debug_view_mode, 28)) { }
+                if (igRadioButton_IntPtr("Refraction Coordinates", ref state.ui.debug_view_mode, 29)) { }
+                if (igRadioButton_IntPtr("Final Alpha", ref state.ui.debug_view_mode, 30)) { }
+                
+                igNewLine();
+                igTextColored(new Vector4(1.0f, 0.8f, 0.2f, 1.0f), "Advanced Transmission Debug:");
+                if (igRadioButton_IntPtr("Beer's Law Attenuation", ref state.ui.debug_view_mode, 31)) { }
+                if (igRadioButton_IntPtr("Base Color Tint", ref state.ui.debug_view_mode, 32)) { }
+                if (igRadioButton_IntPtr("Surface Color (Before Mix)", ref state.ui.debug_view_mode, 33)) { }
+                if (igRadioButton_IntPtr("Transmission After Beer's Law", ref state.ui.debug_view_mode, 34)) { }
+                if (igRadioButton_IntPtr("Transmission After Tint", ref state.ui.debug_view_mode, 35)) { }
             }
         }
         igEnd();

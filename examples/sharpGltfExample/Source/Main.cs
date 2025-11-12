@@ -31,7 +31,9 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "CompareIor/glTF/CompareIor.gltf",
         "CompareTransmission/glTF/CompareTransmission.gltf",
+        "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
         "MorphStressTest/glTF/MorphStressTest.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
@@ -52,7 +54,6 @@ public static unsafe partial class SharpGLTFApp
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
         "FlightHelmet/glTF/FlightHelmet.gltf",
-        "CompareIor/glTF/CompareIor.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "Lantern/glTF/Lantern.gltf",
         "ABeautifulGame/glTF/ABeautifulGame.gltf",
@@ -63,7 +64,6 @@ public static unsafe partial class SharpGLTFApp
         "BoomBox/glTF-Binary/BoomBox.glb",
         "ClearCoatCarPaint/glTF-Binary/ClearCoatCarPaint.glb",
         "ClearcoatRing/glTF/ClearcoatRing.gltf",
-        "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
         "IridescenceLamp/glTF-Binary/IridescenceLamp.glb"
     };
 
@@ -133,6 +133,10 @@ public static unsafe partial class SharpGLTFApp
         public sg_image screen_depth_img;    // Depth buffer
         public sg_view screen_color_view;    // View for screen texture (created once, reused)
         public sg_sampler sampler;           // Linear sampler for screen texture
+        
+        // Background checkerboard rendering
+        public sg_pipeline checkerboard_pipeline;  // Pipeline for fullscreen checkerboard
+        public sg_bindings checkerboard_bindings;  // Bindings for fullscreen quad
     }
 
     struct UIState
