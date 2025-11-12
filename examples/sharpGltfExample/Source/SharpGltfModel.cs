@@ -589,18 +589,12 @@ namespace Sokol
             }
             else if (mesh.TransmissionFactor > 0.0f)
             {
-                // Fallback for transmission without volume: use base color as attenuation color
-                // This provides approximate colored glass effect (e.g., amber tint)
-                mesh.ThicknessFactor = 1.0f;  // Use unit thickness as default
-                mesh.AttenuationDistance = 1.0f;  // Moderate absorption
-                // Use base color's RGB as attenuation color
-                mesh.AttenuationColor = new Vector3(
-                    mesh.BaseColorFactor.X,
-                    mesh.BaseColorFactor.Y,
-                    mesh.BaseColorFactor.Z
-                );
-                Info($"Material {material.LogicalIndex}: No volume extension, using base color as attenuation fallback - " +
-                    $"Color=({mesh.AttenuationColor.X:F2}, {mesh.AttenuationColor.Y:F2}, {mesh.AttenuationColor.Z:F2})", "SharpGLTF");
+                // Transmission without volume extension: infinitely thin glass (no volume absorption)
+                // Per glTF spec, thickness defaults to 0 when KHR_materials_volume is not present
+                mesh.ThicknessFactor = 0.0f;  // Infinitely thin - sample at surface, not through volume
+                mesh.AttenuationDistance = float.MaxValue;  // No absorption
+                mesh.AttenuationColor = new Vector3(1.0f, 1.0f, 1.0f);  // White = no tint
+                Info($"Material {material.LogicalIndex}: Transmission without volume - infinitely thin glass (thickness=0)", "SharpGLTF");
             }
             else
             {
