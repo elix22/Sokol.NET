@@ -827,15 +827,21 @@ public static unsafe partial class SharpGLTFApp
                 if (renderToOffscreen && useTransmission)
                 {
                     // Rendering opaque object to transmission offscreen pass (Pass 1)
-                    // Select pipeline based on skinning and morphing features
-                    if (useSkinning && useMorphing)
-                        pipeline = state.transmission.opaque_skinned_morphing_pipeline;
-                    else if (useSkinning)
-                        pipeline = state.transmission.opaque_skinned_pipeline;
-                    else if (useMorphing)
-                        pipeline = state.transmission.opaque_morphing_pipeline;
-                    else
-                        pipeline = state.transmission.opaque_standard_pipeline;
+                    // Use PipelineManager to get the correct pipeline (handles 32-bit indices automatically)
+                    // Map the regular pipeline type to transmission pipeline type
+                    PipelineType transmissionPipelineType = pipelineType switch
+                    {
+                        PipelineType.Standard => PipelineType.TransmissionOpaque,
+                        PipelineType.Standard32 => PipelineType.TransmissionOpaque32,
+                        PipelineType.Skinned => PipelineType.TransmissionOpaqueSkinned,
+                        PipelineType.Skinned32 => PipelineType.TransmissionOpaqueSkinned32,
+                        PipelineType.Morphing => PipelineType.TransmissionOpaqueMorphing,
+                        PipelineType.Morphing32 => PipelineType.TransmissionOpaqueMorphing32,
+                        PipelineType.SkinnedMorphing => PipelineType.TransmissionOpaqueSkinnedMorphing,
+                        PipelineType.SkinnedMorphing32 => PipelineType.TransmissionOpaqueSkinnedMorphing32,
+                        _ => PipelineType.TransmissionOpaque  // Fallback for blend/mask (shouldn't happen in opaque pass)
+                    };
+                    pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, cullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1);
                 }
                 else if (useBloom)
                 {
