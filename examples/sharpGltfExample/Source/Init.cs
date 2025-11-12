@@ -670,28 +670,6 @@ public static unsafe partial class SharpGLTFApp
             label = "transmission-sampler"
         });
 
-        // Create fullscreen quad vertex buffer for checkerboard background (only once)
-        if (state.transmission.checkerboard_bindings.vertex_buffers[0].id == 0)
-        {
-            // Fullscreen quad in NDC coordinates: two triangles covering [-1,-1] to [1,1]
-            float[] quad_vertices = new float[] { 
-                -1.0f, -1.0f,   // Bottom-left
-                 1.0f, -1.0f,   // Bottom-right
-                -1.0f,  1.0f,   // Top-left
-                 1.0f,  1.0f    // Top-right
-            };
-            
-            fixed (float* ptr = quad_vertices)
-            {
-                state.transmission.checkerboard_bindings.vertex_buffers[0] = sg_make_buffer(new sg_buffer_desc()
-                {
-                    data = new sg_range { ptr = ptr, size = (nuint)(quad_vertices.Length * sizeof(float)) },
-                    label = "checkerboard-vertices"
-                });
-            }
-            Info("[Transmission] Created checkerboard fullscreen quad vertex buffer");
-        }
-
         // Allocate/initialize view for screen texture (create once, reuse every frame)
         if (state.transmission.screen_color_view.id == 0)
         {

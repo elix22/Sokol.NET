@@ -135,9 +135,6 @@ public static unsafe partial class SharpGLTFApp
         public sg_view screen_color_view;    // View for screen texture (created once, reused)
         public sg_sampler sampler;           // Linear sampler for screen texture
         
-        // Background checkerboard rendering
-        public sg_pipeline checkerboard_pipeline;  // Pipeline for fullscreen checkerboard
-        public sg_bindings checkerboard_bindings;  // Bindings for fullscreen quad
     }
 
     struct UIState
