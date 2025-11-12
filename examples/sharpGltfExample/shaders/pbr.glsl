@@ -16,7 +16,7 @@
     Supported glTF Extensions:
     - KHR_materials_clearcoat: Clear coat layer for car paint and lacquer
     - KHR_materials_transmission: Glass and transparent materials with refraction
-    - KHR_materials_volume: Volume attenuation (Beer's law) for colored glass
+    - KHR_materials_volume: Volume attenuation (Beer's law) with thickness texture support
     - KHR_materials_ior: Index of refraction for realistic glass materials
     - KHR_texture_transform: UV scale, rotation, and offset transformations
 */
