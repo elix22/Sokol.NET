@@ -719,25 +719,25 @@ public static unsafe partial class SharpGLTFApp
         {
             Info("[Transmission] Creating opaque rendering pipelines...");
             state.transmission.opaque_standard_pipeline = PipeLineManager.GetOrCreatePipeline(
-                PipelineType.TransmissionOpaque,
+                PipelineType.Transmission,
                 colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
                 depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                 sampleCount: 1
             );
             state.transmission.opaque_skinned_pipeline = PipeLineManager.GetOrCreatePipeline(
-                PipelineType.TransmissionOpaqueSkinned,
+                PipelineType.TransmissionSkinned,
                 colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
                 depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                 sampleCount: 1
             );
             state.transmission.opaque_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
-                PipelineType.TransmissionOpaqueMorphing,
+                PipelineType.TransmissionMorphing,
                 colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
                 depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                 sampleCount: 1
             );
             state.transmission.opaque_skinned_morphing_pipeline = PipeLineManager.GetOrCreatePipeline(
-                PipelineType.TransmissionOpaqueSkinnedMorphing,
+                PipelineType.TransmissionSkinnedMorphing,
                 colorFormat: sg_pixel_format.SG_PIXELFORMAT_RGBA8,
                 depthFormat: sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                 sampleCount: 1

@@ -827,19 +827,43 @@ public static unsafe partial class SharpGLTFApp
                 if ((renderToOffscreen || useScreenTexture) && useTransmission)
                 {
                     // Rendering with transmission shaders (Pass 1: opaque to offscreen, Pass 2: transparent with refraction)
-                    // Use PipelineManager to get the correct pipeline (handles 32-bit indices automatically)
-                    // Map the regular pipeline type to transmission pipeline type
+                    // For materials with transmission, use transmission pipeline variant matching the alpha mode
                     PipelineType transmissionPipelineType = pipelineType switch
                     {
-                        PipelineType.Standard => PipelineType.TransmissionOpaque,
-                        PipelineType.Standard32 => PipelineType.TransmissionOpaque32,
-                        PipelineType.Skinned => PipelineType.TransmissionOpaqueSkinned,
-                        PipelineType.Skinned32 => PipelineType.TransmissionOpaqueSkinned32,
-                        PipelineType.Morphing => PipelineType.TransmissionOpaqueMorphing,
-                        PipelineType.Morphing32 => PipelineType.TransmissionOpaqueMorphing32,
-                        PipelineType.SkinnedMorphing => PipelineType.TransmissionOpaqueSkinnedMorphing,
-                        PipelineType.SkinnedMorphing32 => PipelineType.TransmissionOpaqueSkinnedMorphing32,
-                        _ => PipelineType.TransmissionOpaque  // Fallback for blend/mask (shouldn't happen in opaque pass)
+                        // Standard opaque
+                        PipelineType.Standard => PipelineType.Transmission,
+                        PipelineType.Standard32 => PipelineType.Transmission32,
+                        // Skinned opaque
+                        PipelineType.Skinned => PipelineType.TransmissionSkinned,
+                        PipelineType.Skinned32 => PipelineType.TransmissionSkinned32,
+                        // Morphing opaque
+                        PipelineType.Morphing => PipelineType.TransmissionMorphing,
+                        PipelineType.Morphing32 => PipelineType.TransmissionMorphing32,
+                        // Skinned + Morphing opaque
+                        PipelineType.SkinnedMorphing => PipelineType.TransmissionSkinnedMorphing,
+                        PipelineType.SkinnedMorphing32 => PipelineType.TransmissionSkinnedMorphing32,
+                        
+                        // Blend variants
+                        PipelineType.StandardBlend => PipelineType.TransmissionBlend,
+                        PipelineType.StandardBlend32 => PipelineType.TransmissionBlend32,
+                        PipelineType.SkinnedBlend => PipelineType.TransmissionSkinnedBlend,
+                        PipelineType.SkinnedBlend32 => PipelineType.TransmissionSkinnedBlend32,
+                        PipelineType.MorphingBlend => PipelineType.TransmissionMorphingBlend,
+                        PipelineType.MorphingBlend32 => PipelineType.TransmissionMorphingBlend32,
+                        PipelineType.SkinnedMorphingBlend => PipelineType.TransmissionSkinnedMorphingBlend,
+                        PipelineType.SkinnedMorphingBlend32 => PipelineType.TransmissionSkinnedMorphingBlend32,
+                        
+                        // Mask variants
+                        PipelineType.StandardMask => PipelineType.TransmissionMask,
+                        PipelineType.StandardMask32 => PipelineType.TransmissionMask32,
+                        PipelineType.SkinnedMask => PipelineType.TransmissionSkinnedMask,
+                        PipelineType.SkinnedMask32 => PipelineType.TransmissionSkinnedMask32,
+                        PipelineType.MorphingMask => PipelineType.TransmissionMorphingMask,
+                        PipelineType.MorphingMask32 => PipelineType.TransmissionMorphingMask32,
+                        PipelineType.SkinnedMorphingMask => PipelineType.TransmissionSkinnedMorphingMask,
+                        PipelineType.SkinnedMorphingMask32 => PipelineType.TransmissionSkinnedMorphingMask32,
+                        
+                        _ => PipelineType.Transmission  // Fallback
                     };
                     // Use offscreen format for Pass 1, swapchain format for Pass 2
                     if (renderToOffscreen)
