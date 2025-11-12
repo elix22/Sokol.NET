@@ -827,7 +827,15 @@ public static unsafe partial class SharpGLTFApp
                 if (renderToOffscreen && useTransmission)
                 {
                     // Rendering opaque object to transmission offscreen pass (Pass 1)
-                    pipeline = useSkinning ? state.transmission.opaque_skinned_pipeline : state.transmission.opaque_standard_pipeline;
+                    // Select pipeline based on skinning and morphing features
+                    if (useSkinning && useMorphing)
+                        pipeline = state.transmission.opaque_skinned_morphing_pipeline;
+                    else if (useSkinning)
+                        pipeline = state.transmission.opaque_skinned_pipeline;
+                    else if (useMorphing)
+                        pipeline = state.transmission.opaque_morphing_pipeline;
+                    else
+                        pipeline = state.transmission.opaque_standard_pipeline;
                 }
                 else if (useBloom)
                 {

@@ -9,6 +9,10 @@ using static pbr_shader_cs.Shaders;
 using static pbr_shader_skinning_cs_skinning.Shaders;
 using static pbr_shader_morphing_cs_morphing.Shaders;
 using static pbr_shader_skinning_morphing_cs_skinning_morphing.Shaders;
+using static pbr_shader_transmission_cs_transmission.Shaders;
+using static pbr_shader_transmission_skinning_cs_transmission_skinning.Shaders;
+using static pbr_shader_transmission_morphing_cs_transmission_morphing.Shaders;
+using static pbr_shader_transmission_skinning_morphing_cs_transmission_skinning_morphing.Shaders;
 using static bloom_shader_cs.Shaders;
 
 public enum PipelineType
@@ -45,6 +49,12 @@ public enum PipelineType
     SkinnedMask32,
     MorphingMask32,
     SkinnedMorphingMask32,
+    
+    // Transmission 32-bit index variants
+    TransmissionOpaque32,
+    TransmissionOpaqueSkinned32,
+    TransmissionOpaqueMorphing32,
+    TransmissionOpaqueSkinnedMorphing32,
     
     // Post-processing pipelines
     BloomBright,           // Bright pass for bloom effect
@@ -453,6 +463,10 @@ public static class PipeLineManager
             case PipelineType.SkinnedMask32:
             case PipelineType.MorphingMask32:
             case PipelineType.SkinnedMorphingMask32:
+            case PipelineType.TransmissionOpaque32:
+            case PipelineType.TransmissionOpaqueSkinned32:
+            case PipelineType.TransmissionOpaqueMorphing32:
+            case PipelineType.TransmissionOpaqueSkinnedMorphing32:
                 // Create pipeline with same settings as base type, but with 32-bit indices
                 var baseType = GetBasePipelineType(type);
                 pipeline = CreatePipeline32BitVariant(type, cullMode, finalColorFormat, finalDepthFormat, finalSampleCount);
@@ -503,6 +517,54 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].pixel_format = finalColorFormat;
                 pipeline_desc.depth.pixel_format = finalDepthFormat;
                 pipeline_desc.label = "transmission-opaque-skinned-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.TransmissionOpaqueMorphing:
+                // Morphing mesh pipeline rendering to transmission opaque pass
+                sg_shader shader_transmission_morphing = sg_make_shader(transmission_morphing_pbr_program_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.Morphing, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_transmission_morphing;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                pipeline_desc.depth.pixel_format = finalDepthFormat;
+                pipeline_desc.label = "transmission-opaque-morphing-pipeline";
+                pipeline = sg_make_pipeline(pipeline_desc);
+                break;
+
+            case PipelineType.TransmissionOpaqueSkinnedMorphing:
+                // Skinned + morphing mesh pipeline rendering to transmission opaque pass
+                sg_shader shader_transmission_skinned_morphing = sg_make_shader(transmission_skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "position")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "normal")].format = SG_VERTEXFORMAT_FLOAT3;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "tangent")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "color_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "texcoord_0")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(type, "texcoord_1")].format = SG_VERTEXFORMAT_FLOAT2;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "joints_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.layout.attrs[GetAttrSlot(PipelineType.SkinnedMorphing, "weights_0")].format = SG_VERTEXFORMAT_FLOAT4;
+                pipeline_desc.shader = shader_transmission_skinned_morphing;
+                pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
+                pipeline_desc.cull_mode = cullMode;
+                pipeline_desc.face_winding = sg_face_winding.SG_FACEWINDING_CCW;
+                pipeline_desc.depth.write_enabled = true;
+                pipeline_desc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+                pipeline_desc.sample_count = finalSampleCount;
+                pipeline_desc.colors[0].pixel_format = finalColorFormat;
+                pipeline_desc.depth.pixel_format = finalDepthFormat;
+                pipeline_desc.label = "transmission-opaque-skinned-morphing-pipeline";
                 pipeline = sg_make_pipeline(pipeline_desc);
                 break;
 
@@ -601,13 +663,29 @@ public static class PipeLineManager
         
         // Determine shader based on base type
         sg_shader shader;
-        if (baseType == PipelineType.Skinned || baseType == PipelineType.SkinnedBlend || baseType == PipelineType.SkinnedMask)
+        if (baseType == PipelineType.SkinnedMorphing || baseType == PipelineType.SkinnedMorphingBlend || baseType == PipelineType.SkinnedMorphingMask || baseType == PipelineType.TransmissionOpaqueSkinnedMorphing)
         {
-            shader = sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+            shader = baseType == PipelineType.TransmissionOpaqueSkinnedMorphing 
+                ? sg_make_shader(transmission_skinning_morphing_pbr_program_shader_desc(sg_query_backend()))
+                : sg_make_shader(skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
+        }
+        else if (baseType == PipelineType.Skinned || baseType == PipelineType.SkinnedBlend || baseType == PipelineType.SkinnedMask || baseType == PipelineType.TransmissionOpaqueSkinned)
+        {
+            shader = baseType == PipelineType.TransmissionOpaqueSkinned
+                ? sg_make_shader(transmission_skinning_pbr_program_shader_desc(sg_query_backend()))
+                : sg_make_shader(skinning_pbr_program_shader_desc(sg_query_backend()));
+        }
+        else if (baseType == PipelineType.Morphing || baseType == PipelineType.MorphingBlend || baseType == PipelineType.MorphingMask || baseType == PipelineType.TransmissionOpaqueMorphing)
+        {
+            shader = baseType == PipelineType.TransmissionOpaqueMorphing
+                ? sg_make_shader(transmission_morphing_pbr_program_shader_desc(sg_query_backend()))
+                : sg_make_shader(morphing_pbr_program_shader_desc(sg_query_backend()));
         }
         else
         {
-            shader = sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
+            shader = baseType == PipelineType.TransmissionOpaque
+                ? sg_make_shader(transmission_pbr_program_shader_desc(sg_query_backend()))
+                : sg_make_shader(pbr_program_shader_desc(sg_query_backend()));
         }
         
         // Common setup for all variants
@@ -631,18 +709,29 @@ public static class PipeLineManager
         switch (baseType)
         {
             case PipelineType.Standard:
+            case PipelineType.Morphing:
+            case PipelineType.TransmissionOpaque:
+            case PipelineType.TransmissionOpaqueMorphing:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
-                pipeline_desc.label = "static-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.TransmissionOpaque ? "transmission-opaque-static-32bit-pipeline" :
+                                     baseType == PipelineType.TransmissionOpaqueMorphing ? "transmission-opaque-morphing-32bit-pipeline" :
+                                     baseType == PipelineType.Morphing ? "morphing-32bit-pipeline" : "static-32bit-pipeline";
                 break;
                 
             case PipelineType.Skinned:
+            case PipelineType.SkinnedMorphing:
+            case PipelineType.TransmissionOpaqueSkinned:
+            case PipelineType.TransmissionOpaqueSkinnedMorphing:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
-                pipeline_desc.label = "skinned-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.TransmissionOpaqueSkinned ? "transmission-opaque-skinned-32bit-pipeline" :
+                                     baseType == PipelineType.TransmissionOpaqueSkinnedMorphing ? "transmission-opaque-skinned-morphing-32bit-pipeline" :
+                                     baseType == PipelineType.SkinnedMorphing ? "skinned-morphing-32bit-pipeline" : "skinned-32bit-pipeline";
                 break;
                 
             case PipelineType.StandardBlend:
+            case PipelineType.MorphingBlend:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = false;
                 pipeline_desc.colors[0].blend.enabled = true;
@@ -650,10 +739,11 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
                 pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
                 pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-                pipeline_desc.label = "static-blend-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.MorphingBlend ? "morphing-blend-32bit-pipeline" : "static-blend-32bit-pipeline";
                 break;
                 
             case PipelineType.SkinnedBlend:
+            case PipelineType.SkinnedMorphingBlend:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = false;
                 pipeline_desc.colors[0].blend.enabled = true;
@@ -661,19 +751,21 @@ public static class PipeLineManager
                 pipeline_desc.colors[0].blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
                 pipeline_desc.colors[0].blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
                 pipeline_desc.colors[0].blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-                pipeline_desc.label = "skinned-blend-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.SkinnedMorphingBlend ? "skinned-morphing-blend-32bit-pipeline" : "skinned-blend-32bit-pipeline";
                 break;
                 
             case PipelineType.StandardMask:
+            case PipelineType.MorphingMask:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
-                pipeline_desc.label = "static-mask-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.MorphingMask ? "morphing-mask-32bit-pipeline" : "static-mask-32bit-pipeline";
                 break;
                 
             case PipelineType.SkinnedMask:
+            case PipelineType.SkinnedMorphingMask:
                 pipeline_desc.cull_mode = cullMode;
                 pipeline_desc.depth.write_enabled = true;
-                pipeline_desc.label = "skinned-mask-32bit-pipeline";
+                pipeline_desc.label = baseType == PipelineType.SkinnedMorphingMask ? "skinned-morphing-mask-32bit-pipeline" : "skinned-mask-32bit-pipeline";
                 break;
         }
         
@@ -707,6 +799,10 @@ public static class PipeLineManager
             PipelineType.SkinnedMask32 => PipelineType.SkinnedMask,
             PipelineType.MorphingMask32 => PipelineType.MorphingMask,
             PipelineType.SkinnedMorphingMask32 => PipelineType.SkinnedMorphingMask,
+            PipelineType.TransmissionOpaque32 => PipelineType.TransmissionOpaque,
+            PipelineType.TransmissionOpaqueSkinned32 => PipelineType.TransmissionOpaqueSkinned,
+            PipelineType.TransmissionOpaqueMorphing32 => PipelineType.TransmissionOpaqueMorphing,
+            PipelineType.TransmissionOpaqueSkinnedMorphing32 => PipelineType.TransmissionOpaqueSkinnedMorphing,
             _ => type
         };
     }

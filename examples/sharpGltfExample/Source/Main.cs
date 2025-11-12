@@ -122,6 +122,8 @@ public static unsafe partial class SharpGLTFApp
         // Pipelines for opaque rendering (captures scene behind transparent objects)
         public sg_pipeline opaque_standard_pipeline;
         public sg_pipeline opaque_skinned_pipeline;
+        public sg_pipeline opaque_morphing_pipeline;
+        public sg_pipeline opaque_skinned_morphing_pipeline;
         public sg_pipeline opaque_standard_blend_pipeline;
         public sg_pipeline opaque_skinned_blend_pipeline;
         public sg_pipeline opaque_standard_mask_pipeline;
