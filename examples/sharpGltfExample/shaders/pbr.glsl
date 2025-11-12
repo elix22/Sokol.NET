@@ -233,6 +233,51 @@ vec2 applyTextureTransform(vec2 uv, vec2 offset, float rotation, vec2 scale)
     return transformed;
 }
 
+// Calculate light direction and attenuation for a given light index
+// Returns: light direction in xyz, attenuation in w
+vec4 getLightDirectionAndAttenuation(int lightIndex)
+{
+    vec3 lightPos = light_positions[lightIndex].xyz;
+    vec3 lightDir = light_directions[lightIndex].xyz;
+    int lightType = int(light_positions[lightIndex].w);
+    
+    vec3 l; // Light direction
+    float attenuation = 1.0;
+    
+    // Directional light
+    if (lightType == 0) {
+        l = normalize(-lightDir);
+    }
+    // Point light
+    else if (lightType == 1) {
+        vec3 pointToLight = lightPos - v_Position;
+        l = normalize(pointToLight);
+        float distance = length(pointToLight);
+        float range = light_params_data[lightIndex].x;
+        attenuation = max(0.0, 1.0 - (distance / range));
+        attenuation *= attenuation;
+    }
+    // Spot light
+    else if (lightType == 2) {
+        vec3 pointToLight = lightPos - v_Position;
+        l = normalize(pointToLight);
+        float distance = length(pointToLight);
+        float range = light_params_data[lightIndex].x;
+        attenuation = max(0.0, 1.0 - (distance / range));
+        attenuation *= attenuation;
+        
+        // Spot cone
+        float angle = dot(l, normalize(-lightDir));
+        float innerCutoff = light_directions[lightIndex].w;
+        float outerCutoff = light_params_data[lightIndex].y;
+        float epsilon = innerCutoff - outerCutoff;
+        float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
+        attenuation *= spotIntensity;
+    }
+    
+    return vec4(l, attenuation);
+}
+
 // Include core utilities and functions (after uniforms/samplers/utilities are defined)
 @include brdf.glsl
 @include ibl.glsl
@@ -573,55 +618,42 @@ void main() {
     }
     
     // ========================================================================
+    // Clearcoat preparation (before punctual lights loop)
+    // ========================================================================
+    // Pre-calculate clearcoat properties so we can process both base and clearcoat
+    // in a single light loop for efficiency
+    
+    vec3 clearcoatNormal = normalize(v_Normal);
+    float clearcoatRoughness = clearcoat_roughness;
+    float clearcoatAlphaRoughness = clearcoatRoughness * clearcoatRoughness;
+    vec3 clearcoatF0 = vec3(0.04);
+    vec3 clearcoatF90 = vec3(1.0);
+    vec3 clearcoat_punctual = vec3(0.0);
+    
+    // ========================================================================
     // Punctual Lights (optional)
     // ========================================================================
+    // Process both base material and clearcoat in a single loop to avoid
+    // redundant light direction/attenuation calculations
     
     if (use_punctual_lights > 0) {
         for (int i = 0; i < num_lights; i++) {
-            vec3 lightPos = light_positions[i].xyz;
-            vec3 lightDir = light_directions[i].xyz;
             vec3 lightColor = light_colors[i].rgb;
             float lightIntensity = light_colors[i].w;
-            int lightType = int(light_positions[i].w);
             
-            vec3 l; // Light direction
-            float attenuation = 1.0;
-            
-            // Directional light
-            if (lightType == 0) {
-                l = normalize(-lightDir);
-            }
-            // Point light
-            else if (lightType == 1) {
-                vec3 pointToLight = lightPos - v_Position;
-                l = normalize(pointToLight);
-                float distance = length(pointToLight);
-                float range = light_params_data[i].x;
-                attenuation = max(0.0, 1.0 - (distance / range));
-                attenuation *= attenuation;
-            }
-            // Spot light
-            else if (lightType == 2) {
-                vec3 pointToLight = lightPos - v_Position;
-                l = normalize(pointToLight);
-                float distance = length(pointToLight);
-                float range = light_params_data[i].x;
-                attenuation = max(0.0, 1.0 - (distance / range));
-                attenuation *= attenuation;
-                
-                // Spot cone
-                float angle = dot(l, normalize(-lightDir));
-                float innerCutoff = light_directions[i].w;
-                float outerCutoff = light_params_data[i].y;
-                float epsilon = innerCutoff - outerCutoff;
-                float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
-                attenuation *= spotIntensity;
-            }
+            // Calculate light direction and attenuation ONCE per light
+            vec4 lightData = getLightDirectionAndAttenuation(i);
+            vec3 l = lightData.xyz;
+            float attenuation = lightData.w;
             
             vec3 h = normalize(l + v);
+            float VdotH = clampedDot(v, h);
+            
+            // ================================================================
+            // Base material lighting
+            // ================================================================
             float NdotL = clampedDot(n, l);
             float NdotH = clampedDot(n, h);
-            float VdotH = clampedDot(v, h);
             
             if (NdotL > 0.0 || NdotV > 0.0) {
                 // Calculate the Fresnel term
@@ -645,6 +677,27 @@ void main() {
                 
                 color += lightContribution;
             }
+            
+            // ================================================================
+            // Clearcoat lighting (only if clearcoat is enabled)
+            // ================================================================
+            if (clearcoat_factor > 0.0) {
+                float NdotL_clearcoat = clampedDot(clearcoatNormal, l);
+                float NdotH_clearcoat = clampedDot(clearcoatNormal, h);
+                float NdotV_clearcoat = clampedDot(clearcoatNormal, v);
+                
+                if (NdotL_clearcoat > 0.0 || NdotV_clearcoat > 0.0) {
+                    // Clearcoat BRDF (specular only, no diffuse)
+                    vec3 F_clearcoat = F_Schlick(clearcoatF0, clearcoatF90, VdotH);
+                    float Vis_clearcoat = V_GGX(NdotL_clearcoat, NdotV_clearcoat, clearcoatAlphaRoughness);
+                    float D_clearcoat = D_GGX(NdotH_clearcoat, clearcoatAlphaRoughness);
+                    
+                    vec3 clearcoatSpecular = F_clearcoat * Vis_clearcoat * D_clearcoat;
+                    vec3 clearcoatContribution = NdotL_clearcoat * attenuation * lightIntensity * lightColor * clearcoatSpecular;
+                    
+                    clearcoat_punctual += clearcoatContribution;
+                }
+            }
         }
     }
     
@@ -658,18 +711,6 @@ void main() {
     // Implementation based on glTF Sample Viewer
     
     if (clearcoat_factor > 0.0) {
-        // Clearcoat uses geometric normal (smooth surface), NOT the base material's perturbed normal
-        // This ensures the clearcoat layer is glossy and smooth, even if the base has a detailed normal map
-        vec3 clearcoatNormal = normalize(v_Normal);
-        
-        // Clearcoat roughness (usually very low for glossy coating)
-        float clearcoatRoughness = clearcoat_roughness;
-        float clearcoatAlphaRoughness = clearcoatRoughness * clearcoatRoughness;
-        
-        // Clearcoat is always dielectric (F0 = 0.04 for most clear coatings)
-        vec3 clearcoatF0 = vec3(0.04);
-        vec3 clearcoatF90 = vec3(1.0);
-        
         // Calculate clearcoat Fresnel at the current view angle
         // This determines how much clearcoat reflection vs base material to show
         vec3 clearcoatFresnel = F_Schlick(clearcoatF0, clearcoatF90, clampedDot(clearcoatNormal, v));
@@ -680,71 +721,7 @@ void main() {
             clearcoat_brdf = getIBLRadianceGGX(clearcoatNormal, v, clearcoatRoughness);
         }
         
-        // Calculate clearcoat contribution from punctual lights
-        vec3 clearcoat_punctual = vec3(0.0);
-        if (use_punctual_lights > 0) {
-            for (int i = 0; i < num_lights; i++) {
-                vec3 lightPos = light_positions[i].xyz;
-                vec3 lightDir = light_directions[i].xyz;
-                vec3 lightColor = light_colors[i].rgb;
-                float lightIntensity = light_colors[i].w;
-                int lightType = int(light_positions[i].w);
-                
-                vec3 l; // Light direction
-                float attenuation = 1.0;
-                
-                // Directional light
-                if (lightType == 0) {
-                    l = normalize(-lightDir);
-                }
-                // Point light
-                else if (lightType == 1) {
-                    vec3 pointToLight = lightPos - v_Position;
-                    l = normalize(pointToLight);
-                    float distance = length(pointToLight);
-                    float range = light_params_data[i].x;
-                    attenuation = max(0.0, 1.0 - (distance / range));
-                    attenuation *= attenuation;
-                }
-                // Spot light
-                else if (lightType == 2) {
-                    vec3 pointToLight = lightPos - v_Position;
-                    l = normalize(pointToLight);
-                    float distance = length(pointToLight);
-                    float range = light_params_data[i].x;
-                    attenuation = max(0.0, 1.0 - (distance / range));
-                    attenuation *= attenuation;
-                    
-                    // Spot cone
-                    float angle = dot(l, normalize(-lightDir));
-                    float innerCutoff = light_directions[i].w;
-                    float outerCutoff = light_params_data[i].y;
-                    float epsilon = innerCutoff - outerCutoff;
-                    float spotIntensity = clamp((angle - outerCutoff) / epsilon, 0.0, 1.0);
-                    attenuation *= spotIntensity;
-                }
-                
-                vec3 h = normalize(l + v);
-                float NdotL = clampedDot(clearcoatNormal, l);
-                float NdotH = clampedDot(clearcoatNormal, h);
-                float NdotV_clearcoat = clampedDot(clearcoatNormal, v);
-                float VdotH = clampedDot(v, h);
-                
-                if (NdotL > 0.0 || NdotV_clearcoat > 0.0) {
-                    // Clearcoat BRDF (specular only, no diffuse)
-                    vec3 F_clearcoat = F_Schlick(clearcoatF0, clearcoatF90, VdotH);
-                    float Vis_clearcoat = V_GGX(NdotL, NdotV_clearcoat, clearcoatAlphaRoughness);
-                    float D_clearcoat = D_GGX(NdotH, clearcoatAlphaRoughness);
-                    
-                    vec3 clearcoatSpecular = F_clearcoat * Vis_clearcoat * D_clearcoat;
-                    vec3 clearcoatContribution = NdotL * attenuation * lightIntensity * lightColor * clearcoatSpecular;
-                    
-                    clearcoat_punctual += clearcoatContribution;
-                }
-            }
-        }
-        
-        // Combine clearcoat IBL and punctual lighting
+        // Add punctual lights contribution (calculated in the loop above)
         clearcoat_brdf += clearcoat_punctual;
         
         // Mix clearcoat with base color using Fresnel weighting (physically correct)
