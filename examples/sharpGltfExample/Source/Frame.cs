@@ -727,9 +727,14 @@ public static unsafe partial class SharpGLTFApp
             // Calculate view-projection matrix for frustum culling
             Matrix4x4 viewProjection = state.camera.ViewProj;
 
-            // Separate nodes into opaque and transparent lists - store node, transform, and distance
+            // Separate nodes into opaque, transparent (blend), and transmissive (glass) lists
+            // This matches the glTF Sample Viewer's classification:
+            // - opaqueNodes: alphaMode != BLEND and no transmission
+            // - transparentNodes: alphaMode == BLEND and no transmission  
+            // - transmissiveNodes: has transmission extension (regardless of alphaMode)
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> opaqueNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transparentNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
+            List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transmissiveNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
 
             // Collect and categorize all visible nodes
             foreach (var node in state.model.Nodes)
@@ -784,22 +789,30 @@ public static unsafe partial class SharpGLTFApp
                 Vector3 meshCenter = (worldBounds.Min + worldBounds.Max) * 0.5f;
                 float distanceToCamera = Vector3.Distance(meshCenter, state.camera.EyePos);
 
-                // Categorize as opaque or transparent
-                // Check both TransmissionFactor (glass) and AlphaMode (regular transparency)
-                bool isTransparent = (mesh.TransmissionFactor > 0.0f) || (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND);
-                
-                if (isTransparent)
+                // Categorize nodes according to glTF Sample Viewer logic:
+                // - transmissiveNodes: has KHR_materials_transmission (regardless of alphaMode)
+                // - transparentNodes: alphaMode == BLEND but no transmission
+                // - opaqueNodes: everything else (alphaMode != BLEND and no transmission)
+                if (mesh.TransmissionFactor > 0.0f)
                 {
+                    // Has transmission extension - render separately with transmission shader
+                    transmissiveNodes.Add((node, modelMatrix, distanceToCamera));
+                }
+                else if (mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.BLEND)
+                {
+                    // Regular alpha blending without transmission
                     transparentNodes.Add((node, modelMatrix, distanceToCamera));
                 }
                 else
                 {
+                    // Opaque or masked - no special handling needed
                     opaqueNodes.Add((node, modelMatrix, distanceToCamera));
                 }
             }
 
-            // Sort transparent nodes back-to-front (furthest first)
+            // Sort back-to-front for proper alpha blending
             transparentNodes.Sort((a, b) => b.distance.CompareTo(a.distance));
+            transmissiveNodes.Sort((a, b) => b.distance.CompareTo(a.distance));
 
             // Helper function to render a node
             // modelMatrix: Pre-calculated transform matrix (includes node transform + global rotation + animation)
@@ -924,33 +937,179 @@ public static unsafe partial class SharpGLTFApp
                 }
             }
 
+            // Helper function to render a node with specific cull mode override
+            // Used for double-sided transmissive materials that need separate front/back face passes
+            void RenderNodeWithCullMode(SharpGltfNode node, Matrix4x4 modelMatrix, sg_cull_mode forcedCullMode, bool useScreenTexture = false, bool renderToOffscreen = false)
+            {
+                var mesh = state.model.Meshes[node.MeshIndex];
+
+                // Use skinning if mesh has it and animator exists
+                bool useSkinning = mesh.HasSkinning && state.animator != null;
+                bool useMorphing = mesh.HasMorphTargets;
+                
+                // Check if mesh uses 32-bit indices (based on IndexType field)
+                bool needs32BitIndices = (mesh.IndexType == sg_index_type.SG_INDEXTYPE_UINT32);
+
+                // For double-sided transmission materials rendering BACK FACES:
+                // - If material is OPAQUE, force BLEND mode to enable alpha blending for back faces
+                //   (front faces fully transparent alpha=0, back faces semi-transparent alpha=0.2)
+                // - If material is already BLEND, keep it (handles "Transmission /w Opacity" correctly)
+                var effectiveAlphaMode = mesh.AlphaMode;
+                bool isRenderingBackFaces = (forcedCullMode == SG_CULLMODE_FRONT); // Culling front = rendering back
+                if (mesh.DoubleSided && mesh.TransmissionFactor > 0.0f && isRenderingBackFaces && 
+                    mesh.AlphaMode == SharpGLTF.Schema2.AlphaMode.OPAQUE)
+                {
+                    effectiveAlphaMode = SharpGLTF.Schema2.AlphaMode.BLEND;
+                }
+
+                // Choose pipeline based on alpha mode, skinning, morphing, index type, and rendering mode
+                PipelineType pipelineType = PipeLineManager.GetPipelineTypeForMaterial(effectiveAlphaMode, useSkinning, useMorphing, needs32BitIndices);
+                
+                // Get appropriate pipeline based on rendering mode
+                sg_pipeline pipeline;
+                if ((renderToOffscreen || useScreenTexture) && useTransmission)
+                {
+                    // Rendering with transmission shaders (Pass 1: opaque to offscreen, Pass 2: transparent with refraction)
+                    // For materials with transmission, use transmission pipeline variant matching the alpha mode
+                    PipelineType transmissionPipelineType = pipelineType switch
+                    {
+                        // Standard opaque
+                        PipelineType.Standard => PipelineType.Transmission,
+                        PipelineType.Standard32 => PipelineType.Transmission32,
+                        // Skinned opaque
+                        PipelineType.Skinned => PipelineType.TransmissionSkinned,
+                        PipelineType.Skinned32 => PipelineType.TransmissionSkinned32,
+                        // Morphing opaque
+                        PipelineType.Morphing => PipelineType.TransmissionMorphing,
+                        PipelineType.Morphing32 => PipelineType.TransmissionMorphing32,
+                        // Skinned + Morphing opaque
+                        PipelineType.SkinnedMorphing => PipelineType.TransmissionSkinnedMorphing,
+                        PipelineType.SkinnedMorphing32 => PipelineType.TransmissionSkinnedMorphing32,
+                        
+                        // Blend variants
+                        PipelineType.StandardBlend => PipelineType.TransmissionBlend,
+                        PipelineType.StandardBlend32 => PipelineType.TransmissionBlend32,
+                        PipelineType.SkinnedBlend => PipelineType.TransmissionSkinnedBlend,
+                        PipelineType.SkinnedBlend32 => PipelineType.TransmissionSkinnedBlend32,
+                        PipelineType.MorphingBlend => PipelineType.TransmissionMorphingBlend,
+                        PipelineType.MorphingBlend32 => PipelineType.TransmissionMorphingBlend32,
+                        PipelineType.SkinnedMorphingBlend => PipelineType.TransmissionSkinnedMorphingBlend,
+                        PipelineType.SkinnedMorphingBlend32 => PipelineType.TransmissionSkinnedMorphingBlend32,
+                        
+                        // Mask variants
+                        PipelineType.StandardMask => PipelineType.TransmissionMask,
+                        PipelineType.StandardMask32 => PipelineType.TransmissionMask32,
+                        PipelineType.SkinnedMask => PipelineType.TransmissionSkinnedMask,
+                        PipelineType.SkinnedMask32 => PipelineType.TransmissionSkinnedMask32,
+                        PipelineType.MorphingMask => PipelineType.TransmissionMorphingMask,
+                        PipelineType.MorphingMask32 => PipelineType.TransmissionMorphingMask32,
+                        PipelineType.SkinnedMorphingMask => PipelineType.TransmissionSkinnedMorphingMask,
+                        PipelineType.SkinnedMorphingMask32 => PipelineType.TransmissionSkinnedMorphingMask32,
+                        
+                        _ => PipelineType.Transmission  // Fallback
+                    };
+                    // Use forced cull mode instead of mesh.DoubleSided logic
+                    // Use offscreen format for Pass 1, swapchain format for Pass 2
+                    if (renderToOffscreen)
+                    {
+                        pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, forcedCullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1);
+                    }
+                    else
+                    {
+                        pipeline = PipeLineManager.GetOrCreatePipeline(transmissionPipelineType, forcedCullMode);
+                    }
+                }
+                else if (useBloom)
+                {
+                    // Bloom doesn't need special cull mode handling
+                    PipelineType bloomPipelineType = pipelineType;
+                    pipeline = PipeLineManager.GetOrCreatePipeline(bloomPipelineType, forcedCullMode, sg_pixel_format.SG_PIXELFORMAT_RGBA8, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1);
+                }
+                else
+                {
+                    // Use regular swapchain pipeline with forced cull mode
+                    pipeline = PipeLineManager.GetOrCreatePipeline(pipelineType, forcedCullMode);
+                }
+
+                // Route to appropriate specialized renderer based on mesh features
+                if (useSkinning && useMorphing)
+                {
+                    // Skinned + morphing mesh - use pbr-shader-skinning-morphing.cs
+                    RenderSkinnedMorphingMesh(mesh, node, modelMatrix, pipeline, lightParams, useScreenTexture);
+                }
+                else if (useSkinning)
+                {
+                    // Skinned mesh (without morphing) - use pbr-shader-skinning.cs
+                    RenderSkinnedMesh(mesh, node, modelMatrix, pipeline, lightParams, useScreenTexture);
+                }
+                else if (useMorphing)
+                {
+                    // Morphing mesh without skinning - use pbr-shader-morphing.cs
+                    RenderMorphingMesh(mesh, node, modelMatrix, pipeline, lightParams, useScreenTexture);
+                }
+                else
+                {
+                    // Static mesh (no skinning, no morphing) - use pbr-shader.cs
+                    RenderStaticMesh(mesh, node, modelMatrix, pipeline, lightParams, useScreenTexture);
+                }
+            }
+
             // Render based on mode: Transmission / Bloom / Regular
             if (useTransmission)
             {
-                // TRANSMISSION TWO-PASS RENDERING
-                // Pass 1: Render opaque objects to offscreen texture (already in transmission.opaque_pass)
-                // This captures the background for refraction sampling
+                // TRANSMISSION TWO-PASS RENDERING (matches glTF Sample Viewer)
+                // Pass 1: Render to offscreen texture for refraction sampling
+                // Render opaque objects
                 foreach (var (node, transform, _) in opaqueNodes)
                 {
                     RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: true);
                 }
                 
-                // End opaque pass
+                // CRITICAL: Also render non-transmissive transparent objects (BLEND mode)
+                // These are objects with alpha blending but NO transmission extension
+                // Reference: glTF Sample Viewer renderer.js lines 541-551
+                foreach (var (node, transform, _) in transparentNodes)
+                {
+                    RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: true);
+                }
+                
+                // End offscreen pass
                 sg_end_pass();
                 
-                // Pass 2: Render scene to swapchain
+                // Pass 2: Render scene to swapchain with refraction
                 sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
                 
-                // Render opaque objects again to the actual screen (using regular swapchain pipelines)
+                // Render opaque objects to screen
                 foreach (var (node, transform, _) in opaqueNodes)
                 {
                     RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: false);
                 }
                 
-                // Render transparent objects with screen texture binding for refraction
+                // Render transmissive objects with screen texture for refraction
+                // For double-sided materials, render in two passes: FRONT faces first, THEN back faces
+                // This ensures back faces can sample the already-rendered front faces
+                foreach (var (node, transform, _) in transmissiveNodes)
+                {
+                    var mesh = state.model.Meshes[node.MeshIndex];
+                    if (mesh.DoubleSided)
+                    {
+                        // PASS 1: Render front faces first (with back face culling)  
+                        RenderNodeWithCullMode(node, transform, SG_CULLMODE_BACK, useScreenTexture: true, renderToOffscreen: false);
+                        // PASS 2: Render back faces after (with front face culling)
+                        // Back faces can now sample the front faces that were just rendered
+                        RenderNodeWithCullMode(node, transform, SG_CULLMODE_FRONT, useScreenTexture: true, renderToOffscreen: false);
+                    }
+                    else
+                    {
+                        // Single-sided: render normally
+                        RenderNode(node, transform, useScreenTexture: true, renderToOffscreen: false);
+                    }
+                }
+                
+                // Render regular transparent objects (BLEND mode, no transmission)
                 foreach (var (node, transform, _) in transparentNodes)
                 {
-                    RenderNode(node, transform, useScreenTexture: true, renderToOffscreen: false);
+                    RenderNode(node, transform, useScreenTexture: false, renderToOffscreen: false);
                 }
             }
             else
