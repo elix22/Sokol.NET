@@ -189,14 +189,15 @@ public static unsafe partial class SharpGLTFApp
         
         // Tonemapping params (required by pbr.glsl) - SKINNED VERSION
         skinning_tonemapping_params_t tonemappingParams = new skinning_tonemapping_params_t();
-        tonemappingParams.u_Exposure = 1.0f;
+        tonemappingParams.u_Exposure = state.exposure;
+        tonemappingParams.u_type = state.tonemapType;
         sg_apply_uniforms(UB_skinning_tonemapping_params, SG_RANGE(ref tonemappingParams));
         
         // Rendering flags (required by pbr.glsl) - SKINNED VERSION
         skinning_rendering_flags_t renderingFlags = new skinning_rendering_flags_t();
         renderingFlags.use_ibl = (state.useIBL && state.environmentMap != null && state.environmentMap.IsLoaded) ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
-        renderingFlags.use_tonemapping = 0;
+        renderingFlags.use_tonemapping = state.tonemapType > 0 ? 1 : 0;
         renderingFlags.linear_output = 0;
         renderingFlags.alphamode = mesh.AlphaMode == AlphaMode.MASK ? 1 : (mesh.AlphaMode == AlphaMode.BLEND ? 2 : 0);
         sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));
@@ -360,8 +361,8 @@ public static unsafe partial class SharpGLTFApp
 
         // Tonemapping parameters
         skinning_tonemapping_params_t tonemapParams = new skinning_tonemapping_params_t();
-        tonemapParams.u_Exposure = 1.0f;
-        tonemapParams.u_type = 0; // Filmic tonemapping
+        tonemapParams.u_Exposure = state.exposure;
+        tonemapParams.u_type = state.tonemapType;
         sg_apply_uniforms(UB_skinning_tonemapping_params, SG_RANGE(ref tonemapParams));
 
         // IBL parameters (if using image-based lighting)
@@ -384,7 +385,7 @@ public static unsafe partial class SharpGLTFApp
         skinning_rendering_flags_t renderingFlags = new skinning_rendering_flags_t();
         renderingFlags.use_ibl = state.useIBL ? 1 : 0;
         renderingFlags.use_punctual_lights = 1;
-        renderingFlags.use_tonemapping = 1;
+        renderingFlags.use_tonemapping = state.tonemapType > 0 ? 1 : 0;
         renderingFlags.linear_output = 0;
         renderingFlags.alphamode = (int)mesh.AlphaMode;
         sg_apply_uniforms(UB_skinning_rendering_flags, SG_RANGE(ref renderingFlags));

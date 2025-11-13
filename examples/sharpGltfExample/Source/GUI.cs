@@ -45,6 +45,12 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.bloom_open = bloom_open != 0;
                 }
 
+                byte tonemap_open = state.ui.tonemap_open ? (byte)1 : (byte)0;
+                if (igMenuItem_BoolPtr("Tone Mapping...", null, ref tonemap_open, true))
+                {
+                    state.ui.tonemap_open = tonemap_open != 0;
+                }
+
                 byte glass_materials_open = state.ui.glass_materials_open ? (byte)1 : (byte)0;
                 if (igMenuItem_BoolPtr("Glass Materials...", null, ref glass_materials_open, true))
                 {
@@ -149,6 +155,13 @@ public static unsafe partial class SharpGLTFApp
         if (state.ui.bloom_open)
         {
             DrawBloomWindow(ref pos);
+            pos.X += 20; pos.Y += 20;
+        }
+
+        // Tone Mapping Window
+        if (state.ui.tonemap_open)
+        {
+            DrawTonemapWindow(ref pos);
             pos.X += 20; pos.Y += 20;
         }
 
@@ -496,6 +509,45 @@ public static unsafe partial class SharpGLTFApp
                     state.bloomThreshold = bloomThreshold;
                 }
             }
+        }
+        igEnd();
+    }
+
+    static void DrawTonemapWindow(ref Vector2 pos)
+    {
+        igSetNextWindowSize(new Vector2(280, 200), ImGuiCond.Once);
+        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        byte open = 1;
+        if (igBegin("Tone Mapping", ref open, ImGuiWindowFlags.None))
+        {
+            state.ui.tonemap_open = open != 0;
+
+            igText("Exposure:");
+            float exposure = state.exposure;
+            if (igSliderFloat("##exposure", ref exposure, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags.None))
+            {
+                state.exposure = exposure;
+            }
+
+            igSeparator();
+            igText("Tone Map Algorithm:");
+            
+            int tonemapType = state.tonemapType;
+            string[] tonemapNames = new[] { 
+                "None",
+                "ACES Narkowicz", 
+                "ACES Hill", 
+                "ACES Hill + Exposure Boost",
+                "Khronos PBR Neutral"
+            };
+            
+            if (igCombo_Str_arr("##tonemap", ref tonemapType, tonemapNames, tonemapNames.Length, -1))
+            {
+                state.tonemapType = tonemapType;
+            }
+
+            igSeparator();
+            igTextWrapped("Tone mapping converts HDR (High Dynamic Range) colors to displayable LDR (Low Dynamic Range). Different algorithms produce different looks.");
         }
         igEnd();
     }

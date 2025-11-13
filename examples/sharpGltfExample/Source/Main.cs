@@ -145,6 +145,7 @@ public static unsafe partial class SharpGLTFApp
         public bool animation_open;
         public bool lighting_open;
         public bool bloom_open;
+        public bool tonemap_open;            // Tone mapping controls
         public bool glass_materials_open;
         public bool ibl_open;                // IBL controls
         public bool culling_open;
@@ -231,6 +232,10 @@ public static unsafe partial class SharpGLTFApp
         public bool enableBloom = false;
         public float bloomIntensity = 1.5f;      // Bloom intensity (0.0 - 2.0)
         public float bloomThreshold = 0.8f;      // Brightness threshold (0.0 - 10.0)
+
+        // Tone mapping settings
+        public float exposure = 1.0f;            // Exposure (0.1 - 10.0)
+        public int tonemapType = 4;              // 1=ACES Narkowicz, 2=ACES Hill, 3=ACES Hill+Boost, 4=Khronos PBR Neutral
 
         // Transmission (glass/refraction) rendering
         // Automatically enabled when model contains meshes with transmission_factor > 0

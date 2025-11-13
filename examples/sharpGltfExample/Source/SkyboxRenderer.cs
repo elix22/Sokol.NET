@@ -127,7 +127,7 @@ namespace Sokol
             is_initialized = true;
         }
 
-        public void Render(Camera camera, EnvironmentMap environmentMap, int width, int height, bool useOffscreenPipeline = false)
+        public void Render(Camera camera, EnvironmentMap environmentMap, int width, int height, float exposure, bool useOffscreenPipeline = false)
         {
             if (!is_initialized)
                 return;
@@ -177,9 +177,11 @@ namespace Sokol
             sg_apply_uniforms(UB_fs_cubemap_params, SG_RANGE(ref fs_params));
 
             // Apply tonemapping params (required by cubemap shader)
+            // Note: u_type = 0 for skybox (no tonemapping here, applied in post-processing)
+            // but we still use the global exposure setting
             var tonemap_params = new tonemapping_params_t
             {
-                u_Exposure = 1.0f,
+                u_Exposure = exposure,
                 u_type = 0  // No tonemapping for skybox (handled by post-processing)
             };
             sg_apply_uniforms(UB_tonemapping_params, SG_RANGE(ref tonemap_params));

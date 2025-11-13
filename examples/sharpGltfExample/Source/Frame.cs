@@ -653,7 +653,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: true);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: true);
             }
         }
         else if (useBloom)
@@ -668,7 +668,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: true);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: true);
             }
         }
         else
@@ -683,7 +683,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: false);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: false);
             }
         }
 
@@ -1116,7 +1116,7 @@ public static unsafe partial class SharpGLTFApp
                     {
                         state.skybox.Initialize();
                     }
-                    state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: false);
+                    state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: false);
                 }
                 
                 // Render opaque objects to screen
