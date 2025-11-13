@@ -653,7 +653,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: true);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, state.tonemapType, useOffscreenPipeline: true);
             }
         }
         else if (useBloom)
@@ -668,7 +668,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: true);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, state.tonemapType, useOffscreenPipeline: true);
             }
         }
         else
@@ -683,7 +683,7 @@ public static unsafe partial class SharpGLTFApp
                 {
                     state.skybox.Initialize();
                 }
-                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: false);
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, state.tonemapType, useOffscreenPipeline: false);
             }
         }
 
@@ -1116,7 +1116,7 @@ public static unsafe partial class SharpGLTFApp
                     {
                         state.skybox.Initialize();
                     }
-                    state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, useOffscreenPipeline: false);
+                    state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), state.exposure, state.tonemapType, useOffscreenPipeline: false);
                 }
                 
                 // Render opaque objects to screen
