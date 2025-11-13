@@ -407,6 +407,13 @@ public static unsafe partial class SharpGLTFApp
                 state.useIBL = iblEnabled != 0;
             }
             
+            // Render environment map as background
+            byte renderEnvMap = (byte)(state.renderEnvironmentMap ? 1 : 0);
+            if (igCheckbox("Environment Map Background", ref renderEnvMap))
+            {
+                state.renderEnvironmentMap = renderEnvMap != 0;
+            }
+            
             igSeparator();
 
             // Ambient light slider

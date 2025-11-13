@@ -645,16 +645,46 @@ public static unsafe partial class SharpGLTFApp
             // TRANSMISSION PASS 1: Render opaque objects to offscreen screen texture
             // This captures the background for transparent objects to refract
             sg_begin_pass(state.transmission.opaque_pass);
+            
+            // Render skybox to offscreen pass if enabled
+            if (state.renderEnvironmentMap && state.environmentMap != null && state.environmentMap.IsLoaded)
+            {
+                if (!state.skybox.IsInitialized)
+                {
+                    state.skybox.Initialize();
+                }
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: true);
+            }
         }
         else if (useBloom)
         {
             // BLOOM PASS 1: Render scene to offscreen buffer
             sg_begin_pass(state.bloom.scene_pass);
+            
+            // Render skybox if enabled
+            if (state.renderEnvironmentMap && state.environmentMap != null && state.environmentMap.IsLoaded)
+            {
+                if (!state.skybox.IsInitialized)
+                {
+                    state.skybox.Initialize();
+                }
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: true);
+            }
         }
         else
         {
             // Regular rendering to swapchain
             sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+            
+            // Render skybox if enabled
+            if (state.renderEnvironmentMap && state.environmentMap != null && state.environmentMap.IsLoaded)
+            {
+                if (!state.skybox.IsInitialized)
+                {
+                    state.skybox.Initialize();
+                }
+                state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: false);
+            }
         }
 
         // Render model if loaded
@@ -1078,6 +1108,16 @@ public static unsafe partial class SharpGLTFApp
                 
                 // Pass 2: Render scene to swapchain with refraction
                 sg_begin_pass(new sg_pass { action = state.pass_action, swapchain = sglue_swapchain() });
+                
+                // Render skybox if enabled
+                if (state.renderEnvironmentMap && state.environmentMap != null && state.environmentMap.IsLoaded)
+                {
+                    if (!state.skybox.IsInitialized)
+                    {
+                        state.skybox.Initialize();
+                    }
+                    state.skybox.Render(state.camera, state.environmentMap, sapp_width(), sapp_height(), useOffscreenPipeline: false);
+                }
                 
                 // Render opaque objects to screen
                 foreach (var (node, transform, _) in opaqueNodes)

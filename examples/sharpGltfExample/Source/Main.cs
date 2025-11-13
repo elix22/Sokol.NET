@@ -235,6 +235,9 @@ public static unsafe partial class SharpGLTFApp
         // Transmission (glass/refraction) rendering
         // Automatically enabled when model contains meshes with transmission_factor > 0
         public TransmissionPass transmission;
+        
+        // Skybox renderer for environment map background
+        public SkyboxRenderer skybox = new SkyboxRenderer();
 
         // Glass material overrides (for testing/debugging)
         public bool overrideGlassMaterials = false;
@@ -249,6 +252,7 @@ public static unsafe partial class SharpGLTFApp
         public bool useIBL = true;                     // Enable/disable IBL
         public float iblIntensity = 1.0f;              // IBL brightness multiplier
         public float iblRotationDegrees = 0.0f;        // Environment rotation in degrees
+        public bool renderEnvironmentMap = false;      // Render environment map as background
 
         // UI state
         public UIState ui;
