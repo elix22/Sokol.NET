@@ -32,6 +32,7 @@ public static unsafe partial class SharpGLTFApp
     static readonly string[] availableModels = new string[]
     {
         "CompareTransmission/glTF/CompareTransmission.gltf",
+        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "TransmissionTest/glTF/TransmissionTest.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
@@ -47,7 +48,6 @@ public static unsafe partial class SharpGLTFApp
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
-        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
@@ -162,6 +162,7 @@ public static unsafe partial class SharpGLTFApp
 
     class _state
     {
+        public sg_color clear_color = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1.0f };
         public sg_pass_action pass_action;
         public Sokol.Camera camera = new Sokol.Camera();
         public SharpGltfModel? model;

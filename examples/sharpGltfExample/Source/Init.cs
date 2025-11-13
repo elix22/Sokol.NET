@@ -89,7 +89,7 @@ public static unsafe partial class SharpGLTFApp
 
         state.pass_action = default;
         state.pass_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        state.pass_action.colors[0].clear_value = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1.0f };
+        state.pass_action.colors[0].clear_value = state.clear_color;
 
         PipeLineManager.GetOrCreatePipeline(PipelineType.Standard);
         PipeLineManager.GetOrCreatePipeline(PipelineType.Skinned);
@@ -373,7 +373,7 @@ public static unsafe partial class SharpGLTFApp
         // Create action
         sg_pass_action scene_action = default;
         scene_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        scene_action.colors[0].clear_value = new sg_color { r = 0.25f, g = 0.5f, b = 0.75f, a = 1.0f };
+        scene_action.colors[0].clear_value = state.clear_color;
         scene_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         scene_action.depth.clear_value = 1.0f;
 
@@ -404,7 +404,7 @@ public static unsafe partial class SharpGLTFApp
 
         sg_pass_action bright_action = default;
         bright_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        bright_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        bright_action.colors[0].clear_value = state.clear_color;
 
         state.bloom.bright_pass.action = bright_action;
         state.bloom.bright_pass.label = "bloom-bright-pass";
@@ -432,7 +432,7 @@ public static unsafe partial class SharpGLTFApp
 
         sg_pass_action blur_h_action = default;
         blur_h_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        blur_h_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        blur_h_action.colors[0].clear_value = state.clear_color;
 
         state.bloom.blur_h_pass.action = blur_h_action;
         state.bloom.blur_h_pass.label = "bloom-blur-h-pass";
@@ -460,7 +460,7 @@ public static unsafe partial class SharpGLTFApp
 
         sg_pass_action blur_v_action = default;
         blur_v_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        blur_v_action.colors[0].clear_value = new sg_color { r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f };
+        blur_v_action.colors[0].clear_value = state.clear_color;
 
         state.bloom.blur_v_pass.action = blur_v_action;
         state.bloom.blur_v_pass.label = "bloom-blur-v-pass";
@@ -707,15 +707,8 @@ public static unsafe partial class SharpGLTFApp
 
         sg_pass_action opaque_action = default;
         opaque_action.colors[0].load_action = sg_load_action.SG_LOADACTION_CLEAR;
-        // TODO: TRANSMISSION BACKGROUND ISSUE
-        // Currently clears to gray (0.5) which is an average of the checkerboard pattern.
-        // The transmission framebuffer needs the actual checkerboard pattern (or scene background)
-        // for proper refraction. Options to fix:
-        // 1. Render a fullscreen checkerboard quad as first step in opaque pass
-        // 2. Copy/blit the swapchain's background before rendering to transmission framebuffer
-        // 3. Use a skybox/environment background that's rendered to both passes
-        // For now, transmission materials will refract a solid gray background instead of checkerboard.
-        opaque_action.colors[0].clear_value = new sg_color { r = 1f, g = 1f, b = 1f, a = 0.2f };
+        // TBD ELI
+        opaque_action.colors[0].clear_value = state.clear_color;
         opaque_action.depth.load_action = sg_load_action.SG_LOADACTION_CLEAR;
         opaque_action.depth.clear_value = 1.0f;
 
