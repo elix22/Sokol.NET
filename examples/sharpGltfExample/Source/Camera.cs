@@ -84,6 +84,7 @@ namespace Sokol
             _pitch = desc.Latitude * (float)Math.PI / 180.0f;
         }
 
+        static int counter = 0;
         public void Update(int width, int height, float deltaTime = 0.0f)
         {
             float aspect = (float)width / (float)height;
@@ -104,32 +105,32 @@ namespace Sokol
                     (float)(Math.Cos(_pitch) * Math.Cos(_yaw))
                 );
                 forward = Vector3.Normalize(forward);
-                
+
                 // Calculate right and up vectors
                 Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
                 Vector3 up = Vector3.Cross(right, forward);
-                
+
                 // Handle WASD camera movement
                 if (deltaTime > 0.0f)
                 {
                     float speedMultiplier = _keyShift ? 2.0f : 1.0f;
                     float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
                     Vector3 moveDir = Vector3.Zero;
-                    
+
                     // WASD for forward/back/left/right movement
                     if (_keyW) moveDir += forward;
                     if (_keyS) moveDir -= forward;
                     if (_keyD) moveDir += right;
                     if (_keyA) moveDir -= right;
-                    
+
                     // Q/E for up/down movement
                     if (_keyQ) moveDir += Vector3.UnitY;
                     if (_keyE) moveDir -= Vector3.UnitY;
-                    
+
                     // Arrow keys for up/down movement (alternative to Q/E)
                     if (_keyUp) moveDir += Vector3.UnitY;
                     if (_keyDown) moveDir -= Vector3.UnitY;
-                    
+
                     // Normalize and apply movement
                     if (moveDir.LengthSquared() > 0)
                     {
@@ -138,10 +139,10 @@ namespace Sokol
                         _desc.Center += movement;
                     }
                 }
-                
+
                 // Eye position is at the center (first-person)
                 EyePos = _desc.Center;
-                
+
                 // Look at position is center + forward direction
                 Vector3 lookAt = _desc.Center + forward;
                 View = Matrix4x4.CreateLookAt(EyePos, lookAt, up);
@@ -154,39 +155,39 @@ namespace Sokol
                 {
                     float speedMultiplier = _keyShift ? 2.0f : 1.0f;
                     float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
-                    
+
                     // Get camera forward, right, and up vectors
                     Vector3 forward = Vector3.Normalize(_desc.Center - EyePos);
                     Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
                     Vector3 up = Vector3.UnitY;
-                    
+
                     Vector3 moveDir = Vector3.Zero;
-                    
+
                     // WASD for forward/back/left/right movement
                     if (_keyW) moveDir += forward;
                     if (_keyS) moveDir -= forward;
                     if (_keyD) moveDir += right;
                     if (_keyA) moveDir -= right;
-                    
+
                     // Q/E for up/down movement
                     if (_keyQ) moveDir += up;
                     if (_keyE) moveDir -= up;
-                    
+
                     // Arrow keys for up/down movement (alternative to Q/E)
                     if (_keyUp) moveDir += up;
                     if (_keyDown) moveDir -= up;
-                    
+
                     // Normalize and apply movement
                     if (moveDir.LengthSquared() > 0)
                     {
                         moveDir = Vector3.Normalize(moveDir);
                         Vector3 movement = moveDir * moveAmount;
-                        
+
                         // Move both camera position and look-at center to maintain view direction
                         _desc.Center += movement;
                     }
                 }
-                
+
                 // Calculate camera position from yaw/pitch in orbit mode
                 // We position the camera at Distance away from Center, looking at it
                 Vector3 offset = new Vector3(
@@ -195,7 +196,7 @@ namespace Sokol
                     (float)(Math.Cos(_pitch) * Math.Cos(_yaw))
                 );
                 offset = Vector3.Normalize(offset);
-                
+
                 // Eye position orbits around center at Distance
                 EyePos = _desc.Center + offset * _desc.Distance;
 

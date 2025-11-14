@@ -135,6 +135,9 @@ layout(binding=8) uniform sampler u_CharlieEnvSampler_Raw;
 
 layout(binding=9) uniform texture2D u_CharlieLUTTexture;
 layout(binding=9) uniform sampler u_CharlieLUTSampler_Raw;
+
+#define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
+#define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
 #endif
 
 #ifdef TRANSMISSION
@@ -146,17 +149,13 @@ layout(binding=10) uniform sampler u_TransmissionFramebufferSampler_Raw;
 // Uses binding 8 (shared with Charlie environment for sheen - rarely used together)
 layout(binding=8) uniform texture2D u_TransmissionTexture;
 layout(binding=8) uniform sampler u_TransmissionSampler_Raw;
+
+#define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
+#define u_TransmissionSampler sampler2D(u_TransmissionTexture, u_TransmissionSampler_Raw)
 #endif
 
 // Create combined samplers for IBL functions
 #define u_GGXEnvSampler samplerCube(u_GGXEnvTexture, u_GGXEnvSampler_Raw)
 #define u_LambertianEnvSampler samplerCube(u_LambertianEnvTexture, u_LambertianEnvSampler_Raw)
 #define u_GGXLUT sampler2D(u_GGXLUTTexture, u_GGXLUTSampler_Raw)
-#ifndef MORPHING
-#define u_CharlieEnvSampler samplerCube(u_CharlieEnvTexture, u_CharlieEnvSampler_Raw)
-#define u_CharlieLUT sampler2D(u_CharlieLUTTexture, u_CharlieLUTSampler_Raw)
-#endif
-#ifdef TRANSMISSION
-#define u_TransmissionFramebufferSampler sampler2D(u_TransmissionFramebufferTexture, u_TransmissionFramebufferSampler_Raw)
-#define u_TransmissionSampler sampler2D(u_TransmissionTexture, u_TransmissionSampler_Raw)
-#endif
+

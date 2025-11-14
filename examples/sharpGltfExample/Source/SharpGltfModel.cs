@@ -229,6 +229,54 @@ namespace Sokol
             Info($"Animation cache updated: {animatedBoneNames.Count} animated nodes cached");
         }
 
+        /// <summary>
+        /// Calculate model bounding box from all meshes in world space.
+        /// This is calculated dynamically based on current node transforms,
+        /// so it reflects any changes due to animation or user input.
+        /// </summary>
+        public BoundingBox CalculateModelBounds()
+        {
+            if (Meshes.Count == 0 || Nodes.Count == 0)
+            {
+                return new BoundingBox(Vector3.Zero, Vector3.Zero);
+            }
+
+            bool initialized = false;
+            Vector3 min = new Vector3(float.MaxValue);
+            Vector3 max = new Vector3(float.MinValue);
+
+            // Iterate through all nodes and transform their mesh bounds by the node's world transform
+            foreach (var node in Nodes)
+            {
+                if (node.MeshIndex < 0 || node.MeshIndex >= Meshes.Count)
+                    continue; // Skip nodes without meshes
+
+                var mesh = Meshes[node.MeshIndex];
+                
+                // Transform the mesh bounding box by the node's world transform
+                BoundingBox transformedBounds = mesh.Bounds.Transform(node.WorldTransform);
+                
+                if (!initialized)
+                {
+                    min = transformedBounds.Min;
+                    max = transformedBounds.Max;
+                    initialized = true;
+                }
+                else
+                {
+                    min = Vector3.Min(min, transformedBounds.Min);
+                    max = Vector3.Max(max, transformedBounds.Max);
+                }
+            }
+
+            if (!initialized)
+            {
+                return new BoundingBox(Vector3.Zero, Vector3.Zero);
+            }
+
+            return new BoundingBox(min, max);
+        }
+
         private void ProcessSkinning()
         {
             // Track all nodes that are part of a skin (joints)

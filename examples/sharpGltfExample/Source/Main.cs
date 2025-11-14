@@ -31,20 +31,21 @@ public static unsafe partial class SharpGLTFApp
     // Model list for browser
     static readonly string[] availableModels = new string[]
     {
+        "LittleTokio/LittleTokio.gltf" ,
+        "DancingGangster/glTF-Binary/DancingGangster.glb",
+        "ChairDamaskPurplegold/glTF/ChairDamaskPurplegold.gltf",
+        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "TransmissionTest/glTF/TransmissionTest.gltf",
         "CompareTransmission/glTF/CompareTransmission.gltf",
-        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "CarConcept/glTF/CarConcept.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "ClearCoatCarPaint/glTF/ClearCoatCarPaint.gltf",
-        "ChairDamaskPurplegold/glTF/ChairDamaskPurplegold.gltf",
         "CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
         "CompareIor/glTF/CompareIor.gltf",
         "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
         "MorphStressTest/glTF/MorphStressTest.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "ChronographWatch/glTF/ChronographWatch.gltf",
-        "DancingGangster/glTF-Binary/DancingGangster.glb",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
         "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
@@ -171,8 +172,7 @@ public static unsafe partial class SharpGLTFApp
         public bool modelLoaded = false;
         public bool cameraInitialized = false;  // Track if camera has been auto-positioned
         public bool isMixamoModel = false;      // Track if this is a Mixamo model needing special transforms
-        public Vector3 modelBoundsMin;
-        public Vector3 modelBoundsMax;
+        public BoundingBox modelBounds;
 
         // Skinning system configuration
         public SkinningMode skinningMode = SkinningMode.UniformBased;  // Default to fast uniform-based skinning

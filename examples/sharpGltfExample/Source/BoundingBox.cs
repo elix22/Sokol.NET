@@ -7,6 +7,36 @@ namespace Sokol
         public Vector3 Min;
         public Vector3 Max;
 
+        public Vector3 Size { get { return Vector3.Abs(Max - Min); } }
+
+        public Vector3 Center { get { return (Min + Max) * 0.5f; } }
+
+        public float Radius
+        {
+            get
+            {
+                Vector3 halfSize = Size * 0.5f;
+                return halfSize.Length();
+            }
+        }
+
+        public float DiagonalLength
+        {
+            get
+            {
+                return Vector3.Distance(Min, Max);
+            }
+        }
+
+        public float Volume
+        {
+            get
+            {
+                Vector3 size = Size;
+                return size.X * size.Y * size.Z;
+            }
+        }
+
         Vector3[] corners = new Vector3[8];
         
         public BoundingBox(Vector3 min, Vector3 max)

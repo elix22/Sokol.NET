@@ -310,15 +310,6 @@ public static unsafe partial class SharpGLTFApp
         }
     }
 
-    /// <summary>
-    /// Calculates a bounding sphere that contains the entire axis-aligned bounding box.
-    /// </summary>
-    static (Vector3 center, float radius) CalculateBoundingSphere(Vector3 min, Vector3 max)
-    {
-        Vector3 center = (min + max) * 0.5f;
-        float radius = Vector3.Distance(center, max);
-        return (center, radius);
-    }
 
     private static unsafe void RunSingleFrame()
     {
@@ -363,31 +354,17 @@ public static unsafe partial class SharpGLTFApp
                     return; // Don't proceed with loading
                 }
                 
-                // Calculate model bounds
-                state.modelBoundsMin = new Vector3(float.MaxValue);
-                state.modelBoundsMax = new Vector3(float.MinValue);
+                // Create the model wrapper first (needed for CalculateModelBounds)
+                state.model = new SharpGltfModel(modelRoot, state.pendingModelPath!);
+                
+                // Calculate model bounds using the model's method
+                state.modelBounds = state.model.CalculateModelBounds();
 
-                foreach (var mesh in modelRoot.LogicalMeshes)
-                {
-                    foreach (var primitive in mesh.Primitives)
-                    {
-                        var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array();
-                        if (positions != null)
-                        {
-                            foreach (var pos in positions)
-                            {
-                                state.modelBoundsMin = Vector3.Min(state.modelBoundsMin, pos);
-                                state.modelBoundsMax = Vector3.Max(state.modelBoundsMax, pos);
-                            }
-                        }
-                    }
-                }
+                Vector3 size = state.modelBounds.Size;
+                Vector3 center = state.modelBounds.Center;
+                float boundingRadius = state.modelBounds.Radius;
 
-                Vector3 size = state.modelBoundsMax - state.modelBoundsMin;
-                Vector3 center = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
-                float boundingRadius = Vector3.Distance(state.modelBoundsMin, state.modelBoundsMax) * 0.5f;
-
-                Info($"[SharpGLTF] Model bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
+                Info($"[SharpGLTF] Model bounds: Min={state.modelBounds.Min}, Max={state.modelBounds.Max}");
                 Info($"[SharpGLTF] Model size: {size}, Center: {center}");
                 Info($"[SharpGLTF] Bounding sphere radius: {boundingRadius:F6}");
 
@@ -396,21 +373,22 @@ public static unsafe partial class SharpGLTFApp
                 {
                     Info($"[SharpGLTF] WARNING: Very large bounding radius detected!");
                     float clampedRadius = Math.Min(boundingRadius, 10.0f);
-                    state.modelBoundsMin = center - new Vector3(clampedRadius);
-                    state.modelBoundsMax = center + new Vector3(clampedRadius);
-                    Info($"[SharpGLTF] Clamped bounds: Min={state.modelBoundsMin}, Max={state.modelBoundsMax}");
+                    state.modelBounds = new BoundingBox(
+                        center - new Vector3(clampedRadius),
+                        center + new Vector3(clampedRadius)
+                    );
+                    Info($"[SharpGLTF] Clamped bounds: Min={state.modelBounds.Min}, Max={state.modelBounds.Max}");
                 }
 
                 // Safety check: if bounds are invalid or too small, use defaults
                 if (float.IsInfinity(size.X) || float.IsNaN(size.X) || size.Length() < 0.01f)
                 {
                     Info("[SharpGLTF] Warning: Invalid bounds detected, using defaults");
-                    state.modelBoundsMin = new Vector3(-1, 0, -1);
-                    state.modelBoundsMax = new Vector3(1, 2, 1);
+                    state.modelBounds = new BoundingBox(
+                        new Vector3(-1, 0, -1),
+                        new Vector3(1, 2, 1)
+                    );
                 }
-
-                // Create the model wrapper
-                state.model = new SharpGltfModel(modelRoot, state.pendingModelPath!);
 
                 // Detect Mixamo models
                 state.isMixamoModel = modelRoot.LogicalNodes.Any(n =>
@@ -530,32 +508,6 @@ public static unsafe partial class SharpGLTFApp
         // Auto-position camera using scene bounds after model is loaded
         if (!state.cameraInitialized && state.modelLoaded && state.model != null)
         {
-            Vector3 sceneMin = state.modelBoundsMin;
-            Vector3 sceneMax = state.modelBoundsMax;
-
-            // After rotation, min/max might be swapped, so recalculate
-            Vector3 actualMin = Vector3.Min(sceneMin, sceneMax);
-            Vector3 actualMax = Vector3.Max(sceneMin, sceneMax);
-            sceneMin = actualMin;
-            sceneMax = actualMax;
-
-            Vector3 sceneSize = sceneMax - sceneMin;
-
-            var (sphereCenter, sphereRadius) = CalculateBoundingSphere(sceneMin, sceneMax);
-            Vector3 sceneCenter = sphereCenter;
-
-            // Get all 8 corners of the bounding box
-            Vector3[] corners = new Vector3[8]
-            {
-                new Vector3(sceneMin.X, sceneMin.Y, sceneMin.Z),
-                new Vector3(sceneMin.X, sceneMin.Y, sceneMax.Z),
-                new Vector3(sceneMin.X, sceneMax.Y, sceneMin.Z),
-                new Vector3(sceneMin.X, sceneMax.Y, sceneMax.Z),
-                new Vector3(sceneMax.X, sceneMin.Y, sceneMin.Z),
-                new Vector3(sceneMax.X, sceneMin.Y, sceneMax.Z),
-                new Vector3(sceneMax.X, sceneMax.Y, sceneMin.Z),
-                new Vector3(sceneMax.X, sceneMax.Y, sceneMax.Z)
-            };
 
             // Calculate camera distance using simple formula based on bounding sphere
             // This is more reliable than binary search for small models
@@ -565,18 +517,18 @@ public static unsafe partial class SharpGLTFApp
 
             // Use vertical FOV for calculation (account for aspect ratio if needed)
             float verticalFOV = fovRadians;
-            
+
             // Simple formula: distance = radius / tan(fov/2)
             // For models with radius < 1.0, use tighter framing (likely miniature/detailed models)
             // For normal sized models (radius >= 1.0), use standard framing
-            float paddingFactor = (sphereRadius < 1.0f) ? 0.8f : 1.1f;
-            
-            if (sphereRadius < 1.0f)
+
+            var sphereRadius = state.modelBounds.Radius;
+            if (state.isMixamoModel && sphereRadius < 0.1f)
             {
-                Info($"[Camera] Small model detected (radius={sphereRadius:F3}), using tight framing: padding={paddingFactor}");
+                sphereRadius *= 100;
             }
             
-            float bestDistance = (sphereRadius * paddingFactor) / (float)Math.Tan(verticalFOV * 0.5f);
+            float bestDistance = (sphereRadius * 1.1f) / (float)Math.Tan(verticalFOV * 0.5f);
             
             // Clamp to reasonable range
             float minDistance = sphereRadius * 0.5f;
@@ -584,14 +536,21 @@ public static unsafe partial class SharpGLTFApp
             bestDistance = Math.Clamp(bestDistance, minDistance, maxDistance);
 
             Info($"=== AUTO-POSITIONING CAMERA ===");
-            Info($"Scene bounds: Min={sceneMin}, Max={sceneMax}");
-            Info($"Scene size: {sceneSize}");
-            Info($"Scene center: {sceneCenter}");
+            Info($"Scene bounds: Min={state.modelBounds.Min}, Max={state.modelBounds.Max}");
+            Info($"Scene size: {state.modelBounds.Size}");
+            Info($"Scene center: {state.modelBounds.Center}");
             Info($"Bounding sphere radius: {sphereRadius:F6}");
             Info($"Final distance: {bestDistance:F3}");
             Info($"Distance / Sphere Radius ratio: {bestDistance / sphereRadius:F2}");
 
-            state.camera.Center = sceneCenter;
+            if (state.isMixamoModel && state.modelBounds.Radius < 0.1f)
+            {
+                state.camera.Center = state.modelBounds.Center * 100.0f + new Vector3(0, 1, 0);
+            }
+             else{
+                state.camera.Center = state.modelBounds.Center;
+             }
+            
             state.camera.Distance = bestDistance;
             state.camera.Latitude = 0.0f;
             state.camera.Longitude = 0.0f;
@@ -698,7 +657,7 @@ public static unsafe partial class SharpGLTFApp
                                      Matrix4x4.CreateRotationX(state.modelRotationX);
 
             // Calculate the model center for rotation
-            Vector3 modelCenter = (state.modelBoundsMin + state.modelBoundsMax) * 0.5f;
+            Vector3 modelCenter = (state.modelBounds.Min + state.modelBounds.Max) * 0.5f;
 
             // Create transform: translate to origin -> rotate -> translate back
             Matrix4x4 model = Matrix4x4.CreateTranslation(-modelCenter) *
@@ -765,7 +724,7 @@ public static unsafe partial class SharpGLTFApp
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> opaqueNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transparentNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transmissiveNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
-
+                
             // Collect and categorize all visible nodes
             foreach (var node in state.model.Nodes)
             {
@@ -784,7 +743,7 @@ public static unsafe partial class SharpGLTFApp
 
                 // Apply Mixamo-specific transforms if needed
                 Matrix4x4 modelMatrix;
-                if (state.isMixamoModel)
+                if (state.isMixamoModel && state.modelBounds.Volume < 0.1)
                 {
                     // Mixamo models exported from Blender have 0.01 scale and need rotation correction
                     var scaleMatrix = Matrix4x4.CreateScale(100.0f);
@@ -807,7 +766,7 @@ public static unsafe partial class SharpGLTFApp
                 }
 
                 state.visibleMeshes++;
-                
+
                 // Track rendering statistics
                 state.totalVertices += mesh.VertexCount;
                 state.totalIndices += mesh.IndexCount;
