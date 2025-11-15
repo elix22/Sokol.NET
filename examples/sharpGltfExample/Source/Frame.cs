@@ -543,6 +543,39 @@ public static unsafe partial class SharpGLTFApp
             Info($"Final distance: {bestDistance:F3}");
             Info($"Distance / Sphere Radius ratio: {bestDistance / sphereRadius:F2}");
 
+            // Calculate appropriate NearZ and FarZ based on model radius
+            // Larger models need larger NearZ to avoid Z-fighting
+            // Rule of thumb: NearZ should be roughly 0.1% to 1% of the scene radius
+            // FarZ should be large enough to contain the entire scene
+            float modelRadius = state.modelBounds.Radius;
+            if (state.isMixamoModel && modelRadius < 0.1f)
+            {
+                modelRadius *= 100.0f; // Account for Mixamo scale
+            }
+
+            // Scale NearZ based on model size
+            // Small models (< 1): use tight near plane (0.001 to 0.01)
+            // Medium models (1-100): scale proportionally (0.01 to 1.0)
+            // Large models (> 100): scale proportionally (1.0+)
+            float nearZ = Math.Max(0.001f, modelRadius * 0.01f);
+            
+            // FarZ should be at least 10x the distance from camera to furthest point
+            // Distance to furthest point = bestDistance + modelRadius
+            float farZ = Math.Max(100.0f, (bestDistance + modelRadius) * 10.0f);
+            
+            Info($"Camera NearZ: {nearZ:F6}, FarZ: {farZ:F2}");
+
+            state.camera.Init(new CameraDesc()
+            {
+                Aspect = 60.0f,
+                NearZ = nearZ,
+                FarZ = farZ,
+                Center = new Vector3(0.0f, 1.0f, 0.0f),
+                Distance = 3.0f,
+                Latitude = 10.0f,
+                Longitude = 0.0f,
+            });
+
             if (state.isMixamoModel && state.modelBounds.Radius < 0.1f)
             {
                 state.camera.Center = state.modelBounds.Center * 100.0f + new Vector3(0, 1, 0);

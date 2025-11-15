@@ -36,11 +36,12 @@ public static unsafe partial class SharpGLTFApp
             logger = { func = &slog_func }
         });
 
-        // Setup camera
+        // Setup camera with initial defaults
+        // These will be recalculated based on model bounds when a model is loaded
         state.camera.Init(new CameraDesc()
         {
             Aspect = 60.0f,
-            NearZ = 0.01f,
+            NearZ = 0.01f,  // Will be adjusted based on model size to avoid Z-fighting
             FarZ = 5000.0f,
             Center = new Vector3(0.0f, 1.0f, 0.0f),
             Distance = 3.0f,
