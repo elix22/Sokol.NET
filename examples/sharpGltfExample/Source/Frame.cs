@@ -589,6 +589,9 @@ public static unsafe partial class SharpGLTFApp
             state.camera.Longitude = 0.0f;
 
             state.cameraInitialized = true;
+
+            state.modelRotationY = 0.0f;
+            state.modelRotationX = 0.0f;
         }
 
         // Update camera (handles WASD movement internally)
