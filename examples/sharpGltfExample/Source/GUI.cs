@@ -387,7 +387,7 @@ public static unsafe partial class SharpGLTFApp
                 if (state.skinningMode == SkinningMode.UniformBased)
                 {
                     igTextColored(new Vector4(0, 1, 0, 1), "Fast (60 FPS on mobile)");
-                    igText("Max 85 bones");
+                    igText("Max 100 bones");
                 }
                 else
                 {
