@@ -185,7 +185,8 @@ namespace Sokol
                     skinMeshes,
                     MaterialToMeshMap,
                     Nodes,
-                    boneCount
+                    boneCount,
+                    boneInfoMap  // Pass character-specific bone info map
                 );
                 
                 Characters.Add(character);

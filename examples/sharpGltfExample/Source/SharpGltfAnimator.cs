@@ -17,16 +17,20 @@ namespace Sokol
         // Fast lookup for non-skinned node animations - stores ALL nodes with the same name
         private Dictionary<string, List<SharpGltfNode>> _nodesByName = new Dictionary<string, List<SharpGltfNode>>();
         
+        // Character-specific bone info map (overrides animation's global bone map)
+        private Dictionary<string, BoneInfo>? _characterBoneInfoMap;
+        
         /// <summary>
         /// Playback speed multiplier. 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
         /// </summary>
         public float PlaybackSpeed { get; set; } = 1.0f;
 
-        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, List<SharpGltfNode> nodes, int boneCount)
+        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, List<SharpGltfNode> nodes, int boneCount, Dictionary<string, BoneInfo>? characterBoneInfoMap = null)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
             _materialToMeshMap = materialToMeshMap;
+            _characterBoneInfoMap = characterBoneInfoMap;
             
             // Allocate bone matrices array based on actual bone count
             // This supports both uniform-based (max 100) and texture-based (unlimited) skinning
@@ -47,10 +51,10 @@ namespace Sokol
         }
 
         /// <summary>
-        /// Convenient constructor that accepts a SharpGltfModel
+        /// Convenient constructor that accepts a SharpGltfModel (legacy - for backward compatibility)
         /// </summary>
         public SharpGltfAnimator(SharpGltfModel model)
-            : this(model.Animation, model.MaterialToMeshMap, model.Nodes, model.BoneCounter)
+            : this(model.Animation, model.MaterialToMeshMap, model.Nodes, model.BoneCounter, null)
         {
         }
         
@@ -190,13 +194,18 @@ namespace Sokol
             // Store global transform for node animations (non-skinned)
             _nodeGlobalTransforms[nodeName] = globalTransformation;
 
-            var boneInfoMap = _currentAnimation?.GetBoneIDMap();
+            // Use character-specific bone info map if available, otherwise fallback to animation's global map
+            var boneInfoMap = _characterBoneInfoMap ?? _currentAnimation?.GetBoneIDMap();
             if (boneInfoMap != null && boneInfoMap.ContainsKey(nodeName))
             {
                 int index = boneInfoMap[nodeName].Id;
                 Matrix4x4 offset = boneInfoMap[nodeName].Offset;
-                _finalBoneMatrices[index] = offset * globalTransformation;
-
+                
+                // Safety check: only write if index is within bounds
+                if (index >= 0 && index < _finalBoneMatrices.Length)
+                {
+                    _finalBoneMatrices[index] = offset * globalTransformation;
+                }
             }
 
             for (int i = 0; i < node.ChildrenCount; i++)
