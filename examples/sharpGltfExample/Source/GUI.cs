@@ -385,6 +385,29 @@ public static unsafe partial class SharpGLTFApp
                             {
                                 animator.PlaybackSpeed = playbackSpeed;
                             }
+                            
+                            igSeparator();
+                            
+                            // Skinning mode selection (per-character)
+                            igText("Skinning Mode:");
+                            bool charMustUseTextureBased = character.BoneCount >= AnimationConstants.MAX_BONES;
+                            
+                            if (charMustUseTextureBased)
+                            {
+                                // Show read-only info when texture-based is required
+                                igTextColored(new Vector4(1, 1, 0, 1), "Texture (Required)");
+                                igText($"{character.BoneCount} bones");
+                            }
+                            else
+                            {
+                                // Allow user to choose when under the limit
+                                int skinningMode = (int)(character.UsesTextureSkinning ? SkinningMode.TextureBased : SkinningMode.UniformBased);
+                                string[] skinningModeNames = new[] { "Uniform (Fast)", "Texture (Unlimited)" };
+                                if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
+                                {
+                                    character.SetSkinningMode((SkinningMode)skinningMode);
+                                }
+                            }
                         }
                         else
                         {
@@ -454,43 +477,6 @@ public static unsafe partial class SharpGLTFApp
                     if (igButton("Reset to 1.0x", new Vector2(110, 0)))
                     {
                         state.animator.PlaybackSpeed = 1.0f;
-                    }
-                }
-                
-                // Skinning mode selection (shared for all characters)
-                igSeparator();
-                igText("Skinning Mode:");
-                
-                // Check if we must use texture-based skinning
-                bool mustUseTextureBased = state.model != null && state.model.BoneCounter >= AnimationConstants.MAX_BONES;
-                
-                if (mustUseTextureBased)
-                {
-                    // Show read-only info when texture-based is required
-                    igTextColored(new Vector4(1, 1, 0, 1), "Texture-Based (Required)");
-                    igText($"Model has {state.model.BoneCounter} bones");
-                    igText($"(max {AnimationConstants.MAX_BONES} for uniform mode)");
-                }
-                else
-                {
-                    // Allow user to choose when under the limit
-                    int skinningMode = (int)state.skinningMode;
-                    string[] skinningModeNames = new[] { "Uniform-Based (Fast)", "Texture-Based (Unlimited)" };
-                    if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
-                    {
-                        state.skinningMode = (SkinningMode)skinningMode;
-                    }
-                    
-                    // Show info about current mode
-                    if (state.skinningMode == SkinningMode.UniformBased)
-                    {
-                        igTextColored(new Vector4(0, 1, 0, 1), "Fast (60 FPS on mobile)");
-                        igText($"Max {AnimationConstants.MAX_BONES} bones");
-                    }
-                    else
-                    {
-                        igTextColored(new Vector4(1, 1, 0, 1), "Slower (30 FPS on mobile)");
-                        igText("Unlimited bones");
                     }
                 }
             }
