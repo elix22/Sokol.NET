@@ -410,6 +410,14 @@ public static unsafe partial class SharpGLTFApp
                     state.ui.animation_open = true;
                     Info("[SharpGLTF] Animator created for animated model");
                     
+                    // Automatically switch to texture-based skinning if bone count exceeds uniform limit
+                    if (state.model.BoneCounter >= AnimationConstants.MAX_BONES)
+                    {
+                        state.skinningMode = SkinningMode.TextureBased;
+                        Info($"[Skinning] Model has {state.model.BoneCounter} bones (max {AnimationConstants.MAX_BONES} for uniforms)");
+                        Info($"[Skinning] Automatically switching to TEXTURE-BASED skinning");
+                    }
+                    
                     // Create joint matrix texture only for texture-based skinning mode
                     if (state.skinningMode == SkinningMode.TextureBased && state.model.BoneCounter > 0)
                     {
@@ -418,11 +426,7 @@ public static unsafe partial class SharpGLTFApp
                     }
                     else if (state.model.BoneCounter > 0)
                     {
-                        Info($"[Skinning] Using UNIFORM-BASED skinning ({state.model.BoneCounter} bones, max 85)");
-                        if (state.model.BoneCounter > AnimationConstants.MAX_BONES)
-                        {
-                            Warning($"[Skinning] Model has {state.model.BoneCounter} bones but uniform-based skinning only supports {AnimationConstants.MAX_BONES}. Consider switching to texture-based mode.");
-                        }
+                        Info($"[Skinning] Using UNIFORM-BASED skinning ({state.model.BoneCounter} bones, max {AnimationConstants.MAX_BONES})");
                     }
                 }
                 else

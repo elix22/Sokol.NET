@@ -7,7 +7,7 @@ namespace Sokol
 {
     public class SharpGltfAnimator
     {
-        private Matrix4x4[] _finalBoneMatrices = new Matrix4x4[AnimationConstants.MAX_BONES];
+        private Matrix4x4[] _finalBoneMatrices;  // Sized dynamically based on actual bone count
         private SharpGltfAnimation? _currentAnimation;
         private float _currentTime;
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new Dictionary<string, Matrix4x4>();  // Global transforms for node animations
@@ -22,11 +22,15 @@ namespace Sokol
         /// </summary>
         public float PlaybackSpeed { get; set; } = 1.0f;
 
-        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, List<SharpGltfNode> nodes)
+        public SharpGltfAnimator(SharpGltfAnimation? animation, Dictionary<int, List<Mesh>> materialToMeshMap, List<SharpGltfNode> nodes, int boneCount)
         {
             _currentTime = 0.0f;
             _currentAnimation = animation;
             _materialToMeshMap = materialToMeshMap;
+            
+            // Allocate bone matrices array based on actual bone count
+            // This supports both uniform-based (max 100) and texture-based (unlimited) skinning
+            _finalBoneMatrices = new Matrix4x4[Math.Max(1, boneCount)];  // At least 1 to avoid zero-length arrays
 
             // Build lookup for non-skinned animated nodes
             BuildNodeLookup(nodes);
@@ -46,7 +50,7 @@ namespace Sokol
         /// Convenient constructor that accepts a SharpGltfModel
         /// </summary>
         public SharpGltfAnimator(SharpGltfModel model)
-            : this(model.Animation, model.MaterialToMeshMap, model.Nodes)
+            : this(model.Animation, model.MaterialToMeshMap, model.Nodes, model.BoneCounter)
         {
         }
         
@@ -190,11 +194,9 @@ namespace Sokol
             if (boneInfoMap != null && boneInfoMap.ContainsKey(nodeName))
             {
                 int index = boneInfoMap[nodeName].Id;
-                if( index >=0 && index < AnimationConstants.MAX_BONES)
-                {
-                    Matrix4x4 offset = boneInfoMap[nodeName].Offset;
-                    _finalBoneMatrices[index] = offset * globalTransformation;
-                }
+                Matrix4x4 offset = boneInfoMap[nodeName].Offset;
+                _finalBoneMatrices[index] = offset * globalTransformation;
+
             }
 
             for (int i = 0; i < node.ChildrenCount; i++)
