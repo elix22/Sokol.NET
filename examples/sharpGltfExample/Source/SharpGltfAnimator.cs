@@ -17,6 +17,9 @@ namespace Sokol
         // Fast lookup for non-skinned node animations - stores ALL nodes with the same name
         private Dictionary<string, List<SharpGltfNode>> _nodesByName = new Dictionary<string, List<SharpGltfNode>>();
         
+        // Store all nodes for rebuilding lookups when animation changes
+        private List<SharpGltfNode> _allNodes;
+        
         // Character-specific bone info map (overrides animation's global bone map)
         private Dictionary<string, BoneInfo>? _characterBoneInfoMap;
         
@@ -31,6 +34,7 @@ namespace Sokol
             _currentAnimation = animation;
             _materialToMeshMap = materialToMeshMap;
             _characterBoneInfoMap = characterBoneInfoMap;
+            _allNodes = nodes;
             
             // Allocate bone matrices array based on actual bone count
             // This supports both uniform-based (max 100) and texture-based (unlimited) skinning
@@ -83,6 +87,59 @@ namespace Sokol
                 }
             }
             Info($"Built node lookup with {_nodesByName.Count} unique names, {totalNodes} total non-skinned nodes", "SharpGLTF");
+            
+            // DEBUG: Dump node lookup contents
+            DumpNodeAnimationDebugInfo();
+        }
+        
+        /// <summary>
+        /// Debug function to dump all animation bones and node lookup information
+        /// </summary>
+        private void DumpNodeAnimationDebugInfo()
+        {
+            Info("=== NODE ANIMATION DEBUG INFO ===", "SharpGLTF");
+            
+            // Dump all bones in the animation
+            if (_currentAnimation != null)
+            {
+                var bones = _currentAnimation.GetBones();
+                Info($"Animation has {bones.Count} bones:", "SharpGLTF");
+                foreach (var bone in bones)
+                {
+                    Info($"  - Bone: '{bone.Name}'", "SharpGLTF");
+                }
+            }
+            else
+            {
+                Info("No animation set", "SharpGLTF");
+            }
+            
+            // Dump all nodes in _nodesByName lookup
+            Info($"_nodesByName has {_nodesByName.Count} unique node names:", "SharpGLTF");
+            foreach (var kvp in _nodesByName)
+            {
+                Info($"  - NodeName: '{kvp.Key}' -> {kvp.Value.Count} SharpGltfNode instances", "SharpGLTF");
+            }
+            
+            // Dump all nodes passed to constructor
+            if (_allNodes != null)
+            {
+                int skinnedCount = _allNodes.Count(n => n.IsSkinned);
+                int nonSkinnedCount = _allNodes.Count(n => !n.IsSkinned);
+                int namedCount = _allNodes.Count(n => !string.IsNullOrEmpty(n.NodeName));
+                
+                Info($"Total nodes: {_allNodes.Count} (skinned: {skinnedCount}, non-skinned: {nonSkinnedCount}, named: {namedCount})", "SharpGLTF");
+                
+                // Sample first 20 nodes
+                Info("Sample of all nodes:", "SharpGLTF");
+                for (int i = 0; i < Math.Min(20, _allNodes.Count); i++)
+                {
+                    var node = _allNodes[i];
+                    Info($"  [{i}] Name: '{node.NodeName}', IsSkinned: {node.IsSkinned}, MeshIndex: {node.MeshIndex}", "SharpGLTF");
+                }
+            }
+            
+            Info("=== END DEBUG INFO ===", "SharpGLTF");
         }
 
         public void SetAnimation(SharpGltfAnimation? animation)
@@ -143,9 +200,16 @@ namespace Sokol
             // PERFORMANCE: Early exit if there are no non-skinned animated nodes
             // For skinned characters (like DancingGangster), all nodes are skinned,
             // so this loop would wastefully iterate through all bones finding no matches
-            if (_nodesByName.Count == 0) return;
+            if (_nodesByName.Count == 0)
+            {
+                Info("ApplyAnimationToNodes: _nodesByName is empty, skipping", "SharpGLTF");
+                return;
+            }
 
+            int nodesUpdated = 0;
             var bones = _currentAnimation.GetBones();
+            Info($"ApplyAnimationToNodes: Processing {bones.Count} bones against {_nodesByName.Count} node lookup entries", "SharpGLTF");
+            
             foreach (var bone in bones)
             {
                 // Update ALL nodes with this name (handles multiple primitives per glTF node)
@@ -165,9 +229,12 @@ namespace Sokol
                         
                         // Update the node's local transform (this marks it and children as dirty)
                         renderNode.SetLocalTransform(finalTranslation, finalRotation, finalScale);
+                        nodesUpdated++;
                     }
                 }
             }
+            
+            Info($"ApplyAnimationToNodes: Updated {nodesUpdated} node instances", "SharpGLTF");
         }
 
         public void PlayAnimation(SharpGltfAnimation animation)

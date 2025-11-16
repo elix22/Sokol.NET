@@ -30,6 +30,9 @@ public static unsafe partial class SharpGLTFApp
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
+        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
+        "littlest_tokyo/LittleTokio.gltf" ,
+        "BusterDrone/BusterDrone.gltf",
         "FishAndShark/FishAndShark.gltf",
         "Fish/Fish.gltf",
         "Shark/Shark.gltf",
@@ -39,10 +42,7 @@ public static unsafe partial class SharpGLTFApp
         "Airplane/Airplane2.glb",
         "Lee-Perry-Smith-Head/head.glb",
         "Ferrari/Ferrari.glb",
-        "littlest_tokyo/LittleTokio.gltf" ,
-        "BusterDrone/BusterDrone.gltf",
         "CarConcept/glTF/CarConcept.gltf",
-        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
         "MosquitoInAmber/glTF/MosquitoInAmber.gltf",
         "MorphStressTest/glTF/MorphStressTest.gltf",
