@@ -404,34 +404,50 @@ public static unsafe partial class SharpGLTFApp
                 Info($"[SharpGLTF] Model has {state.model.BoneCounter} bones");
 
                 // Create animator if model has animations
-                if (state.model.HasAnimations)
+                // NOTE: With the new multi-character architecture, characters have their own animators
+                // Only create global state.animator for legacy single-animator models
+                bool hasLegacyAnimation = state.model.HasAnimations && 
+                                         state.model.Animations.Count > 0 && 
+                                         state.model.Characters.Count == 0;
+                
+                if (hasLegacyAnimation)
                 {
                     state.animator = new SharpGltfAnimator(state.model);
                     state.ui.animation_open = true;
-                    Info("[SharpGLTF] Animator created for animated model");
+                    Info("[SharpGLTF] Animator created for animated model (legacy single-animator mode)");
                     
-                    // Automatically switch to texture-based skinning if bone count exceeds uniform limit
+                    // Log skinning mode info (textures are now managed per-character)
                     if (state.model.BoneCounter >= AnimationConstants.MAX_BONES)
                     {
                         state.skinningMode = SkinningMode.TextureBased;
                         Info($"[Skinning] Model has {state.model.BoneCounter} bones (max {AnimationConstants.MAX_BONES} for uniforms)");
-                        Info($"[Skinning] Automatically switching to TEXTURE-BASED skinning");
-                    }
-                    
-                    // Create joint matrix texture only for texture-based skinning mode
-                    if (state.skinningMode == SkinningMode.TextureBased && state.model.BoneCounter > 0)
-                    {
-                        CreateJointMatrixTexture(state.model.BoneCounter);
-                        Info($"[Skinning] Using TEXTURE-BASED skinning ({state.model.BoneCounter} bones)");
+                        Info($"[Skinning] Using TEXTURE-BASED skinning (per-character textures)");
                     }
                     else if (state.model.BoneCounter > 0)
                     {
                         Info($"[Skinning] Using UNIFORM-BASED skinning ({state.model.BoneCounter} bones, max {AnimationConstants.MAX_BONES})");
                     }
                 }
+                else if (state.model.Characters.Count > 0)
+                {
+                    // Multi-character model - characters manage their own animators
+                    state.animator = null;
+                    state.ui.animation_open = state.model.Animations.Count > 0;
+                    Info($"[SharpGLTF] Multi-character model with {state.model.Characters.Count} characters");
+                    
+                    if (state.model.Animations.Count > 0)
+                    {
+                        Info($"[SharpGLTF] {state.model.Animations.Count} animations available, managed by character animators");
+                    }
+                    else
+                    {
+                        Info("[SharpGLTF] No animations found in model");
+                    }
+                }
                 else
                 {
                     state.ui.animation_open = false;
+                    state.animator = null;
                     Info("[SharpGLTF] No animations found in model");
                 }
 
@@ -602,8 +618,21 @@ public static unsafe partial class SharpGLTFApp
         float deltaTime = (float)sapp_frame_duration();
         state.camera.Update(fb_width, fb_height, state.cameraInitialized ? deltaTime : 0.0f);
 
-        // Update animation if available
-        if (state.animator != null)
+        // NEW: Update all characters independently (multi-character support)
+        if (state.model != null && state.model.Characters.Count > 0)
+        {
+            // Update each character's animation
+            // Note: Each character manages its own joint matrix texture
+            foreach (var character in state.model.Characters)
+            {
+                character.Update(deltaTime);
+            }
+            
+            // Update light positions from animated nodes
+            UpdateLightPositions();
+        }
+        // LEGACY: Fallback to old single-animator system for backward compatibility
+        else if (state.animator != null)
         {
             state.animator.UpdateAnimation(deltaTime);
             
@@ -851,8 +880,8 @@ public static unsafe partial class SharpGLTFApp
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
-                // Use skinning if mesh has it and animator exists
-                bool useSkinning = mesh.HasSkinning && state.animator != null;
+                // Use skinning if mesh has it and character exists (multi-character) or legacy animator exists
+                bool useSkinning = mesh.HasSkinning && (state.model.Characters.Count > 0 || state.animator != null);
                 bool useMorphing = mesh.HasMorphTargets;
                 
                 // Check if mesh uses 32-bit indices (based on IndexType field)
@@ -972,8 +1001,8 @@ public static unsafe partial class SharpGLTFApp
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
-                // Use skinning if mesh has it and animator exists
-                bool useSkinning = mesh.HasSkinning && state.animator != null;
+                // Use skinning if mesh has it and character exists (multi-character) or legacy animator exists
+                bool useSkinning = mesh.HasSkinning && (state.model.Characters.Count > 0 || state.animator != null);
                 bool useMorphing = mesh.HasMorphTargets;
                 
                 // Check if mesh uses 32-bit indices (based on IndexType field)

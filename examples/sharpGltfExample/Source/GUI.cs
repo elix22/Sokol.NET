@@ -317,7 +317,11 @@ public static unsafe partial class SharpGLTFApp
         {
             state.ui.animation_open = open != 0;
 
-            if (state.animator != null && state.model != null && state.model.HasAnimations)
+            // Check if we have animations - either via characters or legacy animator
+            bool hasAnimations = (state.model != null && state.model.HasAnimations && state.model.Animations.Count > 0);
+            bool hasAnimator = hasAnimations && ((state.model.Characters.Count > 0) || state.animator != null);
+
+            if (hasAnimator)
             {
                 int animCount = state.model.GetAnimationCount();
                 string currentAnimName = state.model.GetCurrentAnimationName();
@@ -331,7 +335,22 @@ public static unsafe partial class SharpGLTFApp
                     if (igButton("<- Previous", new Vector2(110, 0)))
                     {
                         state.model.PreviousAnimation();
-                        state.animator.SetAnimation(state.model.Animation);
+                        
+                        // Update animation for all characters (multi-character support)
+                        if (state.model.Characters.Count > 0)
+                        {
+                            foreach (var character in state.model.Characters)
+                            {
+                                // Try to find appropriate animation for this character
+                                var newAnim = state.model.Animations[state.model.CurrentAnimationIndex];
+                                character.Animator.SetAnimation(newAnim);
+                            }
+                        }
+                        // Legacy: also update global animator if it exists
+                        else if (state.animator != null)
+                        {
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
                     }
 
                     igSameLine(0, 10);
@@ -339,17 +358,36 @@ public static unsafe partial class SharpGLTFApp
                     if (igButton("Next ->", new Vector2(110, 0)))
                     {
                         state.model.NextAnimation();
-                        state.animator.SetAnimation(state.model.Animation);
+                        
+                        // Update animation for all characters (multi-character support)
+                        if (state.model.Characters.Count > 0)
+                        {
+                            foreach (var character in state.model.Characters)
+                            {
+                                // Try to find appropriate animation for this character
+                                var newAnim = state.model.Animations[state.model.CurrentAnimationIndex];
+                                character.Animator.SetAnimation(newAnim);
+                            }
+                        }
+                        // Legacy: also update global animator if it exists
+                        else if (state.animator != null)
+                        {
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
                     }
                 }
 
-                // Animation timing
-                var currentAnim = state.animator.GetCurrentAnimation();
+                // Animation timing - get from first character or legacy animator
+                SharpGltfAnimator? activeAnimator = state.model.Characters.Count > 0 
+                    ? state.model.Characters[0].Animator 
+                    : state.animator;
+                    
+                var currentAnim = activeAnimator?.GetCurrentAnimation();
                 if (currentAnim != null)
                 {
                     igSeparator();
                     float duration = currentAnim.GetDuration();
-                    float currentTime = state.animator.GetCurrentTime();
+                    float currentTime = activeAnimator.GetCurrentTime();
                     float ticksPerSecond = currentAnim.GetTicksPerSecond();
                     float durationInSeconds = duration / ticksPerSecond;
                     float currentTimeInSeconds = currentTime / ticksPerSecond;
@@ -362,15 +400,39 @@ public static unsafe partial class SharpGLTFApp
                 // Playback speed control
                 igSeparator();
                 igText("Playback Speed:");
-                float playbackSpeed = state.animator.PlaybackSpeed;
+                float playbackSpeed = activeAnimator != null ? activeAnimator.PlaybackSpeed : 1.0f;
                 if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
                 {
-                    state.animator.PlaybackSpeed = playbackSpeed;
+                    // Update playback speed for all characters
+                    if (state.model.Characters.Count > 0)
+                    {
+                        foreach (var character in state.model.Characters)
+                        {
+                            character.Animator.PlaybackSpeed = playbackSpeed;
+                        }
+                    }
+                    // Legacy: also update global animator if it exists
+                    else if (state.animator != null)
+                    {
+                        state.animator.PlaybackSpeed = playbackSpeed;
+                    }
                 }
                 
                 if (igButton("Reset to 1.0x", new Vector2(110, 0)))
                 {
-                    state.animator.PlaybackSpeed = 1.0f;
+                    // Reset playback speed for all characters
+                    if (state.model.Characters.Count > 0)
+                    {
+                        foreach (var character in state.model.Characters)
+                        {
+                            character.Animator.PlaybackSpeed = 1.0f;
+                        }
+                    }
+                    // Legacy: also update global animator if it exists
+                    else if (state.animator != null)
+                    {
+                        state.animator.PlaybackSpeed = 1.0f;
+                    }
                 }
                 
                 // Skinning mode selection
