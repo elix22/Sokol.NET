@@ -346,6 +346,28 @@ public static unsafe partial class SharpGLTFApp
                             igText($"Animation: {currentAnim.Name}");
                             igText($"Bones: {currentAnim.GetBones().Count}");
                             
+                            // Animation selection (if character has multiple animations)
+                            int animCount = character.GetAnimationCount();
+                            if (animCount > 1)
+                            {
+                                igSeparator();
+                                igText($"Animations: {character.CurrentAnimationIndex + 1} of {animCount}");
+                                
+                                if (igButton("<- Prev", new Vector2(80, 0)))
+                                {
+                                    character.PreviousAnimation();
+                                }
+                                
+                                igSameLine(0, 5);
+                                
+                                if (igButton("Next ->", new Vector2(80, 0)))
+                                {
+                                    character.NextAnimation();
+                                }
+                            }
+                            
+                            igSeparator();
+                            
                             // Timing info
                             float duration = currentAnim.GetDuration();
                             float currentTime = animator.GetCurrentTime();

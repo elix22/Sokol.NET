@@ -178,14 +178,11 @@ namespace Sokol
                     continue;
                 }
                 
-                // Use first animation for this character
-                var characterAnimation = characterAnimations[0];
-                
-                // Create character with its OWN animation
+                // Create character with ALL its animations
                 var character = new AnimatedCharacter(
                     skinIndex,
                     skinName,
-                    characterAnimation,  // Character's OWN animation with its OWN bones
+                    characterAnimations,  // Pass ALL animations for this character
                     skinMeshes,
                     MaterialToMeshMap,
                     Nodes,
@@ -194,7 +191,7 @@ namespace Sokol
                 );
                 
                 Characters.Add(character);
-                Info($"Created character '{skinName}': Skin {skinIndex}, {boneCount} bones, {skinMeshes.Count} meshes, Animation: {characterAnimation.GetBones().Count} bones, Skinning: {(character.UsesTextureSkinning ? "Texture" : "Uniform")}", "SharpGLTF");
+                Info($"Created character '{skinName}': Skin {skinIndex}, {boneCount} bones, {skinMeshes.Count} meshes, {characterAnimations.Count} animations, Skinning: {(character.UsesTextureSkinning ? "Texture" : "Uniform")}", "SharpGLTF");
             }
             
             // Step 7: Store first character's animations in legacy Animations list for backward compatibility
