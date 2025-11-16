@@ -27,47 +27,56 @@ public enum SkinningMode
 
 public static unsafe partial class SharpGLTFApp
 {
-   //  "BusterDrone/scene.gltf",
-    // Model list for browser
+    // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
-        "LittleTokio/LittleTokio.gltf" ,
-        "DancingGangster/glTF-Binary/DancingGangster.glb",
-        "ChairDamaskPurplegold/glTF/ChairDamaskPurplegold.gltf",
-        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
-        "TransmissionTest/glTF/TransmissionTest.gltf",
-        "CompareTransmission/glTF/CompareTransmission.gltf",
+        "Airplane/Airplane.gltf",
+        "Airplane/Airplane2.glb",
+        "Shark/Shark.gltf",
+       // "Dragon/Dragon.gltf",
+        "Lee-Perry-Smith-Head/head.glb",
+        "Ferrari/Ferrari.glb",
+        "littlest_tokyo/LittleTokio.gltf" ,
+        "BusterDrone/BusterDrone.gltf",
         "CarConcept/glTF/CarConcept.gltf",
+        "DancingGangster/glTF-Binary/DancingGangster.glb",
+        "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
         "GlassHurricaneCandleHolder/glTF/GlassHurricaneCandleHolder.gltf",
-        "ClearCoatCarPaint/glTF/ClearCoatCarPaint.gltf",
-        "CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
-        "CompareIor/glTF/CompareIor.gltf",
-        "MosquitoInAmber/glTF-Binary/MosquitoInAmber.glb",
+        "MosquitoInAmber/glTF/MosquitoInAmber.gltf",
         "MorphStressTest/glTF/MorphStressTest.gltf",
-        "DragonAttenuation/glTF/DragonAttenuation.gltf", // support Transmission
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
         "DiffuseTransmissionPlant/glTF/DiffuseTransmissionPlant.gltf",
-        "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "GlassVaseFlowers/glTF/GlassVaseFlowers.gltf",
+        "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
+        "WaterBottle/glTF/WaterBottle.gltf",
+        "FlightHelmet/glTF/FlightHelmet.gltf",
+        "ABeautifulGame/glTF/ABeautifulGame.gltf",
+        "BoomBox/glTF-Binary/BoomBox.glb",
+        "IridescenceLamp/glTF-Binary/IridescenceLamp.glb",
+        "DragonAttenuation/glTF/DragonAttenuation.gltf", 
+/* Rmoved to conserve space
+        "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
+        "ChairDamaskPurplegold/glTF/ChairDamaskPurplegold.gltf",
+        "TransmissionTest/glTF/TransmissionTest.gltf",
+        "CompareTransmission/glTF/CompareTransmission.gltf",
+        "ClearCoatCarPaint/glTF/ClearCoatCarPaint.gltf",
+        "CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
+        "CompareIor/glTF/CompareIor.gltf",
+        "EmissiveStrengthTest/glTF-Binary/EmissiveStrengthTest.glb",
         "EnvironmentTest/glTF/EnvironmentTest.gltf",
         "GlassBrokenWindow/glTF/GlassBrokenWindow.gltf",
-        "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
         "PotOfCoals/glTF/PotOfCoals.gltf",
         "LightsPunctualLamp/glTF/LightsPunctualLamp.gltf",
-        "WaterBottle/glTF/WaterBottle.gltf",
         "InterpolationTest/glTF/InterpolationTest.gltf",
         "IORTestGrid/glTF/IORTestGrid.gltf",
-        "FlightHelmet/glTF/FlightHelmet.gltf",
         "Lantern/glTF/Lantern.gltf",
-        "ABeautifulGame/glTF/ABeautifulGame.gltf",
         "MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
         "AlphaBlendModeTest/glTF-Binary/AlphaBlendModeTest.glb",
         "AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
         "AttenuationTest/glTF-Binary/AttenuationTest.glb",
-        "BoomBox/glTF-Binary/BoomBox.glb",
         "ClearcoatRing/glTF/ClearcoatRing.gltf",
-        "IridescenceLamp/glTF-Binary/IridescenceLamp.glb"
+*/
     };
 
     static string filename => availableModels[state.currentModelIndex];

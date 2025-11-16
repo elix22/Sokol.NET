@@ -190,8 +190,11 @@ namespace Sokol
             if (boneInfoMap != null && boneInfoMap.ContainsKey(nodeName))
             {
                 int index = boneInfoMap[nodeName].Id;
-                Matrix4x4 offset = boneInfoMap[nodeName].Offset;
-                _finalBoneMatrices[index] = offset * globalTransformation;
+                if( index >=0 && index < AnimationConstants.MAX_BONES)
+                {
+                    Matrix4x4 offset = boneInfoMap[nodeName].Offset;
+                    _finalBoneMatrices[index] = offset * globalTransformation;
+                }
             }
 
             for (int i = 0; i < node.ChildrenCount; i++)

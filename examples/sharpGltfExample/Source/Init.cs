@@ -764,20 +764,41 @@ public static unsafe partial class SharpGLTFApp
             // Option 2: Load from EXR panorama (slow ~300ms, Desktop/Mobile only)
             
             bool useCubemapFaces = true; // Set to false to use EXR panorama
+            bool useHDRPanorama = false; // Set to true to use HDR panorama (not implemented here)
             
             if (useCubemapFaces)
             {
                 // Load from 6 separate cubemap face images (JPEG)
                 // This is fast and works on all platforms including WebAssembly
+                // string[] faceFiles = new string[]
+                // {
+                //     "TextureEnvironments/nb2_posx.jpg",  // +X
+                //     "TextureEnvironments/nb2_negx.jpg",  // -X
+                //     "TextureEnvironments/nb2_posy.jpg",  // +Y
+                //     "TextureEnvironments/nb2_negy.jpg",  // -Y
+                //     "TextureEnvironments/nb2_posz.jpg",  // +Z
+                //     "TextureEnvironments/nb2_negz.jpg"   // -Z
+                // };
+
                 string[] faceFiles = new string[]
                 {
-                    "TextureEnvironments/nb2_posx.jpg",  // +X
-                    "TextureEnvironments/nb2_negx.jpg",  // -X
-                    "TextureEnvironments/nb2_posy.jpg",  // +Y
-                    "TextureEnvironments/nb2_negy.jpg",  // -Y
-                    "TextureEnvironments/nb2_posz.jpg",  // +Z
-                    "TextureEnvironments/nb2_negz.jpg"   // -Z
+                    "skyboxes/skybox/skybox_px.jpg",  // +X
+                    "skyboxes/skybox/skybox_nx.jpg",  // -X
+                    "skyboxes/skybox/skybox_py.jpg",  // +Y
+                    "skyboxes/skybox/skybox_ny.jpg",  // -Y
+                    "skyboxes/skybox/skybox_pz.jpg",  // +Z
+                    "skyboxes/skybox/skybox_nz.jpg"   // -Z
                 };
+
+                // string[] faceFiles = new string[]
+                // {
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_px.jpg",  // +X
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_nx.jpg",  // -X
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_py.jpg",  // +Y
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_ny.jpg",  // -Y
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_pz.jpg",  // +Z
+                //     "skyboxes/TropicalSunnyDay/TropicalSunnyDay_nz.jpg"   // -Z
+                // };
                 
                 EnvironmentMapLoader.LoadCubemapFacesAsync(faceFiles, (envMap) =>
                 {
@@ -799,25 +820,50 @@ public static unsafe partial class SharpGLTFApp
             }
             else
             {
-                // Load EXR environment map asynchronously (Desktop/Mobile only, ~300ms)
-                // EXR files load much faster than HDR since they can be pre-filtered offline
-                EnvironmentMapLoader.LoadEXREnvironmentAsync("TextureEnvironments/autumn_hill_view_1k.exr", (envMap) =>
+
+                if (useHDRPanorama)
                 {
-                    if (envMap != null && envMap.IsLoaded)
+                    // Load HDR environment map asynchronously (Desktop/Mobile only, ~800ms)
+                    EnvironmentMapLoader.LoadHDREnvironmentAsync("TextureEnvironments/autumn_hill_view_1k.hdr", (envMap) =>
                     {
-                        state.environmentMap = envMap;
-                        Info($"[IBL] EXR environment map loaded successfully:");
-                        Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
-                        Info($"[IBL]   - Intensity: {state.iblIntensity}");
-                        Info($"[IBL]   - Enabled: {state.useIBL}");
-                    }
-                    else
+                        if (envMap != null && envMap.IsLoaded)
+                        {
+                            state.environmentMap = envMap;
+                            Info($"[IBL] HDR environment map loaded successfully:");
+                            Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
+                            Info($"[IBL]   - Intensity: {state.iblIntensity}");
+                            Info($"[IBL]   - Enabled: {state.useIBL}");
+                        }
+                        else
+                        {
+                            Warning("[IBL] Failed to load HDR, using procedural fallback");
+                            state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("fallback-environment");
+                            state.useIBL = state.environmentMap != null && state.environmentMap.IsLoaded;
+                        }
+                    });
+                }
+                else
+                {
+                    // Load EXR environment map asynchronously (Desktop/Mobile only, ~300ms)
+                    // EXR files load much faster than HDR since they can be pre-filtered offline
+                    EnvironmentMapLoader.LoadEXREnvironmentAsync("TextureEnvironments/autumn_hill_view_1k.exr", (envMap) =>
                     {
-                        Warning("[IBL] Failed to load HDR, using procedural fallback");
-                        state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("fallback-environment");
-                        state.useIBL = state.environmentMap != null && state.environmentMap.IsLoaded;
-                    }
-                });
+                        if (envMap != null && envMap.IsLoaded)
+                        {
+                            state.environmentMap = envMap;
+                            Info($"[IBL] EXR environment map loaded successfully:");
+                            Info($"[IBL]   - Mip count: {state.environmentMap.MipCount}");
+                            Info($"[IBL]   - Intensity: {state.iblIntensity}");
+                            Info($"[IBL]   - Enabled: {state.useIBL}");
+                        }
+                        else
+                        {
+                            Warning("[IBL] Failed to load HDR, using procedural fallback");
+                            state.environmentMap = EnvironmentMapLoader.CreateTestEnvironment("fallback-environment");
+                            state.useIBL = state.environmentMap != null && state.environmentMap.IsLoaded;
+                        }
+                    });
+                }
             }
 
             // Create temporary procedural environment while loading
