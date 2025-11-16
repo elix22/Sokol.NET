@@ -11,7 +11,8 @@ using static pbr_shader_skinning_cs_skinning.Shaders;
 public static unsafe partial class SharpGLTFApp
 {
     /// <summary>
-    /// Render a skinned mesh - dispatches to texture-based or uniform-based implementation
+    /// Render a skinned mesh - dispatches to texture-based or uniform-based implementation.
+    /// NEW ARCHITECTURE: Decision is made per-character based on bone count, not global mode.
     /// </summary>
     public static void RenderSkinnedMesh(
         Sokol.Mesh mesh,
@@ -21,7 +22,25 @@ public static unsafe partial class SharpGLTFApp
         pbr_shader_cs.Shaders.light_params_t lightParams,
         bool useScreenTexture)
     {
-        if (state.skinningMode == SkinningMode.TextureBased)
+        // NEW: Determine skinning mode based on the CHARACTER that owns this mesh
+        bool useTextureSkinning = false;
+        
+        if (mesh.SkinIndex >= 0 && state.model != null && state.model.Characters.Count > 0)
+        {
+            // Multi-character architecture: check if this character uses texture skinning
+            var character = state.model.Characters.FirstOrDefault(c => c.SkinIndex == mesh.SkinIndex);
+            if (character != null)
+            {
+                useTextureSkinning = character.UsesTextureSkinning;
+            }
+        }
+        else
+        {
+            // LEGACY: Fallback to global mode for old single-animator models
+            useTextureSkinning = (state.skinningMode == SkinningMode.TextureBased);
+        }
+        
+        if (useTextureSkinning)
         {
             RenderSkinnedMesh_TextureBased(mesh, node, modelMatrix, pipeline, lightParams, useScreenTexture);
         }
@@ -33,8 +52,8 @@ public static unsafe partial class SharpGLTFApp
 
     /// <summary>
     /// Render a skinned mesh using TEXTURE-BASED skinning (pbr-transition branch).
-    /// Bone matrices are uploaded to GPU texture every frame. Supports unlimited bones.
-    /// Slower on mobile due to texture upload overhead.
+    /// Bone matrices are uploaded to GPU texture right before rendering (per-character).
+    /// Supports unlimited bones. Slower on mobile due to texture upload overhead.
     /// </summary>
     private static void RenderSkinnedMesh_TextureBased(
         Sokol.Mesh mesh,
@@ -44,6 +63,19 @@ public static unsafe partial class SharpGLTFApp
         pbr_shader_cs.Shaders.light_params_t lightParams,
         bool useScreenTexture)
     {
+        // Find the character that owns this mesh (multi-character support)
+        AnimatedCharacter? character = null;
+        if (mesh.SkinIndex >= 0 && state.model != null)
+        {
+            character = state.model.Characters.FirstOrDefault(c => c.SkinIndex == mesh.SkinIndex);
+            
+            // Upload this character's bone matrices to their texture right before rendering
+            if (character != null && character.UsesTextureSkinning)
+            {
+                character.UpdateJointMatrixTexture();
+            }
+        }
+        
         // Vertex shader uniforms
         skinning_vs_params_t vsParams = new skinning_vs_params_t();
         vsParams.model = modelMatrix;
@@ -52,7 +84,7 @@ public static unsafe partial class SharpGLTFApp
         vsParams.use_uniform_skinning = 0; // Flag for shader: 0=texture-based, 1=uniform-based
 
         // NO bone matrices here - they come from texture lookup in shader
-        // (Texture was already uploaded in UpdateJointMatrixTexture)
+        // (Texture was just uploaded above for this specific character)
 
         sg_apply_pipeline(pipeline);
         sg_apply_uniforms(UB_skinning_vs_params, SG_RANGE(ref vsParams));
@@ -209,11 +241,13 @@ public static unsafe partial class SharpGLTFApp
         sg_sampler screenSampler = useScreenTexture && state.transmission.sampler.id != 0
             ? state.transmission.sampler
             : default;
-        sg_view jointView = state.jointMatrixView.id != 0 
-            ? state.jointMatrixView
+        
+        // Use character's own joint matrix texture (each character has independent texture)
+        sg_view jointView = (character != null && character.JointMatrixView.id != 0)
+            ? character.JointMatrixView
             : default;
-        sg_sampler jointSampler = state.jointMatrixSampler.id != 0 
-            ? state.jointMatrixSampler 
+        sg_sampler jointSampler = (character != null && character.JointMatrixSampler.id != 0)
+            ? character.JointMatrixSampler
             : default;
         
         mesh.Draw(pipeline, state.useIBL ? state.environmentMap : null, state.useIBL, screenView, screenSampler, jointView, jointSampler, default, default);
@@ -246,10 +280,41 @@ public static unsafe partial class SharpGLTFApp
         }
 
         // Copy bone matrices directly to shader uniforms (no texture upload - this is the key difference!)
-        if (mesh.HasSkinning && state.animator != null)
+        if (mesh.HasSkinning)
         {
-            var boneMatrices = state.animator.GetFinalBoneMatrices();
-            boneMatrices.AsSpan().CopyTo(destSpan);
+            // Find the character that owns this mesh (multi-character support)
+            AnimatedCharacter? character = null;
+            if (mesh.SkinIndex >= 0 && state.model != null)
+            {
+                character = state.model.Characters.FirstOrDefault(c => c.SkinIndex == mesh.SkinIndex);
+            }
+            
+            // Get bone matrices from the correct character (or fallback to legacy animator)
+            Matrix4x4[] boneMatrices;
+            if (character != null)
+            {
+                boneMatrices = character.GetBoneMatrices();
+            }
+            else if (state.animator != null)
+            {
+                // LEGACY: Fallback to old single animator for backward compatibility
+                boneMatrices = state.animator.GetFinalBoneMatrices();
+            }
+            else
+            {
+                // No animator found - matrices remain identity
+                boneMatrices = Array.Empty<Matrix4x4>();
+            }
+            
+            // Copy to shader uniforms (limit to MAX_BONES capacity)
+            if (boneMatrices.Length > 0)
+            {
+                int copyCount = Math.Min(boneMatrices.Length, AnimationConstants.MAX_BONES);
+                for (int i = 0; i < copyCount; i++)
+                {
+                    destSpan[i] = boneMatrices[i];
+                }
+            }
         }
 
         sg_apply_pipeline(pipeline);

@@ -15,6 +15,7 @@ namespace Sokol
         public sg_index_type IndexType;  // Track whether we're using 16-bit or 32-bit indices
         public List<Texture?> Textures = new List<Texture?>();
         public bool HasSkinning;
+        public int SkinIndex = -1;  // Which skin this mesh belongs to (-1 = no skin/static)
         public BoundingBox Bounds;
 
         // Morph target properties

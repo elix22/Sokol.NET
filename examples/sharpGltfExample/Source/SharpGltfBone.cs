@@ -106,5 +106,28 @@ namespace Sokol
             rotation = _lastRotation;
             scale = _lastScale;
         }
+        
+        /// <summary>
+        /// Creates a deep clone of this bone with a new ID.
+        /// The clone has independent state but shares the same samplers (samplers are read-only).
+        /// This allows multiple characters to animate the same bones independently.
+        /// </summary>
+        public SharpGltfBone Clone(int newId)
+        {
+            var clone = new SharpGltfBone(Name, newId, null!);
+            
+            // Share samplers (they're read-only, so safe to share)
+            clone._translationSampler = _translationSampler;
+            clone._rotationSampler = _rotationSampler;
+            clone._scaleSampler = _scaleSampler;
+            
+            // Clone has independent transform state
+            clone.LocalTransform = LocalTransform;
+            clone._lastTranslation = _lastTranslation;
+            clone._lastRotation = _lastRotation;
+            clone._lastScale = _lastScale;
+            
+            return clone;
+        }
     }
 }

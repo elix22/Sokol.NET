@@ -310,103 +310,173 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawAnimationWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(250, 200), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(300, 400), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Animation", ref open, ImGuiWindowFlags.None))
         {
             state.ui.animation_open = open != 0;
 
-            if (state.animator != null && state.model != null && state.model.HasAnimations)
+            // Check if we have animations - either via characters or legacy animator
+            bool hasAnimations = (state.model != null && state.model.HasAnimations && state.model.Animations.Count > 0);
+            bool hasAnimator = hasAnimations && ((state.model.Characters.Count > 0) || state.animator != null);
+
+            if (hasAnimator)
             {
-                int animCount = state.model.GetAnimationCount();
-                string currentAnimName = state.model.GetCurrentAnimationName();
-
-                igText($"Current: {currentAnimName}");
-                igText($"Total Anims: {animCount}");
-
-                if (animCount > 1)
+                // Multi-character support: show each character's animation separately
+                if (state.model.Characters.Count > 0)
                 {
+                    igText($"Characters: {state.model.Characters.Count}");
                     igSeparator();
-                    if (igButton("<- Previous", new Vector2(110, 0)))
+                    
+                    for (int i = 0; i < state.model.Characters.Count; i++)
                     {
-                        state.model.PreviousAnimation();
-                        state.animator.SetAnimation(state.model.Animation);
+                        var character = state.model.Characters[i];
+                        var animator = character.Animator;
+                        var currentAnim = animator.GetCurrentAnimation();
+                        
+                        igPushID_Int(i);
+                        
+                        // Character header
+                        igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), $"Character {i + 1}: {character.Name}");
+                        
+                        if (currentAnim != null)
+                        {
+                            // Animation info
+                            igText($"Animation: {currentAnim.Name}");
+                            igText($"Bones: {currentAnim.GetBones().Count}");
+                            
+                            // Animation selection (if character has multiple animations)
+                            int animCount = character.GetAnimationCount();
+                            if (animCount > 1)
+                            {
+                                igSeparator();
+                                igText($"Animations: {character.CurrentAnimationIndex + 1} of {animCount}");
+                                
+                                if (igButton("<- Prev", new Vector2(80, 0)))
+                                {
+                                    character.PreviousAnimation();
+                                }
+                                
+                                igSameLine(0, 5);
+                                
+                                if (igButton("Next ->", new Vector2(80, 0)))
+                                {
+                                    character.NextAnimation();
+                                }
+                            }
+                            
+                            igSeparator();
+                            
+                            // Timing info
+                            float duration = currentAnim.GetDuration();
+                            float currentTime = animator.GetCurrentTime();
+                            float ticksPerSecond = currentAnim.GetTicksPerSecond();
+                            float durationInSeconds = duration / ticksPerSecond;
+                            float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                            igText($"Time: {currentTimeInSeconds:F2}s / {durationInSeconds:F2}s");
+                            igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                            
+                            // Playback speed control
+                            igText("Speed:");
+                            float playbackSpeed = animator.PlaybackSpeed;
+                            if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
+                            {
+                                animator.PlaybackSpeed = playbackSpeed;
+                            }
+                            
+                            igSeparator();
+                            
+                            // Skinning mode selection (per-character)
+                            igText("Skinning Mode:");
+                            bool charMustUseTextureBased = character.BoneCount >= AnimationConstants.MAX_BONES;
+                            
+                            if (charMustUseTextureBased)
+                            {
+                                // Show read-only info when texture-based is required
+                                igTextColored(new Vector4(1, 1, 0, 1), "Texture (Required)");
+                                igText($"{character.BoneCount} bones");
+                            }
+                            else
+                            {
+                                // Allow user to choose when under the limit
+                                int skinningMode = (int)(character.UsesTextureSkinning ? SkinningMode.TextureBased : SkinningMode.UniformBased);
+                                string[] skinningModeNames = new[] { "Uniform (Fast)", "Texture (Unlimited)" };
+                                if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
+                                {
+                                    character.SetSkinningMode((SkinningMode)skinningMode);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            igText("No animation");
+                        }
+                        
+                        igPopID();
+                        
+                        if (i < state.model.Characters.Count - 1)
+                        {
+                            igSeparator();
+                        }
+                    }
+                }
+                // Legacy single animator
+                else if (state.animator != null)
+                {
+                    int animCount = state.model.GetAnimationCount();
+                    string currentAnimName = state.model.GetCurrentAnimationName();
+
+                    igText($"Current: {currentAnimName}");
+                    igText($"Total Anims: {animCount}");
+
+                    if (animCount > 1)
+                    {
+                        igSeparator();
+                        if (igButton("<- Previous", new Vector2(110, 0)))
+                        {
+                            state.model.PreviousAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
+
+                        igSameLine(0, 10);
+
+                        if (igButton("Next ->", new Vector2(110, 0)))
+                        {
+                            state.model.NextAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
                     }
 
-                    igSameLine(0, 10);
-
-                    if (igButton("Next ->", new Vector2(110, 0)))
+                    // Animation timing - legacy animator
+                    var currentAnim = state.animator?.GetCurrentAnimation();
+                    if (currentAnim != null)
                     {
-                        state.model.NextAnimation();
-                        state.animator.SetAnimation(state.model.Animation);
-                    }
-                }
+                        igSeparator();
+                        float duration = currentAnim.GetDuration();
+                        float currentTime = state.animator.GetCurrentTime();
+                        float ticksPerSecond = currentAnim.GetTicksPerSecond();
+                        float durationInSeconds = duration / ticksPerSecond;
+                        float currentTimeInSeconds = currentTime / ticksPerSecond;
 
-                // Animation timing
-                var currentAnim = state.animator.GetCurrentAnimation();
-                if (currentAnim != null)
-                {
-                    igSeparator();
-                    float duration = currentAnim.GetDuration();
-                    float currentTime = state.animator.GetCurrentTime();
-                    float ticksPerSecond = currentAnim.GetTicksPerSecond();
-                    float durationInSeconds = duration / ticksPerSecond;
-                    float currentTimeInSeconds = currentTime / ticksPerSecond;
-
-                    igText($"Duration: {durationInSeconds:F2}s");
-                    igText($"Time: {currentTimeInSeconds:F2}s");
-                    igText($"Progress: {(currentTime / duration * 100):F1}%%");
-                }
-                
-                // Playback speed control
-                igSeparator();
-                igText("Playback Speed:");
-                float playbackSpeed = state.animator.PlaybackSpeed;
-                if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
-                {
-                    state.animator.PlaybackSpeed = playbackSpeed;
-                }
-                
-                if (igButton("Reset to 1.0x", new Vector2(110, 0)))
-                {
-                    state.animator.PlaybackSpeed = 1.0f;
-                }
-                
-                // Skinning mode selection
-                igSeparator();
-                igText("Skinning Mode:");
-                
-                // Check if we must use texture-based skinning
-                bool mustUseTextureBased = state.model != null && state.model.BoneCounter >= AnimationConstants.MAX_BONES;
-                
-                if (mustUseTextureBased)
-                {
-                    // Show read-only info when texture-based is required
-                    igTextColored(new Vector4(1, 1, 0, 1), "Texture-Based (Required)");
-                    igText($"Model has {state.model.BoneCounter} bones");
-                    igText($"(max {AnimationConstants.MAX_BONES} for uniform mode)");
-                }
-                else
-                {
-                    // Allow user to choose when under the limit
-                    int skinningMode = (int)state.skinningMode;
-                    string[] skinningModeNames = new[] { "Uniform-Based (Fast)", "Texture-Based (Unlimited)" };
-                    if (igCombo_Str_arr("##skinning", ref skinningMode, skinningModeNames, skinningModeNames.Length, -1))
-                    {
-                        state.skinningMode = (SkinningMode)skinningMode;
+                        igText($"Duration: {durationInSeconds:F2}s");
+                        igText($"Time: {currentTimeInSeconds:F2}s");
+                        igText($"Progress: {(currentTime / duration * 100):F1}%%");
                     }
                     
-                    // Show info about current mode
-                    if (state.skinningMode == SkinningMode.UniformBased)
+                    // Playback speed control
+                    igSeparator();
+                    igText("Playback Speed:");
+                    float playbackSpeed = state.animator.PlaybackSpeed;
+                    if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
                     {
-                        igTextColored(new Vector4(0, 1, 0, 1), "Fast (60 FPS on mobile)");
-                        igText($"Max {AnimationConstants.MAX_BONES} bones");
+                        state.animator.PlaybackSpeed = playbackSpeed;
                     }
-                    else
+                    
+                    if (igButton("Reset to 1.0x", new Vector2(110, 0)))
                     {
-                        igTextColored(new Vector4(1, 1, 0, 1), "Slower (30 FPS on mobile)");
-                        igText("Unlimited bones");
+                        state.animator.PlaybackSpeed = 1.0f;
                     }
                 }
             }
