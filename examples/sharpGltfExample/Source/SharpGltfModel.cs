@@ -98,8 +98,9 @@ namespace Sokol
         {
             Info($"Processing model with {_model.LogicalNodes.Count} nodes, {_model.LogicalMeshes.Count} meshes, {_model.LogicalSkins.Count} skins", "SharpGLTF");
 
-            // Step 1: Process all skins first (creates isolated bone spaces per skin)
+            // Step 1: Process all skins - each gets its OWN SEPARATE bone map (0-N indexing per skin)
             var skinDataList = new List<(int skinIndex, string skinName, Dictionary<string, BoneInfo> boneInfoMap, int boneCount, HashSet<string> jointNames)>();
+            
             for (int skinIndex = 0; skinIndex < _model.LogicalSkins.Count; skinIndex++)
             {
                 var skin = _model.LogicalSkins[skinIndex];
@@ -107,7 +108,9 @@ namespace Sokol
                 string skinName = skin.Name ?? $"Skin_{skinIndex}";
                 skinDataList.Add((skinIndex, skinName, boneInfoMap, boneCount, jointNames));
                 
-                // Also populate legacy BoneInfoMap with first skin's data for backward compatibility
+                Info($"Skin {skinIndex} '{skinName}': {boneCount} bones (independent bone space 0-{boneCount-1})", "SharpGLTF");
+                
+                // Populate legacy BoneInfoMap with FIRST skin's data for backward compatibility
                 if (skinIndex == 0)
                 {
                     BoneInfoMap = boneInfoMap;
@@ -156,10 +159,8 @@ namespace Sokol
             // Separate static meshes (no skin)
             StaticMeshes = Meshes.Where(m => m.SkinIndex < 0).ToList();
 
-            // Step 6: Load animations
-            ProcessAnimations();
-
-            // Step 7: Create AnimatedCharacter for each skin
+            // Step 6: Create AnimatedCharacter for each skin
+            // Each character processes its OWN animations with its OWN bone map
             foreach (var (skinIndex, skinName, boneInfoMap, boneCount, jointNames) in skinDataList)
             {
                 if (!meshesBySkin.TryGetValue(skinIndex, out var skinMeshes))
@@ -168,29 +169,38 @@ namespace Sokol
                     continue; // Skin has no meshes
                 }
                 
-                // Find appropriate animation for this skin
-                var animation = FindAnimationForSkin(Animations, skinIndex, boneInfoMap, skinName);
+                // Process animations for THIS SPECIFIC CHARACTER using ONLY its bones
+                var characterAnimations = ProcessAnimationsForCharacter(skinIndex, skinName, boneInfoMap);
                 
-                if (animation == null)
+                if (characterAnimations.Count == 0)
                 {
-                    Warning($"No animation found for Skin {skinIndex} '{skinName}'", "SharpGLTF");
+                    Warning($"No animations found for character '{skinName}'", "SharpGLTF");
                     continue;
                 }
                 
-                // Create character
+                // Use first animation for this character
+                var characterAnimation = characterAnimations[0];
+                
+                // Create character with its OWN animation
                 var character = new AnimatedCharacter(
                     skinIndex,
                     skinName,
-                    animation,
+                    characterAnimation,  // Character's OWN animation with its OWN bones
                     skinMeshes,
                     MaterialToMeshMap,
                     Nodes,
                     boneCount,
-                    boneInfoMap  // Pass character-specific bone info map
+                    boneInfoMap  // Character's OWN bone info map
                 );
                 
                 Characters.Add(character);
-                Info($"Created character '{skinName}': Skin {skinIndex}, {boneCount} bones, {skinMeshes.Count} meshes, Skinning: {(character.UsesTextureSkinning ? "Texture" : "Uniform")}", "SharpGLTF");
+                Info($"Created character '{skinName}': Skin {skinIndex}, {boneCount} bones, {skinMeshes.Count} meshes, Animation: {characterAnimation.GetBones().Count} bones, Skinning: {(character.UsesTextureSkinning ? "Texture" : "Uniform")}", "SharpGLTF");
+            }
+            
+            // Step 7: Store first character's animations in legacy Animations list for backward compatibility
+            if (Characters.Count > 0 && Characters[0].Animation != null)
+            {
+                Animations.Add(Characters[0].Animation);
             }
 
             // Step 8: Cache animation info for rendering optimization
@@ -1292,21 +1302,25 @@ namespace Sokol
             return animations[0];
         }
 
-        private void ProcessAnimations()
+        /// <summary>
+        /// Process animations for a SPECIFIC character using ONLY that character's bones.
+        /// Each character gets its own independent animation with its own bone indexing (0-N).
+        /// NO SHARING between characters.
+        /// </summary>
+        private List<SharpGltfAnimation> ProcessAnimationsForCharacter(
+            int skinIndex, 
+            string characterName, 
+            Dictionary<string, BoneInfo> characterBoneInfoMap)
         {
-            var stopwatch = Stopwatch.StartNew();
+            var characterAnimations = new List<SharpGltfAnimation>();
             
             if (_model.LogicalAnimations.Count == 0)
             {
-                Info($"ProcessAnimations: No animations (0.000ms)", "SharpGLTF PROFILE");
-                return;
+                Info($"ProcessAnimationsForCharacter '{characterName}': No animations in model", "SharpGLTF");
+                return characterAnimations;
             }
 
-            // Use first animation for now
-            var gltfAnim = _model.LogicalAnimations[0];
-            Info($"Processing animation: {gltfAnim.Name ?? "Unnamed"}, duration: {gltfAnim.Duration}", "SharpGLTF");
-
-            // Build complete node hierarchy - create a virtual root that contains all scene nodes
+            // Build complete node hierarchy ONCE (shared for structure, not for bone data)
             SharpGltfNodeData rootNode = new SharpGltfNodeData
             {
                 Name = "SceneRoot",
@@ -1320,18 +1334,19 @@ namespace Sokol
                 rootNode.Children.Add(BuildNodeHierarchy(sceneNode));
                 rootNode.ChildrenCount++;
             }
-            
-            Info($"Built node hierarchy with {rootNode.ChildrenCount} root children", "SharpGLTF");
 
-            // Process ALL animations from the model
+            // Process each glTF animation for THIS CHARACTER ONLY
             foreach (var gltfAnimation in _model.LogicalAnimations)
             {
                 float duration = (float)gltfAnimation.Duration;
-                int ticksPerSecond = 1; // SharpGLTF uses seconds directly (no conversion needed)
-                var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, BoneInfoMap);
-                animation.Name = gltfAnimation.Name ?? $"Animation{Animations.Count}";
+                int ticksPerSecond = 1; // SharpGLTF uses seconds directly
+                
+                // Create animation using THIS CHARACTER'S bone map ONLY
+                var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, characterBoneInfoMap);
+                animation.Name = gltfAnimation.Name ?? $"Animation{characterAnimations.Count}";
 
-                // Process animation channels - store samplers WITHOUT pre-sampling
+                // Process animation channels - ONLY process bones that belong to THIS CHARACTER
+                int channelCount = 0;
                 foreach (var channel in gltfAnimation.Channels)
                 {
                     var targetNode = channel.TargetNode;
@@ -1357,12 +1372,20 @@ namespace Sokol
                     }
                     
                     string boneName = targetNode.Name ?? "Unnamed";
+                    
+                    // CRITICAL: Only process bones that belong to THIS CHARACTER
+                    if (!characterBoneInfoMap.ContainsKey(boneName))
+                    {
+                        continue; // Skip bones that don't belong to this character
+                    }
+                    
+                    channelCount++;
 
-                    // Find or create bone
+                    // Find or create bone using THIS CHARACTER'S bone map
                     var bone = animation.FindBone(boneName);
                     if (bone == null)
                     {
-                        bone = new SharpGltfBone(boneName, BoneInfoMap.ContainsKey(boneName) ? BoneInfoMap[boneName].Id : -1, targetNode);
+                        bone = new SharpGltfBone(boneName, characterBoneInfoMap[boneName].Id, targetNode);
                         animation.AddBone(bone);
                     }
 
@@ -1374,13 +1397,20 @@ namespace Sokol
                     );
                 }
 
-                Animations.Add(animation);
-                Info($"Loaded animation '{animation.Name}' with {animation.GetBoneIDMap().Count} bones, duration: {duration:F2}s", "SharpGLTF");
+                // Only add animation if it has bones for this character
+                if (animation.GetBones().Count > 0)
+                {
+                    characterAnimations.Add(animation);
+                    Info($"Character '{characterName}': Animation '{animation.Name}' - {animation.GetBones().Count} bones, {channelCount} channels, {duration}s", "SharpGLTF");
+                }
+                else
+                {
+                    Info($"Character '{characterName}': Skipping animation '{animation.Name}' (no bones matched)", "SharpGLTF");
+                }
             }
 
-            stopwatch.Stop();
-            Info($"Processed {Animations.Count} animation(s)", "SharpGLTF");
-            Info($"ProcessAnimations completed in {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F3}s)", "SharpGLTF PROFILE");
+            Info($"Character '{characterName}': Processed {characterAnimations.Count} animations", "SharpGLTF");
+            return characterAnimations;
         }
 
         private void ParseMaterialPropertyAnimation(AnimationChannel channel, SharpGltfAnimation animation)

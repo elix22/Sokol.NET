@@ -176,5 +176,41 @@ namespace Sokol
         public ref SharpGltfNodeData GetRootNode() => ref _rootNode;
         public Dictionary<string, BoneInfo> GetBoneIDMap() => _boneInfoMap;
         public List<SharpGltfBone> GetBones() => _bones;
+        
+        /// <summary>
+        /// Creates a new animation containing only bones that match the given bone info map.
+        /// This is used to split a multi-character animation into separate per-character animations.
+        /// Each bone is CLONED so characters can animate independently without interfering with each other.
+        /// </summary>
+        public SharpGltfAnimation CreateSubsetForCharacter(Dictionary<string, BoneInfo> characterBoneInfoMap, string characterName)
+        {
+            // Create new animation with same duration and timing
+            var subset = new SharpGltfAnimation(_duration, _ticksPerSecond, _rootNode, characterBoneInfoMap);
+            subset.Name = $"{Name}_{characterName}";
+            
+            // DEBUG: Log bone names
+            Console.WriteLine($"[DEBUG] CreateSubsetForCharacter '{characterName}': Animation has {_bones.Count} bones, Character has {characterBoneInfoMap.Count} bones");
+            Console.WriteLine($"[DEBUG] Character bone names: {string.Join(", ", characterBoneInfoMap.Keys.Take(5))}...");
+            Console.WriteLine($"[DEBUG] Animation bone names: {string.Join(", ", _bones.Take(5).Select(b => b.Name))}...");
+            
+            // Clone only bones that belong to this character
+            int matchedCount = 0;
+            foreach (var bone in _bones)
+            {
+                if (characterBoneInfoMap.ContainsKey(bone.Name))
+                {
+                    // Clone the bone so each character has independent bone state
+                    var clonedBone = bone.Clone(characterBoneInfoMap[bone.Name].Id);
+                    subset.AddBone(clonedBone);
+                    matchedCount++;
+                }
+            }
+            
+            Console.WriteLine($"[DEBUG] Matched {matchedCount} bones for character '{characterName}'");
+            
+            // Don't copy material/morph animations (they're not character-specific)
+            
+            return subset;
+        }
     }
 }

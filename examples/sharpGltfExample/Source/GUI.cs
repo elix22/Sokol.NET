@@ -310,7 +310,7 @@ public static unsafe partial class SharpGLTFApp
 
     static void DrawAnimationWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(250, 200), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(300, 400), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Animation", ref open, ImGuiWindowFlags.None))
@@ -323,119 +323,119 @@ public static unsafe partial class SharpGLTFApp
 
             if (hasAnimator)
             {
-                int animCount = state.model.GetAnimationCount();
-                string currentAnimName = state.model.GetCurrentAnimationName();
-
-                igText($"Current: {currentAnimName}");
-                igText($"Total Anims: {animCount}");
-
-                if (animCount > 1)
+                // Multi-character support: show each character's animation separately
+                if (state.model.Characters.Count > 0)
                 {
+                    igText($"Characters: {state.model.Characters.Count}");
                     igSeparator();
-                    if (igButton("<- Previous", new Vector2(110, 0)))
-                    {
-                        state.model.PreviousAnimation();
-                        
-                        // Update animation for all characters (multi-character support)
-                        if (state.model.Characters.Count > 0)
-                        {
-                            foreach (var character in state.model.Characters)
-                            {
-                                // Try to find appropriate animation for this character
-                                var newAnim = state.model.Animations[state.model.CurrentAnimationIndex];
-                                character.Animator.SetAnimation(newAnim);
-                            }
-                        }
-                        // Legacy: also update global animator if it exists
-                        else if (state.animator != null)
-                        {
-                            state.animator.SetAnimation(state.model.Animation);
-                        }
-                    }
-
-                    igSameLine(0, 10);
-
-                    if (igButton("Next ->", new Vector2(110, 0)))
-                    {
-                        state.model.NextAnimation();
-                        
-                        // Update animation for all characters (multi-character support)
-                        if (state.model.Characters.Count > 0)
-                        {
-                            foreach (var character in state.model.Characters)
-                            {
-                                // Try to find appropriate animation for this character
-                                var newAnim = state.model.Animations[state.model.CurrentAnimationIndex];
-                                character.Animator.SetAnimation(newAnim);
-                            }
-                        }
-                        // Legacy: also update global animator if it exists
-                        else if (state.animator != null)
-                        {
-                            state.animator.SetAnimation(state.model.Animation);
-                        }
-                    }
-                }
-
-                // Animation timing - get from first character or legacy animator
-                SharpGltfAnimator? activeAnimator = state.model.Characters.Count > 0 
-                    ? state.model.Characters[0].Animator 
-                    : state.animator;
                     
-                var currentAnim = activeAnimator?.GetCurrentAnimation();
-                if (currentAnim != null)
-                {
-                    igSeparator();
-                    float duration = currentAnim.GetDuration();
-                    float currentTime = activeAnimator.GetCurrentTime();
-                    float ticksPerSecond = currentAnim.GetTicksPerSecond();
-                    float durationInSeconds = duration / ticksPerSecond;
-                    float currentTimeInSeconds = currentTime / ticksPerSecond;
-
-                    igText($"Duration: {durationInSeconds:F2}s");
-                    igText($"Time: {currentTimeInSeconds:F2}s");
-                    igText($"Progress: {(currentTime / duration * 100):F1}%%");
-                }
-                
-                // Playback speed control
-                igSeparator();
-                igText("Playback Speed:");
-                float playbackSpeed = activeAnimator != null ? activeAnimator.PlaybackSpeed : 1.0f;
-                if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
-                {
-                    // Update playback speed for all characters
-                    if (state.model.Characters.Count > 0)
+                    for (int i = 0; i < state.model.Characters.Count; i++)
                     {
-                        foreach (var character in state.model.Characters)
+                        var character = state.model.Characters[i];
+                        var animator = character.Animator;
+                        var currentAnim = animator.GetCurrentAnimation();
+                        
+                        igPushID_Int(i);
+                        
+                        // Character header
+                        igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), $"Character {i + 1}: {character.Name}");
+                        
+                        if (currentAnim != null)
                         {
-                            character.Animator.PlaybackSpeed = playbackSpeed;
+                            // Animation info
+                            igText($"Animation: {currentAnim.Name}");
+                            igText($"Bones: {currentAnim.GetBones().Count}");
+                            
+                            // Timing info
+                            float duration = currentAnim.GetDuration();
+                            float currentTime = animator.GetCurrentTime();
+                            float ticksPerSecond = currentAnim.GetTicksPerSecond();
+                            float durationInSeconds = duration / ticksPerSecond;
+                            float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                            igText($"Time: {currentTimeInSeconds:F2}s / {durationInSeconds:F2}s");
+                            igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                            
+                            // Playback speed control
+                            igText("Speed:");
+                            float playbackSpeed = animator.PlaybackSpeed;
+                            if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
+                            {
+                                animator.PlaybackSpeed = playbackSpeed;
+                            }
+                        }
+                        else
+                        {
+                            igText("No animation");
+                        }
+                        
+                        igPopID();
+                        
+                        if (i < state.model.Characters.Count - 1)
+                        {
+                            igSeparator();
                         }
                     }
-                    // Legacy: also update global animator if it exists
-                    else if (state.animator != null)
+                }
+                // Legacy single animator
+                else if (state.animator != null)
+                {
+                    int animCount = state.model.GetAnimationCount();
+                    string currentAnimName = state.model.GetCurrentAnimationName();
+
+                    igText($"Current: {currentAnimName}");
+                    igText($"Total Anims: {animCount}");
+
+                    if (animCount > 1)
+                    {
+                        igSeparator();
+                        if (igButton("<- Previous", new Vector2(110, 0)))
+                        {
+                            state.model.PreviousAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
+
+                        igSameLine(0, 10);
+
+                        if (igButton("Next ->", new Vector2(110, 0)))
+                        {
+                            state.model.NextAnimation();
+                            state.animator.SetAnimation(state.model.Animation);
+                        }
+                    }
+
+                    // Animation timing - legacy animator
+                    var currentAnim = state.animator?.GetCurrentAnimation();
+                    if (currentAnim != null)
+                    {
+                        igSeparator();
+                        float duration = currentAnim.GetDuration();
+                        float currentTime = state.animator.GetCurrentTime();
+                        float ticksPerSecond = currentAnim.GetTicksPerSecond();
+                        float durationInSeconds = duration / ticksPerSecond;
+                        float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                        igText($"Duration: {durationInSeconds:F2}s");
+                        igText($"Time: {currentTimeInSeconds:F2}s");
+                        igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                    }
+                    
+                    // Playback speed control
+                    igSeparator();
+                    igText("Playback Speed:");
+                    float playbackSpeed = state.animator.PlaybackSpeed;
+                    if (igSliderFloat("##speed", ref playbackSpeed, 0.1f, 2.0f, "%.2fx", ImGuiSliderFlags.None))
                     {
                         state.animator.PlaybackSpeed = playbackSpeed;
                     }
-                }
-                
-                if (igButton("Reset to 1.0x", new Vector2(110, 0)))
-                {
-                    // Reset playback speed for all characters
-                    if (state.model.Characters.Count > 0)
-                    {
-                        foreach (var character in state.model.Characters)
-                        {
-                            character.Animator.PlaybackSpeed = 1.0f;
-                        }
-                    }
-                    // Legacy: also update global animator if it exists
-                    else if (state.animator != null)
+                    
+                    if (igButton("Reset to 1.0x", new Vector2(110, 0)))
                     {
                         state.animator.PlaybackSpeed = 1.0f;
                     }
                 }
                 
-                // Skinning mode selection
+                // Skinning mode selection (shared for all characters)
                 igSeparator();
                 igText("Skinning Mode:");
                 
