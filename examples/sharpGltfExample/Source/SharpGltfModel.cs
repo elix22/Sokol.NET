@@ -1458,6 +1458,7 @@ namespace Sokol
                 animation.Name = gltfAnimation.Name ?? $"Animation{characterAnimations.Count}";
 
                 // Process animation channels - process BOTH skinned bones AND non-skinned nodes
+                // BUT only include channels that belong to THIS character
                 int boneChannelCount = 0;
                 int nodeChannelCount = 0;
                 foreach (var channel in gltfAnimation.Channels)
@@ -1488,6 +1489,13 @@ namespace Sokol
                     
                     // Check if this is a skinned bone or a non-skinned node
                     bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+                    bool isNodeAnimation = _skinnedNodeNames != null && !_skinnedNodeNames.Contains(nodeName);
+                    
+                    // For multi-character models: ONLY include bones that belong to THIS character
+                    // For node animations: Include if it's a non-skinned node (affects whole model)
+                    if (!isBone && !isNodeAnimation)
+                        continue; // Skip bones/nodes that don't belong to this character
+                    
                     int boneId = isBone ? characterBoneInfoMap[nodeName].Id : -1; // -1 for non-skinned nodes
                     
                     if (isBone)
@@ -1511,8 +1519,8 @@ namespace Sokol
                     );
                 }
 
-                // Only add animation if it has bones or nodes
-                if (animation.GetBones().Count > 0)
+                // Only add animation if it has channels for THIS character's bones or global node animations
+                if (boneChannelCount > 0 || nodeChannelCount > 0)
                 {
                     characterAnimations.Add(animation);
                     Info($"Character '{characterName}': Animation '{animation.Name}' - {boneChannelCount} bone channels, {nodeChannelCount} node channels, {duration}s", "SharpGLTF");
