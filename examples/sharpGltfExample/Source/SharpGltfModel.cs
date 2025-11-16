@@ -1457,8 +1457,9 @@ namespace Sokol
                 var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, characterBoneInfoMap);
                 animation.Name = gltfAnimation.Name ?? $"Animation{characterAnimations.Count}";
 
-                // Process animation channels - ONLY process bones that belong to THIS CHARACTER
-                int channelCount = 0;
+                // Process animation channels - process BOTH skinned bones AND non-skinned nodes
+                int boneChannelCount = 0;
+                int nodeChannelCount = 0;
                 foreach (var channel in gltfAnimation.Channels)
                 {
                     var targetNode = channel.TargetNode;
@@ -1483,21 +1484,22 @@ namespace Sokol
                         continue;
                     }
                     
-                    string boneName = targetNode.Name ?? "Unnamed";
+                    string nodeName = targetNode.Name ?? "Unnamed";
                     
-                    // CRITICAL: Only process bones that belong to THIS CHARACTER
-                    if (!characterBoneInfoMap.ContainsKey(boneName))
-                    {
-                        continue; // Skip bones that don't belong to this character
-                    }
+                    // Check if this is a skinned bone or a non-skinned node
+                    bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+                    int boneId = isBone ? characterBoneInfoMap[nodeName].Id : -1; // -1 for non-skinned nodes
                     
-                    channelCount++;
+                    if (isBone)
+                        boneChannelCount++;
+                    else
+                        nodeChannelCount++;
 
-                    // Find or create bone using THIS CHARACTER'S bone map
-                    var bone = animation.FindBone(boneName);
+                    // Find or create bone/node entry
+                    var bone = animation.FindBone(nodeName);
                     if (bone == null)
                     {
-                        bone = new SharpGltfBone(boneName, characterBoneInfoMap[boneName].Id, targetNode);
+                        bone = new SharpGltfBone(nodeName, boneId, targetNode);
                         animation.AddBone(bone);
                     }
 
@@ -1509,15 +1511,15 @@ namespace Sokol
                     );
                 }
 
-                // Only add animation if it has bones for this character
+                // Only add animation if it has bones or nodes
                 if (animation.GetBones().Count > 0)
                 {
                     characterAnimations.Add(animation);
-                    Info($"Character '{characterName}': Animation '{animation.Name}' - {animation.GetBones().Count} bones, {channelCount} channels, {duration}s", "SharpGLTF");
+                    Info($"Character '{characterName}': Animation '{animation.Name}' - {boneChannelCount} bone channels, {nodeChannelCount} node channels, {duration}s", "SharpGLTF");
                 }
                 else
                 {
-                    Info($"Character '{characterName}': Skipping animation '{animation.Name}' (no bones matched)", "SharpGLTF");
+                    Info($"Character '{characterName}': Skipping animation '{animation.Name}' (no channels matched)", "SharpGLTF");
                 }
             }
 
