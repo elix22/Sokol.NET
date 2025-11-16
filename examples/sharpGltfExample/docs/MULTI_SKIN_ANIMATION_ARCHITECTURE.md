@@ -1,101 +1,648 @@
-# Multi-Skin Animation Architecture Design
+# Multi-Skin Animation Architecture
 
 ## Executive Summary
 
-This document outlines the architectural redesign required to support glTF models with multiple skins (independent character rigs) and their corresponding animations. The current single-animator architecture cannot properly handle multiple independent characters in one model, as it attempts to animate all characters from a single animation source, causing cross-contamination and deformation.
+This document describes the implemented multi-character animation system that supports glTF models with multiple skins, node animations, and mixed animation scenarios. The architecture provides full independence for each animated character while correctly handling bone animations, node animations, and models without skinning data.
 
-## Problem Statement
+## Problem Statement & Solution
 
-### Current Architecture (Broken)
+### Original Problem
 
-The existing implementation uses a single-animator pattern:
+The previous single-animator architecture couldn't handle:
+1. **Multiple independent characters** in one glTF file (e.g., 2 characters with separate bone hierarchies)
+2. **Node animations** (animations targeting non-skinned nodes like cameras or props)
+3. **Mixed animation scenarios** (models with both skinned bones and node animations)
+
+### Implemented Architecture
+
+The new system uses a **per-character animation** approach:
 
 ```
 SharpGltfModel
-├── Animation (single)
-├── SharpGltfAnimator (single instance)
-│   └── _currentAnimation (contains ALL bones from ALL characters)
-├── BoneInfoMap (mixed bone data)
-└── Meshes (all meshes, no character separation)
-```
-
-**Fatal Flaw**: When a glTF file contains multiple skins (e.g., Clown with 100 bones + Shark with 56 bones), the current architecture loads them as a single animation containing bones from both characters. When `UpdateAnimation()` runs, it processes all bones simultaneously, causing:
-
-- Cross-contamination: Shark receives Clown's animation transforms (or vice versa)
-- Deformation: Characters render with incorrect bone matrices
-- No isolation: Impossible to control characters independently
-
-### Example of the Problem
-
-**glTF File Structure** (Multi-Character Scene):
-```
-skins: [
-  {
-    name: "Clown",
-    joints: [100 bones: "root", "Clown1:Root", "Clown1:head", ...]
-    inverseBindMatrices: [...]
-  },
-  {
-    name: "Shark", 
-    joints: [56 bones: "shark_root", "Head", "Tail", ...]
-    inverseBindMatrices: [...]
-  }
-]
-animations: [
-  {
-    name: "ClownDance",
-    channels: [...] // Targets Clown's joints
-  },
-  {
-    name: "SharkSwim",
-    channels: [...] // Targets Shark's joints
-  }
-]
-```
-
-**Current Broken Flow**:
-1. Model loads single `Animation` containing bones from both Clown AND Shark
-2. Single `SharpGltfAnimator` updates all bones at once
-3. `CalculateBoneTransform()` traverses entire hierarchy, writing to both characters
-4. Result: Shark gets Clown's transforms → deformation
-
-## Correct Architecture
-
-### High-Level Design
-
-```
-SharpGltfModel (Scene Container)
-├── List<AnimatedCharacter> Characters
-│   ├── AnimatedCharacter (Clown)
+├── List<AnimatedCharacter> Characters (one per skin)
+│   ├── AnimatedCharacter (Character 0)
 │   │   ├── int SkinIndex = 0
-│   │   ├── SharpGltfAnimation Animation (ClownDance)
-│   │   ├── SharpGltfAnimator Animator (dedicated instance)
-│   │   ├── Matrix4x4[] BoneMatrices (100 bones)
-│   │   ├── Dictionary<string, BoneInfo> BoneInfoMap (Clown's bones only)
+│   │   ├── List<SharpGltfAnimation> Animations (filtered for this character's bones)
+│   │   ├── SharpGltfAnimator Animator (dedicated instance, 0-N bone indexing)
+│   │   ├── Dictionary<string, BoneInfo> BoneInfoMap (character-specific, 0-N indices)
 │   │   └── List<Mesh> Meshes (references Skin 0)
 │   │
-│   └── AnimatedCharacter (Shark)
+│   └── AnimatedCharacter (Character 1)
 │       ├── int SkinIndex = 1
-│       ├── SharpGltfAnimation Animation (SharkSwim)
-│       ├── SharpGltfAnimator Animator (dedicated instance)
-│       ├── Matrix4x4[] BoneMatrices (56 bones)
-│       ├── Dictionary<string, BoneInfo> BoneInfoMap (Shark's bones only)
+│       ├── List<SharpGltfAnimation> Animations (filtered for this character's bones)
+│       ├── SharpGltfAnimator Animator (dedicated instance, 0-N bone indexing)
+│       ├── Dictionary<string, BoneInfo> BoneInfoMap (character-specific, 0-N indices)
 │       └── List<Mesh> Meshes (references Skin 1)
 │
+├── SharpGltfAnimation? NodeAnimation (for models without skins)
 ├── List<Mesh> NonSkinnedMeshes (static geometry)
-└── Dictionary<int, List<Mesh>> MaterialToMeshMap (for property animations)
+└── HashSet<string> SkinnedNodeNames (global: all joint names from all skins)
 ```
 
-### Key Principles
+### Key Implementation Details
 
-1. **Character Encapsulation**: Each character is a self-contained unit with its own animation system
-2. **Animation Isolation**: Each animator updates only its character's bones
-3. **Independent Control**: Characters can play different animations at different speeds
-4. **Mesh Grouping**: Meshes are grouped by character for efficient rendering
+### Key Implementation Details
 
-## Implementation Plan
+#### 1. Character-Specific Bone Indexing (0-N per Character)
 
-### Phase 1: Create AnimatedCharacter Class
+Each character has **independent bone indices** starting from 0:
+
+```csharp
+// Character 0: bones indexed 0, 1, 2, ..., N₀
+Dictionary<string, BoneInfo> character0BoneMap = {
+    {"Root", new BoneInfo(0, ...)},
+    {"Spine", new BoneInfo(1, ...)},
+    {"Head", new BoneInfo(2, ...)},
+    ...
+};
+
+// Character 1: bones ALSO indexed 0, 1, 2, ..., N₁ (independent!)
+Dictionary<string, BoneInfo> character1BoneMap = {
+    {"Root", new BoneInfo(0, ...)},     // Different bone, same index!
+    {"Hips", new BoneInfo(1, ...)},
+    {"Leg_L", new BoneInfo(2, ...)},
+    ...
+};
+```
+
+**Benefits**:
+- Each character's bone array is compact and cache-friendly
+- Shader uniforms/textures can use simple 0-N indexing
+- No gaps in bone arrays
+- Easy to determine skinning mode per character (if bones >= 100, use texture skinning)
+
+#### 2. Character-Specific Animation Filtering
+
+**Critical Fix**: Animations are filtered per character to include only channels that affect that character's bones OR non-skinned nodes:
+
+```csharp
+private List<SharpGltfAnimation> ProcessAnimationsForCharacter(
+    string characterName,
+    Dictionary<string, BoneInfo> characterBoneInfoMap,
+    SharpGltfNode rootNode)
+{
+    var characterAnimations = new List<SharpGltfAnimation>();
+    
+    foreach (var gltfAnimation in _model.LogicalAnimations)
+    {
+        var animation = new SharpGltfAnimation(...);
+        
+        int boneChannelCount = 0;
+        int nodeChannelCount = 0;
+        
+        foreach (var channel in gltfAnimation.Channels)
+        {
+            string nodeName = channel.TargetNode.Name;
+            
+            // Check if this is a bone belonging to THIS character
+            bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+            
+            // Check if this is a non-skinned node (global animation like camera)
+            bool isNodeAnimation = _skinnedNodeNames != null 
+                && !_skinnedNodeNames.Contains(nodeName);
+            
+            // CRITICAL: Only include if it's THIS character's bone OR a global node
+            if (!isBone && !isNodeAnimation)
+                continue; // Skip bones from other characters!
+            
+            // Process channel...
+            if (isBone)
+                boneChannelCount++;
+            else
+                nodeChannelCount++;
+        }
+        
+        // Only add animation if it has channels for this character
+        if (boneChannelCount > 0 || nodeChannelCount > 0)
+            characterAnimations.Add(animation);
+    }
+    
+    return characterAnimations;
+}
+```
+
+**Result**:
+- Multi-character models: Each character gets only its own animations
+- Single-character models: Character gets all animations
+- Node animations: Included in all characters (global animations)
+
+#### 3. Global Skinned Node Tracking
+
+**Critical Fix**: `_skinnedNodeNames` must collect joint names from **ALL skins**, not just the first one:
+
+```csharp
+private void BuildSkinnedNodeNames()
+{
+    _skinnedNodeNames = new HashSet<string>();
+    
+    // Collect joint names from ALL skins
+    foreach (var skin in _model.LogicalSkins)
+    {
+        foreach (var joint in skin.JointsIndices)
+        {
+            var node = _model.LogicalNodes[joint];
+            _skinnedNodeNames.Add(node.Name);
+        }
+    }
+}
+```
+
+**Why This Matters**:
+- Distinguishes between skinned bones and non-skinned animated nodes
+- Enables correct handling of mixed bone+node animations (e.g., LittleTokio)
+- Prevents marking bones from character 2 as "non-skinned" just because they're not in character 1's skin
+
+#### 4. Node-Only Animation Support
+
+For models **without skins** (e.g., CommercialRefrigerator with animated doors):
+
+```csharp
+private void ProcessNodeAnimations()
+{
+    if (_model.LogicalSkins.Count > 0)
+        return; // Has skins, use character animations instead
+    
+    // Create a single animation with all node channels
+    var nodeAnimation = new SharpGltfAnimation(...);
+    
+    foreach (var gltfAnimation in _model.LogicalAnimations)
+    {
+        foreach (var channel in gltfAnimation.Channels)
+        {
+            // Process all nodes (no bone filtering)
+            var node = new SharpGltfBone(nodeName, -1, targetNode);
+            nodeAnimation.AddBone(node);
+        }
+    }
+    
+    NodeAnimation = nodeAnimation;
+}
+```
+
+**Result**: Models without skinning data can still have animated nodes.
+
+#### 5. AnimatedCharacter Encapsulation
+
+Each character is a self-contained animation unit:
+
+```csharp
+public class AnimatedCharacter
+{
+    public int SkinIndex { get; }
+    public string Name { get; }
+    public List<SharpGltfAnimation> Animations { get; }
+    public int CurrentAnimationIndex { get; private set; }
+    public SharpGltfAnimator Animator { get; }
+    public List<Mesh> Meshes { get; }
+    public Dictionary<string, BoneInfo> BoneInfoMap { get; }
+    public int BoneCount { get; }
+    public SkinningMode SkinningMode { get; set; }
+    
+    public void Update(float dt)
+    {
+        Animator.UpdateAnimation(dt);
+    }
+    
+    public void SetAnimation(int index)
+    {
+        if (index >= 0 && index < Animations.Count)
+        {
+            CurrentAnimationIndex = index;
+            Animator.SetAnimation(Animations[index]);
+        }
+    }
+    
+    public Matrix4x4[] GetBoneMatrices()
+    {
+        return Animator.GetFinalBoneMatrices();
+    }
+}
+```
+
+**Benefits**:
+- Complete animation independence
+- Per-character animation selection
+- Per-character skinning mode (Uniform vs Texture)
+- Clean API for rendering code
+
+## Implementation Details
+
+### Phase 1: Model Loading & Character Creation
+
+**File**: `SharpGltfModel.cs` (Lines ~165-200)
+
+```csharp
+// Step 1: Build global skinned node names (from ALL skins)
+_skinnedNodeNames = new HashSet<string>();
+foreach (var skin in _model.LogicalSkins)
+{
+    foreach (var jointIndex in skin.JointsIndices)
+    {
+        var node = _model.LogicalNodes[jointIndex];
+        _skinnedNodeNames.Add(node.Name);
+    }
+}
+
+// Step 2: Create a character for each skin
+for (int skinIndex = 0; skinIndex < _model.LogicalSkins.Count; skinIndex++)
+{
+    var skin = _model.LogicalSkins[skinIndex];
+    
+    // Build character-specific bone map (0-N indexing)
+    var characterBoneInfoMap = new Dictionary<string, BoneInfo>();
+    int boneCounter = 0;
+    
+    foreach (var (jointNode, invBindMatrix) in skin.GetEnumerable(rootNode))
+    {
+        string boneName = jointNode.Name;
+        if (!characterBoneInfoMap.ContainsKey(boneName))
+        {
+            characterBoneInfoMap[boneName] = new BoneInfo(boneCounter++, invBindMatrix);
+        }
+    }
+    
+    // Get meshes for this skin
+    var skinMeshes = Meshes.Where(m => m.SkinIndex == skinIndex).ToList();
+    
+    if (skinMeshes.Count == 0)
+        continue; // No meshes for this skin
+    
+    // Process animations for THIS character ONLY
+    var characterAnimations = ProcessAnimationsForCharacter(
+        characterName,
+        characterBoneInfoMap,
+        rootNode);
+    
+    if (characterAnimations.Count == 0)
+    {
+        Warn($"No animations found for character '{characterName}'");
+        continue;
+    }
+    
+    // Create character
+    var character = new AnimatedCharacter(
+        skinIndex,
+        characterName,
+        characterAnimations,
+        skinMeshes,
+        MaterialToMeshMap,
+        Nodes,
+        characterBoneInfoMap,
+        boneCounter);
+    
+    Characters.Add(character);
+}
+
+// Step 3: Handle models without skins (node-only animations)
+if (_model.LogicalSkins.Count == 0 && _model.LogicalAnimations.Count > 0)
+{
+    ProcessNodeAnimations();
+}
+```
+
+### Phase 2: Animation Processing with Character Filtering
+
+**File**: `SharpGltfModel.cs` (Lines ~1450-1530)
+
+The critical fix that prevents animation sharing between characters:
+
+```csharp
+private List<SharpGltfAnimation> ProcessAnimationsForCharacter(
+    string characterName,
+    Dictionary<string, BoneInfo> characterBoneInfoMap,
+    SharpGltfNode rootNode)
+{
+    var characterAnimations = new List<SharpGltfAnimation>();
+    
+    foreach (var gltfAnimation in _model.LogicalAnimations)
+    {
+        var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, characterBoneInfoMap);
+        
+        int boneChannelCount = 0;
+        int nodeChannelCount = 0;
+        
+        foreach (var channel in gltfAnimation.Channels)
+        {
+            string nodeName = channel.TargetNode.Name;
+            
+            // Check if this is THIS character's bone
+            bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+            
+            // Check if this is a global non-skinned node
+            bool isNodeAnimation = _skinnedNodeNames != null 
+                && !_skinnedNodeNames.Contains(nodeName);
+            
+            // CRITICAL FIX: Skip bones/nodes that don't belong to this character
+            if (!isBone && !isNodeAnimation)
+                continue;
+            
+            int boneId = isBone ? characterBoneInfoMap[nodeName].Id : -1;
+            
+            if (isBone)
+                boneChannelCount++;
+            else
+                nodeChannelCount++;
+            
+            // Create bone entry and store samplers
+            var bone = new SharpGltfBone(nodeName, boneId, targetNode);
+            bone.SetSamplers(
+                channel.GetTranslationSampler(),
+                channel.GetRotationSampler(),
+                channel.GetScaleSampler());
+            animation.AddBone(bone);
+        }
+        
+        // Only add if it has channels for THIS character
+        if (boneChannelCount > 0 || nodeChannelCount > 0)
+        {
+            characterAnimations.Add(animation);
+        }
+    }
+    
+    return characterAnimations;
+}
+```
+
+**Key Points**:
+1. Each character gets its own `List<SharpGltfAnimation>`
+2. Animations are filtered to include only channels affecting that character
+3. Bone channels: Must match `characterBoneInfoMap` (this character's bones)
+4. Node channels: Must be non-skinned nodes (global animations)
+5. Prevents character 1 from getting character 2's animations
+
+### Phase 3: Rendering with Per-Character Updates
+
+**File**: `Frame_Skinning.cs`
+
+```csharp
+public void Draw()
+{
+    // Update and render each character independently
+    foreach (var character in state.model.Characters)
+    {
+        // Update this character's animation
+        character.Update(state.deltaTime);
+        
+        // Get bone matrices for this character
+        Matrix4x4[] boneMatrices = character.GetBoneMatrices();
+        
+        // Render all meshes for this character
+        foreach (var mesh in character.Meshes)
+        {
+            RenderSkinnedMesh(mesh, boneMatrices, character.SkinningMode);
+        }
+    }
+    
+    // Render static meshes
+    foreach (var mesh in state.model.StaticMeshes)
+    {
+        RenderStaticMesh(mesh);
+    }
+    
+    // Render node-animated meshes (models without skins)
+    if (state.model.NodeAnimation != null)
+    {
+        state.model.NodeAnimator.UpdateAnimation(state.deltaTime);
+        // Render node-animated meshes...
+    }
+}
+```
+
+### Phase 4: GUI Controls (Per-Character)
+
+**File**: `Frame_Gui.cs`
+
+```csharp
+private void DrawCharacterControls()
+{
+    foreach (var character in state.model.Characters)
+    {
+        if (igTreeNode($"{character.Name} (Skin {character.SkinIndex})"))
+        {
+            // Animation selection
+            int currentAnim = character.CurrentAnimationIndex;
+            if (igCombo("Animation", ref currentAnim, 
+                GetAnimationNames(character.Animations)))
+            {
+                character.SetAnimation(currentAnim);
+            }
+            
+            // Skinning mode selection
+            int skinningMode = (int)character.SkinningMode;
+            if (igCombo("Skinning Mode", ref skinningMode, 
+                "Uniform\0Texture\0"))
+            {
+                character.SkinningMode = (SkinningMode)skinningMode;
+            }
+            
+            igTreePop();
+        }
+    }
+}
+```
+
+## Critical Bugs Fixed
+
+### Bug #1: `_skinnedNodeNames` Only Populated from First Skin
+
+**Problem**: When building `_skinnedNodeNames`, only the first skin's joints were added. This caused bones from other characters to be incorrectly marked as "non-skinned nodes".
+
+**Solution**: Collect joint names from ALL skins:
+
+```csharp
+// BEFORE (broken):
+var skin = _model.LogicalSkins[0]; // Only first skin!
+foreach (var joint in skin.JointsIndices)
+    _skinnedNodeNames.Add(...);
+
+// AFTER (fixed):
+foreach (var skin in _model.LogicalSkins) // ALL skins!
+{
+    foreach (var joint in skin.JointsIndices)
+        _skinnedNodeNames.Add(...);
+}
+```
+
+### Bug #2: Node Animations Not Working (No Skins)
+
+**Problem**: Models without skins (e.g., CommercialRefrigerator) have animations but no characters were created, so animations were never processed.
+
+**Solution**: Added `ProcessNodeAnimations()` for skinless models:
+
+```csharp
+if (_model.LogicalSkins.Count == 0 && _model.LogicalAnimations.Count > 0)
+{
+    ProcessNodeAnimations(); // Creates NodeAnimation and NodeAnimator
+}
+```
+
+### Bug #3: Mixed Bone+Node Animations Not Working
+
+**Problem**: Models like LittleTokio have BOTH skinned bones AND node animations, but only bone animations were processed (node channels were skipped).
+
+**Solution**: Modified `ProcessAnimationsForCharacter` to include BOTH bone and node channels:
+
+```csharp
+bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+bool isNodeAnimation = _skinnedNodeNames != null && !_skinnedNodeNames.Contains(nodeName);
+
+// Include BOTH bones and nodes
+if (!isBone && !isNodeAnimation)
+    continue;
+```
+
+### Bug #4: Characters Sharing Animations
+
+**Problem**: After fixing bug #3, ALL characters were getting ALL animations because node animation fix removed character-specific filtering.
+
+**Solution**: Restore character-specific filtering while keeping node animation support:
+
+```csharp
+// Only include channels that are:
+// 1. THIS character's bones (in characterBoneInfoMap), OR
+// 2. Non-skinned nodes (global animations)
+
+bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+bool isNodeAnimation = _skinnedNodeNames != null && !_skinnedNodeNames.Contains(nodeName);
+
+if (!isBone && !isNodeAnimation)
+    continue; // Skip bones from other characters!
+
+// Result: Character gets its own bone animations + global node animations
+```
+
+## Test Cases & Validation
+
+### Test Case 1: Multi-Character Model (DancingGangster.glb)
+
+**Expected**:
+- 2 characters created, each with independent animations
+- Each character has its own bone map (0-N indexing)
+- GUI shows separate animation controls per character
+- Characters can play different animations simultaneously
+
+**Verified**: ✅ All characters have independent animation lists
+
+### Test Case 2: Node-Only Animation (CommercialRefrigerator.glb)
+
+**Expected**:
+- No skins → No characters created
+- NodeAnimation populated with door/shelf animations
+- Animations play correctly
+
+**Verified**: ✅ Node animations work without skins
+
+### Test Case 3: Mixed Bone+Node (LittleTokio.glb)
+
+**Expected**:
+- 1 character created from skin
+- Character animations include BOTH bone and node channels
+- Both bone and node animations play simultaneously
+
+**Verified**: ✅ Mixed animations work correctly
+
+### Test Case 4: 100+ Bone Character
+
+**Expected**:
+- Character automatically uses texture-based skinning
+- `character.SkinningMode` defaults to `SkinningMode.TextureBased`
+- Can switch to uniform mode in GUI (if desired)
+
+**Verified**: ✅ Automatic skinning mode selection works
+
+## Performance Characteristics
+
+### Memory Usage
+
+- **Per Character**: `boneCount × 64 bytes` (Matrix4x4) for bone matrices
+- **Example**: 2 characters with 80 bones each = 2 × 80 × 64 = 10,240 bytes (~10 KB)
+- **Impact**: Negligible for typical multi-character scenes
+
+### CPU Usage
+
+- **Per Frame**: `O(bones₁) + O(bones₂) + ... = O(total bones)`
+- **Benefit**: Better cache locality (each animator processes contiguous bone array)
+- **Impact**: Neutral or slightly positive vs. single-animator approach
+
+### GPU Usage
+
+- **No Change**: Same total bone matrices uploaded, just organized per-character
+- **Benefit**: Can skip characters outside view frustum independently
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        SharpGltfModel                           │
+├─────────────────────────────────────────────────────────────────┤
+│ + List<AnimatedCharacter> Characters                            │
+│ + SharpGltfAnimation? NodeAnimation (for skinless models)       │
+│ + SharpGltfAnimator? NodeAnimator                               │
+│ + HashSet<string> SkinnedNodeNames (global joint names)         │
+│ + List<Mesh> NonSkinnedMeshes                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ - ProcessAnimationsForCharacter(name, boneMap, root)            │
+│ - ProcessNodeAnimations()                                       │
+│ - BuildSkinnedNodeNames()                                       │
+└─────────────────────────────────────────────────────────────────┘
+                            │ contains 0..N
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      AnimatedCharacter                          │
+├─────────────────────────────────────────────────────────────────┤
+│ + int SkinIndex                                                 │
+│ + string Name                                                   │
+│ + List<SharpGltfAnimation> Animations (character-specific)      │
+│ + int CurrentAnimationIndex                                     │
+│ + SharpGltfAnimator Animator (dedicated, 0-N bone indexing)    │
+│ + Dictionary<string, BoneInfo> BoneInfoMap (0-N indices)        │
+│ + List<Mesh> Meshes                                             │
+│ + int BoneCount                                                 │
+│ + SkinningMode SkinningMode (Uniform/Texture)                   │
+├─────────────────────────────────────────────────────────────────┤
+│ + Update(dt)                                                    │
+│ + SetAnimation(index)                                           │
+│ + GetBoneMatrices() → Matrix4x4[]                               │
+└─────────────────────────────────────────────────────────────────┘
+                            │ owns
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     SharpGltfAnimator                           │
+├─────────────────────────────────────────────────────────────────┤
+│ - Matrix4x4[] _finalBoneMatrices (0-N for this character)      │
+│ - SharpGltfAnimation? _currentAnimation                         │
+│ - float _currentTime                                            │
+│ + float PlaybackSpeed                                           │
+├─────────────────────────────────────────────────────────────────┤
+│ + UpdateAnimation(dt)                                           │
+│ + SetAnimation(animation)                                       │
+│ + GetFinalBoneMatrices() → Matrix4x4[]                          │
+│ - CalculateBoneTransform(node, parentTransform)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Summary
+
+This implementation provides:
+
+1. ✅ **Multi-character support**: Each character has independent animation system with 0-N bone indexing
+2. ✅ **Node animation support**: Models without skins can have animated nodes
+3. ✅ **Mixed animations**: Models with both bone and node animations work correctly
+4. ✅ **Character isolation**: Each character gets only its own animations (no sharing)
+5. ✅ **Independent control**: Per-character animation selection and skinning mode
+6. ✅ **Global skinned node tracking**: Correctly distinguishes bones from non-skinned nodes across all skins
+7. ✅ **Clean architecture**: Self-contained AnimatedCharacter encapsulation
+8. ✅ **Automatic skinning mode**: Texture-based for 100+ bones, uniform for fewer
+
+**All animation scenarios work correctly**:
+- Single-character models (backward compatible)
+- Multi-character models (independent animations per character)
+- Node-only animations (models without skins)
+- Mixed bone+node animations (single character with both types)
+
+---
+
+*Last Updated: Implementation complete with all critical fixes applied*
 
 **File**: `src/Sokol/SharpGLTF/SharpGltfAnimatedCharacter.cs`
 
