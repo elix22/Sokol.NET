@@ -1,12 +1,12 @@
 [submodule "ext/sokol"]
 	path = ext/sokol
-	url = git@github.com:elix22/sokol.git
+	url = https://github.com/elix22/sokol.git
 [submodule "tools/sokol-tools"]
 	path = tools/sokol-tools
-	url = git@github.com:elix22/sokol-tools.git
+	url = https://github.com/elix22/sokol-tools.git
 [submodule "ext/cimgui"]
 	path = ext/cimgui
-	url = git@github.com:elix22/cimgui.git
+	url = https://github.com/elix22/cimgui.git
 	branch = v1.92.2b
 [submodule "tools/emsdk"]
 	path = tools/emsdk
