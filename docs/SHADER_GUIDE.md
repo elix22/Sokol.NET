@@ -439,13 +439,13 @@ var vsParams = new VsParams {
     Model = modelMatrix,
     ViewProj = viewProjMatrix
 };
-sg.ApplyUniforms(sg_shader_stage.SG_SHADERSTAGE_VS, 0, ref vsParams);
+sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vsParams));
 
 var fsParams = new FsParams {
     Color = new Vector4(1, 0, 0, 1),
     Roughness = 0.5f
 };
-sg.ApplyUniforms(sg_shader_stage.SG_SHADERSTAGE_FS, 0, ref fsParams);
+sg_apply_uniforms(UB_fs_params, SG_RANGE(ref fsParams));
 ```
 
 ### Uniform Buffer Layout (std140)
@@ -524,12 +524,17 @@ void main() {
 
 **Usage in C#**:
 ```csharp
-sg.ApplyBindings(new sg_bindings {
-    fs = {
-        images = new[] { myTexture },
-        samplers = new[] { mySampler }
-    }
-});
+sg_bindings bind = new sg_bindings
+{
+    views = {
+        [0] = sg_make_view(new sg_view_desc
+        {
+            texture = { image = myTexture }
+        })
+    },
+    samplers = { [0] = mySampler }
+};
+sg_apply_bindings(in bind);
 ```
 
 ### Multiple Textures
