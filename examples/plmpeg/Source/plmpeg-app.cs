@@ -190,7 +190,7 @@ public static unsafe partial class PlMpegApp
             plm_set_audio_decode_callback(state.plm, (IntPtr)(delegate* unmanaged<plm_t*, plm_samples_t*, void*, void>)&audio_cb, null);
             plm_set_loop(state.plm, 1);
             plm_set_audio_enabled(state.plm, 1, 0);
-            plm_set_audio_lead_time(state.plm, 0.25);
+            plm_set_audio_lead_time(state.plm, 0.30);
             if (plm_get_num_audio_streams(state.plm) > 0)
             {
                 saudio_setup(new saudio_desc()

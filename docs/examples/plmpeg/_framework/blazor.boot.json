@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "plmpegweb.dll",
   "resources": {
-    "hash": "sha256-fknpBdFrgluigFRLPZSQfc8XyHk+DHEI0aO5nkQ4xIU=",
+    "hash": "sha256-bJob1I9T25v3aaIXGdAcjCA7CXI3uMTzMxXrI2bTuIA=",
     "jsModuleNative": {
       "dotnet.native.js": "sha256-A9I2T5lftE4WAnmuQjwMAkahQxPkgM9+qvd4cfI/F0E="
     },
@@ -180,10 +180,10 @@
       "mscorlib.wasm": "sha256-K9gNrsN9UmPqLs6J/FrkiKpmkVGnHjjqUsc7YGvesCY=",
       "netstandard.wasm": "sha256-4emjlXLM9qW3t2tlII20SDylBgG4ueI0wy9nh5FMd8g=",
       "System.Private.CoreLib.wasm": "sha256-2DN4v7I/tabltDEPdIO8sDBB0tY8zOm+0CvHbMssXW4=",
-      "plmpegweb.wasm": "sha256-NqRt1jheFRNQoTcQGnRdWHmKb3LZJnxZ90BUzKIiwJ8="
+      "plmpegweb.wasm": "sha256-LuMORpLZeD7TA97t/lOi57U2gQUrRLu9qYP+sb0RUS4="
     },
     "pdb": {
-      "plmpegweb.pdb": "sha256-q03DRiPg8hQPmMPLlE6no4/98P3kuR4u9BJfyfdxq74="
+      "plmpegweb.pdb": "sha256-LZ26uDbOvgmP1eUSDInNEiHKP8cceXHkIfaUobMbMpA="
     },
     "vfs": {
       "runtimeconfig.bin": {

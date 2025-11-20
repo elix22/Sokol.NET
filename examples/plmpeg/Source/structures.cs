@@ -36,7 +36,7 @@ public static unsafe partial class PlMpegApp
         public fixed float interleaved[PLM_AUDIO_SAMPLES_PER_FRAME * 2];
     };
 
-    const string filename = "bjork-all-is-full-of-love.mpg";
+    const string filename = "BigBuckBunny.mpg";
 
     const int BUFFER_SIZE = (1024 * 1024);
     const int CHUNK_SIZE = (128 * 1024);
