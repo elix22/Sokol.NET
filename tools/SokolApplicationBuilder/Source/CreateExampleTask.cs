@@ -437,71 +437,64 @@ $@"		{{{projectGuid}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
             bool modified = false;
 
             // Find and update the exampleName input options (for launch.json picker)
-            string searchPattern = "\"id\": \"exampleName\"";
-            int exampleNameInputIndex = content.IndexOf(searchPattern);
-            
-            if (exampleNameInputIndex != -1)
-            {
-                // Find the options array after this
-                int optionsStart = content.IndexOf("\"options\": [", exampleNameInputIndex);
-                int defaultIndex = content.IndexOf("\"default\": \"cube\"", exampleNameInputIndex);
-                
-                if (optionsStart != -1 && defaultIndex != -1 && optionsStart < defaultIndex)
-                {
-                    // Find where to insert (after the opening bracket)
-                    int bracketIndex = content.IndexOf("[", optionsStart) + 1;
-                    int nextLine = content.IndexOf("\n", bracketIndex) + 1;
-                    
-                    // Get indentation
-                    int indentEnd = nextLine;
-                    while (indentEnd < content.Length && (content[indentEnd] == ' ' || content[indentEnd] == '\t'))
-                    {
-                        indentEnd++;
-                    }
-                    string indent = content.Substring(nextLine, indentEnd - nextLine);
-                    
-                    string newEntry = $"{indent}\"{exampleName}\",\n";
-                    content = content.Insert(nextLine, newEntry);
-                    modified = true;
-                }
-            }
+            modified |= AddToInputOptions(ref content, "\"id\": \"exampleName\"", exampleName);
 
             // Find and update the examplePath input options (for Android/iOS tasks)
-            searchPattern = "\"id\": \"examplePath\"";
-            int examplePathInputIndex = content.IndexOf(searchPattern);
-            
-            if (examplePathInputIndex != -1)
-            {
-                // Find the options array after this
-                int optionsStart = content.IndexOf("\"options\": [", examplePathInputIndex);
-                
-                // Find the end of this options array (before the next input)
-                int nextInputIndex = content.IndexOf("\"id\":", examplePathInputIndex + searchPattern.Length);
-                
-                if (optionsStart != -1 && (nextInputIndex == -1 || optionsStart < nextInputIndex))
-                {
-                    // Find where to insert (after the opening bracket)
-                    int bracketIndex = content.IndexOf("[", optionsStart) + 1;
-                    int nextLine = content.IndexOf("\n", bracketIndex) + 1;
-                    
-                    // Get indentation
-                    int indentEnd = nextLine;
-                    while (indentEnd < content.Length && (content[indentEnd] == ' ' || content[indentEnd] == '\t'))
-                    {
-                        indentEnd++;
-                    }
-                    string indent = content.Substring(nextLine, indentEnd - nextLine);
-                    
-                    string newEntry = $"{indent}\"examples/{exampleName}\",\n";
-                    content = content.Insert(nextLine, newEntry);
-                    modified = true;
-                }
-            }
+            modified |= AddToInputOptions(ref content, "\"id\": \"examplePath\"", $"examples/{exampleName}");
+
+            // Find and update the exampleToDelete input options (for delete task)
+            modified |= AddToInputOptions(ref content, "\"id\": \"exampleToDelete\"", exampleName);
 
             if (modified)
             {
                 File.WriteAllText(tasksJsonPath, content);
             }
+        }
+
+        private bool AddToInputOptions(ref string content, string inputIdPattern, string valueToAdd)
+        {
+            int inputIndex = content.IndexOf(inputIdPattern);
+            
+            if (inputIndex != -1)
+            {
+                // Find the options array after this input
+                int optionsStart = content.IndexOf("\"options\": [", inputIndex);
+                
+                // Find the end of this options array (before the next input or end of inputs)
+                int nextInputIndex = content.IndexOf("\"id\":", inputIndex + inputIdPattern.Length);
+                
+                if (optionsStart != -1 && (nextInputIndex == -1 || optionsStart < nextInputIndex))
+                {
+                    // Check if the value already exists
+                    int closingBracket = content.IndexOf("]", optionsStart);
+                    if (closingBracket != -1)
+                    {
+                        string optionsSection = content.Substring(optionsStart, closingBracket - optionsStart);
+                        if (optionsSection.Contains($"\"{valueToAdd}\""))
+                        {
+                            return false; // Already exists
+                        }
+                    }
+
+                    // Find where to insert (after the opening bracket)
+                    int bracketIndex = content.IndexOf("[", optionsStart) + 1;
+                    int nextLine = content.IndexOf("\n", bracketIndex) + 1;
+                    
+                    // Get indentation
+                    int indentEnd = nextLine;
+                    while (indentEnd < content.Length && (content[indentEnd] == ' ' || content[indentEnd] == '\t'))
+                    {
+                        indentEnd++;
+                    }
+                    string indent = content.Substring(nextLine, indentEnd - nextLine);
+                    
+                    string newEntry = $"{indent}\"{valueToAdd}\",\n";
+                    content = content.Insert(nextLine, newEntry);
+                    return true;
+                }
+            }
+            
+            return false;
         }
     }
 }

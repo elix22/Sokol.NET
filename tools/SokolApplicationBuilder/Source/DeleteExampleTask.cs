@@ -47,13 +47,21 @@ namespace SokolApplicationBuilder
                     return false;
                 }
 
-                string sokolNetHome = Environment.GetEnvironmentVariable("sokol_net_root");
-                if (string.IsNullOrWhiteSpace(sokolNetHome))
+                // Get SokolNetHome path
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (string.IsNullOrEmpty(homeDir) || !Directory.Exists(homeDir))
                 {
-                    Log.LogError("ERROR: 'sokol_net_root' environment variable is not set.");
+                    homeDir = Environment.GetEnvironmentVariable("HOME") ?? "";
+                }
+                
+                string sokolNetHomeFile = Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+                if (!File.Exists(sokolNetHomeFile))
+                {
+                    Log.LogError("ERROR: SokolNetHome configuration not found. Please run 'register' task first.");
                     return false;
                 }
 
+                string sokolNetHome = File.ReadAllText(sokolNetHomeFile).Trim();
                 string examplePath = Path.Combine(sokolNetHome, "examples", exampleName);
                 
                 if (!Directory.Exists(examplePath))
