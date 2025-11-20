@@ -711,6 +711,31 @@
 				"showReuseMessage": true,
 				"clear": false
 			}
+		},
+		{
+			"label": "Delete Example",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/SokolApplicationBuilder",
+				"--",
+				"--task",
+				"delete",
+				"--project",
+				"${input:exampleToDelete}"
+			],
+			"group": "build",
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			}
 		}
 	],
 	"inputs": [
@@ -833,6 +858,48 @@
 			"type": "promptString",
 			"description": "Enter the name for the new example (alphanumeric and underscore only, must start with letter)",
 			"default": "my_example"
+		},
+		{
+			"id": "exampleToDelete",
+			"type": "pickString",
+			"description": "⚠️ WARNING: Select an example to PERMANENTLY DELETE",
+			"options": [
+				"cube",
+				"assimp_simple",
+				"assimp_animation",
+				"assimp_scene",
+				"dyntex",
+				"cimgui",
+				"loadpng",
+				"instancing",
+				"plmpeg",
+				"drawcallperf",
+				"sgl",
+				"sgl_lines",
+				"debugtext",
+				"debugtext_context",
+				"imgui_usercallback",
+				"offscreen",
+				"sdf",
+				"shadows",
+				"shapes_transform",
+				"cgltf",
+				"basisu",
+				"clear",
+				"texview",
+				"fontstash",
+				"fontstash_layers",
+				"cubemaprt",
+				"miprender",
+				"cubemap_jpeg",
+				"spine_simple",
+				"spine_skinsets",
+				"spine_inspector",
+				"ozz_shdfeatures",
+				"vertextexture",
+				"mrt",
+				"GltfViewer"
+			]
 		}
 	]
 }

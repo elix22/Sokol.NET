@@ -129,3 +129,37 @@ After creation, you can customize:
 - Look at existing examples in the `examples/` folder for inspiration
 - Use the shader compilation guide in `docs/SHADER_GUIDE.md` for shader development
 - Test on desktop first before building for other platforms
+
+## Deleting an Example
+
+⚠️ **WARNING: This operation permanently deletes the example and CANNOT be undone!**
+
+To delete an example you've created:
+
+### Via VS Code Task (Recommended)
+
+1. Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
+2. Type "Tasks: Run Task"
+3. Select **"Delete Example"**
+4. Choose the example to delete from the dropdown
+5. **Confirm by typing the exact example name** when prompted
+
+### Via Command Line
+
+```bash
+dotnet run --project tools/SokolApplicationBuilder -- --task delete --project example_name
+```
+
+You will be prompted to confirm the deletion by typing the example name. This safety measure prevents accidental deletions.
+
+### What Gets Deleted
+
+When you delete an example, the following are permanently removed:
+
+- ✗ Project folder: `examples/example_name/`
+- ✗ Solution entries in `Sokol.NET.sln`
+- ✗ Launch configuration in `.vscode/launch.json`
+- ✗ Prepare tasks in `.vscode/tasks.json`
+- ✗ Input options in `.vscode/tasks.json`
+
+**There is no undo operation.** Make sure you have backups of any important code before deleting an example.

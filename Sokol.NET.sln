@@ -148,10 +148,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_new", "examples\test_n
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_newWeb", "examples\test_new\test_newWeb.csproj", "{80C85E1A-0B3B-4703-AF9D-2AB7A4B9B67B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SomeNewExample", "examples\SomeNewExample\SomeNewExample.csproj", "{0A0C3069-EE81-43BA-85F9-1E7791A2266D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SomeNewExampleWeb", "examples\SomeNewExample\SomeNewExampleWeb.csproj", "{729D9A80-5424-4D8A-A648-2DDE068061FA}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_android_ios", "examples\test_android_ios\test_android_ios.csproj", "{A2C62AB4-315A-436F-A4D1-D4D90BC33F91}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_android_iosWeb", "examples\test_android_ios\test_android_iosWeb.csproj", "{AA085F4B-9AB6-48CC-BCBB-8701252E2FBA}"
