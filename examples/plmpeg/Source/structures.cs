@@ -39,8 +39,8 @@ public static unsafe partial class PlMpegApp
     const string filename = "BigBuckBunny.mpg";
 
     const int BUFFER_SIZE = (1024 * 1024);
-    const int CHUNK_SIZE = (128 * 1024);
-    const int NUM_BUFFERS = (4);
+    const int CHUNK_SIZE = (256 * 1024);
+    const int NUM_BUFFERS = (8);
 
     /*************************************************************************************************/
     // These buffers must be manually destroyed , because they are not managed by the Garbage Collector
