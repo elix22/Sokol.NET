@@ -24,7 +24,7 @@
                 "program": "powershell",
                 "args": [
                     "-Command",
-                    "dotnet run --project $(Get-Content $env:USERPROFILE\\.sokolnet_config\\sokolnet_home)\\tools\\dotnet-serve\\src\\dotnet-serve\\dotnet-serve.csproj -- -d ${workspaceFolder}\\bin\\Debug\\net8.0\\browser-wasm\\AppBundle -p ${input:browserPort} -h 'Cross-Origin-Opener-Policy: same-origin' -h 'Cross-Origin-Embedder-Policy: require-corp' -h 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' -h 'Pragma: no-cache'"
+                    "$sokolHome = Get-Content $env:USERPROFILE\\.sokolnet_config\\sokolnet_home; dotnet run --project \"$sokolHome\\tools\\dotnet-serve\\src\\dotnet-serve\\dotnet-serve.csproj\" -- -d ${workspaceFolder}\\bin\\Debug\\net8.0\\browser-wasm\\AppBundle -p ${input:browserPort} -h 'Cross-Origin-Opener-Policy: same-origin' -h 'Cross-Origin-Embedder-Policy: require-corp' -h 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' -h 'Pragma: no-cache'"
                 ]
             },
             "linux": {
