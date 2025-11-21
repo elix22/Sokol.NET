@@ -157,14 +157,19 @@ Example:
 </PropertyGroup>
 ```
 
-### Adding Dependencies
+### Adding NuGet Packages
 
-**For Desktop/WebAssembly**, edit `my_game.csproj` or `my_gameWeb.csproj`:
+**Add NuGet packages to `Directory.Build.props`** in an `<ItemGroup>` section:
 ```xml
 <ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   <PackageReference Include="YourPackage" Version="1.0.0" />
 </ItemGroup>
 ```
+
+This ensures the packages are available across all project configurations (Desktop, Web, Android, iOS).
+
+### Adding Native Libraries
 
 **For Native Libraries** (Assimp, Spine, Ozz), see example projects in the Sokol.NET repository:
 - `examples/assimp_simple` - Assimp configuration

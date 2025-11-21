@@ -123,6 +123,18 @@ After creation, you can customize:
 2. **Project files**: All `.csproj` files are renamed to match your example name
 3. **Build configuration**: Modify `Directory.Build.props` for custom build settings
 
+### Adding NuGet Packages
+
+Add NuGet packages to your example's `Directory.Build.props` in an `<ItemGroup>` section:
+```xml
+<ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  <PackageReference Include="YourPackage" Version="1.0.0" />
+</ItemGroup>
+```
+
+This ensures the packages are available across all project configurations (Desktop, Web, Android, iOS).
+
 ## Tips
 
 - Start simple with the template and gradually add complexity
