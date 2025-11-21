@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="modulepreload" href="./_framework/dotnet.js" />
+  <link rel="modulepreload" href="./main.js" />
+  <title>Sokol.Sample</title>
+  <style>
+    body
+    {
+      margin: 0;
+      background-color: white;
+      overflow: hidden;
+    }
+
+    .emscripten {
+      padding-right: 0;
+      margin-left: auto;
+      margin-right: auto;
+      display: block;
+    }
+
+    div.emscripten {
+      text-align: center;
+    }
+
+    canvas#canvas
+    {
+      width: 100vw;
+      height: 100vh;
+      outline: none;
+      margin: 0;
+      position: absolute;
+    }
+
+    #spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #spinner_animation {
+      height:60px;
+      width:60px;
+      animation: rotation .6s infinite linear;
+      border-left:6px solid rgba(0,174,239,.15);
+      border-right:6px solid rgba(0,174,239,.15);
+      border-bottom:6px solid rgba(0,174,239,.15);
+      border-top:6px solid rgba(0,174,239,.8);
+      border-radius:100%;
+    }
+    @keyframes rotation {
+      from {transform: rotate(0deg);}
+      to {transform: rotate(359deg);}
+    }
+    .centered {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-50%);
+    }
+  </style>
+</head>
+<body>
+<div class="centered">
+  <div id="Downloading" class="emscripten" id="status">Downloading...</div>
+</div>
+<div id="spinner"><div id="spinner_animation"></div></div>
+<!-- <canvas class=game id=canvas width="800" height="600"> -->
+<canvas class="emscripten" id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()">
+Your browser does not support HTML5 canvas.
+</canvas>
+<script type="module" src="./main.js"></script>
+<script>
+// Check WebGL context after sokol initializes it (run after a delay to ensure sokol has created the context)
+window.addEventListener('load', function() {
+    setTimeout(function() {
+              // Create WebGL context with no alpha channel and no premultiplied alpha
+        // This matches what dotnet-serve enforces via CORS headers
+        var contextAttributes = {
+            alpha: false,  // No alpha channel - prevents white background blending issues
+            premultipliedAlpha: false,  // Don't premultiply alpha
+            antialias: true,
+            depth: true,
+            stencil: false,
+            preserveDrawingBuffer: false,
+            failIfMajorPerformanceCaveat: false
+        };
+        var canvas = document.getElementById('canvas');
+        // Get the existing WebGL context that sokol created (don't create a new one!)
+        var gl = canvas.getContext('webgl2', contextAttributes) || 
+                 canvas.getContext('webgl', contextAttributes);
+        if (gl) {
+            var depthBits = gl.getParameter(gl.DEPTH_BITS);
+            var alphaBits = gl.getParameter(gl.ALPHA_BITS);
+            console.log('WebGL depth bits:', depthBits);
+            console.log('WebGL alpha bits:', alphaBits);
+            console.log('WebGL premultiplied alpha:', gl.getContextAttributes().premultipliedAlpha);
+            if (depthBits === 0) {
+                console.warn('No depth buffer available in WebGL context!');
+            }
+        }
+    }, 1000); // Wait 1 second for sokol to initialize
+});
+</script>
+</body>
+</html>

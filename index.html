@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sokol.NET Examples - Interactive WebAssembly Showcase</title>
+    <meta name="description" content="Try 36 interactive WebAssembly examples showcasing Sokol.NET's cross-platform graphics capabilities. Run directly in your browser!">
+    <link rel="stylesheet" href="css/showcase.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>🎮 Sokol.NET Examples</h1>
+            <p class="tagline">Interactive WebAssembly Showcase - Try 36 Examples in Your Browser</p>
+            <div class="header-links">
+                <a href="https://github.com/elix22/Sokol.NET" class="btn btn-primary" target="_blank">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    View on GitHub
+                </a>
+                <a href="https://github.com/elix22/Sokol.NET#-quick-start" class="btn btn-secondary" target="_blank">
+                    📘 Documentation
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- Category Filter -->
+            <div class="filter-section">
+                <h2>Filter by Category</h2>
+                <div class="category-filters" id="categoryFilters">
+                    <button class="filter-btn active" data-category="all">All Examples</button>
+                </div>
+            </div>
+
+            <!-- Examples Grid -->
+            <div class="examples-grid" id="examplesGrid">
+                <!-- Examples will be dynamically inserted here -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>
+                Built with <a href="https://github.com/elix22/Sokol.NET" target="_blank">Sokol.NET</a> by 
+                <a href="https://github.com/elix22" target="_blank">Eli Aloni</a>
+            </p>
+            <p class="tech-stack">
+                WebAssembly • .NET NativeAOT • WebGL 2.0 • Cross-Platform Graphics
+            </p>
+        </div>
+    </footer>
+
+    <!-- Example Modal -->
+    <div class="modal" id="exampleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <div class="modal-actions">
+                    <a href="#" id="sourceLink" class="btn btn-small" target="_blank">View Source</a>
+                    <button class="close-btn" id="closeModal">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <iframe id="exampleFrame" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/showcase.js"></script>
+</body>
+</html>

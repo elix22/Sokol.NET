@@ -1,0 +1,302 @@
+{
+  "examples": [
+    {
+      "id": "cube",
+      "name": "Cube",
+      "category": "Graphics Fundamentals",
+      "description": "Rotating 3D cube with texture",
+      "thumbnail": "thumbnails/cube.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cube"
+    },
+    {
+      "id": "clear",
+      "name": "Clear",
+      "category": "Graphics Fundamentals",
+      "description": "Basic window and clear color",
+      "thumbnail": "thumbnails/clear.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/clear"
+    },
+    {
+      "id": "instancing",
+      "name": "Instancing",
+      "category": "Graphics Fundamentals",
+      "description": "Hardware instancing demonstration",
+      "thumbnail": "thumbnails/instancing.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/instancing"
+    },
+    {
+      "id": "offscreen",
+      "name": "Offscreen",
+      "category": "Graphics Fundamentals",
+      "description": "Render-to-texture techniques",
+      "thumbnail": "thumbnails/offscreen.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/offscreen"
+    },
+    {
+      "id": "mrt",
+      "name": "MRT",
+      "category": "Graphics Fundamentals",
+      "description": "Multiple render targets",
+      "thumbnail": "thumbnails/mrt.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/mrt"
+    },
+    {
+      "id": "shadows",
+      "name": "Shadows",
+      "category": "Graphics Fundamentals",
+      "description": "Shadow mapping implementation",
+      "thumbnail": "thumbnails/shadows.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/shadows"
+    },
+    {
+      "id": "sgl",
+      "name": "SGL",
+      "category": "2D Graphics",
+      "description": "2D immediate mode rendering",
+      "thumbnail": "thumbnails/sgl.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/sgl"
+    },
+    {
+      "id": "sgl_lines",
+      "name": "SGL Lines",
+      "category": "2D Graphics",
+      "description": "Line rendering techniques",
+      "thumbnail": "thumbnails/sgl_lines.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/sgl_lines"
+    },
+    {
+      "id": "shapes_transform",
+      "name": "Shapes Transform",
+      "category": "2D Graphics",
+      "description": "2D transformations",
+      "thumbnail": "thumbnails/shapes_transform.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/shapes_transform"
+    },
+    {
+      "id": "dyntex",
+      "name": "Dynamic Texture",
+      "category": "2D Graphics",
+      "description": "Dynamic texture updates",
+      "thumbnail": "thumbnails/dyntex.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/dyntex"
+    },
+    {
+      "id": "debugtext",
+      "name": "Debug Text",
+      "category": "Text & Fonts",
+      "description": "Debug text overlay",
+      "thumbnail": "thumbnails/debugtext.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/debugtext"
+    },
+    {
+      "id": "debugtext_context",
+      "name": "Debug Text Context",
+      "category": "Text & Fonts",
+      "description": "Multiple text contexts",
+      "thumbnail": "thumbnails/debugtext_context.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/debugtext_context"
+    },
+    {
+      "id": "fontstash",
+      "name": "Fontstash",
+      "category": "Text & Fonts",
+      "description": "TrueType font rendering",
+      "thumbnail": "thumbnails/fontstash.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/fontstash"
+    },
+    {
+      "id": "fontstash_layers",
+      "name": "Fontstash Layers",
+      "category": "Text & Fonts",
+      "description": "Layered text effects",
+      "thumbnail": "thumbnails/fontstash_layers.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/fontstash_layers"
+    },
+    {
+      "id": "assimp_simple",
+      "name": "Assimp Simple",
+      "category": "3D Models & Animation",
+      "description": "Basic 3D model loading",
+      "thumbnail": "thumbnails/assimp_simple.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/assimp_simple"
+    },
+    {
+      "id": "assimp_animation",
+      "name": "Assimp Animation",
+      "category": "3D Models & Animation",
+      "description": "Skeletal animation with Assimp",
+      "thumbnail": "thumbnails/assimp_animation.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/assimp_animation"
+    },
+    {
+      "id": "assimp_scene",
+      "name": "Assimp Scene",
+      "category": "3D Models & Animation",
+      "description": "Complex scene loading",
+      "thumbnail": "thumbnails/assimp_scene.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/assimp_scene"
+    },
+    {
+      "id": "cgltf",
+      "name": "cgltf",
+      "category": "3D Models & Animation",
+      "description": "glTF 2.0 model loading",
+      "thumbnail": "thumbnails/cgltf.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cgltf"
+    },
+    {
+      "id": "cgltf_scene",
+      "name": "cgltf Scene",
+      "category": "3D Models & Animation",
+      "description": "glTF 2.0 scene loading",
+      "thumbnail": "thumbnails/cgltf_scene.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cgltf_scene"
+    },
+    {
+      "id": "GltfViewer",
+      "name": "GLTF Viewer",
+      "category": "3D Models & Animation",
+      "description": "Full-featured glTF viewer with PBR",
+      "thumbnail": "thumbnails/GltfViewer.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/GltfViewer"
+    },
+    {
+      "id": "ozz_shdfeatures",
+      "name": "Ozz Animation",
+      "category": "3D Models & Animation",
+      "description": "Ozz animation system with shader features",
+      "thumbnail": "thumbnails/ozz_shdfeatures.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/ozz_shdfeatures"
+    },
+    {
+      "id": "spine_simple",
+      "name": "Spine Simple",
+      "category": "2D Animation",
+      "description": "Basic Spine animation",
+      "thumbnail": "thumbnails/spine_simple.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/spine_simple"
+    },
+    {
+      "id": "spine_skinsets",
+      "name": "Spine Skinsets",
+      "category": "2D Animation",
+      "description": "Spine skin swapping",
+      "thumbnail": "thumbnails/spine_skinsets.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/spine_skinsets"
+    },
+    {
+      "id": "spine_inspector",
+      "name": "Spine Inspector",
+      "category": "2D Animation",
+      "description": "Spine animation debugger",
+      "thumbnail": "thumbnails/spine_inspector.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/spine_inspector"
+    },
+    {
+      "id": "loadpng",
+      "name": "Load PNG",
+      "category": "Textures & Materials",
+      "description": "PNG texture loading",
+      "thumbnail": "thumbnails/loadpng.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/loadpng"
+    },
+    {
+      "id": "basisu",
+      "name": "Basis Universal",
+      "category": "Textures & Materials",
+      "description": "Basis Universal GPU textures",
+      "thumbnail": "thumbnails/basisu.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/basisu"
+    },
+    {
+      "id": "cubemap_jpeg",
+      "name": "Cubemap JPEG",
+      "category": "Textures & Materials",
+      "description": "Cubemap textures",
+      "thumbnail": "thumbnails/cubemap_jpeg.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cubemap_jpeg"
+    },
+    {
+      "id": "cubemaprt",
+      "name": "Cubemap RT",
+      "category": "Textures & Materials",
+      "description": "Render-to-cubemap",
+      "thumbnail": "thumbnails/cubemaprt.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cubemaprt"
+    },
+    {
+      "id": "miprender",
+      "name": "Mip Render",
+      "category": "Textures & Materials",
+      "description": "Mipmap generation",
+      "thumbnail": "thumbnails/miprender.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/miprender"
+    },
+    {
+      "id": "vertextexture",
+      "name": "Vertex Texture",
+      "category": "Textures & Materials",
+      "description": "Vertex texture fetch",
+      "thumbnail": "thumbnails/vertextexture.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/vertextexture"
+    },
+    {
+      "id": "texview",
+      "name": "Texture Viewer",
+      "category": "Textures & Materials",
+      "description": "Texture viewer utility",
+      "thumbnail": "thumbnails/texview.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/texview"
+    },
+    {
+      "id": "sdf",
+      "name": "SDF",
+      "category": "Textures & Materials",
+      "description": "Signed distance field rendering",
+      "thumbnail": "thumbnails/sdf.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/sdf"
+    },
+    {
+      "id": "cimgui",
+      "name": "Dear ImGui",
+      "category": "UI & Integration",
+      "description": "Dear ImGui integration",
+      "thumbnail": "thumbnails/cimgui.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cimgui"
+    },
+    {
+      "id": "imgui_usercallback",
+      "name": "ImGui User Callback",
+      "category": "UI & Integration",
+      "description": "Custom ImGui rendering",
+      "thumbnail": "thumbnails/imgui_usercallback.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/imgui_usercallback"
+    },
+    {
+      "id": "drawcallperf",
+      "name": "Draw Call Perf",
+      "category": "Advanced",
+      "description": "Draw call performance testing",
+      "thumbnail": "thumbnails/drawcallperf.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/drawcallperf"
+    },
+    {
+      "id": "plmpeg",
+      "name": "MPEG Video",
+      "category": "Advanced",
+      "description": "MPEG1 video playback",
+      "thumbnail": "thumbnails/plmpeg.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/plmpeg"
+    }
+  ],
+  "categories": [
+    "Graphics Fundamentals",
+    "2D Graphics",
+    "Text & Fonts",
+    "3D Models & Animation",
+    "2D Animation",
+    "Textures & Materials",
+    "UI & Integration",
+    "Advanced"
+  ]
+}
