@@ -144,13 +144,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GltfViewer", "examples\Gltf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GltfViewerWeb", "examples\GltfViewer\GltfViewerWeb.csproj", "{EB850F03-7F10-4ED1-82EA-A1DBF4587056}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_new", "examples\test_new\test_new.csproj", "{64CD88AE-B047-4542-8E00-A127ECEE87BE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "bepuphysics", "examples\bepuphysics\bepuphysics.csproj", "{0532801E-AE23-426E-A60A-A712F95654CB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_newWeb", "examples\test_new\test_newWeb.csproj", "{80C85E1A-0B3B-4703-AF9D-2AB7A4B9B67B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_android_ios", "examples\test_android_ios\test_android_ios.csproj", "{A2C62AB4-315A-436F-A4D1-D4D90BC33F91}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test_android_iosWeb", "examples\test_android_ios\test_android_iosWeb.csproj", "{AA085F4B-9AB6-48CC-BCBB-8701252E2FBA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "bepuphysicsWeb", "examples\bepuphysics\bepuphysicsWeb.csproj", "{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -438,6 +434,14 @@ Global
 		{EB850F03-7F10-4ED1-82EA-A1DBF4587056}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EB850F03-7F10-4ED1-82EA-A1DBF4587056}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EB850F03-7F10-4ED1-82EA-A1DBF4587056}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0532801E-AE23-426E-A60A-A712F95654CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0532801E-AE23-426E-A60A-A712F95654CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0532801E-AE23-426E-A60A-A712F95654CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0532801E-AE23-426E-A60A-A712F95654CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -513,6 +517,8 @@ Global
 		{66D47205-4E2C-4D21-A622-CD7A00DAD0BC} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{E0E3C2DD-A654-43C7-AFC1-38EAAB929F77} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{EB850F03-7F10-4ED1-82EA-A1DBF4587056} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{0532801E-AE23-426E-A60A-A712F95654CB} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{480C0AEA-CF34-453B-B51C-6B44BD5DD4DE} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

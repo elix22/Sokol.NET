@@ -710,6 +710,20 @@
 			}
 		},
 		{
+			"label": "prepare-bepuphysics",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/bepuphysics"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-bepuphysics-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/bepuphysics"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Create New Example",
 			"type": "shell",
 			"command": "dotnet",
@@ -793,6 +807,7 @@
 			"type": "pickString",
 			"description": "Select an example",
 			"options": [
+				"bepuphysics",
 				"cube",
 				"assimp_simple",
 				"assimp_animation",
@@ -836,6 +851,7 @@
 			"type": "pickString",
 			"description": "Select an example to build",
 			"options": [
+				"examples/bepuphysics",
 				"examples/cube",
 				"examples/assimp_simple",
 				"examples/assimp_animation",
@@ -913,6 +929,7 @@
 			"type": "pickString",
 			"description": "⚠️ WARNING: Select an example to PERMANENTLY DELETE",
 			"options": [
+				"bepuphysics",
 				"cube",
 				"assimp_simple",
 				"assimp_animation",
