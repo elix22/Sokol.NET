@@ -145,14 +145,6 @@
       "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cgltf"
     },
     {
-      "id": "cgltf_scene",
-      "name": "cgltf Scene",
-      "category": "3D Models & Animation",
-      "description": "glTF 2.0 scene loading",
-      "thumbnail": "thumbnails/cgltf_scene.png",
-      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/cgltf_scene"
-    },
-    {
       "id": "GltfViewer",
       "name": "GLTF Viewer",
       "category": "3D Models & Animation",
@@ -287,6 +279,14 @@
       "description": "MPEG1 video playback",
       "thumbnail": "thumbnails/plmpeg.png",
       "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/plmpeg"
+    },
+    {
+      "id": "JoltPhysics",
+      "name": "JoltPhysics",
+      "category": "Physics",
+      "description": "10,000 dynamic physics bodies with GPU instancing and multithreading",
+      "thumbnail": "thumbnails/JoltPhysics.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/JoltPhysics"
     }
   ],
   "categories": [
@@ -297,6 +297,7 @@
     "2D Animation",
     "Textures & Materials",
     "UI & Integration",
+    "Physics",
     "Advanced"
   ]
 }
