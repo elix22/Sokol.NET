@@ -281,6 +281,14 @@
       "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/plmpeg"
     },
     {
+      "id": "ShaderToyApp",
+      "name": "ShaderToy Gallery",
+      "category": "Advanced",
+      "description": "Multi-shader gallery with 7 fragment shaders",
+      "thumbnail": "thumbnails/ShaderToyApp400x300.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/ShaderToyApp"
+    },
+    {
       "id": "JoltPhysics",
       "name": "JoltPhysics",
       "category": "Physics",
