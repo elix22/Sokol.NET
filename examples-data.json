@@ -49,6 +49,14 @@
       "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/shadows"
     },
     {
+      "id": "SkiaSokolApp",
+      "name": "SkiaSharp Gallery",
+      "category": "2D Graphics",
+      "description": "SkiaSharp sample gallery with 40+ interactive samples (shapes, text, images, filters, shaders, animations)",
+      "thumbnail": "thumbnails/SkiaSokolApp400x300.png",
+      "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/SkiaSokolApp"
+    },
+    {
       "id": "sgl",
       "name": "SGL",
       "category": "2D Graphics",
