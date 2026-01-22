@@ -87,6 +87,16 @@ public static unsafe partial class GltfViewer
                     state.ui.debug_view_open = debug_view_open != 0;
                 }
 
+                // Only show physics window if physics system is initialized
+                if (state.physicsSystem != null && state.physicsSystem.IsInitialized)
+                {
+                    byte physics_open = state.ui.physics_open ? (byte)1 : (byte)0;
+                    if (igMenuItem_BoolPtr("Physics...", null, ref physics_open, true))
+                    {
+                        state.ui.physics_open = physics_open != 0;
+                    }
+                }
+
                 igEndMenu();
             }
 
@@ -203,6 +213,12 @@ public static unsafe partial class GltfViewer
         if (state.ui.debug_view_open)
         {
             DrawDebugViewWindow(ref pos);
+        }
+
+        // Physics Window (only if physics system exists)
+        if (state.ui.physics_open && state.physicsSystem != null && state.physicsSystem.IsInitialized)
+        {
+            DrawPhysicsWindow(ref pos);
         }
 
         // Help Window
@@ -593,6 +609,172 @@ public static unsafe partial class GltfViewer
                 {
                     state.bloomThreshold = bloomThreshold;
                 }
+            }
+        }
+        igEnd();
+    }
+
+    static void DrawPhysicsWindow(ref Vector2 pos)
+    {
+        igSetNextWindowSize(new Vector2(350, 500), ImGuiCond.Once);
+        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        byte open = 1;
+        if (igBegin("Physics Simulation", ref open, ImGuiWindowFlags.None))
+        {
+            state.ui.physics_open = open != 0;
+
+            if (state.physicsSystem != null && state.physicsSystem.IsInitialized)
+            {
+                // Enable/Disable toggle
+                byte physicsEnabled = (byte)(state.enablePhysics ? 1 : 0);
+                if (igCheckbox("Enable Physics Simulation", ref physicsEnabled))
+                {
+                    state.enablePhysics = physicsEnabled != 0;
+                }
+
+                igSeparator();
+                
+                // Engine info
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Physics Engine:");
+                igText("  Engine: Jolt Physics");
+                igText($"  Status: {(state.enablePhysics ? "Running" : "Paused")}");
+                
+                igSeparator();
+                
+                // Body statistics
+                var stats = state.physicsSystem.GetBodyStatistics();
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Physics Bodies:");
+                igText($"  Total: {stats.totalBodies}");
+                igText($"  Static: {stats.staticBodies}");
+                igText($"  Dynamic: {stats.dynamicBodies}");
+                igText($"  Kinematic: {stats.kinematicBodies}");
+                igText($"  Triggers: {stats.triggerBodies}");
+                
+                igSeparator();
+                
+                // Show detailed body info checkbox
+                byte showDetails = (byte)(state.ui.show_body_details ? 1 : 0);
+                if (igCheckbox("Show Detailed Body Info", ref showDetails))
+                {
+                    state.ui.show_body_details = showDetails != 0;
+                }
+                
+                // Detailed body information (if enabled)
+                if (state.ui.show_body_details)
+                {
+                    igSeparator();
+                    igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Body Details:");
+                    
+                    var bodyInfos = state.physicsSystem.GetDetailedBodyInfo();
+                    
+                    // Scrollable child window for body details
+                    if (igBeginChild_Str("##bodyDetailsScroll", new Vector2(0, 250), ImGuiChildFlags.Borders, ImGuiWindowFlags.None))
+                    {
+                        for (int i = 0; i < bodyInfos.Count; i++)
+                        {
+                            var info = bodyInfos[i];
+                            
+                            igPushID_Int(i);
+                            
+                            // Header with body name and type
+                            Vector4 headerColor = info.motionType == JoltPhysicsSharp.MotionType.Dynamic 
+                                ? new Vector4(0.2f, 1.0f, 0.2f, 1.0f)  // Green for dynamic
+                                : info.motionType == JoltPhysicsSharp.MotionType.Kinematic
+                                ? new Vector4(1.0f, 1.0f, 0.2f, 1.0f)  // Yellow for kinematic
+                                : new Vector4(0.6f, 0.6f, 0.6f, 1.0f); // Gray for static
+                            
+                            string typeStr = info.motionType.ToString();
+                            if (info.isSensor) typeStr += " (Trigger)";
+                            
+                            igTextColored(headerColor, $"{info.name}");
+                            igText($"  Type: {typeStr}");
+                            igText($"  ID: {info.id.ID}");
+                            igText($"  Active: {(info.isActive ? "Yes" : "No")}");
+                            igText($"  Position: ({info.position.X:F2}, {info.position.Y:F2}, {info.position.Z:F2})");
+                            igText($"  Rotation: ({info.rotation.X:F2}, {info.rotation.Y:F2}, {info.rotation.Z:F2}, {info.rotation.W:F2})");
+                            
+                            if (info.motionType != JoltPhysicsSharp.MotionType.Static)
+                            {
+                                igText($"  Linear Vel: ({info.linearVelocity.X:F2}, {info.linearVelocity.Y:F2}, {info.linearVelocity.Z:F2})");
+                                igText($"  Angular Vel: ({info.angularVelocity.X:F2}, {info.angularVelocity.Y:F2}, {info.angularVelocity.Z:F2})");
+                            }
+                            
+                            if (i < bodyInfos.Count - 1)
+                            {
+                                igSeparator();
+                            }
+                            
+                            igPopID();
+                        }
+                    }
+                    igEndChild();
+                }
+                
+                igSeparator();
+                
+                // Gravity
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Gravity:");
+                var gravity = state.physicsSystem.GetGravity();
+                igText($"  X: {gravity.X:F2}");
+                igText($"  Y: {gravity.Y:F2}");
+                igText($"  Z: {gravity.Z:F2}");
+                
+                igSeparator();
+                
+                // Trigger Events section with scrollable child window
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Trigger Events:");
+                
+                var events = state.physicsSystem.GetTriggerEvents();
+                igText($"Total Events: {events.Count}");
+                
+                if (igButton("Clear Events", new Vector2(120, 0)))
+                {
+                    state.physicsSystem.ClearTriggerEvents();
+                }
+                
+                igSeparator();
+                
+                // Scrollable child window for events
+                if (igBeginChild_Str("##triggerEventsScroll", new Vector2(0, 200), ImGuiChildFlags.Borders, ImGuiWindowFlags.None))
+                {
+                    if (events.Count == 0)
+                    {
+                        igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "No trigger events yet...");
+                    }
+                    else
+                    {
+                        for (int i = 0; i < events.Count; i++)  // Show oldest first (chronological order)
+                        {
+                            var evt = events[i];
+                            
+                            // Color code by event type
+                            Vector4 color = evt.eventType == "ENTER" 
+                                ? new Vector4(0.2f, 1.0f, 0.2f, 1.0f)  // Green for enter
+                                : new Vector4(1.0f, 0.2f, 0.2f, 1.0f); // Red for exit
+                            
+                            string icon = evt.eventType == "ENTER" ? "🟢" : "🔴";
+                            
+                            igPushID_Int(i);
+                            igTextColored(color, $"{icon} {evt.eventType}");
+                            igText($"  Trigger: {evt.triggerName}");
+                            igText($"  Object: {evt.otherName}");
+                            igText($"  Time: {evt.timestamp:F2}s");
+                            
+                            if (i > 0)
+                            {
+                                igSeparator();
+                            }
+                            
+                            igPopID();
+                        }
+                    }
+                }
+                igEndChild();
+            }
+            else
+            {
+                igText("Physics system not initialized");
+                igText("Load a model with physics extensions");
             }
         }
         igEnd();

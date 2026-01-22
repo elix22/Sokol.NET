@@ -3,6 +3,8 @@ using static Sokol.SG;
 using static Sokol.StbImage;
 using static Sokol.SBasisu;
 using static Sokol.Utils;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Sokol
 {
@@ -64,6 +66,12 @@ namespace Sokol
                 return LoadFromMemoryBasisU(data, label, samplerSettings);
             }
             
+            // Check if this is a WebP file by checking magic bytes
+            if (IsWebPImage(data))
+            {
+                return LoadFromMemoryWebP(data, label, format, samplerSettings);
+            }
+            
             // Regular PNG/JPEG loading via stb_image
             int width = 0, height = 0, channels = 0;
             byte* pixels = stbi_load_csharp(
@@ -91,6 +99,52 @@ namespace Sokol
             if (data[0] != 0x73) return false; // 's'
             if (data[1] != 0x42) return false; // 'B'
             return true;
+        }
+
+        private static bool IsWebPImage(byte[] data)
+        {
+            // WebP magic bytes: "RIFF" at offset 0, "WEBP" at offset 8
+            // Reference: https://developers.google.com/speed/webp/docs/riff_container
+            if (data.Length < 12) return false;
+            if (data[0] != 0x52) return false; // 'R'
+            if (data[1] != 0x49) return false; // 'I'
+            if (data[2] != 0x46) return false; // 'F'
+            if (data[3] != 0x46) return false; // 'F'
+            if (data[8] != 0x57) return false;  // 'W'
+            if (data[9] != 0x45) return false;  // 'E'
+            if (data[10] != 0x42) return false; // 'B'
+            if (data[11] != 0x50) return false; // 'P'
+            return true;
+        }
+
+        private static unsafe Texture? LoadFromMemoryWebP(byte[] data, string label, sg_pixel_format format, SamplerSettings? samplerSettings = null)
+        {
+            try
+            {
+                // Use SixLabors.ImageSharp to decode WebP
+                using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(data);
+                
+                int width = image.Width;
+                int height = image.Height;
+                
+                // Allocate pixel buffer
+                byte[] pixelData = new byte[width * height * 4];
+                
+                // Copy pixel data
+                image.CopyPixelDataTo(pixelData);
+                
+                // Create texture from pixel data
+                fixed (byte* pixelPtr = pixelData)
+                {
+                    var texture = new Texture(pixelPtr, width, height, label, format, samplerSettings);
+                    return texture;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Texture] Failed to load WebP image '{label}': {ex.Message}");
+                return null;
+            }
         }
 
         private static unsafe Texture? LoadFromMemoryBasisU(byte[] data, string label, SamplerSettings? samplerSettings = null)

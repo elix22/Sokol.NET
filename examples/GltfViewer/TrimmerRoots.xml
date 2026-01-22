@@ -1,0 +1,8 @@
+<linker>
+  <assembly fullname="JoltPhysicsWeb">
+    <type fullname="*" />
+  </assembly>
+  <assembly fullname="JoltPhysicsSharp">
+    <type fullname="*" />
+  </assembly>
+</linker>

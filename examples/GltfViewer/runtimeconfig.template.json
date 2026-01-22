@@ -1,4 +1,8 @@
 {
+  "configProperties": {
+    "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
+    "System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault": true
+  },
   "wasmHostProperties": {
     "perHostConfig": [
       {

@@ -65,6 +65,11 @@
       <Compile Remove="bin/**/*" />
     </ItemGroup>
 
+  <!-- joltc Library Paths -->
+  <PropertyGroup>
+    <JoltPhysicsCLibsPath>$(SokolNetHome)/ext/joltc/libs/</JoltPhysicsCLibsPath>
+  </PropertyGroup>
+
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
     <Compile Remove="shaders/compiled/web/**/*.cs" />
@@ -76,13 +81,20 @@
   </ItemGroup>
 
 
+
   <Target Name="CopyCustomContentWindows" AfterTargets="AfterBuild" Condition="'$(IsWindows)'=='true'">
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)windows/$(OSArch)/release/joltc.dll</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)windows/$(OSArch)/release/Jolt.dll</libJolt>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="joltc.dll not found at $(libJoltc). Please build the library using .\ext\joltc\scripts\build-joltc-windows.ps1" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="Jolt.dll not found at $(libJolt). Please build the library using .\ext\joltc\scripts\build-joltc-windows.ps1" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
@@ -90,9 +102,15 @@
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)windows/$(OSArch)/$(BuildConfigLower)/sokol.dll</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)windows/$(OSArch)/release/joltc.dll</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)windows/$(OSArch)/release/Jolt.dll</libJolt>
       </PropertyGroup>
-      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" />
+      <Error Condition="! Exists('$(libSokol)')" Text="sokol.dll not found at $(libSokol). Please build the library using .\scripts\build-vs2022-windows.ps1" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="joltc.dll not found at $(libJoltc). Please build the library using .\ext\joltc\scripts\build-joltc-windows.ps1" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="Jolt.dll not found at $(libJolt). Please build the library using .\ext\joltc\scripts\build-joltc-windows.ps1" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
@@ -100,9 +118,15 @@
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)macos/$(OSArch)/release/libjoltc.dylib</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)macos/$(OSArch)/release/libJolt.dylib</libJolt>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="libjoltc.dylib not found at $(libJoltc). Please build the library using ./ext/joltc/scripts/build-xcode-macos.sh" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="libJolt.dylib not found at $(libJolt). Please build the library using ./ext/joltc/scripts/build-joltc-macos.sh" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
        <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
@@ -110,9 +134,15 @@
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)macos/$(OSArch)/$(BuildConfigLower)/libsokol.dylib</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)macos/$(OSArch)/release/libjoltc.dylib</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)macos/$(OSArch)/release/libJolt.dylib</libJolt>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libSokol.dylib not found at $(libSokol). Please build the library using ./scripts/build-xcode-macos.sh" /> 
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="libjoltc.dylib not found at $(libJoltc). Please build the library using ./ext/joltc/scripts/build-xcode-macos.sh" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="libJolt.dylib not found at $(libJolt). Please build the library using ./ext/joltc/scripts/build-joltc-macos.sh" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
@@ -120,9 +150,15 @@
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)linux/$(OSArch)/release/libjoltc.so</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)linux/$(OSArch)/release/libJolt.so</libJolt>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="libjoltc.so not found at $(libJoltc). Please build the library using ./ext/joltc/scripts/build-joltc-linux.sh" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="libJolt.so not found at $(libJolt). Please build the library using ./ext/joltc/scripts/build-joltc-linux.sh" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(OutDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 
@@ -130,9 +166,15 @@
       <PropertyGroup>
         <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
         <libSokol>$(SokolLibsPath)linux/$(OSArch)/$(BuildConfigLower)/libsokol.so</libSokol>
+        <libJoltc>$(JoltPhysicsCLibsPath)linux/$(OSArch)/release/libjoltc.so</libJoltc>
+        <libJolt>$(JoltPhysicsCLibsPath)linux/$(OSArch)/release/libJolt.so</libJolt>
       </PropertyGroup>
       <Error Condition="! Exists('$(libSokol)')" Text="libsokol.so not found at $(libSokol). Please build the library using ./scripts/build-linux-library.sh" />
       <Copy SourceFiles="$(libSokol)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJoltc)')" Text="libjoltc.so not found at $(libJoltc). Please build the library using ./ext/joltc/scripts/build-joltc-linux.sh" />
+      <Copy SourceFiles="$(libJoltc)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+      <Error Condition="! Exists('$(libJolt)')" Text="libJolt.so not found at $(libJolt). Please build the library using ./ext/joltc/scripts/build-joltc-linux.sh" />
+      <Copy SourceFiles="$(libJolt)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
       <Copy SourceFiles="@(AssetsSourceFiles)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="300" />
   </Target>
 

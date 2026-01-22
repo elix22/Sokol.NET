@@ -13,6 +13,7 @@ public static unsafe partial class GltfViewer
 {
     static void InitApplication()
     {
+        // OMI extensions are automatically supported through SharpGLTF
 
         // Initialize FileSystem
         FileSystem.Instance.Initialize();
@@ -989,6 +990,14 @@ public static unsafe partial class GltfViewer
         }
         state.morphTextureWidth = 0;
         state.morphTextureLayerCount = 0;
+
+        // Cleanup physics system if it exists
+        if (state.physicsSystem != null)
+        {
+            Info("[Physics] Disposing physics system for model switch");
+            state.physicsSystem.Dispose();
+            state.physicsSystem = null;
+        }
 
         // Dispose the old model (after rendering has stopped using it)
         oldModel?.Dispose();

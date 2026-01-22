@@ -11,21 +11,22 @@
         <WasmBuildNative>true</WasmBuildNative>
         <RunAOTCompilation>true</RunAOTCompilation>
         <WasmEnableSIMD>false</WasmEnableSIMD>
-        <EmccEnableAssertions>true</EmccEnableAssertions>
-        <EnableAggressiveTrimming>true</EnableAggressiveTrimming>
-        <PublishTrimmed>true</PublishTrimmed>
+        <EmccEnableAssertions>false</EmccEnableAssertions>
+        <EnableAggressiveTrimming>false</EnableAggressiveTrimming>
+        <PublishTrimmed>false</PublishTrimmed>
         <TrimMode>partial</TrimMode>
+        <WasmStripILAfterAOT>true</WasmStripILAfterAOT>
         <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
+        <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <DefineConstants>WEB</DefineConstants>
         <IsWeb>true</IsWeb>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
         <!-- Exclude build artifacts from project view -->
-        <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.template.json;Source/obj/**/*</DefaultItemExcludes>
+        <DefaultItemExcludes>$(DefaultItemExcludes);obj/**/*;bin/**/*;wwwroot/**/*;scripts/**/*;Android/**/*;ios/**/*;Directory.Build.props;Directory.Build.targets;Directory.Packages.props;*.user;Android.Build.targets;IOS.Build.targets;runtimeconfig.JoltPhysics.json;Source/obj/**/*</DefaultItemExcludes>
         <HomeDir>$(UserProfile)</HomeDir>
         <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
         <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
@@ -37,16 +38,27 @@
     <PropertyGroup>
       <BuildConfigLower>$(Configuration.ToLower())</BuildConfigLower>
       <SokolLibPath>$(SokolLibsPath)emscripten/x86/$(BuildConfigLower)/sokol.a</SokolLibPath>
+      <JoltPhysicsCLibsPath>$(SokolNetHome)/ext/joltc/libs/</JoltPhysicsCLibsPath>
+      <JoltcLibPath>$(JoltPhysicsCLibsPath)emscripten/x86/release/joltc.a</JoltcLibPath>
+      <JoltLibPath>$(JoltPhysicsCLibsPath)emscripten/x86/release/libJolt.a</JoltLibPath>
     </PropertyGroup>
 
     <ItemGroup>
       <NativeFileReference Include="$(SokolLibPath)">
         <Link>libs\sokol.a</Link>
       </NativeFileReference>
+      <NativeFileReference Include="$(JoltcLibPath)">
+        <Link>libs\joltc.a</Link>
+      </NativeFileReference>
+      <NativeFileReference Include="$(JoltLibPath)">
+        <Link>libs\libJolt.a</Link>
+      </NativeFileReference>
     </ItemGroup>
 
     <Target Name="ValidateSokolLib" BeforeTargets="Build">
       <Error Condition="!Exists('$(SokolLibPath)')" Text="sokol.a not found at $(SokolLibPath). Please build the library using ./scripts/build-web-library.sh" />
+      <Error Condition="!Exists('$(JoltcLibPath)')" Text="joltc.a not found at $(JoltcLibPath). Please build the library using ./ext/joltc/scripts/build-joltc-web.sh" />
+      <Error Condition="!Exists('$(JoltLibPath)')" Text="libJolt.a not found at $(JoltLibPath). Please build the library using ./ext/joltc/scripts/build-joltc-web.sh" />
     </Target>
 
     <PropertyGroup>
@@ -59,6 +71,10 @@
       <Compile Remove="ios/**/*" />
       <Compile Remove="obj/**/*" />
       <Compile Remove="bin/**/*" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <TrimmerRootDescriptor Include="TrimmerRoots.xml" />
     </ItemGroup>
 
   <!-- Exclude shaders from other platform folders -->
@@ -77,7 +93,11 @@
   </ItemGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <DefineConstants>DEBUG;TRACE;WEB</DefineConstants>
+      <DefineConstants>DEBUG;TRACE;WEB;WEB_INTERPRETER</DefineConstants>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <DefineConstants>WEB</DefineConstants>
     </PropertyGroup>
 
     
@@ -86,7 +106,7 @@
             <PropertyGroup>
                 <WasmEmitSymbolMap>true</WasmEmitSymbolMap>
                 <EmccFlags>
-                    -s EXPORT_ALL=1
+                  -s EXPORT_ALL=1
                     --bind  
                     -Wbad-function-cast -Wcast-function-type 
                     -O1 
@@ -98,11 +118,11 @@
                     -s MAX_WEBGL_VERSION=2
                     -s ASSERTIONS=1
                     -s WASM=1
-                    -s INITIAL_MEMORY=128MB
+                    -s INITIAL_MEMORY=512MB
                     -s MAXIMUM_MEMORY=2048MB
                     -s ALLOW_MEMORY_GROWTH=1
+                    -s STACK_SIZE=16MB
                     -s ASYNCIFY_STACK_SIZE=10000000
-                    -s TOTAL_MEMORY=520MB
                 </EmccFlags>
                 <EmccExtraLDFlags>
                     -lidbfs.js
@@ -124,10 +144,11 @@
                     -s MIN_WEBGL_VERSION=2 
                     -s MAX_WEBGL_VERSION=2
                     -s ASSERTIONS=1
-                    -s INITIAL_MEMORY=128MB
+                    -s INITIAL_MEMORY=512MB
                     -s MAXIMUM_MEMORY=2048MB
                     -s ALLOW_MEMORY_GROWTH=1
-                    -s TOTAL_MEMORY=520MB
+                    -s STACK_SIZE=16MB
+                    -s ASYNCIFY_STACK_SIZE=10000000
                 </EmccFlags>
                 <EmccExtraLDFlags>
                     -lexports.js

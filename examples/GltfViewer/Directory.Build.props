@@ -44,11 +44,20 @@
    </ItemGroup>
 
    <ItemGroup>
+    <Compile Include="../../src/JoltPhysicsSharp/**/*.cs" >
+        <Link>JoltPhysicsSharp\%(Filename)%(Extension)</Link>
+    </Compile>
+   </ItemGroup>
+
+   <ItemGroup>
     <Compile Include="$(SokolNetHome)/ext/SharpGLTF/src/Shared/*.cs" >
         <Link>SharpGLTF\Shared\%(Filename)%(Extension)</Link>
     </Compile>
     <Compile Include="$(SokolNetHome)/ext/SharpGLTF/src/SharpGLTF.Core/**/*.cs" >
         <Link>SharpGLTF\Core\%(Filename)%(Extension)</Link>
+    </Compile>
+    <Compile Include="$(SokolNetHome)/ext/SharpGLTF/src/SharpGLTF.Ext.OMI/**/*.cs" >
+        <Link>SharpGLTF\Ext.OMI\%(Filename)%(Extension)</Link>
     </Compile>
   </ItemGroup>
 
@@ -93,6 +102,20 @@
   </Target>
 
 
+
+  <!-- iOS Configuration -->
+   <!-- Native Library Configuration for Android and iOS -->
+   <PropertyGroup>
+  
+      <!-- Android joltc and Jolt Library Configuration -->
+      <AndroidNativeLibrary_JoltPath>../../ext/joltc/libs/android</AndroidNativeLibrary_JoltPath>
+      <AndroidNativeLibrary_joltcPath>../../ext/joltc/libs/android</AndroidNativeLibrary_joltcPath>
+       <!-- iOS joltc and Jolt Library Configuration -->
+       <IOSNativeLibrary_JoltPath>../../ext/joltc/libs/ios/release</IOSNativeLibrary_JoltPath>
+      <IOSNativeLibrary_joltcPath>../../ext/joltc/libs/ios/release</IOSNativeLibrary_joltcPath>
+   </PropertyGroup>
+
+   
    <!-- Android Configuration -->
    <PropertyGroup>
       <!-- Package Prefix (e.g., com.yourcompany will create com.yourcompany.appname) -->
@@ -159,4 +182,7 @@
       <WebIcon>logo_s_large.png</WebIcon>
    </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+  </ItemGroup>
 </Project>

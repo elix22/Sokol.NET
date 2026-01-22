@@ -249,37 +249,165 @@ public static unsafe partial class GltfViewer
     /// </summary>
     static void UpdateLightPositions()
     {
-        if (state.lightNodes == null || state.lightNodes.Count == 0)
+        if (state.lightNodes.Count == 0)
             return;
 
+        // Update each light position from its corresponding animated node
         foreach (var (node, lightIndex) in state.lightNodes)
         {
             if (lightIndex >= state.lights.Count)
                 continue;
 
             var light = state.lights[lightIndex];
-            
-            // Get current world transform for the node (WorldTransform on SharpGltfNode)
             var worldTransform = node.WorldTransform;
+            
+            // Update position from node's world transform
             var position = new Vector3(worldTransform.M41, worldTransform.M42, worldTransform.M43);
-            var direction = Vector3.TransformNormal(new Vector3(0, 0, -1), worldTransform);
-            direction = Vector3.Normalize(direction);
-
-            // Update light position/direction based on type
-            if (light.Type == LightType.Point)
+            light.Position = position;
+            
+            // Update direction for directional and spot lights
+            if (light.Type == LightType.Directional || light.Type == LightType.Spot)
             {
-                light.Position = position;
-            }
-            else if (light.Type == LightType.Directional)
-            {
-                light.Direction = direction;
-            }
-            else if (light.Type == LightType.Spot)
-            {
-                light.Position = position;
-                light.Direction = direction;
+                var direction = Vector3.TransformNormal(new Vector3(0, 0, -1), worldTransform);
+                light.Direction = Vector3.Normalize(direction);
             }
         }
+    }
+
+    /// <summary>
+    /// Load and initialize physics from glTF model extensions.
+    /// Supports OMI_physics_body and OMI_physics_shape extensions.
+    /// </summary>
+    static void LoadPhysicsFromModel(SharpGLTF.Schema2.ModelRoot? modelRoot)
+    {
+        if (modelRoot == null)
+            return;
+
+        try
+        {
+            // Check if model has physics extensions
+            var hasPhysicsShape = modelRoot.ExtensionsUsed?.Contains("OMI_physics_shape") == true;
+            var hasPhysicsBody = modelRoot.ExtensionsUsed?.Contains("OMI_physics_body") == true;
+
+            if (!hasPhysicsShape && !hasPhysicsBody)
+            {
+                Info("[Physics] Model does not use physics extensions");
+                return;
+            }
+
+            Info($"[Physics] Model uses physics extensions: OMI_physics_shape={hasPhysicsShape}, OMI_physics_body={hasPhysicsBody}");
+
+            // Initialize physics system if not already done
+            if (state.physicsSystem == null)
+            {
+                state.physicsSystem = new PhysicsSystem();
+                state.physicsSystem.Initialize();
+            }
+
+            // Get OMI_physics_shape extension from root using JSON parsing
+            var physicsShapeExt = PhysicsExtensionParser.ParsePhysicsShapeExtension(modelRoot);
+            if (physicsShapeExt != null && physicsShapeExt.Shapes != null && physicsShapeExt.Shapes.Length > 0)
+            {
+                state.physicsSystem.LoadPhysicsShapes(physicsShapeExt.Shapes);
+                Info($"[Physics] Loaded {physicsShapeExt.Shapes.Length} physics shapes");
+            }
+            
+            // Get OMI_physics_body extension from root for document-level arrays
+            var physicsBodyDocExt = PhysicsExtensionParser.ParsePhysicsBodyDocumentExtension(modelRoot);
+            if (physicsBodyDocExt != null)
+            {
+                // Load physics materials
+                if (physicsBodyDocExt.PhysicsMaterials != null && physicsBodyDocExt.PhysicsMaterials.Length > 0)
+                {
+                    state.physicsSystem.LoadPhysicsMaterials(physicsBodyDocExt.PhysicsMaterials);
+                    Info($"[Physics] Loaded {physicsBodyDocExt.PhysicsMaterials.Length} physics materials");
+                }
+                
+                // Load collision filters
+                if (physicsBodyDocExt.CollisionFilters != null && physicsBodyDocExt.CollisionFilters.Length > 0)
+                {
+                    state.physicsSystem.LoadCollisionFilters(physicsBodyDocExt.CollisionFilters);
+                    Info($"[Physics] Loaded {physicsBodyDocExt.CollisionFilters.Length} collision filters");
+                }
+            }
+
+            // Debug: List all nodes in the model
+            Info($"[Physics] Model has {state.model?.Nodes.Count ?? 0} nodes:");
+            if (state.model != null)
+            {
+                foreach (var n in state.model.Nodes)
+                {
+                    Info($"[Physics]   - Node '{n.NodeName}': NodeIndex={n.NodeIndex}, MeshIndex={n.MeshIndex}");
+                }
+            }
+
+            // Find nodes with OMI_physics_body extension
+            int physicsBodyCount = 0;
+            foreach (var gltfNode in modelRoot.LogicalNodes)
+            {
+                var physicsBodyExt = PhysicsExtensionParser.ParsePhysicsBodyExtension(gltfNode);
+                Info($"[Physics] Checking node '{gltfNode.Name}' (LogicalIndex={gltfNode.LogicalIndex}): hasPhysicsExt={physicsBodyExt != null}, hasCollider={physicsBodyExt?.Collider != null}, motion={physicsBodyExt?.Motion?.Type}");
+                
+                if (physicsBodyExt != null)
+                {
+                    // If node has collider but no motion, inherit motion from parent
+                    if (physicsBodyExt.Motion == null && gltfNode.VisualParent != null)
+                    {
+                        var parentPhysicsExt = PhysicsExtensionParser.ParsePhysicsBodyExtension(gltfNode.VisualParent);
+                        if (parentPhysicsExt?.Motion != null)
+                        {
+                            Info($"[Physics] Node '{gltfNode.Name}' has no motion, inheriting from parent '{gltfNode.VisualParent.Name}': {parentPhysicsExt.Motion.Type}");
+                            physicsBodyExt.Motion = parentPhysicsExt.Motion;
+                        }
+                    }
+                    
+                    // Find matching SharpGltfNode wrapper by NodeIndex (which stores LogicalIndex)
+                    var modelNode = state.model?.Nodes.FirstOrDefault(n => n.NodeIndex == gltfNode.LogicalIndex);
+                    if (modelNode != null)
+                    {
+                        Info($"[Physics] Matched glTF node '{gltfNode.Name}' (LogicalIndex={gltfNode.LogicalIndex}) to SharpGltfNode '{modelNode.NodeName}' (NodeIndex={modelNode.NodeIndex}, MeshIndex={modelNode.MeshIndex})");
+                        if (state.physicsSystem.CreatePhysicsBody(gltfNode, modelNode, physicsBodyExt, state.model, modelRoot))
+                        {
+                            physicsBodyCount++;
+                            Info($"[Physics] Created physics body for node '{gltfNode.Name}' (motion: {physicsBodyExt.Motion?.Type ?? "default"})");
+                        }
+                    }
+                    else
+                    {
+                        Warning($"[Physics] Could not find matching SharpGltfNode for glTF node '{gltfNode.Name}' (LogicalIndex={gltfNode.LogicalIndex})");
+                    }
+                }
+            }
+
+            if (physicsBodyCount > 0)
+            {
+                Info($"[Physics] Loaded {physicsBodyCount} physics bodies");
+                // Auto-open physics window when scene has physics
+                state.ui.physics_open = true;
+            }
+            else
+            {
+                Info("[Physics] No physics bodies found in model");
+            }
+        }
+        catch (Exception ex)
+        {
+            Error($"[Physics] Failed to load physics from model: {ex.Message}");
+            Error($"[Physics] Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    /// <summary>
+    /// Update physics simulation and node transforms.
+    /// Called every frame when physics is active.
+    /// </summary>
+    static void UpdatePhysics(float deltaTime)
+    {
+        if (state.physicsSystem == null || !state.physicsSystem.IsInitialized)
+            return;
+
+        // Step physics simulation
+        state.physicsSystem.Update(deltaTime);
     }
     
     /// <summary>
@@ -464,6 +592,9 @@ public static unsafe partial class GltfViewer
                 // Try to load punctual lights from glTF if available
                 LoadLightsFromModel(state.pendingModelRoot);
 
+                // Try to load physics from glTF if available
+                LoadPhysicsFromModel(state.pendingModelRoot);
+
                 state.modelLoaded = true;
                 state.isLoadingModel = false;
                 state.pendingModelRoot = null;
@@ -476,12 +607,15 @@ public static unsafe partial class GltfViewer
                 // Continue loading the next dependency
                 SharpGLTF.Schema2.ModelRoot.AsyncFileLoadCallback asyncLoader = (assetName, onComplete) =>
                 {
+                    // URL-decode the asset name (e.g., "textures%2Fgrass.webp" -> "textures/grass.webp")
+                    string decodedAssetName = Uri.UnescapeDataString(assetName);
+                    
                     // Construct full path
                     string fullAssetPath = string.IsNullOrEmpty(baseDirectory)
-                        ? assetName
-                        : Path.Combine(baseDirectory, assetName);
+                        ? decodedAssetName
+                        : Path.Combine(baseDirectory, decodedAssetName);
 
-                    Info($"[SharpGLTF] Loading dependency: {assetName} ({loadState.LoadedDependencies + 1}/{loadState.TotalDependencies})");
+                    Info($"[SharpGLTF] Loading dependency: {decodedAssetName} ({loadState.LoadedDependencies + 1}/{loadState.TotalDependencies})");
 
                     // Use FileSystem async load
                     FileSystem.Instance.LoadFile(fullAssetPath, (filePath, data, status) =>
@@ -490,12 +624,12 @@ public static unsafe partial class GltfViewer
                         
                         if (success)
                         {
-                            Info($"[SharpGLTF] Loaded {assetName} ({data!.Length} bytes)");
+                            Info($"[SharpGLTF] Loaded {decodedAssetName} ({data!.Length} bytes)");
                             onComplete(true, new ArraySegment<byte>(data));
                         }
                         else
                         {
-                            Error($"[SharpGLTF] Failed to load {assetName}: {status}");
+                            Error($"[SharpGLTF] Failed to load {decodedAssetName}: {status}");
                             onComplete(false, default);
                         }
                     });
@@ -658,6 +792,12 @@ public static unsafe partial class GltfViewer
             
             // Update light positions from animated nodes
             UpdateLightPositions();
+        }
+
+        // Update physics simulation if enabled
+        if (state.enablePhysics && state.physicsSystem != null)
+        {
+            UpdatePhysics(deltaTime);
         }
 
         // Begin rendering

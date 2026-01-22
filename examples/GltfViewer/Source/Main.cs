@@ -34,6 +34,9 @@ public static unsafe partial class GltfViewer
         "littlest_tokyo/LittleTokio.gltf" ,
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
+        "Physics/ball_pit/physics_ball_pit.gltf",
+         "Physics/BouncingObjects/physics_bouncing_objects.gltf",
+        "Physics/triggers/physics_triggers.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
@@ -137,6 +140,8 @@ public static unsafe partial class GltfViewer
         public bool camera_controls_open;
         public bool help_open;
         public bool debug_view_open;
+        public bool physics_open;
+        public bool show_body_details;       // Show detailed body information
         public int theme;
         
         // Debug view state
@@ -243,6 +248,10 @@ public static unsafe partial class GltfViewer
 
         // UI state
         public UIState ui;
+
+        // Physics system
+        public PhysicsSystem? physicsSystem;
+        public bool enablePhysics = true;
     }
 
     static _state state = new _state();

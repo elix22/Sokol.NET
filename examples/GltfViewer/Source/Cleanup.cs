@@ -19,6 +19,9 @@ public static unsafe partial class GltfViewer
 
         state.model?.Dispose();
 
+        // Cleanup physics system
+        state.physicsSystem?.Dispose();
+
         // Shutdown texture cache (will dispose all cached textures and cleanup Basis Universal)
         TextureCache.Instance.Shutdown();
 
