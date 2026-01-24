@@ -234,6 +234,17 @@ public static unsafe partial class GltfViewer
                 new Vector3(worldTransform.M21, worldTransform.M22, worldTransform.M23).Length(),
                 new Vector3(worldTransform.M31, worldTransform.M32, worldTransform.M33).Length());
             
+            // Diagnostic logging for Floor node
+            if (gltfNode.Name != null && (gltfNode.Name.Contains("Floor") || gltfNode.Name.Contains("Collision")))
+            {
+                Info($"[Physics] Creating body for '{gltfNode.Name}':");
+                Info($"  Position: {position}");
+                Info($"  Rotation: {rotation}");
+                Info($"  Scale: {scale}");
+                Info($"  Parent: {(modelNode.Parent != null ? modelNode.Parent.NodeName : "null")}");
+                Info($"  Will track: {(modelNode.Parent != null ? modelNode.Parent.NodeName : modelNode.NodeName)}");
+            }
+            
             // Apply scale to shape
             shape = new ScaledShapeSettings(shape, scale);
 
@@ -439,9 +450,21 @@ public static unsafe partial class GltfViewer
                 var activation = motionType == MotionType.Static ? Activation.DontActivate : Activation.Activate;
                 bodyInterface.AddBody(joltBody.ID, activation);
 
-                // IMPORTANT: Track the parent node (the one with the mesh as child) instead of the collision shape node
-                // This ensures the entire visual hierarchy moves with physics
-                var nodeToTrack = modelNode.Parent ?? modelNode;
+                // IMPORTANT: Determine which node to track for physics updates
+                // - If collider node has no local transform (identity), track parent (entire hierarchy moves together)
+                // - If collider node has its own transform, track itself (independent physics body)
+                // This prevents multiple collider children from overwriting the same parent tracking
+                var hasLocalTransform = gltfNode.LocalTransform.Matrix != System.Numerics.Matrix4x4.Identity;
+                var nodeToTrack = (!hasLocalTransform && modelNode.Parent != null) ? modelNode.Parent : modelNode;
+                
+                // Check if this parent is already tracked by another body
+                if (_nodeBodies.ContainsKey(nodeToTrack) && nodeToTrack == modelNode.Parent)
+                {
+                    // Parent already has a physics body, track this node independently instead
+                    Info($"[Physics] Parent '{nodeToTrack.NodeName}' already tracked, tracking '{modelNode.NodeName}' independently");
+                    nodeToTrack = modelNode;
+                }
+                
                 _nodeBodies[nodeToTrack] = joltBody.ID;
                 _bodyNames[joltBody.ID] = gltfNode.Name ?? "unnamed";
                 
