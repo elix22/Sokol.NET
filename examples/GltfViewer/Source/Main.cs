@@ -31,7 +31,7 @@ public static unsafe partial class GltfViewer
     static readonly string[] availableModels = new string[]
     {
         "Physics/BouncingObjects/physics_bouncing_objects.gltf",
-          "Physics/BouncingObjects/BouncingObjects.gltf",
+        "Physics/UnityBouncingObjects/BouncingObjects.gltf",
         "Physics/UnitySimple/SampleScene.gltf",
         "Physics/ball_pit/physics_ball_pit.gltf",
         //  
