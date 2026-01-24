@@ -226,13 +226,27 @@ public static unsafe partial class GltfViewer
             // Get world transform for the node
             var worldTransform = gltfNode.WorldMatrix;
             var position = new Vector3(worldTransform.M41, worldTransform.M42, worldTransform.M43);
-            var rotation = Quaternion.CreateFromRotationMatrix(worldTransform);
             
             // Extract scale from world transform
             var scale = new Vector3(
                 new Vector3(worldTransform.M11, worldTransform.M12, worldTransform.M13).Length(),
                 new Vector3(worldTransform.M21, worldTransform.M22, worldTransform.M23).Length(),
                 new Vector3(worldTransform.M31, worldTransform.M32, worldTransform.M33).Length());
+            
+            // Extract rotation by normalizing the matrix columns (removing scale)
+            // CRITICAL: Must remove scale before extracting rotation, otherwise quaternion is invalid
+            // Safety: Avoid division by zero if scale is zero (use 1.0 as fallback)
+            var safeScaleX = scale.X > 0.00001f ? scale.X : 1.0f;
+            var safeScaleY = scale.Y > 0.00001f ? scale.Y : 1.0f;
+            var safeScaleZ = scale.Z > 0.00001f ? scale.Z : 1.0f;
+            
+            var rotationMatrix = new Matrix4x4(
+                worldTransform.M11 / safeScaleX, worldTransform.M12 / safeScaleX, worldTransform.M13 / safeScaleX, 0,
+                worldTransform.M21 / safeScaleY, worldTransform.M22 / safeScaleY, worldTransform.M23 / safeScaleY, 0,
+                worldTransform.M31 / safeScaleZ, worldTransform.M32 / safeScaleZ, worldTransform.M33 / safeScaleZ, 0,
+                0, 0, 0, 1
+            );
+            var rotation = Quaternion.CreateFromRotationMatrix(rotationMatrix);
             
             // Diagnostic logging for Floor node
             if (gltfNode.Name != null && (gltfNode.Name.Contains("Floor") || gltfNode.Name.Contains("Collision")))
