@@ -465,11 +465,15 @@ public static unsafe partial class GltfViewer
                 bodyInterface.AddBody(joltBody.ID, activation);
 
                 // IMPORTANT: Determine which node to track for physics updates
-                // - If collider node has no local transform (identity), track parent (entire hierarchy moves together)
-                // - If collider node has its own transform, track itself (independent physics body)
-                // This prevents multiple collider children from overwriting the same parent tracking
-                var hasLocalTransform = gltfNode.LocalTransform.Matrix != System.Numerics.Matrix4x4.Identity;
-                var nodeToTrack = (!hasLocalTransform && modelNode.Parent != null) ? modelNode.Parent : modelNode;
+                // - If collider node has no LOCAL TRANSLATION, track parent (entire hierarchy moves together)
+                // - If collider node has local translation, track itself (independent physics body)
+                // This handles Unity's component pattern: parent (Transform) + child (Collider with scale but no translation)
+                // We check ONLY for translation, NOT scale (scale-only transforms should still track parent)
+                var localMatrix = gltfNode.LocalTransform.Matrix;
+                var hasLocalTranslation = Math.Abs(localMatrix.M41) > 0.001f || 
+                                         Math.Abs(localMatrix.M42) > 0.001f || 
+                                         Math.Abs(localMatrix.M43) > 0.001f;
+                var nodeToTrack = (!hasLocalTranslation && modelNode.Parent != null) ? modelNode.Parent : modelNode;
                 
                 // Check if this parent is already tracked by another body
                 if (_nodeBodies.ContainsKey(nodeToTrack) && nodeToTrack == modelNode.Parent)
