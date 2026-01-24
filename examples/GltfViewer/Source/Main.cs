@@ -17,7 +17,7 @@ public enum SkinningMode
     /// Limited to ~85 bones but very efficient. Best for mobile/low-end devices.
     /// </summary>
     UniformBased,
-    
+
     /// <summary>
     /// Texture-based skinning (pbr-transition): Supports unlimited bones via texture lookup.
     /// Requires GPU texture upload every frame - slower on mobile but no bone limit.
@@ -30,13 +30,15 @@ public static unsafe partial class GltfViewer
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
+          "Physics/BouncingObjects/BouncingObjects.gltf",
+        "Physics/UnitySimple/SampleScene.gltf",
+        "Physics/ball_pit/physics_ball_pit.gltf",
+        //  "Physics/BouncingObjects/physics_bouncing_objects.gltf",
+        "Physics/triggers/physics_triggers.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
         "littlest_tokyo/LittleTokio.gltf" ,
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
-        "Physics/ball_pit/physics_ball_pit.gltf",
-         "Physics/BouncingObjects/physics_bouncing_objects.gltf",
-        "Physics/triggers/physics_triggers.gltf",
         "DragonAttenuation/glTF/DragonAttenuation.gltf",
         "PotOfCoalsAnimationPointer/glTF/PotOfCoalsAnimationPointer.gltf",
         "CommercialRefrigerator/glTF/CommercialRefrigerator.gltf",
@@ -52,7 +54,7 @@ public static unsafe partial class GltfViewer
         "WaterBottle/glTF/WaterBottle.gltf",
         "BoomBox/glTF-Binary/BoomBox.glb",
         "IridescenceLamp/glTF-Binary/IridescenceLamp.glb",
-        "DragonAttenuation/glTF/DragonAttenuation.gltf", 
+        "DragonAttenuation/glTF/DragonAttenuation.gltf",
     };
 
     static string filename => availableModels[state.currentModelIndex];
@@ -65,8 +67,8 @@ public static unsafe partial class GltfViewer
         public sg_pass bright_pass;      // Bright pass extraction
         public sg_pass blur_h_pass;      // Horizontal blur
         public sg_pass blur_v_pass;      // Vertical blur
-        // Note: composite pass renders to swapchain and is created each frame
-        
+                                         // Note: composite pass renders to swapchain and is created each frame
+
         // Model rendering pipelines for offscreen scene pass (sample_count = 1)
         public sg_pipeline scene_standard_pipeline;
         public sg_pipeline scene_skinned_pipeline;
@@ -80,25 +82,25 @@ public static unsafe partial class GltfViewer
         public sg_pipeline scene_skinned_mask_pipeline;
         public sg_pipeline scene_morphing_mask_pipeline;
         public sg_pipeline scene_skinned_morphing_mask_pipeline;
-        
+
         // Bloom post-processing pipelines
         public sg_pipeline bright_pipeline;
-        public sg_pipeline blur_h_pipeline; 
+        public sg_pipeline blur_h_pipeline;
         public sg_pipeline blur_v_pipeline;
         public sg_pipeline composite_pipeline;
-        
+
         public sg_bindings bright_bindings;
         public sg_bindings blur_h_bindings;
         public sg_bindings blur_v_bindings;
         public sg_bindings composite_bindings;
-        
+
         public sg_image scene_color_img;     // Main scene color buffer
         public sg_image scene_depth_img;     // Main scene depth buffer
         public sg_image bright_img;          // Bright pass result
         public sg_image blur_h_img;          // Horizontal blur result
         public sg_image blur_v_img;          // Vertical blur result (final bloom)
         public sg_image dummy_depth_img;     // 1x1 dummy depth for WebGL compatibility
-        
+
         public sg_sampler sampler;           // Linear sampler for all passes
     }
 
@@ -106,7 +108,7 @@ public static unsafe partial class GltfViewer
     {
         // Two-pass rendering: opaque objects first, then transparent with refraction
         public sg_pass opaque_pass;          // Render opaque objects to screen texture
-        
+
         // Pipelines for opaque rendering (captures scene behind transparent objects)
         public sg_pipeline opaque_standard_pipeline;
         public sg_pipeline opaque_skinned_pipeline;
@@ -116,12 +118,12 @@ public static unsafe partial class GltfViewer
         public sg_pipeline opaque_skinned_blend_pipeline;
         public sg_pipeline opaque_standard_mask_pipeline;
         public sg_pipeline opaque_skinned_mask_pipeline;
-        
+
         public sg_image screen_color_img;    // Screen texture for refraction sampling
         public sg_image screen_depth_img;    // Depth buffer
         public sg_view screen_color_view;    // View for screen texture (created once, reused)
         public sg_sampler sampler;           // Linear sampler for screen texture
-        
+
     }
 
     struct UIState
@@ -143,7 +145,7 @@ public static unsafe partial class GltfViewer
         public bool physics_open;
         public bool show_body_details;       // Show detailed body information
         public int theme;
-        
+
         // Debug view state
         public int debug_view_enabled;  // 0 = disabled, 1 = enabled
         public int debug_view_mode;     // Which debug view to display
@@ -209,11 +211,11 @@ public static unsafe partial class GltfViewer
         // Lighting system
         public List<Light> lights = new List<Light>();
         public float ambientStrength = 0.8f;    // Test: very low ambient
-        
+
         // Light nodes from glTF (for animation updates)
         // Using SharpGltfNode wrapper (not Schema2.Node) because animator updates wrapper transforms
         public List<(SharpGltfNode node, int lightIndex)> lightNodes = new List<(SharpGltfNode, int)>();
-        
+
         // Bloom post-processing
         public BloomPass bloom;
         public bool enableBloom = false;
@@ -227,7 +229,7 @@ public static unsafe partial class GltfViewer
         // Transmission (glass/refraction) rendering
         // Automatically enabled when model contains meshes with transmission_factor > 0
         public TransmissionPass transmission;
-        
+
         // Skybox renderer for environment map background
         public SkyboxRenderer skybox = new SkyboxRenderer();
 

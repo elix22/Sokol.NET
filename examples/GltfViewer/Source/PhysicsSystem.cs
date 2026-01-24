@@ -961,10 +961,13 @@ public static unsafe partial class GltfViewer
                 var position = bodyInterface.GetPosition(bodyId);
                 var rotation = bodyInterface.GetRotation(bodyId);
 
-                // Info($"[Physics] Body pos={position}, node '{node.NodeName}' (MeshIndex={node.MeshIndex})");
-
-                // Create transform matrix from physics body state
-                var matrix = Matrix4x4.CreateFromQuaternion(rotation) * 
+                // CRITICAL: Preserve the node's original scale
+                // Physics only controls position and rotation, not scale
+                var originalScale = node.Scale;
+                
+                // Create transform matrix from physics body state WITH original scale
+                var matrix = Matrix4x4.CreateScale(originalScale) *
+                             Matrix4x4.CreateFromQuaternion(rotation) * 
                              Matrix4x4.CreateTranslation(position);
                 
                 // Update the node's world transform
