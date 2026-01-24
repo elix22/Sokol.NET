@@ -30,8 +30,10 @@ public static unsafe partial class GltfViewer
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
-        "Physics/BouncingObjects/physics_bouncing_objects.gltf",
+        "Physics/SubwaySurfers/Scene_TrainWayRunner.gltf",
+        "Physics/TriggerScene/Trigger.gltf",
         "Physics/UnityBouncingObjects/BouncingObjects.gltf",
+        "Physics/BouncingObjects/physics_bouncing_objects.gltf",
         "Physics/UnitySimple/SampleScene.gltf",
         "Physics/ball_pit/physics_ball_pit.gltf",
         //  

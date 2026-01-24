@@ -215,7 +215,7 @@ public static unsafe partial class GltfViewer
                 }
 
                 var shapeData = _physicsShapes[body.Collider.Shape];
-                shape = CreateShape(shapeData, modelRoot);
+                shape = CreateShape(shapeData, modelRoot, modelNode);
                 if (shape == null)
                 {
                     Console.WriteLine($"[Physics] Warning: Failed to create shape for node {gltfNode.Name ?? "unnamed"}");
@@ -518,6 +518,8 @@ public static unsafe partial class GltfViewer
             // Check if trigger has a direct shape reference
             if (body.Trigger.Shape.HasValue)
             {
+                Info($"[Physics] Trigger '{gltfNode.Name}' has direct shape reference: index={body.Trigger.Shape.Value}");
+                
                 if (body.Trigger.Shape.Value >= _physicsShapes.Count)
                 {
                     Warning($"[Physics] Trigger '{gltfNode.Name}' references invalid shape index {body.Trigger.Shape.Value}");
@@ -525,7 +527,8 @@ public static unsafe partial class GltfViewer
                 }
 
                 var shapeData = _physicsShapes[body.Trigger.Shape.Value];
-                shape = CreateShape(shapeData, modelRoot);
+                Info($"[Physics] Creating shape for trigger from shape index {body.Trigger.Shape.Value}, type={shapeData.Type}");
+                shape = CreateShape(shapeData, modelRoot, modelNode);
                 if (shape == null)
                 {
                     Warning($"[Physics] Failed to create shape for trigger '{gltfNode.Name}'");
@@ -579,7 +582,7 @@ public static unsafe partial class GltfViewer
                     if (childShapeIndex.HasValue && childShapeIndex.Value < _physicsShapes.Count)
                     {
                         var childShapeData = _physicsShapes[childShapeIndex.Value];
-                        childShape = CreateShape(childShapeData, modelRoot);
+                        childShape = CreateShape(childShapeData, modelRoot, modelNode);
                     }
                     // Otherwise, if child has a mesh, create convex hull from mesh
                     else if (childNode.Mesh != null)
@@ -598,7 +601,7 @@ public static unsafe partial class GltfViewer
                             if (positions != null && positions.Count > 0)
                             {
                                 Info($"[Physics] Creating convex hull from {positions.Count} vertices for child '{childNode.Name}'");
-                                childShape = new ConvexHullShapeSettings(positions.ToArray());
+                                childShape = new ConvexHullShapeSettings(positions.ToArray(), 0.05f);
                             }
                         }
                     }
@@ -624,7 +627,7 @@ public static unsafe partial class GltfViewer
                                 if (positions != null && positions.Count > 0)
                                 {
                                     Info($"[Physics] Creating convex hull from {positions.Count} vertices for child '{meshChildNode.Name}'");
-                                    childShape = new ConvexHullShapeSettings(positions.ToArray());
+                                    childShape = new ConvexHullShapeSettings(positions.ToArray(), 0.05f);
                                     break; // Use first mesh child
                                 }
                             }
@@ -659,7 +662,7 @@ public static unsafe partial class GltfViewer
                                     if (positions != null && positions.Count > 0)
                                     {
                                         Info($"[Physics] Creating convex hull from {positions.Count} vertices for '{potentialMeshNode.Name}'");
-                                        childShape = new ConvexHullShapeSettings(positions.ToArray());
+                                        childShape = new ConvexHullShapeSettings(positions.ToArray(), 0.05f);
                                         break;
                                     }
                                 }
@@ -778,58 +781,96 @@ public static unsafe partial class GltfViewer
                 new Vector3(worldTransform.M21, worldTransform.M22, worldTransform.M23).Length(),
                 new Vector3(worldTransform.M31, worldTransform.M32, worldTransform.M33).Length());
             
-            // Apply scale to shape
-            shape = new ScaledShapeSettings(shape, scale);
+            Info($"[Physics] Trigger '{gltfNode.Name}' scale: {scale}");
+            
+            // Clamp scale to avoid Jolt Physics issues with zero or very small scales
+            const float minScale = 0.001f;
+            scale = new Vector3(
+                Math.Max(scale.X, minScale),
+                Math.Max(scale.Y, minScale),
+                Math.Max(scale.Z, minScale));
+            
+            if (scale.X < 0.01f || scale.Y < 0.01f || scale.Z < 0.01f)
+            {
+                Warning($"[Physics] Trigger '{gltfNode.Name}' has very small scale: {scale}, clamped to minimum {minScale}");
+            }
+            
+            // Apply scale to shape only if scale is not (1,1,1)
+            bool isUniformScale = Math.Abs(scale.X - 1.0f) < 0.001f && 
+                                  Math.Abs(scale.Y - 1.0f) < 0.001f && 
+                                  Math.Abs(scale.Z - 1.0f) < 0.001f;
+            
+            if (!isUniformScale)
+            {
+                Info($"[Physics] Applying scale to trigger shape: {scale}");
+                shape = new ScaledShapeSettings(shape, scale);
+            }
+            else
+            {
+                Info($"[Physics] Skipping scale wrapper for trigger (scale is uniform 1.0)");
+            }
 
             // Triggers are always static sensors (they don't move and don't have physics interactions)
             var layer = Layers.NON_MOVING;
             var motionType = MotionType.Static;
 
-            using (var settings = new BodyCreationSettings(shape, position, rotation, motionType, layer))
+            try
             {
-                // CRITICAL: Set IsSensor to true for triggers
-                settings.IsSensor = true;
-                
-                var bodyInterface = _bodyInterface.Value;
-                var joltBody = bodyInterface.CreateBody(settings);
-                if (joltBody == null)
+                using (var settings = new BodyCreationSettings(shape, position, rotation, motionType, layer))
                 {
-                    Console.WriteLine($"[Physics] Failed to create trigger body for {gltfNode.Name ?? "unnamed"}");
-                    return false;
-                }
-                
-                // Verify IsSensor was set correctly after creation
-                Console.WriteLine($"[Physics] Created trigger '{gltfNode.Name}': IsSensor={joltBody.IsSensor}, Position={position.Y:F3}");
-
-                bodyInterface.AddBody(joltBody.ID, Activation.DontActivate);
-
-                // Track the node (parent node if available)
-                var nodeToTrack = modelNode.Parent ?? modelNode;
-                _nodeBodies[nodeToTrack] = joltBody.ID;
-                
-                // Track this as a sensor body for collision detection
-                _sensorBodies.Add(joltBody.ID);
-                _bodyNames[joltBody.ID] = gltfNode.Name ?? "unnamed_trigger";
-                
-                // Store collision filter if specified
-                if (body.Trigger.CollisionFilter.HasValue)
-                {
-                    int filterIndex = body.Trigger.CollisionFilter.Value;
-                    if (filterIndex >= 0 && filterIndex < _collisionFilters.Count)
+                    // CRITICAL: Set IsSensor to true for triggers
+                    settings.IsSensor = true;
+                    
+                    Info($"[Physics] Creating body for trigger '{gltfNode.Name}' at position {position}");
+                    var bodyInterface = _bodyInterface.Value;
+                    var joltBody = bodyInterface.CreateBody(settings);
+                    if (joltBody == null)
                     {
-                        _bodyCollisionFilters[joltBody.ID] = _collisionFilters[filterIndex];
-                        Info($"[Physics] Trigger '{gltfNode.Name}' using collision filter {filterIndex}");
+                        Console.WriteLine($"[Physics] Failed to create trigger body for {gltfNode.Name ?? "unnamed"}");
+                        return false;
                     }
+                
+                    // Verify IsSensor was set correctly after creation
+                    Console.WriteLine($"[Physics] Created trigger '{gltfNode.Name}': IsSensor={joltBody.IsSensor}, Position={position.Y:F3}");
+
+                    bodyInterface.AddBody(joltBody.ID, Activation.DontActivate);
+
+                    // Track the node (parent node if available)
+                    var nodeToTrack = modelNode.Parent ?? modelNode;
+                    _nodeBodies[nodeToTrack] = joltBody.ID;
+                    
+                    // Track this as a sensor body for collision detection
+                    _sensorBodies.Add(joltBody.ID);
+                    _bodyNames[joltBody.ID] = gltfNode.Name ?? "unnamed_trigger";
+                    
+                    // Store collision filter if specified
+                    if (body.Trigger.CollisionFilter.HasValue)
+                    {
+                        int filterIndex = body.Trigger.CollisionFilter.Value;
+                        if (filterIndex >= 0 && filterIndex < _collisionFilters.Count)
+                        {
+                            _bodyCollisionFilters[joltBody.ID] = _collisionFilters[filterIndex];
+                            Info($"[Physics] Trigger '{gltfNode.Name}' using collision filter {filterIndex}");
+                        }
+                    }
+
+                    Info($"[Physics] Created sensor trigger for node '{gltfNode.Name}' (IsSensor=true)");
+
+                    return true;
                 }
-
-                Info($"[Physics] Created sensor trigger for node '{gltfNode.Name}' (IsSensor=true)");
-
-                return true;
+            }
+            catch (Exception ex)
+            {
+                Warning($"[Physics] Exception creating trigger body for '{gltfNode.Name}': {ex.Message}");
+                Warning($"[Physics] Stack trace: {ex.StackTrace}");
+                return false;
             }
         }
 
-        private ShapeSettings? CreateShape(OMI_physics_shape.PhysicsShape shapeData, ModelRoot modelRoot)
+        private ShapeSettings? CreateShape(OMI_physics_shape.PhysicsShape shapeData, ModelRoot modelRoot, SharpGltfNode modelNode)
         {
+            Info($"[Physics] CreateShape called: type={shapeData.Type}, sphere={shapeData.Sphere != null}, box={shapeData.Box != null}, capsule={shapeData.Capsule != null}, cylinder={shapeData.Cylinder != null}, convex={shapeData.Convex != null}, trimesh={shapeData.Trimesh != null}");
+            
             if (shapeData == null)
                 return null;
 
@@ -842,7 +883,13 @@ public static unsafe partial class GltfViewer
             {
                 var size = shapeData.Box.Size ?? new[] { 1.0f, 1.0f, 1.0f };
                 var halfExtents = new Vector3(size[0] / 2, size[1] / 2, size[2] / 2);
-                return new BoxShapeSettings(halfExtents);
+                
+                // Calculate appropriate convex radius (must be smaller than smallest half-extent)
+                float minHalfExtent = Math.Min(Math.Min(halfExtents.X, halfExtents.Y), halfExtents.Z);
+                float convexRadius = Math.Min(0.05f, minHalfExtent * 0.1f); // 10% of smallest dimension, max 0.05
+                
+                Info($"[Physics] Creating box: halfExtents={halfExtents}, minHalfExtent={minHalfExtent}, convexRadius={convexRadius}");
+                return new BoxShapeSettings(halfExtents, convexRadius);
             }
             else if (shapeData.Capsule != null)
             {
@@ -905,10 +952,20 @@ public static unsafe partial class GltfViewer
                     return null;
                 }
                 
-                Info($"[Physics] Creating convex hull from {positions.Count} vertices");
+                Info($"[Physics] Creating convex hull from {positions.Count} vertices with convex radius 0.05f");
                 
-                // Create convex hull shape from vertices
-                return new ConvexHullShapeSettings(positions.ToArray());
+                try
+                {
+                    // Create convex hull shape from vertices with explicit convex radius
+                    var convexHull = new ConvexHullShapeSettings(positions.ToArray(), 0.05f);
+                    Info($"[Physics] Convex hull created successfully");
+                    return convexHull;
+                }
+                catch (Exception ex)
+                {
+                    Warning($"[Physics] Failed to create convex hull: {ex.Message}");
+                    throw;
+                }
             }
             else if (shapeData.Trimesh != null)
             {
