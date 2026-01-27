@@ -783,50 +783,111 @@ namespace Sokol
 
         private void ProcessMaterial(Material material, Mesh mesh)
         {
-            // Extract base color from material
-            var baseColorChannel = material.FindChannel("BaseColor");
-            if (baseColorChannel.HasValue)
+            // Check if this is a specular-glossiness material (deprecated extension)
+            bool isSpecularGlossiness = material.FindChannel("Diffuse").HasValue;
+            
+            // Extract base color from material (BaseColor or Diffuse)
+            if (isSpecularGlossiness)
             {
-                try
+                // KHR_materials_pbrSpecularGlossiness: use Diffuse channel
+                var diffuseChannel = material.FindChannel("Diffuse");
+                if (diffuseChannel.HasValue)
                 {
-                    mesh.BaseColorFactor = baseColorChannel.Value.Color;
-                    Info($"Material has BaseColor: {mesh.BaseColorFactor}", "SharpGLTF");
+                    try
+                    {
+                        mesh.BaseColorFactor = diffuseChannel.Value.Color;
+                        Info($"Material has Diffuse (spec-gloss): {mesh.BaseColorFactor}", "SharpGLTF");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to extract diffuse color: {ex.Message}", "SharpGLTF");
+                        mesh.BaseColorFactor = Vector4.One; // Fallback to white
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Error($"Failed to extract color: {ex.Message}", "SharpGLTF");
-                    mesh.BaseColorFactor = Vector4.One; // Fallback to white
+                    mesh.BaseColorFactor = Vector4.One;
                 }
             }
             else
             {
-                Info("Material has NO BaseColor channel - using white", "SharpGLTF");
-                mesh.BaseColorFactor = Vector4.One;
+                // Standard metallic-roughness: use BaseColor channel
+                var baseColorChannel = material.FindChannel("BaseColor");
+                if (baseColorChannel.HasValue)
+                {
+                    try
+                    {
+                        mesh.BaseColorFactor = baseColorChannel.Value.Color;
+                        Info($"Material has BaseColor: {mesh.BaseColorFactor}", "SharpGLTF");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to extract color: {ex.Message}", "SharpGLTF");
+                        mesh.BaseColorFactor = Vector4.One; // Fallback to white
+                    }
+                }
+                else
+                {
+                    Info("Material has NO BaseColor channel - using white", "SharpGLTF");
+                    mesh.BaseColorFactor = Vector4.One;
+                }
             }
             
-            // Extract metallic and roughness values from MetallicRoughness channel
-            var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
-            if (metallicRoughnessChannel.HasValue)
+            // Extract metallic and roughness values
+            if (isSpecularGlossiness)
             {
-                try
+                // KHR_materials_pbrSpecularGlossiness: convert glossiness to roughness
+                var specularGlossinessChannel = material.FindChannel("SpecularGlossiness");
+                if (specularGlossinessChannel.HasValue)
                 {
-                    // GetFactor extracts the scalar value by parameter name
-                    mesh.MetallicFactor = metallicRoughnessChannel.Value.GetFactor("MetallicFactor");
-                    mesh.RoughnessFactor = metallicRoughnessChannel.Value.GetFactor("RoughnessFactor");
+                    try
+                    {
+                        // Extract glossiness and convert to roughness
+                        var glossiness = specularGlossinessChannel.Value.GetFactor("GlossinessFactor");
+                        mesh.RoughnessFactor = 1.0f - glossiness; // Roughness = 1 - Glossiness
+                        // Set metallic to 0 for specular-glossiness materials
+                        mesh.MetallicFactor = 0.0f;
+                        Info($"Material has SpecularGlossiness: glossiness={glossiness}, converted to roughness={mesh.RoughnessFactor}", "SharpGLTF");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to extract glossiness: {ex.Message}", "SharpGLTF");
+                        mesh.MetallicFactor = 0.0f;
+                        mesh.RoughnessFactor = 0.5f;
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Error($"Failed to extract metallic/roughness: {ex.Message}", "SharpGLTF");
-                    // Default to non-metallic, moderately rough for better shading visibility
                     mesh.MetallicFactor = 0.0f;
                     mesh.RoughnessFactor = 0.5f;
                 }
             }
             else
             {
-                // No metallic-roughness channel - use sensible defaults for better shading
-                mesh.MetallicFactor = 0.0f;  // Non-metallic (better for showing diffuse lighting)
-                mesh.RoughnessFactor = 0.5f; // Moderately rough
+                // Standard metallic-roughness workflow
+                var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
+                if (metallicRoughnessChannel.HasValue)
+                {
+                    try
+                    {
+                        // GetFactor extracts the scalar value by parameter name
+                        mesh.MetallicFactor = metallicRoughnessChannel.Value.GetFactor("MetallicFactor");
+                        mesh.RoughnessFactor = metallicRoughnessChannel.Value.GetFactor("RoughnessFactor");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to extract metallic/roughness: {ex.Message}", "SharpGLTF");
+                        // Default to non-metallic, moderately rough for better shading visibility
+                        mesh.MetallicFactor = 0.0f;
+                        mesh.RoughnessFactor = 0.5f;
+                    }
+                }
+                else
+                {
+                    // No metallic-roughness channel - use sensible defaults for better shading
+                    mesh.MetallicFactor = 0.0f;  // Non-metallic (better for showing diffuse lighting)
+                    mesh.RoughnessFactor = 0.5f; // Moderately rough
+                }
             }
             
             // Extract emissive factor from material
@@ -971,10 +1032,11 @@ namespace Sokol
             }
 
             // Extract texture transforms (KHR_texture_transform) for all texture types
-            // Base Color
-            if (baseColorChannel.HasValue)
+            // Base Color / Diffuse
+            var baseColorOrDiffuseChannel = isSpecularGlossiness ? material.FindChannel("Diffuse") : material.FindChannel("BaseColor");
+            if (baseColorOrDiffuseChannel.HasValue)
             {
-                var textureTransform = baseColorChannel.Value.TextureTransform;
+                var textureTransform = baseColorOrDiffuseChannel.Value.TextureTransform;
                 if (textureTransform != null)
                 {
                     mesh.BaseColorTexOffset = textureTransform.Offset;
@@ -989,7 +1051,8 @@ namespace Sokol
                     
                     if (mesh.HasBaseColorTexTransform)
                     {
-                        Info($"Material {material.LogicalIndex}: BaseColor texture transform - " +
+                        string channelType = isSpecularGlossiness ? "Diffuse" : "BaseColor";
+                        Info($"Material {material.LogicalIndex}: {channelType} texture transform - " +
                             $"Offset=({mesh.BaseColorTexOffset.X:F2}, {mesh.BaseColorTexOffset.Y:F2}), " +
                             $"Rotation={mesh.BaseColorTexRotation:F2}rad, " +
                             $"Scale=({mesh.BaseColorTexScale.X:F2}, {mesh.BaseColorTexScale.Y:F2})", "SharpGLTF");
@@ -997,10 +1060,11 @@ namespace Sokol
                 }
             }
             
-            // Metallic-Roughness
-            if (metallicRoughnessChannel.HasValue)
+            // Metallic-Roughness / Specular-Glossiness
+            var metallicRoughnessOrSpecGlossChannel = isSpecularGlossiness ? material.FindChannel("SpecularGlossiness") : material.FindChannel("MetallicRoughness");
+            if (metallicRoughnessOrSpecGlossChannel.HasValue)
             {
-                var textureTransform = metallicRoughnessChannel.Value.TextureTransform;
+                var textureTransform = metallicRoughnessOrSpecGlossChannel.Value.TextureTransform;
                 if (textureTransform != null)
                 {
                     mesh.MetallicRoughnessTexOffset = textureTransform.Offset;
@@ -1015,7 +1079,8 @@ namespace Sokol
                     
                     if (mesh.HasMetallicRoughnessTexTransform)
                     {
-                        Info($"Material {material.LogicalIndex}: MetallicRoughness texture transform - " +
+                        string channelType = isSpecularGlossiness ? "SpecularGlossiness" : "MetallicRoughness";
+                        Info($"Material {material.LogicalIndex}: {channelType} texture transform - " +
                             $"Offset=({mesh.MetallicRoughnessTexOffset.X:F2}, {mesh.MetallicRoughnessTexOffset.Y:F2}), " +
                             $"Rotation={mesh.MetallicRoughnessTexRotation:F2}rad, " +
                             $"Scale=({mesh.MetallicRoughnessTexScale.X:F2}, {mesh.MetallicRoughnessTexScale.Y:F2})", "SharpGLTF");
@@ -1134,8 +1199,20 @@ namespace Sokol
             Info($"Material double-sided: {mesh.DoubleSided}", "SharpGLTF");
 
             // Load textures
-            LoadTexture(material, "BaseColor", mesh, 0);
-            LoadTexture(material, "MetallicRoughness", mesh, 1);
+            // Check if this is specular-glossiness (use Diffuse instead of BaseColor)
+            // Note: isSpecularGlossiness was already declared at the start of ProcessMaterial
+            
+            if (isSpecularGlossiness)
+            {
+                LoadTexture(material, "Diffuse", mesh, 0);  // Use Diffuse for spec-gloss materials
+                LoadTexture(material, "SpecularGlossiness", mesh, 1);  // Use SpecularGlossiness instead of MetallicRoughness
+            }
+            else
+            {
+                LoadTexture(material, "BaseColor", mesh, 0);
+                LoadTexture(material, "MetallicRoughness", mesh, 1);
+            }
+            
             LoadTexture(material, "Normal", mesh, 2);
             LoadTexture(material, "Occlusion", mesh, 3);
             LoadTexture(material, "Emissive", mesh, 4);
@@ -1199,9 +1276,11 @@ namespace Sokol
             switch (channelName)
             {
                 case "BaseColor":
+                case "Diffuse":  // KHR_materials_pbrSpecularGlossiness
                     mesh.BaseColorTexCoord = texCoord;
                     break;
                 case "MetallicRoughness":
+                case "SpecularGlossiness":  // KHR_materials_pbrSpecularGlossiness
                     mesh.MetallicRoughnessTexCoord = texCoord;
                     break;
                 case "Normal":
