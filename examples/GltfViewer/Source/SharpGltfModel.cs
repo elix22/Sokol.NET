@@ -1559,12 +1559,28 @@ namespace Sokol
                 var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, characterBoneInfoMap);
                 animation.Name = animName;
 
-                // Process animation channels - ONLY process skinned bones for THIS character
+                // Process animation channels - include both skinned bones AND node animations
                 int boneChannelCount = 0;
+                int nodeChannelCount = 0;
                 int skippedChannelCount = 0;
+                
+                Info($"  [Animation Processing] Animation '{animName}' has {gltfAnimation.Channels.Count} total channels", "SharpGLTF");
+                
                 foreach (var channel in gltfAnimation.Channels)
                 {
                     var targetNode = channel.TargetNode;
+                    
+                    if (targetNode != null)
+                    {
+                        Info($"  [Channel] Target: '{targetNode.Name}', Path: {channel.TargetNodePath}", "SharpGLTF");
+                        
+                        // Check sampler keyframe count
+                        var transSampler = channel.GetTranslationSampler();
+                        var rotSampler = channel.GetRotationSampler();
+                        var scaleSampler = channel.GetScaleSampler();
+                        
+                        Info($"    Samplers: T={transSampler != null}, R={rotSampler != null}, S={scaleSampler != null}", "SharpGLTF");
+                    }
                     
                     // Handle non-node targets (e.g., KHR_animation_pointer material properties)
                     if (targetNode == null)
@@ -1590,17 +1606,21 @@ namespace Sokol
                     
                     // Check if this is a skinned bone that belongs to THIS character
                     bool isBone = characterBoneInfoMap.ContainsKey(nodeName);
+                    // Check if this is a non-skinned node animation (like coins, etc.)
+                    bool isNodeAnimation = _skinnedNodeNames != null && !_skinnedNodeNames.Contains(nodeName);
                     
-                    // For character animations: ONLY include bones that belong to THIS character
-                    // DO NOT include node animations (coins, etc.) - those are processed separately in ProcessNodeAnimations
-                    if (!isBone)
+                    if (!isBone && !isNodeAnimation)
                     {
                         skippedChannelCount++;
-                        continue; // Skip nodes that don't belong to this character's skeleton
+                        continue; // Skip bones/nodes that don't belong to this character
                     }
+
+                    int boneId = isBone ? characterBoneInfoMap[nodeName].Id : -1;
                     
-                    int boneId = characterBoneInfoMap[nodeName].Id;
-                    boneChannelCount++;
+                    if (isBone)
+                        boneChannelCount++;
+                    else
+                        nodeChannelCount++;
 
                     // Find or create bone/node entry
                     var bone = animation.FindBone(nodeName);
@@ -1618,19 +1638,40 @@ namespace Sokol
                     );
                 }
 
-                // Only add animation if it has channels for THIS character's bones
+                // Only add animation if it has bone channels (skeletal animations for this character)
+                // Node-only animations (like coin rotations) should NOT be added to skinned characters
                 if (boneChannelCount > 0)
                 {
                     characterAnimations.Add(animation);
-                    Info($"  ✓ ADDED animation '{animation.Name}': {boneChannelCount} bone channels, {skippedChannelCount} skipped", "SharpGLTF");
+                    Info($"  ✓ ADDED animation '{animation.Name}': {boneChannelCount} bone channels, {nodeChannelCount} node channels, {skippedChannelCount} skipped", "SharpGLTF");
+                }
+                else if (nodeChannelCount > 0)
+                {
+                    Info($"  ⊘ SKIPPED node-only animation '{animation.Name}': 0 bone channels, {nodeChannelCount} node channels (not for skinned character)", "SharpGLTF");
                 }
                 else
                 {
-                    Info($"  ✗ SKIPPED animation '{animation.Name}': 0 bone channels, {skippedChannelCount} channels didn't match this character", "SharpGLTF");
+                    Info($"  ✗ SKIPPED animation '{animation.Name}': 0 matching channels, {skippedChannelCount} channels didn't match this character", "SharpGLTF");
                 }
                 
                 animIndex++;
             }
+
+            // Sort animations: prioritize skeletal animations (with bone channels) over node animations
+            // This ensures the character defaults to playing its skeletal animation (e.g., "Idle")
+            // rather than a node animation (e.g., "Anim_Coin_Rotate")
+            characterAnimations.Sort((a, b) =>
+            {
+                int aBones = a.GetBones().Count(bone => bone.ID >= 0); // Bones with valid ID
+                int bBones = b.GetBones().Count(bone => bone.ID >= 0);
+                
+                // Animations with more skeleton bones come first
+                if (aBones != bBones)
+                    return bBones.CompareTo(aBones); // Descending order
+                
+                // If same number of bones, sort by total bone count (includes nodes)
+                return b.GetBones().Count.CompareTo(a.GetBones().Count);
+            });
 
             Info($"========== Character '{characterName}': Processed {characterAnimations.Count} animations ==========", "SharpGLTF");
             return characterAnimations;

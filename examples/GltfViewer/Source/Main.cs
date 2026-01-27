@@ -30,6 +30,7 @@ public static unsafe partial class GltfViewer
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
+        "littlest_tokyo/LittleTokio.gltf" ,
         // "littlest_tokyo/LittleTokio.gltf" ,
         // "AnimatedCube/glTF/AnimatedCube.gltf",
         // "Physics/Jack/Jack.gltf",

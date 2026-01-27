@@ -36,6 +36,8 @@ namespace Sokol
             _characterBoneInfoMap = characterBoneInfoMap;
             _allNodes = nodes;
             
+            Info($"[Animator] Constructor: animation={animation?.Name ?? "NULL"}, boneCount={boneCount}", "Animation");
+            
             // Allocate bone matrices array based on actual bone count
             // This supports both uniform-based (max 100) and texture-based (unlimited) skinning
             _finalBoneMatrices = new Matrix4x4[Math.Max(1, boneCount)];  // At least 1 to avoid zero-length arrays
@@ -49,8 +51,21 @@ namespace Sokol
             // Update once to get the initial pose at time 0
             if (_currentAnimation != null)
             {
+                var bones = _currentAnimation.GetBones();
+                Info($"[Animator] Initializing to time 0 with animation '{_currentAnimation.Name}', {bones.Count} bones", "Animation");
+                
+                // Log first few bone names
+                for (int i = 0; i < Math.Min(3, bones.Count); i++)
+                {
+                    Info($"  Bone {i}: '{bones[i].Name}'", "Animation");
+                }
+                
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+            }
+            else
+            {
+                Info($"[Animator] No animation provided, character will remain in bind pose", "Animation");
             }
         }
 
@@ -111,9 +126,12 @@ namespace Sokol
                 // Apply playback speed multiplier
                 _currentTime += _currentAnimation.GetTicksPerSecond() * dt * PlaybackSpeed;
                 _currentTime = _currentTime % _currentAnimation.GetDuration();
+                
+                Info($"[Animator] UpdateAnimation: dt={dt:F4}, currentTime={_currentTime:F4}, duration={_currentAnimation.GetDuration():F4}", "Animation");
 
                 // Batch update all bones at once before hierarchy traversal (optimization for WebAssembly)
                 var bones = _currentAnimation.GetBones();
+                Info($"[Animator] Updating {bones.Count} bones at time {_currentTime:F4}", "Animation");
                 foreach (var bone in bones)
                 {
                     bone.Update(_currentTime);
@@ -122,6 +140,8 @@ namespace Sokol
                 // Only recalculate bone transforms when we update the bone data
                 ref SharpGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
                 CalculateBoneTransform(rootNode, Matrix4x4.Identity);
+                
+                Info($"[Animator] First bone matrix after update: M41={_finalBoneMatrices[0].M41}, M42={_finalBoneMatrices[0].M42}, M43={_finalBoneMatrices[0].M43}", "Animation");
                 
                 // Apply animated transforms to non-skinned nodes
                 ApplyAnimationToNodes();

@@ -879,6 +879,7 @@ public static unsafe partial class GltfViewer
         // NEW: Update all characters independently (multi-character support)
         if (state.model != null && state.model.Characters.Count > 0)
         {
+            Info($"[Frame] Updating {state.model.Characters.Count} characters, dt={deltaTime:F4}", "Animation");
             // Update each character's animation
             // Note: Each character manages its own joint matrix texture
             foreach (var character in state.model.Characters)
@@ -1104,35 +1105,20 @@ public static unsafe partial class GltfViewer
                 }
                 else
                 {
-                    // SKINNED MESH FIX: For skinned meshes, bone matrices transform vertices from
-                    // mesh-local space to world space (offset * globalTransform). The shader then
-                    // applies modelMatrix: "pos = model * skinnedPosition". Since bone matrices
-                    // already produce world-space positions, we only need the user's rotation/centering
-                    // transform in modelMatrix (NOT the node hierarchy transform which is in the bones).
-                    if (mesh.HasSkinning && node.Parent != null)
+                    // SKINNED MESH FIX: For ALL skinned meshes, bone matrices are calculated as
+                    // "offset * globalTransformation" which transforms from mesh-local to world space.
+                    // The shader then applies "model * skinnedPosition". Since bone matrices already
+                    // produce world-space positions (including all parent transforms), modelMatrix
+                    // should ONLY contain the user's scene rotation/centering, NOT node transforms.
+                    if (mesh.HasSkinning)
                     {
-                        // For skinned meshes: use ONLY the user's model centering/rotation, not node transform
-                        // Node transform is already baked into bone matrices via globalTransformation
+                        // Use only user's model transform (rotation/centering), not node hierarchy
+                        // Node transforms are already baked into bone matrices via globalTransformation
                         modelMatrix = model;
-                        
-                        // DEBUG: Detailed transform debugging for Jack
-                        if (_frameCount < 28 && node.Parent.NodeName != null && node.Parent.NodeName.Contains("Jack"))
-                        {
-                            Vector3 worldPosition = new Vector3(nodeTransform.M41, nodeTransform.M42, nodeTransform.M43);
-                            Info($"[DEBUG Jack] === SKINNED MESH TRANSFORM ===");
-                            Info($"[DEBUG Jack] Mesh node: {node.NodeName}");
-                            Info($"[DEBUG Jack] Parent node (Jack): {node.Parent.NodeName}");
-                            Info($"[DEBUG Jack] Jack's GLTF Position: {node.Parent.Position}");
-                            Info($"[DEBUG Jack] Node world position: {worldPosition}");
-                            Info($"[DEBUG Jack] Model matrix (user rotation/centering): {model}");
-                            Info($"[DEBUG Jack] Final modelMatrix = model (ignoring node transform): {modelMatrix}");
-                            Info($"[DEBUG Jack] NOTE: Bone matrices already contain world transform");
-                            Info($"[DEBUG Jack] === END ===");
-                        }
                     }
                     else
                     {
-                        // Both animated and static nodes use the same transform
+                        // Non-skinned nodes use full node transform
                         // nodeTransform is the world transform (calculated through hierarchy)
                         // which is in model-local space and needs the user's model transform applied
                         modelMatrix = nodeTransform * model;

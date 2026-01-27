@@ -191,6 +191,7 @@ namespace Sokol
         /// </summary>
         public void Update(float dt)
         {
+            Info($"[Character] '{Name}' Update called: dt={dt:F4}", "Animation");
             Animator.UpdateAnimation(dt);
             
             // Reset the texture update flag at the start of each frame
