@@ -30,22 +30,10 @@ public static unsafe partial class GltfViewer
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
-        "subway_surfers/scene.gltf",
-        "littlest_tokyo/LittleTokio.gltf" ,
-        // "littlest_tokyo/LittleTokio.gltf" ,
-        // "AnimatedCube/glTF/AnimatedCube.gltf",
-        // "Physics/Jack/Jack.gltf",
-        // "Physics/JackWithCoin/SampleScene.gltf",
-        // "Physics/SubwaySurfers/TestScene.gltf",
-        "Physics/SubwaySurfers/Scene_TrainWayRunner.gltf",
-        "Physics/TriggerScene/Trigger.gltf",
-        "Physics/UnityBouncingObjects/BouncingObjects.gltf",
-        "Physics/BouncingObjects/physics_bouncing_objects.gltf",
-        "Physics/UnitySimple/SampleScene.gltf",
-        "Physics/ball_pit/physics_ball_pit.gltf",
-        //  
-        "Physics/triggers/physics_triggers.gltf",
         "DancingGangster/glTF-Binary/DancingGangster.glb",
+        "Physics/BouncingObjects/physics_bouncing_objects.gltf",
+        "Physics/ball_pit/physics_ball_pit.gltf",
+        "Physics/triggers/physics_triggers.gltf",
         "littlest_tokyo/LittleTokio.gltf" ,
         "ChronographWatch/glTF/ChronographWatch.gltf",
         "DamagedHelmet/glTF/DamagedHelmet.gltf",
