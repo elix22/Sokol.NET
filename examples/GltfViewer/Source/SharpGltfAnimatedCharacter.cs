@@ -139,6 +139,77 @@ namespace Sokol
         /// </summary>
         private bool textureUpdatedThisFrame;
         
+        /// <summary>
+        /// Creates an animated character instance with its own independent animator.
+        /// 
+        /// MULTI-CHARACTER ARCHITECTURE:
+        /// =============================
+        /// Each AnimatedCharacter represents a single skinned mesh with its own skeleton (skin).
+        /// Multiple characters can coexist in the same scene, each with:
+        /// - Independent bone hierarchy (skeleton structure)
+        /// - Independent animation list (filtered to only affect this character's bones)
+        /// - Independent animator (manages animation playback and bone matrix calculation)
+        /// - Independent joint matrix texture (for GPU skinning with many bones)
+        /// 
+        /// CONSTRUCTOR PARAMETERS:
+        /// -----------------------
+        /// - skinIndex: Index of the glTF skin this character uses (identifies which skeleton)
+        /// - name: Character identifier (e.g., "Jack", "Enemy_01", "Skin_0")
+        /// - animations: PRE-FILTERED list of animations that only affect THIS character's bones
+        ///   * Filtered by ProcessAnimationsForCharacter() to exclude other characters' animations
+        ///   * Sorted to prioritize skeletal animations over node-only animations
+        ///   * Example: Jack might have ["Idle", "Run", "Jump"] while Enemy has ["Patrol", "Attack"]
+        /// - meshes: List of meshes that use this character's skin (usually just one mesh)
+        /// - materialToMeshMap: Mapping of material indices to meshes (for rendering)
+        /// - nodes: All nodes in the scene (shared hierarchy structure)
+        /// - boneCount: Number of bones in THIS character's skeleton
+        ///   * Jack: 40 bones, Enemy: 30 bones, etc.
+        ///   * Determines whether to use texture-based skinning (>= MAX_BONES)
+        /// - boneInfoMap: THIS CHARACTER'S bone map containing:
+        ///   * Bone names → BoneInfo (ID: 0-N, OffsetMatrix)
+        ///   * CRITICAL: Bone IDs are per-character (Jack's bone 0 ≠ Enemy's bone 0)
+        ///   * Used by animator to calculate final bone matrices
+        /// 
+        /// ANIMATION SELECTION:
+        /// --------------------
+        /// The constructor uses animations[0] as the default starting animation. This works because:
+        /// 1. ProcessAnimationsForCharacter() filters animations to only include those with bone channels
+        /// 2. Animations are sorted to prioritize skeletal animations (more bones first)
+        /// 3. Result: animations[0] is guaranteed to be a skeletal animation for this character
+        ///    (not a node-only animation like coin rotations)
+        /// 
+        /// TEXTURE-BASED SKINNING:
+        /// -----------------------
+        /// - If boneCount >= MAX_BONES (typically 96), use GPU texture-based skinning
+        /// - Creates a joint matrix texture to store all bone matrices
+        /// - Allows unlimited bones without uniform buffer size limitations
+        /// - Each character manages its own texture (no sharing)
+        /// 
+        /// EXAMPLE MULTI-CHARACTER SCENE:
+        /// ------------------------------
+        /// Character 1 (Jack):
+        ///   - SkinIndex: 0
+        ///   - Name: "Jack"
+        ///   - BoneCount: 40
+        ///   - Animations: ["Idle", "Run", "Jump"] (3 animations)
+        ///   - BoneInfoMap: {"Jack_Hips": {ID=0, ...}, "Jack_Spine": {ID=1, ...}, ...}
+        ///   - UsesTextureSkinning: false (40 < 96)
+        /// 
+        /// Character 2 (Enemy):
+        ///   - SkinIndex: 1
+        ///   - Name: "Enemy"
+        ///   - BoneCount: 30
+        ///   - Animations: ["Patrol", "Attack"] (2 animations)
+        ///   - BoneInfoMap: {"Enemy_Root": {ID=0, ...}, "Enemy_Leg_L": {ID=1, ...}, ...}
+        ///   - UsesTextureSkinning: false (30 < 96)
+        /// 
+        /// Key Points:
+        /// - Both characters have independent bone ID ranges (0-39 for Jack, 0-29 for Enemy)
+        /// - Each has its own filtered animation list
+        /// - Each has its own SharpGltfAnimator instance
+        /// - They update and render independently
+        /// - No conflicts because bone names are unique per character
+        /// </summary>
         public AnimatedCharacter(
             int skinIndex,
             string name,

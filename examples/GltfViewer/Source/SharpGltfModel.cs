@@ -1508,6 +1508,91 @@ namespace Sokol
 
         /// <summary>
         /// Process animations for a SPECIFIC character using ONLY that character's bones.
+        /// 
+        /// MULTI-CHARACTER ANIMATION SYSTEM ARCHITECTURE:
+        /// ==============================================
+        /// This method is the core of the multi-character animation support system. It ensures that each
+        /// character (skinned mesh with its own skeleton) gets its own independent set of animations that
+        /// only affect its bones, enabling multiple characters to coexist and animate independently in the
+        /// same scene without conflicts.
+        /// 
+        /// HOW IT WORKS:
+        /// -------------
+        /// 1. PER-CHARACTER BONE MAP:
+        ///    - Each character has its own bone map (characterBoneInfoMap) containing:
+        ///      * Bone names (e.g., "mixamorig:Hips", "Armature_Bone_01")
+        ///      * Bone IDs (0-N, indexed per character, NOT global)
+        ///      * Offset matrices for skinning
+        ///    - Example: Jack (40 bones: ID 0-39), Enemy (30 bones: ID 0-29)
+        ///    
+        /// 2. ANIMATION FILTERING:
+        ///    - For each glTF animation in the model, we examine ALL animation channels
+        ///    - A channel targets a specific node (bone) by name
+        ///    - We check: Does this channel's target node name exist in THIS character's bone map?
+        ///      * If YES → Include it (increment boneChannelCount)
+        ///      * If NO → Skip it (increment skippedChannelCount)
+        ///    - This ensures animations only include channels affecting THIS character's skeleton
+        ///    
+        /// 3. BONE CHANNEL vs NODE CHANNEL DISTINCTION:
+        ///    - boneChannelCount: Channels targeting bones in the character's skeleton (skinned animation)
+        ///    - nodeChannelCount: Channels targeting non-skinned nodes (e.g., props, coins)
+        ///    - CRITICAL: We ONLY add animations with boneChannelCount > 0 for skinned characters
+        ///    - This prevents node-only animations (like coin rotations) from appearing in character lists
+        ///    
+        /// 4. INDEPENDENT ANIMATION LISTS:
+        ///    - Each character gets its own List<SharpGltfAnimation>
+        ///    - Animations are filtered to contain ONLY channels relevant to that character
+        ///    - Result: Character A's "Walk" animation only affects Character A's bones
+        ///    
+        /// EXAMPLE SCENARIO:
+        /// -----------------
+        /// Scene contains:
+        /// - Jack (Character A): 40 bones, animations: "Idle", "Run", "Jump"
+        /// - Enemy (Character B): 30 bones, animations: "Patrol", "Attack"
+        /// - 100 Coins: Node animations "Anim_Coin_Rotate_0" to "Anim_Coin_Rotate_99"
+        /// 
+        /// glTF file structure:
+        /// - Total animations: 105 (Jack: 3 + Enemy: 2 + Coins: 100)
+        /// - Jack's "Idle" animation has channels targeting: "Jack_Hips", "Jack_Spine", etc.
+        /// - Enemy's "Patrol" animation has channels targeting: "Enemy_Root", "Enemy_Leg_L", etc.
+        /// - Coin animations have channels targeting: "Coin_001", "Coin_002", etc.
+        /// 
+        /// Processing results:
+        /// - ProcessAnimationsForCharacter("Jack", jackBoneMap):
+        ///   * Processes all 105 animations
+        ///   * "Idle": 40 channels match Jack's bones → ADDED (boneChannelCount=40)
+        ///   * "Run": 38 channels match Jack's bones → ADDED (boneChannelCount=38)
+        ///   * "Jump": 35 channels match Jack's bones → ADDED (boneChannelCount=35)
+        ///   * "Patrol": 0 channels match Jack's bones → SKIPPED (boneChannelCount=0)
+        ///   * "Attack": 0 channels match Jack's bones → SKIPPED (boneChannelCount=0)
+        ///   * "Anim_Coin_Rotate_*": 0 bone channels → SKIPPED (node-only, not for skinned character)
+        ///   * Final: Jack gets 3 animations
+        ///   
+        /// - ProcessAnimationsForCharacter("Enemy", enemyBoneMap):
+        ///   * Processes all 105 animations
+        ///   * "Idle": 0 channels match Enemy's bones → SKIPPED
+        ///   * "Patrol": 28 channels match Enemy's bones → ADDED (boneChannelCount=28)
+        ///   * "Attack": 30 channels match Enemy's bones → ADDED (boneChannelCount=30)
+        ///   * "Anim_Coin_Rotate_*": 0 bone channels → SKIPPED
+        ///   * Final: Enemy gets 2 animations
+        /// 
+        /// KEY PRINCIPLE:
+        /// --------------
+        /// Bone name matching is the KEY to multi-character support:
+        /// - Each character's bone map contains UNIQUE bone names for that skeleton
+        /// - Animation channels reference bones by name
+        /// - Only channels with matching bone names are included
+        /// - This creates a natural separation where each character only sees animations
+        ///   that were designed for its specific skeleton structure
+        /// 
+        /// BENEFITS:
+        /// ---------
+        /// 1. Memory efficiency: No duplicate bone matrices across characters
+        /// 2. Animation isolation: Characters don't interfere with each other
+        /// 3. Scalability: Supports unlimited characters in same scene
+        /// 4. Correct indexing: Each character's bones are indexed 0-N independently
+        /// 5. Flexibility: Mix different skeleton types (humanoid, creature, vehicle, etc.)
+        /// 
         /// Each character gets its own independent animation with its own bone indexing (0-N).
         /// NO SHARING between characters.
         /// </summary>
