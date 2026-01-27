@@ -1066,11 +1066,6 @@ public static unsafe partial class GltfViewer
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transparentNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transmissiveNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
                 
-            // Collect and categorize all visible nodes
-            if (_frameCount < 3)
-            {
-                Info($"[Frame {_frameCount}] Starting node collection loop - Total nodes: {state.model.Nodes.Count}");
-            }
             
             foreach (var node in state.model.Nodes)
             {
@@ -1080,12 +1075,6 @@ public static unsafe partial class GltfViewer
 
                 var mesh = state.model.Meshes[node.MeshIndex];
                 state.totalMeshes++;
-
-                // LOG: Track skinned meshes during collection (first 3 frames only)
-                if (_frameCount < 3 && mesh.SkinIndex >= 0)
-                {
-                    Info($"[Frame {_frameCount}] Found skinned mesh - NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}, SkinIndex={mesh.SkinIndex}, HasSkinning={mesh.HasSkinning}");
-                }
 
                 // Use the world transform from node hierarchy
                 // For non-skinned animated nodes: updated by animator via SetLocalTransform()
@@ -1124,49 +1113,14 @@ public static unsafe partial class GltfViewer
                     }
                 }
 
-                // LOG: Check all skinned meshes before culling
-                if (_frameCount < 30 && mesh.SkinIndex >= 0)
-                {
-                    BoundingBox preCheckBounds = mesh.Bounds.Transform(modelMatrix);
-                    Vector3 preCheckCenter = (preCheckBounds.Min + preCheckBounds.Max) * 0.5f;
-                    Info($"[Frame {_frameCount}] Found skinned mesh - NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}, SkinIndex={mesh.SkinIndex}");
-                    Info($"  Pre-culling check - Mesh center: {preCheckCenter}");
-                    Info($"  Camera pos: {state.camera.EyePos}");
-                    Info($"  Frustum culling enabled: {state.enableFrustumCulling}");
-                }
-
                 // FRUSTUM CULLING: Check if mesh is visible
                 if (state.enableFrustumCulling && !mesh.IsVisible(modelMatrix, viewProjection))
                 {
                     state.culledMeshes++;
-                    
-                    // LOG: Track if Jack's mesh is being culled
-                    if (_frameCount < 30 && mesh.SkinIndex >= 0)
-                    {
-                        BoundingBox culledWorldBounds = mesh.Bounds.Transform(modelMatrix);
-                        Vector3 culledMeshCenter = (culledWorldBounds.Min + culledWorldBounds.Max) * 0.5f;
-                        Info($"[Frame {_frameCount}] >>> CULLED skinned mesh <<<");
-                        Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
-                        Info($"  Mesh center: {culledMeshCenter}");
-                        Info($"  Camera pos: {state.camera.EyePos}");
-                        Info($"  Bounds: Min={culledWorldBounds.Min}, Max={culledWorldBounds.Max}");
-                    }
                     continue;  // Skip this mesh
                 }
 
                 state.visibleMeshes++;
-                
-                // LOG: Track Jack's mesh position when visible
-                if (_frameCount < 30 && mesh.SkinIndex >= 0)
-                {
-                    BoundingBox visibleWorldBounds = mesh.Bounds.Transform(modelMatrix);
-                    Vector3 visibleMeshCenter = (visibleWorldBounds.Min + visibleWorldBounds.Max) * 0.5f;
-                    Info($"[Frame {_frameCount}] >>> VISIBLE skinned mesh <<<");
-                    Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
-                    Info($"  Mesh center: {visibleMeshCenter}");
-                    Info($"  Camera pos: {state.camera.EyePos}");
-                    Info($"  Bounds: Min={visibleWorldBounds.Min}, Max={visibleWorldBounds.Max}");
-                }
 
                 // Track rendering statistics
                 state.totalVertices += mesh.VertexCount;
@@ -1212,22 +1166,10 @@ public static unsafe partial class GltfViewer
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
-                // LOG: Track which meshes are being rendered (only for first 3 frames)
-                if (_frameCount < 3 && mesh.SkinIndex >= 0)
-                {
-                    Info($"[Frame {_frameCount}] Rendering skinned mesh (SkinIndex={mesh.SkinIndex}, HasSkinning={mesh.HasSkinning})");
-                    Info($"  Characters.Count={state.model.Characters.Count}, animator={state.animator != null}");
-                    Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
-                }
-
                 // Use skinning if mesh has it and character exists (multi-character) or legacy animator exists
                 bool useSkinning = mesh.HasSkinning && (state.model.Characters.Count > 0 || state.animator != null);
                 bool useMorphing = mesh.HasMorphTargets;
                 
-                if (_frameCount < 3 && mesh.SkinIndex >= 0)
-                {
-                    Info($"  useSkinning={useSkinning}, useMorphing={useMorphing}");
-                }
                 
                 // Check if mesh uses 32-bit indices (based on IndexType field)
                 bool needs32BitIndices = (mesh.IndexType == sg_index_type.SG_INDEXTYPE_UINT32);
@@ -1570,7 +1512,6 @@ public static unsafe partial class GltfViewer
 
         sg_commit();
 
-        _frameCount++;  // Increment frame counter
     }
 
     private static unsafe void PerformBloomPasses(int screenWidth, int screenHeight)

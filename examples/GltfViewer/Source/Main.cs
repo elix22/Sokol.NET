@@ -268,8 +268,6 @@ public static unsafe partial class GltfViewer
     static _state state = new _state();
     static bool _loggedMeshInfoOnce = false;  // Debug flag for mesh info
     static bool _loggedTransmissionDebug = false;  // Debug flag for transmission info
-    static int _frameCount = 0;  // Frame counter for debugging
-
 
     [UnmanagedCallersOnly]
     private static unsafe void Init()
