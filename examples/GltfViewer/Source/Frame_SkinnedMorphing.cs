@@ -24,8 +24,8 @@ public static unsafe partial class GltfViewer
         // Vertex shader uniforms
         skinning_morphing_vs_params_t vsParams = new skinning_morphing_vs_params_t();
         vsParams.model = modelMatrix;
-        vsParams.view_proj = state.camera.ViewProj;
-        vsParams.eye_pos = state.camera.EyePos;
+        vsParams.view_proj = state.GetViewProjMatrix();
+        vsParams.eye_pos = state.GetEyePosition();
 
         // Copy bone matrices
         var boneMatrices = state.animator.GetFinalBoneMatrices();

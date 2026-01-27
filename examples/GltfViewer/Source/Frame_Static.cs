@@ -23,8 +23,8 @@ public static unsafe partial class GltfViewer
         // Vertex shader uniforms
         vs_params_t vsParams = new vs_params_t();
         vsParams.model = modelMatrix;
-        vsParams.view_proj = state.camera.ViewProj;
-        vsParams.eye_pos = state.camera.EyePos;
+        vsParams.view_proj = state.GetViewProjMatrix();
+        vsParams.eye_pos = state.GetEyePosition();
 
         sg_apply_pipeline(pipeline);
         sg_apply_uniforms(UB_vs_params, SG_RANGE(ref vsParams));

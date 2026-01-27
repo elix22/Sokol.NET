@@ -41,8 +41,55 @@ public static unsafe partial class GltfViewer
             return; // Don't pass to camera
         }
 
-        // Camera handles all input events including keyboard and touch
-        state.camera.HandleEvent(e);
+        // Handle camera input based on active camera type
+        if (state.usingGltfCamera && state.gltfCamera != null)
+        {
+            // === GltfCamera Input ===
+            
+            // Mouse drag - free-look rotation
+            if (e->type == sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE)
+            {
+                if (e->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
+                {
+                    state.gltfCamera.Rotate(e->mouse_dx, -e->mouse_dy);
+                }
+            }
+            
+            // Keyboard - free movement
+            float dt = (float)sapp_frame_duration();
+            
+            if (e->type == sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN || 
+                e->type == sapp_event_type.SAPP_EVENTTYPE_CHAR)
+            {
+                switch (e->key_code)
+                {
+                    case sapp_keycode.SAPP_KEYCODE_W:
+                        state.gltfCamera.MoveForward(dt);
+                        break;
+                    case sapp_keycode.SAPP_KEYCODE_S:
+                        state.gltfCamera.MoveForward(-dt);
+                        break;
+                    case sapp_keycode.SAPP_KEYCODE_A:
+                        state.gltfCamera.MoveRight(-dt);
+                        break;
+                    case sapp_keycode.SAPP_KEYCODE_D:
+                        state.gltfCamera.MoveRight(dt);
+                        break;
+                    case sapp_keycode.SAPP_KEYCODE_Q:
+                        state.gltfCamera.MoveUp(-dt);
+                        break;
+                    case sapp_keycode.SAPP_KEYCODE_E:
+                        state.gltfCamera.MoveUp(dt);
+                        break;
+                }
+            }
+        }
+        else
+        {
+            // === Orbit Camera Input ===
+            // Camera handles all input events including keyboard and touch
+            state.camera.HandleEvent(e);
+        }
 
         // After camera processes touch, check if 2-finger touch is active and handle model rotation
         if (e->type == sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED && 

@@ -733,102 +733,51 @@ public static unsafe partial class GltfViewer
             bool usedGltfCamera = false;
             if (state.model?.ModelRoot?.LogicalCameras?.Count > 0)
             {
-                var gltfCamera = state.model.ModelRoot.LogicalCameras[0];
-                var cameraSettings = gltfCamera.Settings;
+                var gltfCameraDefinition = state.model.ModelRoot.LogicalCameras[0];
                 
-                if (cameraSettings != null)
+                Info($"[Camera] Using glTF camera: {gltfCameraDefinition.Name ?? "Unnamed"}");
+                
+                // Find the node that contains this camera
+                SharpGLTF.Schema2.Node? cameraNode = null;
+                foreach (var node in state.model.ModelRoot.LogicalNodes)
                 {
-                    Info($"[Camera] Using glTF camera: {gltfCamera.Name ?? "Unnamed"}");
-                    
-                    // Find the node that contains this camera
-                    SharpGLTF.Schema2.Node? cameraNode = null;
-                    foreach (var node in state.model.ModelRoot.LogicalNodes)
+                    if (node.Camera == gltfCameraDefinition)
                     {
-                        if (node.Camera == gltfCamera)
-                        {
-                            cameraNode = node;
-                            break;
-                        }
+                        cameraNode = node;
+                        break;
+                    }
+                }
+                
+                if (cameraNode != null)
+                {
+                    // Extract world transform from camera node
+                    var worldMatrix = cameraNode.WorldMatrix;
+                    Matrix4x4.Decompose(worldMatrix, out var scale, out var rotation, out var position);
+                    
+                    // Get camera parameters
+                    float fov = 60.0f;  // Default
+                    float camNearZ = 0.01f;
+                    float camFarZ = 1000.0f;
+                    
+                    var camSettings = gltfCameraDefinition.Settings;
+                    if (camSettings is SharpGLTF.Schema2.CameraPerspective perspective)
+                    {
+                        // Convert vertical FOV from radians to degrees
+                        fov = perspective.VerticalFOV * (180.0f / MathF.PI);
+                        camNearZ = perspective.ZNear;
+                        camFarZ = float.IsPositiveInfinity(perspective.ZFar) ? camFarZ : perspective.ZFar;
                     }
                     
-                    if (cameraNode != null)
-                    {
-                        var worldMatrix = cameraNode.WorldMatrix;
-                        Matrix4x4.Decompose(worldMatrix, out var scale, out var rotation, out var cameraPosition);
-                        
-                        
-                        // Extract basis vectors from world matrix
-                        // In glTF, cameras look down -Z axis in their local space
-                        Vector3 right = new Vector3(worldMatrix.M11, worldMatrix.M21, worldMatrix.M31);
-                        Vector3 up = new Vector3(worldMatrix.M12, worldMatrix.M22, worldMatrix.M32);
-                        Vector3 back = new Vector3(worldMatrix.M13, worldMatrix.M23, worldMatrix.M33);
-                        
-                        // Camera forward direction from glTF world matrix
-                        Vector3 forward = back;
-                        
-                        // Calculate look-at point to match Unity reference (60° FOV)
-                        float lookDistance = 0.001f;
-                        Vector3 lookAt = cameraPosition + forward * lookDistance;
-                        
-                        Info($"[Camera] World Matrix basis vectors:");
-                        Info($"  Right: {right}");
-                        Info($"  Up: {up}");
-                        Info($"  Back (Z): {back}");
-                        Info($"  Forward: {forward}");
-                        Info($"[Camera] Position: {cameraPosition}, LookAt: {lookAt}");
-                        
-                        // Get near/far plane values based on camera settings
-                        float camNear = nearZ;  // Fallback
-                        float camFar = farZ;    // Fallback
-                        
-                        // Access camera settings through public API
-                        var camSettings = gltfCamera.Settings;
-                        if (camSettings != null)
-                        {
-                            // Try to cast to specific camera types
-                            if (camSettings is SharpGLTF.Schema2.CameraPerspective perspective)
-                            {
-                                camNear = perspective.ZNear;
-                                camFar = float.IsPositiveInfinity(perspective.ZFar) ? farZ : perspective.ZFar;
-                            }
-                            else if (camSettings is SharpGLTF.Schema2.CameraOrthographic orthographic)
-                            {
-                                camNear = orthographic.ZNear;
-                                camFar = orthographic.ZFar;
-                            }
-                        }
-                        
-                        Info($"[Camera] Position: {cameraPosition}, LookAt: {lookAt}");
-                        Info($"[Camera] Near: {camNear}, Far: {camFar}");
-                        
-                        // Calculate latitude and longitude from forward direction for orbit camera
-                        // This allows WASD controls to work correctly
-                        Vector3 toLookAt = Vector3.Normalize(lookAt - cameraPosition);
-                        float distance = Vector3.Distance(cameraPosition, lookAt);
-                        
-                        // Calculate spherical coordinates (latitude/longitude) from direction vector
-                        // Latitude: angle from horizontal plane (asin of Y component)
-                        // Longitude: angle in horizontal plane (atan2 of X, Z components)
-                        float latitude = MathF.Asin(toLookAt.Y) * 180.0f / MathF.PI;
-                        float longitude = MathF.Atan2(toLookAt.X, toLookAt.Z) * 180.0f / MathF.PI;
-                        
-                        Info($"[Camera] Orbit setup - Distance: {distance:F2}, Latitude: {latitude:F2}°, Longitude: {longitude:F2}°");
-                        
-                        state.camera.Init(new CameraDesc()
-                        {
-                            Aspect = 60.0f,
-                            NearZ = camNear,
-                            FarZ = camFar,
-                            Center = lookAt,
-                            Distance = distance,
-                            Latitude = latitude,
-                            Longitude = longitude,
-                        });
-                        
-                        state.camera.Center = lookAt;
-                        usedGltfCamera = true;
-                        Info($"[Camera] Successfully initialized from glTF camera");
-                    }
+                    // Create and initialize GltfCamera
+                    state.gltfCamera = new GltfCamera();
+                    state.gltfCamera.Init(position, rotation, fov, camNearZ, camFarZ);
+                    state.gltfCamera.AspectRatio = (float)fb_width / (float)fb_height;
+                    state.usingGltfCamera = true;
+                    usedGltfCamera = true;
+                    
+                    Info($"[Camera] Initialized glTF camera at position: {position}");
+                    Info($"[Camera] FOV: {fov:F2}°, Near: {camNearZ}, Far: {camFarZ}");
+                    Info($"[Camera] Forward: {state.gltfCamera.Forward}");
                 }
             }
             
@@ -847,6 +796,7 @@ public static unsafe partial class GltfViewer
                     Latitude = 10.0f,
                     Longitude = 0.0f,
                 });
+                state.usingGltfCamera = false;
             }
 
             // Only apply automatic camera adjustments if not using glTF camera
@@ -874,7 +824,17 @@ public static unsafe partial class GltfViewer
 
         // Update camera (handles WASD movement internally)
         float deltaTime = (float)sapp_frame_duration();
-        state.camera.Update(fb_width, fb_height, state.cameraInitialized ? deltaTime : 0.0f);
+        
+        if (state.usingGltfCamera && state.gltfCamera != null)
+        {
+            // Update aspect ratio for GltfCamera
+            state.gltfCamera.AspectRatio = (float)fb_width / (float)fb_height;
+        }
+        else
+        {
+            // Update orbit camera
+            state.camera.Update(fb_width, fb_height, state.cameraInitialized ? deltaTime : 0.0f);
+        }
 
         // NEW: Update all characters independently (multi-character support)
         if (state.model != null && state.model.Characters.Count > 0)
@@ -1055,7 +1015,23 @@ public static unsafe partial class GltfViewer
             state.totalFaces = 0;
 
             // Calculate view-projection matrix for frustum culling
-            Matrix4x4 viewProjection = state.camera.ViewProj;
+            Matrix4x4 viewProjection;
+            Vector3 eyePos;
+            
+            if (state.usingGltfCamera && state.gltfCamera != null)
+            {
+                // Get matrices from GltfCamera
+                Matrix4x4 viewMatrix = state.gltfCamera.GetViewMatrix();
+                Matrix4x4 projMatrix = state.gltfCamera.GetProjectionMatrix();
+                viewProjection = viewMatrix * projMatrix;
+                eyePos = state.gltfCamera.Position;
+            }
+            else
+            {
+                // Get matrices from orbit camera
+                viewProjection = state.camera.ViewProj;
+                eyePos = state.camera.EyePos;
+            }
 
             // Separate nodes into opaque, transparent (blend), and transmissive (glass) lists
             // This matches the glTF Sample Viewer's classification:
@@ -1131,7 +1107,7 @@ public static unsafe partial class GltfViewer
                 // Use the center of the mesh's bounding box
                 BoundingBox worldBounds = mesh.Bounds.Transform(modelMatrix);
                 Vector3 meshCenter = (worldBounds.Min + worldBounds.Max) * 0.5f;
-                float distanceToCamera = Vector3.Distance(meshCenter, state.camera.EyePos);
+                float distanceToCamera = Vector3.Distance(meshCenter, eyePos);
 
                 // Categorize nodes according to glTF Sample Viewer logic:
                 // - transmissiveNodes: has KHR_materials_transmission (regardless of alphaMode)

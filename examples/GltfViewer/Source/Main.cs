@@ -165,6 +165,8 @@ public static unsafe partial class GltfViewer
         public sg_color clear_color = new sg_color { r = 0.5f, g = 0.5f, b = 0.5f, a = 1.0f };
         public sg_pass_action pass_action;
         public Sokol.Camera camera = new Sokol.Camera();
+        public GltfCamera? gltfCamera = null;           // GltfCamera instance (null if not used)
+        public bool usingGltfCamera = false;            // Flag: true = use gltfCamera, false = use camera
         public SharpGltfModel? model;
         public SharpGltfAnimator? animator;
         public bool modelLoaded = false;
@@ -263,6 +265,35 @@ public static unsafe partial class GltfViewer
         // Physics system
         public PhysicsSystem? physicsSystem;
         public bool enablePhysics = true;
+        
+        // Helper methods to get camera matrices from active camera
+        public Matrix4x4 GetViewMatrix()
+        {
+            if (usingGltfCamera && gltfCamera != null)
+                return gltfCamera.GetViewMatrix();
+            return camera.View;
+        }
+        
+        public Matrix4x4 GetProjectionMatrix()
+        {
+            if (usingGltfCamera && gltfCamera != null)
+                return gltfCamera.GetProjectionMatrix();
+            return camera.Proj;
+        }
+        
+        public Matrix4x4 GetViewProjMatrix()
+        {
+            if (usingGltfCamera && gltfCamera != null)
+                return gltfCamera.GetViewMatrix() * gltfCamera.GetProjectionMatrix();
+            return camera.ViewProj;
+        }
+        
+        public Vector3 GetEyePosition()
+        {
+            if (usingGltfCamera && gltfCamera != null)
+                return gltfCamera.Position;
+            return camera.EyePos;
+        }
     }
 
     static _state state = new _state();

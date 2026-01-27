@@ -1128,17 +1128,41 @@ public static unsafe partial class GltfViewer
 
     static void DrawCameraInfoWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(200, 120), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(200, 150), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Camera Info", ref open, ImGuiWindowFlags.None))
         {
             state.ui.camera_info_open = open != 0;
 
-            igText($"Distance: {state.camera.Distance:F2}");
-            igText($"Latitude: {state.camera.Latitude:F2}");
-            igText($"Longitude: {state.camera.Longitude:F2}");
-            igText($"Center: ({state.camera.Center.X:F1}, {state.camera.Center.Y:F1}, {state.camera.Center.Z:F1})");
+            if (state.usingGltfCamera && state.gltfCamera != null)
+            {
+                igText("Type: glTF Free-Look");
+                igText($"Position:");
+                igText($"  ({state.gltfCamera.Position.X:F1}, {state.gltfCamera.Position.Y:F1}, {state.gltfCamera.Position.Z:F1})");
+                igText($"Forward:");
+                igText($"  ({state.gltfCamera.Forward.X:F2}, {state.gltfCamera.Forward.Y:F2}, {state.gltfCamera.Forward.Z:F2})");
+                igText($"FOV: {state.gltfCamera.Fov:F1}°");
+                
+                if (igButton("Switch to Orbit", Vector2.Zero))
+                {
+                    state.usingGltfCamera = false;
+                }
+            }
+            else
+            {
+                igText("Type: Orbit");
+                igText($"Distance: {state.camera.Distance:F2}");
+                igText($"Latitude: {state.camera.Latitude:F2}");
+                igText($"Longitude: {state.camera.Longitude:F2}");
+                igText($"Center:");
+                igText($"  ({state.camera.Center.X:F1}, {state.camera.Center.Y:F1}, {state.camera.Center.Z:F1})");
+                
+                if (state.gltfCamera != null && igButton("Switch to Free-Look", Vector2.Zero))
+                {
+                    state.usingGltfCamera = true;
+                }
+            }
         }
         igEnd();
     }

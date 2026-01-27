@@ -23,8 +23,8 @@ public static unsafe partial class GltfViewer
         // Vertex shader uniforms
         morphing_vs_params_t vsParams = new morphing_vs_params_t();
         vsParams.model = modelMatrix;
-        vsParams.view_proj = state.camera.ViewProj;
-        vsParams.eye_pos = state.camera.EyePos;
+        vsParams.view_proj = state.GetViewProjMatrix();
+        vsParams.eye_pos = state.GetEyePosition();
 
         // Set morph weights if mesh has morph targets
         if (mesh.HasMorphTargets && node.NodeIndex >= 0)

@@ -81,8 +81,8 @@ public static unsafe partial class GltfViewer
         // Vertex shader uniforms
         skinning_vs_params_t vsParams = new skinning_vs_params_t();
         vsParams.model = modelMatrix;
-        vsParams.view_proj = state.camera.ViewProj;
-        vsParams.eye_pos = state.camera.EyePos;
+        vsParams.view_proj = state.GetViewProjMatrix();
+        vsParams.eye_pos = state.GetEyePosition();
         vsParams.use_uniform_skinning = 0; // Flag for shader: 0=texture-based, 1=uniform-based
 
         // NO bone matrices here - they come from texture lookup in shader
@@ -270,8 +270,8 @@ public static unsafe partial class GltfViewer
         // Vertex shader parameters with bone matrices (UNIFORM-BASED: pass bone matrices via uniforms)
         skinning_vs_params_t vsParams = new skinning_vs_params_t();
         vsParams.model = modelMatrix;
-        vsParams.view_proj = state.camera.ViewProj;
-        vsParams.eye_pos = state.camera.EyePos;
+        vsParams.view_proj = state.GetViewProjMatrix();
+        vsParams.eye_pos = state.GetEyePosition();
         vsParams.use_uniform_skinning = 1; // Flag for shader: 1=uniform-based, 0=texture-based
 
         // Initialize bone matrices to identity (prevents malformed meshes when no skinning)
