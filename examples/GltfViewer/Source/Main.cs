@@ -30,6 +30,11 @@ public static unsafe partial class GltfViewer
     // Please check the license of each model before using it for commercial purposes!
     static readonly string[] availableModels = new string[]
     {
+        // "littlest_tokyo/LittleTokio.gltf" ,
+        // "AnimatedCube/glTF/AnimatedCube.gltf",
+        // "Physics/Jack/Jack.gltf",
+        // "Physics/JackWithCoin/SampleScene.gltf",
+        // "Physics/SubwaySurfers/TestScene.gltf",
         "Physics/SubwaySurfers/Scene_TrainWayRunner.gltf",
         "Physics/TriggerScene/Trigger.gltf",
         "Physics/UnityBouncingObjects/BouncingObjects.gltf",
@@ -204,7 +209,7 @@ public static unsafe partial class GltfViewer
         public int totalMeshes = 0;
         public int visibleMeshes = 0;
         public int culledMeshes = 0;
-        public bool enableFrustumCulling = true;
+        public bool enableFrustumCulling = false;  // TEMPORARILY DISABLED to debug Jack visibility
 
         // Rendering statistics
         public int totalVertices = 0;

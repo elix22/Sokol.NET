@@ -437,6 +437,62 @@ public static unsafe partial class GltfViewer
                             igSeparator();
                         }
                     }
+                    
+                    // ALSO show node animations if we have characters
+                    // Node animations are things like coin rotations that exist separately from character skeletal animations
+                    int nodeAnimCount = state.model.GetAnimationCount();
+                    if (nodeAnimCount > 0)
+                    {
+                        igSeparator();
+                        igSeparator();
+                        igTextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Node Animations");
+                        igText($"Total: {nodeAnimCount} animations");
+                        igText("(Coins, props, etc.)");
+                        
+                        if (nodeAnimCount > 1)
+                        {
+                            igSeparator();
+                            igText($"Current: {state.model.CurrentAnimationIndex + 1} of {nodeAnimCount}");
+                            
+                            if (igButton("<- Prev##node", new Vector2(80, 0)))
+                            {
+                                state.model.PreviousAnimation();
+                            }
+                            
+                            igSameLine(0, 5);
+                            
+                            if (igButton("Next ->##node", new Vector2(80, 0)))
+                            {
+                                state.model.NextAnimation();
+                            }
+                        }
+                        
+                        var currentNodeAnim = state.model.Animations[state.model.CurrentAnimationIndex];
+                        if (currentNodeAnim != null && state.animator != null)
+                        {
+                            igSeparator();
+                            igText($"Name: {currentNodeAnim.Name}");
+                            igText($"Nodes: {currentNodeAnim.GetBones().Count}");
+                            
+                            // Animation timing for node animations
+                            float duration = currentNodeAnim.GetDuration();
+                            float currentTime = state.animator.GetCurrentTime();
+                            float ticksPerSecond = currentNodeAnim.GetTicksPerSecond();
+                            float durationInSeconds = duration / ticksPerSecond;
+                            float currentTimeInSeconds = currentTime / ticksPerSecond;
+
+                            igText($"Time: {currentTimeInSeconds:F2}s / {durationInSeconds:F2}s");
+                            igText($"Progress: {(currentTime / duration * 100):F1}%%");
+                            
+                            // Animation speed slider
+                            igSeparator();
+                            float speed = state.animator.PlaybackSpeed;
+                            if (igSliderFloat("Speed##node", ref speed, 0.0f, 3.0f, "%.2f", ImGuiSliderFlags.None))
+                            {
+                                state.animator.PlaybackSpeed = speed;
+                            }
+                        }
+                    }
                 }
                 // Legacy single animator
                 else if (state.animator != null)

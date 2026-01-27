@@ -30,6 +30,11 @@ namespace Sokol
         private List<SharpGltfAnimation> Animations { get; }
         
         /// <summary>
+        /// Number of animations available for this character
+        /// </summary>
+        public int AnimationCount => Animations.Count;
+        
+        /// <summary>
         /// Current animation index
         /// </summary>
         public int CurrentAnimationIndex { get; private set; }
@@ -37,7 +42,19 @@ namespace Sokol
         /// <summary>
         /// The current animation for this character
         /// </summary>
-        public SharpGltfAnimation Animation => Animations[CurrentAnimationIndex];
+        public SharpGltfAnimation Animation
+        {
+            get
+            {
+                if (Animations.Count == 0)
+                {
+                    Error($"Character '{Name}' has no animations.");
+                    return null;
+                }
+                
+                return Animations[CurrentAnimationIndex];
+            }
+        }
         
         /// <summary>
         /// The animator that updates this character's bones
@@ -143,13 +160,24 @@ namespace Sokol
             UsesTextureSkinning = (boneCount >= AnimationConstants.MAX_BONES);
             
             // Each character gets its own animator instance
+            // If character has animations, use the first one; otherwise use null for bind pose
             Animator = new SharpGltfAnimator(
-                animations[0], 
+                animations.Count > 0 ? animations[0] : null, 
                 materialToMeshMap, 
                 nodes, 
                 boneCount,
                 boneInfoMap  // Pass character-specific bone info map
             );
+            
+            // Log character initialization
+            if (animations.Count > 0)
+            {
+                Info($"[Character] '{name}' initialized with animation '{animations[0].Name}' (Index 0/{animations.Count})", "Animation");
+            }
+            else
+            {
+                Info($"[Character] '{name}' initialized in bind pose (no animations)", "Animation");
+            }
             
             // Create joint matrix texture if this character uses texture-based skinning
             if (UsesTextureSkinning)

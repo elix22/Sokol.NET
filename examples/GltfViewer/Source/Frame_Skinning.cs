@@ -5,6 +5,7 @@ using Sokol;
 using static Sokol.SG;
 using static Sokol.Utils;
 using static Sokol.SApp;
+using static Sokol.SLog;
 using SharpGLTF.Schema2;
 using static pbr_shader_skinning_cs_skinning.Shaders;
 
@@ -63,6 +64,12 @@ public static unsafe partial class GltfViewer
         pbr_shader_cs.Shaders.light_params_t lightParams,
         bool useScreenTexture)
     {
+        // DEBUG: Log when rendering Jack
+        if (_frameCount < 30 && mesh.SkinIndex >= 0)
+        {
+            Info($"[Frame {_frameCount}] RenderSkinnedMesh_TextureBased called for SkinIndex={mesh.SkinIndex}");
+        }
+        
         // Find the character that owns this mesh (multi-character support)
         AnimatedCharacter? character = null;
         if (mesh.SkinIndex >= 0 && state.model != null)
@@ -264,6 +271,12 @@ public static unsafe partial class GltfViewer
         pbr_shader_cs.Shaders.light_params_t lightParams,
         bool useScreenTexture)
     {
+        // DEBUG: Log when rendering Jack
+        if (_frameCount < 30 && mesh.SkinIndex >= 0)
+        {
+            Info($"[Frame {_frameCount}] RenderSkinnedMesh_UniformBased called for SkinIndex={mesh.SkinIndex}");
+        }
+        
         // Vertex shader parameters with bone matrices (UNIFORM-BASED: pass bone matrices via uniforms)
         skinning_vs_params_t vsParams = new skinning_vs_params_t();
         vsParams.model = modelMatrix;
@@ -287,6 +300,16 @@ public static unsafe partial class GltfViewer
             if (mesh.SkinIndex >= 0 && state.model != null)
             {
                 character = state.model.Characters.FirstOrDefault(c => c.SkinIndex == mesh.SkinIndex);
+                
+                // DEBUG: Log character lookup result
+                if (_frameCount < 30)
+                {
+                    Info($"[UniformSkinning] Looking for character with SkinIndex={mesh.SkinIndex}, Found={character != null}");
+                    if (character != null)
+                    {
+                        Info($"[UniformSkinning] Character '{character.Name}' found, BoneCount={character.BoneCount}");
+                    }
+                }
             }
             
             // Get bone matrices from the correct character (or fallback to legacy animator)
@@ -294,16 +317,36 @@ public static unsafe partial class GltfViewer
             if (character != null)
             {
                 boneMatrices = character.GetBoneMatrices();
+                
+                // DEBUG: Log bone matrix retrieval
+                if (_frameCount < 30)
+                {
+                    Info($"[UniformSkinning] Got {boneMatrices.Length} bone matrices from character");
+                    if (boneMatrices.Length > 0)
+                    {
+                        Info($"[UniformSkinning] First bone matrix M41={boneMatrices[0].M41}, M42={boneMatrices[0].M42}, M43={boneMatrices[0].M43}");
+                    }
+                }
             }
             else if (state.animator != null)
             {
                 // LEGACY: Fallback to old single animator for backward compatibility
                 boneMatrices = state.animator.GetFinalBoneMatrices();
+                
+                if (_frameCount < 3)
+                {
+                    Info($"[UniformSkinning] Using legacy animator, got {boneMatrices.Length} bone matrices", "Render");
+                }
             }
             else
             {
                 // No animator found - matrices remain identity
                 boneMatrices = Array.Empty<Matrix4x4>();
+                
+                if (_frameCount < 3)
+                {
+                    Warning($"[UniformSkinning] NO ANIMATOR FOUND! Mesh will render in bind pose (invisible/wrong)", "Render");
+                }
             }
             
             // Copy to shader uniforms (limit to MAX_BONES capacity)

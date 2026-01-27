@@ -558,19 +558,29 @@ public static unsafe partial class GltfViewer
                 }
                 else if (state.model.Characters.Count > 0)
                 {
-                    // Multi-character model - characters manage their own animators
-                    state.animator = null;
-                    state.ui.animation_open = state.model.Animations.Count > 0;
-                    Info($"[SharpGLTF] Multi-character model with {state.model.Characters.Count} characters");
-                    
+                    // Multi-character model - characters manage their own animators for skeletal animation
+                    // BUT we still need state.animator for NODE animations (coins, props, etc.)
+                    // Create animator using the model's legacy Animations list (which includes node animations)
                     if (state.model.Animations.Count > 0)
                     {
-                        Info($"[SharpGLTF] {state.model.Animations.Count} animations available, managed by character animators");
+                        state.animator = new SharpGltfAnimator(state.model);
+                        
+                        // CRITICAL FIX: Set animator to first NODE animation (not character animation)
+                        // The Animations list contains: [0..N-1] = node animations, [N] = character wrapper
+                        // We want to animate the node animations (coins, props), not the character
+                        state.animator.SetAnimation(state.model.Animations[0]);
+                        
+                        Info($"[SharpGLTF] Multi-character model with {state.model.Characters.Count} characters");
+                        Info($"[SharpGLTF] Created animator for {state.model.Animations.Count} animations (coins, props, etc.)");
+                        Info($"[SharpGLTF] Set animator to first node animation: '{state.model.Animations[0].Name}'");
                     }
                     else
                     {
-                        Info("[SharpGLTF] No animations found in model");
+                        state.animator = null;
+                        Info($"[SharpGLTF] Multi-character model with {state.model.Characters.Count} characters, no node animations");
                     }
+                    
+                    state.ui.animation_open = state.model.Animations.Count > 0;
                 }
                 else
                 {
@@ -719,28 +729,142 @@ public static unsafe partial class GltfViewer
             
             Info($"Camera NearZ: {nearZ:F6}, FarZ: {farZ:F2}");
 
-            state.camera.Init(new CameraDesc()
+            // Check if glTF scene has a camera and use its properties
+            bool usedGltfCamera = false;
+            if (state.model?.ModelRoot?.LogicalCameras?.Count > 0)
             {
-                Aspect = 60.0f,
-                NearZ = nearZ,
-                FarZ = farZ,
-                Center = new Vector3(0.0f, 1.0f, 0.0f),
-                Distance = 3.0f,
-                Latitude = 10.0f,
-                Longitude = 0.0f,
-            });
-
-            if (state.isMixamoModel && state.modelBounds.Radius < 0.1f)
-            {
-                state.camera.Center = state.modelBounds.Center * 100.0f + new Vector3(0, 1, 0);
+                var gltfCamera = state.model.ModelRoot.LogicalCameras[0];
+                var cameraSettings = gltfCamera.Settings;
+                
+                if (cameraSettings != null)
+                {
+                    Info($"[Camera] Using glTF camera: {gltfCamera.Name ?? "Unnamed"}");
+                    
+                    // Find the node that contains this camera
+                    SharpGLTF.Schema2.Node? cameraNode = null;
+                    foreach (var node in state.model.ModelRoot.LogicalNodes)
+                    {
+                        if (node.Camera == gltfCamera)
+                        {
+                            cameraNode = node;
+                            break;
+                        }
+                    }
+                    
+                    if (cameraNode != null)
+                    {
+                        var worldMatrix = cameraNode.WorldMatrix;
+                        Matrix4x4.Decompose(worldMatrix, out var scale, out var rotation, out var cameraPosition);
+                        
+                        
+                        // Extract basis vectors from world matrix
+                        // In glTF, cameras look down -Z axis in their local space
+                        Vector3 right = new Vector3(worldMatrix.M11, worldMatrix.M21, worldMatrix.M31);
+                        Vector3 up = new Vector3(worldMatrix.M12, worldMatrix.M22, worldMatrix.M32);
+                        Vector3 back = new Vector3(worldMatrix.M13, worldMatrix.M23, worldMatrix.M33);
+                        
+                        // Camera forward direction from glTF world matrix
+                        Vector3 forward = back;
+                        
+                        // Calculate look-at point to match Unity reference (60° FOV)
+                        float lookDistance = 0.001f;
+                        Vector3 lookAt = cameraPosition + forward * lookDistance;
+                        
+                        Info($"[Camera] World Matrix basis vectors:");
+                        Info($"  Right: {right}");
+                        Info($"  Up: {up}");
+                        Info($"  Back (Z): {back}");
+                        Info($"  Forward: {forward}");
+                        Info($"[Camera] Position: {cameraPosition}, LookAt: {lookAt}");
+                        
+                        // Get near/far plane values based on camera settings
+                        float camNear = nearZ;  // Fallback
+                        float camFar = farZ;    // Fallback
+                        
+                        // Access camera settings through public API
+                        var camSettings = gltfCamera.Settings;
+                        if (camSettings != null)
+                        {
+                            // Try to cast to specific camera types
+                            if (camSettings is SharpGLTF.Schema2.CameraPerspective perspective)
+                            {
+                                camNear = perspective.ZNear;
+                                camFar = float.IsPositiveInfinity(perspective.ZFar) ? farZ : perspective.ZFar;
+                            }
+                            else if (camSettings is SharpGLTF.Schema2.CameraOrthographic orthographic)
+                            {
+                                camNear = orthographic.ZNear;
+                                camFar = orthographic.ZFar;
+                            }
+                        }
+                        
+                        Info($"[Camera] Position: {cameraPosition}, LookAt: {lookAt}");
+                        Info($"[Camera] Near: {camNear}, Far: {camFar}");
+                        
+                        // Calculate latitude and longitude from forward direction for orbit camera
+                        // This allows WASD controls to work correctly
+                        Vector3 toLookAt = Vector3.Normalize(lookAt - cameraPosition);
+                        float distance = Vector3.Distance(cameraPosition, lookAt);
+                        
+                        // Calculate spherical coordinates (latitude/longitude) from direction vector
+                        // Latitude: angle from horizontal plane (asin of Y component)
+                        // Longitude: angle in horizontal plane (atan2 of X, Z components)
+                        float latitude = MathF.Asin(toLookAt.Y) * 180.0f / MathF.PI;
+                        float longitude = MathF.Atan2(toLookAt.X, toLookAt.Z) * 180.0f / MathF.PI;
+                        
+                        Info($"[Camera] Orbit setup - Distance: {distance:F2}, Latitude: {latitude:F2}°, Longitude: {longitude:F2}°");
+                        
+                        state.camera.Init(new CameraDesc()
+                        {
+                            Aspect = 60.0f,
+                            NearZ = camNear,
+                            FarZ = camFar,
+                            Center = lookAt,
+                            Distance = distance,
+                            Latitude = latitude,
+                            Longitude = longitude,
+                        });
+                        
+                        state.camera.Center = lookAt;
+                        usedGltfCamera = true;
+                        Info($"[Camera] Successfully initialized from glTF camera");
+                    }
+                }
             }
-             else{
-                state.camera.Center = state.modelBounds.Center;
-             }
             
-            state.camera.Distance = bestDistance;
-            state.camera.Latitude = 0.0f;
-            state.camera.Longitude = 0.0f;
+            // Fallback to automatic camera positioning if no glTF camera found
+            if (!usedGltfCamera)
+            {
+                Info($"[Camera] No glTF camera found, using automatic positioning");
+                
+                state.camera.Init(new CameraDesc()
+                {
+                    Aspect = 60.0f,
+                    NearZ = nearZ,
+                    FarZ = farZ,
+                    Center = new Vector3(0.0f, 1.0f, 0.0f),
+                    Distance = 3.0f,
+                    Latitude = 10.0f,
+                    Longitude = 0.0f,
+                });
+            }
+
+            // Only apply automatic camera adjustments if not using glTF camera
+            if (!usedGltfCamera)
+            {
+                if (state.isMixamoModel && state.modelBounds.Radius < 0.1f)
+                {
+                    state.camera.Center = state.modelBounds.Center * 100.0f + new Vector3(0, 1, 0);
+                }
+                else
+                {
+                    state.camera.Center = state.modelBounds.Center;
+                }
+                
+                state.camera.Distance = bestDistance;
+                state.camera.Latitude = 0.0f;
+                state.camera.Longitude = 0.0f;
+            }
 
             state.cameraInitialized = true;
 
@@ -760,6 +884,14 @@ public static unsafe partial class GltfViewer
             foreach (var character in state.model.Characters)
             {
                 character.Update(deltaTime);
+            }
+            
+            // NEW: Also update node animations (coins, props, etc.) using legacy animator
+            // When characters exist, we still need to animate non-skinned nodes (coins, etc.)
+            // The legacy animator handles this - it updates transforms for non-skinned nodes
+            if (state.animator != null)
+            {
+                state.animator.UpdateAnimation(deltaTime);
             }
             
             // Update light positions from animated nodes
@@ -935,6 +1067,11 @@ public static unsafe partial class GltfViewer
             List<(SharpGltfNode node, Matrix4x4 transform, float distance)> transmissiveNodes = new List<(SharpGltfNode, Matrix4x4, float)>();
                 
             // Collect and categorize all visible nodes
+            if (_frameCount < 3)
+            {
+                Info($"[Frame {_frameCount}] Starting node collection loop - Total nodes: {state.model.Nodes.Count}");
+            }
+            
             foreach (var node in state.model.Nodes)
             {
                 // Skip nodes without meshes (e.g., bone nodes, empty transforms)
@@ -943,6 +1080,12 @@ public static unsafe partial class GltfViewer
 
                 var mesh = state.model.Meshes[node.MeshIndex];
                 state.totalMeshes++;
+
+                // LOG: Track skinned meshes during collection (first 3 frames only)
+                if (_frameCount < 3 && mesh.SkinIndex >= 0)
+                {
+                    Info($"[Frame {_frameCount}] Found skinned mesh - NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}, SkinIndex={mesh.SkinIndex}, HasSkinning={mesh.HasSkinning}");
+                }
 
                 // Use the world transform from node hierarchy
                 // For non-skinned animated nodes: updated by animator via SetLocalTransform()
@@ -961,20 +1104,84 @@ public static unsafe partial class GltfViewer
                 }
                 else
                 {
-                    // Both animated and static nodes use the same transform
-                    // nodeTransform is the world transform (calculated through hierarchy)
-                    // which is in model-local space and needs the user's model transform applied
-                    modelMatrix = nodeTransform * model;
+                    // SKINNED MESH FIX: For skinned meshes, bone matrices transform vertices from
+                    // mesh-local space to world space (offset * globalTransform). The shader then
+                    // applies modelMatrix: "pos = model * skinnedPosition". Since bone matrices
+                    // already produce world-space positions, we only need the user's rotation/centering
+                    // transform in modelMatrix (NOT the node hierarchy transform which is in the bones).
+                    if (mesh.HasSkinning && node.Parent != null)
+                    {
+                        // For skinned meshes: use ONLY the user's model centering/rotation, not node transform
+                        // Node transform is already baked into bone matrices via globalTransformation
+                        modelMatrix = model;
+                        
+                        // DEBUG: Detailed transform debugging for Jack
+                        if (_frameCount < 28 && node.Parent.NodeName != null && node.Parent.NodeName.Contains("Jack"))
+                        {
+                            Vector3 worldPosition = new Vector3(nodeTransform.M41, nodeTransform.M42, nodeTransform.M43);
+                            Info($"[DEBUG Jack] === SKINNED MESH TRANSFORM ===");
+                            Info($"[DEBUG Jack] Mesh node: {node.NodeName}");
+                            Info($"[DEBUG Jack] Parent node (Jack): {node.Parent.NodeName}");
+                            Info($"[DEBUG Jack] Jack's GLTF Position: {node.Parent.Position}");
+                            Info($"[DEBUG Jack] Node world position: {worldPosition}");
+                            Info($"[DEBUG Jack] Model matrix (user rotation/centering): {model}");
+                            Info($"[DEBUG Jack] Final modelMatrix = model (ignoring node transform): {modelMatrix}");
+                            Info($"[DEBUG Jack] NOTE: Bone matrices already contain world transform");
+                            Info($"[DEBUG Jack] === END ===");
+                        }
+                    }
+                    else
+                    {
+                        // Both animated and static nodes use the same transform
+                        // nodeTransform is the world transform (calculated through hierarchy)
+                        // which is in model-local space and needs the user's model transform applied
+                        modelMatrix = nodeTransform * model;
+                    }
+                }
+
+                // LOG: Check all skinned meshes before culling
+                if (_frameCount < 30 && mesh.SkinIndex >= 0)
+                {
+                    BoundingBox preCheckBounds = mesh.Bounds.Transform(modelMatrix);
+                    Vector3 preCheckCenter = (preCheckBounds.Min + preCheckBounds.Max) * 0.5f;
+                    Info($"[Frame {_frameCount}] Found skinned mesh - NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}, SkinIndex={mesh.SkinIndex}");
+                    Info($"  Pre-culling check - Mesh center: {preCheckCenter}");
+                    Info($"  Camera pos: {state.camera.EyePos}");
+                    Info($"  Frustum culling enabled: {state.enableFrustumCulling}");
                 }
 
                 // FRUSTUM CULLING: Check if mesh is visible
                 if (state.enableFrustumCulling && !mesh.IsVisible(modelMatrix, viewProjection))
                 {
                     state.culledMeshes++;
+                    
+                    // LOG: Track if Jack's mesh is being culled
+                    if (_frameCount < 30 && mesh.SkinIndex >= 0)
+                    {
+                        BoundingBox culledWorldBounds = mesh.Bounds.Transform(modelMatrix);
+                        Vector3 culledMeshCenter = (culledWorldBounds.Min + culledWorldBounds.Max) * 0.5f;
+                        Info($"[Frame {_frameCount}] >>> CULLED skinned mesh <<<");
+                        Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
+                        Info($"  Mesh center: {culledMeshCenter}");
+                        Info($"  Camera pos: {state.camera.EyePos}");
+                        Info($"  Bounds: Min={culledWorldBounds.Min}, Max={culledWorldBounds.Max}");
+                    }
                     continue;  // Skip this mesh
                 }
 
                 state.visibleMeshes++;
+                
+                // LOG: Track Jack's mesh position when visible
+                if (_frameCount < 30 && mesh.SkinIndex >= 0)
+                {
+                    BoundingBox visibleWorldBounds = mesh.Bounds.Transform(modelMatrix);
+                    Vector3 visibleMeshCenter = (visibleWorldBounds.Min + visibleWorldBounds.Max) * 0.5f;
+                    Info($"[Frame {_frameCount}] >>> VISIBLE skinned mesh <<<");
+                    Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
+                    Info($"  Mesh center: {visibleMeshCenter}");
+                    Info($"  Camera pos: {state.camera.EyePos}");
+                    Info($"  Bounds: Min={visibleWorldBounds.Min}, Max={visibleWorldBounds.Max}");
+                }
 
                 // Track rendering statistics
                 state.totalVertices += mesh.VertexCount;
@@ -1020,9 +1227,22 @@ public static unsafe partial class GltfViewer
             {
                 var mesh = state.model.Meshes[node.MeshIndex];
 
+                // LOG: Track which meshes are being rendered (only for first 3 frames)
+                if (_frameCount < 3 && mesh.SkinIndex >= 0)
+                {
+                    Info($"[Frame {_frameCount}] Rendering skinned mesh (SkinIndex={mesh.SkinIndex}, HasSkinning={mesh.HasSkinning})");
+                    Info($"  Characters.Count={state.model.Characters.Count}, animator={state.animator != null}");
+                    Info($"  NodeIndex={node.NodeIndex}, MeshIndex={node.MeshIndex}");
+                }
+
                 // Use skinning if mesh has it and character exists (multi-character) or legacy animator exists
                 bool useSkinning = mesh.HasSkinning && (state.model.Characters.Count > 0 || state.animator != null);
                 bool useMorphing = mesh.HasMorphTargets;
+                
+                if (_frameCount < 3 && mesh.SkinIndex >= 0)
+                {
+                    Info($"  useSkinning={useSkinning}, useMorphing={useMorphing}");
+                }
                 
                 // Check if mesh uses 32-bit indices (based on IndexType field)
                 bool needs32BitIndices = (mesh.IndexType == sg_index_type.SG_INDEXTYPE_UINT32);

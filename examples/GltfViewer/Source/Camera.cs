@@ -45,6 +45,7 @@ namespace Sokol
         private bool _keyUp = false;    // Arrow up
         private bool _keyDown = false;  // Arrow down
         private bool _keyShift = false;  // Speed boost
+        private bool _leftMouseButtonPressed = false;  // Track left mouse button state
         
         // Touch state for mobile
         private float _lastTouch1X = 0;  // 1-finger: camera orbit
@@ -54,7 +55,7 @@ namespace Sokol
         private float _lastTouch2Y = 0;
         private bool _touch2IsActive = false;
         
-        public float MoveSpeed { get; set; } = 1.0f;  // Units per second
+        public float MoveSpeed { get; set; } = 100.0f;  // Units per second
 
         // Public properties for camera modification
         public Vector3 Center { get => _desc.Center; set => _desc.Center = value; }
@@ -110,8 +111,8 @@ namespace Sokol
                 Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
                 Vector3 up = Vector3.Cross(right, forward);
 
-                // Handle WASD camera movement
-                if (deltaTime > 0.0f)
+                // Handle WASD camera movement (only when left mouse button is held)
+                if (deltaTime > 0.0f && _leftMouseButtonPressed)
                 {
                     float speedMultiplier = _keyShift ? 2.0f : 1.0f;
                     float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
@@ -150,8 +151,8 @@ namespace Sokol
             else
             {
                 // Orbit camera: rotate around center point
-                // Handle WASD camera movement
-                if (deltaTime > 0.0f)
+                // Handle WASD camera movement (only when left mouse button is held)
+                if (deltaTime > 0.0f && _leftMouseButtonPressed)
                 {
                     float speedMultiplier = _keyShift ? 2.0f : 1.0f;
                     float moveAmount = MoveSpeed * deltaTime * speedMultiplier;
@@ -234,6 +235,8 @@ namespace Sokol
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
                     {
+                        _leftMouseButtonPressed = true;
+                        
                         // Left click: Enable first-person rotation around world axis
                         // Save orbit state
                         _savedCenter = _desc.Center;
@@ -254,6 +257,8 @@ namespace Sokol
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
                     if (ev->mouse_button == sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT)
                     {
+                        _leftMouseButtonPressed = false;
+                        
                         // When returning to orbit mode from first-person:
                         // Keep the camera looking in the same direction
                         // Calculate where the Center should be based on current forward direction
