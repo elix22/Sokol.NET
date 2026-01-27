@@ -169,16 +169,6 @@ namespace Sokol
                 boneInfoMap  // Pass character-specific bone info map
             );
             
-            // Log character initialization
-            if (animations.Count > 0)
-            {
-                Info($"[Character] '{name}' initialized with animation '{animations[0].Name}' (Index 0/{animations.Count})", "Animation");
-            }
-            else
-            {
-                Info($"[Character] '{name}' initialized in bind pose (no animations)", "Animation");
-            }
-            
             // Create joint matrix texture if this character uses texture-based skinning
             if (UsesTextureSkinning)
             {
@@ -191,7 +181,6 @@ namespace Sokol
         /// </summary>
         public void Update(float dt)
         {
-            Info($"[Character] '{Name}' Update called: dt={dt:F4}", "Animation");
             Animator.UpdateAnimation(dt);
             
             // Reset the texture update flag at the start of each frame

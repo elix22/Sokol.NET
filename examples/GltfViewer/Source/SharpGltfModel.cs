@@ -1517,18 +1517,12 @@ namespace Sokol
             Dictionary<string, BoneInfo> characterBoneInfoMap)
         {
             Info($"========== ProcessAnimationsForCharacter '{characterName}' ==========", "SharpGLTF");
-            Info($"Character has {characterBoneInfoMap.Count} bones in bone map", "SharpGLTF");
-            Info($"Bone names: {string.Join(", ", characterBoneInfoMap.Keys.Take(10))}{(characterBoneInfoMap.Count > 10 ? "..." : "")}", "SharpGLTF");
-            
             var characterAnimations = new List<SharpGltfAnimation>();
             
             if (_model.LogicalAnimations.Count == 0)
             {
-                Info($"ProcessAnimationsForCharacter '{characterName}': No animations in model", "SharpGLTF");
                 return characterAnimations;
             }
-            
-            Info($"Processing {_model.LogicalAnimations.Count} animations from model", "SharpGLTF");
 
             // Build complete node hierarchy ONCE (shared for structure, not for bone data)
             SharpGltfNodeData rootNode = new SharpGltfNodeData
@@ -1553,7 +1547,6 @@ namespace Sokol
                 int ticksPerSecond = 1; // SharpGLTF uses seconds directly
                 
                 string animName = gltfAnimation.Name ?? $"Animation{characterAnimations.Count}";
-                Info($"  Processing animation {animIndex}: '{animName}' ({gltfAnimation.Channels.Count} channels)", "SharpGLTF");
                 
                 // Create animation using THIS CHARACTER'S bone map ONLY
                 var animation = new SharpGltfAnimation(duration, ticksPerSecond, rootNode, characterBoneInfoMap);
@@ -1564,23 +1557,9 @@ namespace Sokol
                 int nodeChannelCount = 0;
                 int skippedChannelCount = 0;
                 
-                Info($"  [Animation Processing] Animation '{animName}' has {gltfAnimation.Channels.Count} total channels", "SharpGLTF");
-                
                 foreach (var channel in gltfAnimation.Channels)
                 {
                     var targetNode = channel.TargetNode;
-                    
-                    if (targetNode != null)
-                    {
-                        Info($"  [Channel] Target: '{targetNode.Name}', Path: {channel.TargetNodePath}", "SharpGLTF");
-                        
-                        // Check sampler keyframe count
-                        var transSampler = channel.GetTranslationSampler();
-                        var rotSampler = channel.GetRotationSampler();
-                        var scaleSampler = channel.GetScaleSampler();
-                        
-                        Info($"    Samplers: T={transSampler != null}, R={rotSampler != null}, S={scaleSampler != null}", "SharpGLTF");
-                    }
                     
                     // Handle non-node targets (e.g., KHR_animation_pointer material properties)
                     if (targetNode == null)
@@ -1643,15 +1622,6 @@ namespace Sokol
                 if (boneChannelCount > 0)
                 {
                     characterAnimations.Add(animation);
-                    Info($"  ✓ ADDED animation '{animation.Name}': {boneChannelCount} bone channels, {nodeChannelCount} node channels, {skippedChannelCount} skipped", "SharpGLTF");
-                }
-                else if (nodeChannelCount > 0)
-                {
-                    Info($"  ⊘ SKIPPED node-only animation '{animation.Name}': 0 bone channels, {nodeChannelCount} node channels (not for skinned character)", "SharpGLTF");
-                }
-                else
-                {
-                    Info($"  ✗ SKIPPED animation '{animation.Name}': 0 matching channels, {skippedChannelCount} channels didn't match this character", "SharpGLTF");
                 }
                 
                 animIndex++;
@@ -1673,7 +1643,7 @@ namespace Sokol
                 return b.GetBones().Count.CompareTo(a.GetBones().Count);
             });
 
-            Info($"========== Character '{characterName}': Processed {characterAnimations.Count} animations ==========", "SharpGLTF");
+            Info($"Character '{characterName}': {characterAnimations.Count} animations", "SharpGLTF");
             return characterAnimations;
         }
 

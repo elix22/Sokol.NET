@@ -317,16 +317,6 @@ public static unsafe partial class GltfViewer
             if (character != null)
             {
                 boneMatrices = character.GetBoneMatrices();
-                
-                // DEBUG: Log bone matrix retrieval
-                if (_frameCount < 30)
-                {
-                    Info($"[UniformSkinning] Got {boneMatrices.Length} bone matrices from character");
-                    if (boneMatrices.Length > 0)
-                    {
-                        Info($"[UniformSkinning] First bone matrix M41={boneMatrices[0].M41}, M42={boneMatrices[0].M42}, M43={boneMatrices[0].M43}");
-                    }
-                }
             }
             else if (state.animator != null)
             {

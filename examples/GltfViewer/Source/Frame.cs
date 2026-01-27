@@ -879,7 +879,6 @@ public static unsafe partial class GltfViewer
         // NEW: Update all characters independently (multi-character support)
         if (state.model != null && state.model.Characters.Count > 0)
         {
-            Info($"[Frame] Updating {state.model.Characters.Count} characters, dt={deltaTime:F4}", "Animation");
             // Update each character's animation
             // Note: Each character manages its own joint matrix texture
             foreach (var character in state.model.Characters)

@@ -66,14 +66,6 @@ namespace Sokol
             Quaternion rotation = _rotationSampler?.GetPoint(animationTime) ?? Quaternion.Identity;
             Vector3 scale = _scaleSampler?.GetPoint(animationTime) ?? Vector3.One;
 
-            static void Info(string message) => Sokol.SLog.Info(message, "BoneUpdate");
-            
-            if (ID == 0) // Only log first bone
-            {
-                Info($"[Bone {ID} '{Name}'] Update: time={animationTime:F4}, samplers: T={_translationSampler != null}, R={_rotationSampler != null}, S={_scaleSampler != null}");
-                Info($"[Bone {ID}] Values: translation={translation}, rotation={rotation}, scale={scale}");
-            }
-
             Matrix4x4 translationMatrix = Matrix4x4.CreateTranslation(translation);
             Matrix4x4 rotationMatrix = Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(rotation));
             Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(scale);
