@@ -8,6 +8,12 @@ using static Imgui.ImguiNative;
 
 public static unsafe partial class GltfViewer
 {
+
+#if  __ANDROID__ ||  __IOS__ || WEB
+    static bool enableDumpToFile = false;
+#else
+    static bool enableDumpToFile = true;
+#endif
     static void DrawUI()
     {
         // Main menu bar
@@ -273,14 +279,15 @@ public static unsafe partial class GltfViewer
                     state.modelRotationY = 0.0f;
                     state.modelRotationX = 0.0f;
                 }
-
-                igSameLine(0, 10);
-                
-                if (igButton("Dump Model Info", Vector2.Zero))
+                if (enableDumpToFile)
                 {
-                    DumpModelInfoToLog();
+                    igSameLine(0, 10);
+
+                    if (igButton("Dump Model Info", Vector2.Zero))
+                    {
+                        DumpModelInfoToFile();
+                    }
                 }
-                
                 igSeparator();
                 
                 // Node Hierarchy Viewer

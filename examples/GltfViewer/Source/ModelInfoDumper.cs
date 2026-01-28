@@ -11,7 +11,7 @@ public static partial class GltfViewer
 {
     static StringBuilder dumpOutput = new StringBuilder();
     
-    static void DumpModelInfoToLog()
+    static void DumpModelInfoToFile()
     {
         if (state.model == null)
         {
