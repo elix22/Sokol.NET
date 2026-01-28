@@ -579,17 +579,18 @@ public static unsafe partial class GltfViewer
             hasContent = true;
         }
         
-        // Check for camera (nodes don't directly expose CameraIndex, check node name patterns)
-        if (node.NodeName != null && node.NodeName.ToLower().Contains("camera"))
+        // Check for camera
+        if (node.Camera != null)
         {
-            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "  > Camera");
+            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), $"  > Camera");
             hasContent = true;
         }
         
-        // Check for light (check node name patterns)
-        if (node.NodeName != null && (node.NodeName.ToLower().Contains("light") || node.NodeName.ToLower().Contains("lamp")))
+        // Check for light (KHR_lights_punctual extension)
+        if (node.PunctualLight != null)
         {
-            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "  > Light");
+            string lightType = node.PunctualLight.LightType.ToString();
+            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), $"  > Light: {lightType}");
             hasContent = true;
         }
         

@@ -31,6 +31,8 @@ namespace Sokol
         
         // Rendering properties
         public int MeshIndex = -1;  // Index into SharpGltfModel.Meshes
+        public SharpGLTF.Schema2.Camera? Camera = null;  // Reference to glTF camera if this node has one
+        public SharpGLTF.Schema2.PunctualLight? PunctualLight = null;  // Reference to glTF punctual light if this node has one
         public string? NodeName = null;  // Name of the original glTF node (for matching with animations)
         public bool HasAnimation = false;  // Pre-calculated flag to avoid expensive LINQ calls
         public bool IsSkinned = false;  // True if this node is part of a skin (bone hierarchy)

@@ -377,6 +377,8 @@ namespace Sokol
                         Rotation = rotation,
                         Scale = scale,
                         MeshIndex = primMeshIndex,
+                        Camera = node.Camera,  // Store camera reference if node has one
+                        PunctualLight = node.PunctualLight,  // Store punctual light reference if node has one
                         NodeName = node.Name,
                         HasAnimation = false,
                         IsSkinned = isSkinned,  // Mark if this is a skinned node
@@ -422,6 +424,8 @@ namespace Sokol
                         Rotation = rotation,
                         Scale = scale,
                         MeshIndex = -1,  // No mesh
+                        Camera = node.Camera,  // Store camera reference if node has one
+                        PunctualLight = node.PunctualLight,  // Store punctual light reference if node has one
                         NodeName = node.Name,
                         HasAnimation = false,
                         IsSkinned = isSkinned,  // Mark if this is a skinned node

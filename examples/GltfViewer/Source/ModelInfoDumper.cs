@@ -103,15 +103,16 @@ public static partial class GltfViewer
         }
         
         // Camera component
-        if (node.NodeName != null && node.NodeName.ToLower().Contains("camera"))
+        if (node.Camera != null)
         {
             dumpOutput.AppendLine($"{propIndent}│ ├─ Camera");
         }
         
         // Light component
-        if (node.NodeName != null && (node.NodeName.ToLower().Contains("light") || node.NodeName.ToLower().Contains("lamp")))
+        if (node.PunctualLight != null)
         {
-            dumpOutput.AppendLine($"{propIndent}│ ├─ Light");
+            string lightType = node.PunctualLight.LightType.ToString();
+            dumpOutput.AppendLine($"{propIndent}│ ├─ Light: {lightType}");
         }
         
         // Physics details
