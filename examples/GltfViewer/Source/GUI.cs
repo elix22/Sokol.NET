@@ -586,6 +586,76 @@ public static unsafe partial class GltfViewer
             hasContent = true;
         }
         
+        // Check for physics components using cached OMI_physics_body extension
+        if (node.PhysicsBody != null)
+        {
+            var physicsBodyExt = node.PhysicsBody;
+            
+            if (physicsBodyExt != null)
+            {
+                // Display motion type (rigidbody)
+                if (physicsBodyExt.Motion != null)
+                {
+                    string motionType = physicsBodyExt.Motion.Type?.ToUpper() ?? "DYNAMIC";
+                    var motionColor = motionType switch
+                    {
+                        "STATIC" => new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
+                        "KINEMATIC" => new Vector4(0.5f, 0.8f, 1.0f, 1.0f),
+                        _ => new Vector4(1.0f, 0.7f, 0.3f, 1.0f) // DYNAMIC
+                    };
+                    igTextColored(motionColor, $"  > Rigidbody [{motionType}]");
+                    
+                    if (physicsBodyExt.Motion.Mass.HasValue)
+                    {
+                        igSameLine(0, 5);
+                        igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), $"Mass: {physicsBodyExt.Motion.Mass.Value:F2}kg");
+                    }
+                    hasContent = true;
+                }
+                
+                // Display collider shape
+                if (physicsBodyExt.Collider != null && node.PhysicsShape != null)
+                {
+                    var shape = node.PhysicsShape;
+                    string shapeType = shape.Type?.ToUpper() ?? "UNKNOWN";
+                    igTextColored(new Vector4(0.5f, 1.0f, 0.7f, 1.0f), $"  > Collider [{shapeType}]");
+                        
+                    // Show shape-specific details
+                    if (shape.Box != null && shape.Box.Size != null && shape.Box.Size.Length == 3)
+                    {
+                        igSameLine(0, 5);
+                        igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), 
+                            $"Size: {shape.Box.Size[0]:F2} x {shape.Box.Size[1]:F2} x {shape.Box.Size[2]:F2}");
+                    }
+                    else if (shape.Sphere != null && shape.Sphere.Radius.HasValue)
+                    {
+                        igSameLine(0, 5);
+                        igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), 
+                            $"Radius: {shape.Sphere.Radius.Value:F2}");
+                    }
+                    else if (shape.Capsule != null)
+                    {
+                        igSameLine(0, 5);
+                        string details = "";
+                        if (shape.Capsule.Height.HasValue) details += $"H:{shape.Capsule.Height.Value:F2}";
+                        if (shape.Capsule.RadiusBottom.HasValue) details += $" R:{shape.Capsule.RadiusBottom.Value:F2}";
+                        if (!string.IsNullOrEmpty(details))
+                        {
+                            igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), details);
+                        }
+                    }
+                    hasContent = true;
+                }
+                
+                // Display trigger
+                if (physicsBodyExt.Trigger != null)
+                {
+                    igTextColored(new Vector4(1.0f, 0.5f, 1.0f, 1.0f), "  > Trigger");
+                    hasContent = true;
+                }
+            }
+        }
+        
         if (!hasContent)
         {
             igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1.0f), "  (Empty Node)");

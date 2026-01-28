@@ -40,6 +40,10 @@ namespace Sokol
         public IReadOnlyList<float>? NodeMorphWeights = null;  // Node-level morph weights (if any)
         public IReadOnlyList<float>? MeshMorphWeights = null;  // Mesh-level morph weights (fallback)
         
+        // Physics data (cached from OMI_physics_body extension at load time)
+        public OMI_physics_body? PhysicsBody = null;  // Cached physics body extension data
+        public OMI_physics_shape.PhysicsShape? PhysicsShape = null;  // Cached resolved shape (from document-level shapes array)
+        
         
         // ========================================================================
         // Properties - Local Transform (Parent Space)

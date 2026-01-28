@@ -953,6 +953,8 @@ public static unsafe partial class GltfViewer
         // Clear state BEFORE disposing (so rendering stops using it)
         state.model = null;
         state.animator = null;
+        state.modelRoot = null;  // Clear stored ModelRoot
+        state.physicsShapeExtension = null;  // Clear cached physics shape data
         state.modelLoaded = false;
         state.cameraInitialized = false;
         

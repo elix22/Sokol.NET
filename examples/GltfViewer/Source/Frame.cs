@@ -605,6 +605,10 @@ public static unsafe partial class GltfViewer
                 // Try to load physics from glTF if available
                 LoadPhysicsFromModel(state.pendingModelRoot);
 
+                // Store ModelRoot and physics shape extension for GUI access
+                state.modelRoot = state.pendingModelRoot;
+                state.physicsShapeExtension = PhysicsExtensionParser.ParsePhysicsShapeExtension(state.pendingModelRoot);
+
                 state.modelLoaded = true;
                 state.isLoadingModel = false;
                 state.pendingModelRoot = null;

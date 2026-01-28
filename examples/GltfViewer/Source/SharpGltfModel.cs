@@ -308,10 +308,10 @@ namespace Sokol
 
         private void ProcessNode(Node node, Matrix4x4 parentTransform, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap, Dictionary<Node, int> nodeIndexMap)
         {
-            ProcessNodeWithParent(node, null, meshMap, nodeIndexMap);
+            ProcessNodeWithParent(node, null, meshMap, nodeIndexMap, _model);
         }
         
-        private void ProcessNodeWithParent(Node node, SharpGltfNode? parentRenderNode, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap, Dictionary<Node, int> nodeIndexMap)
+        private void ProcessNodeWithParent(Node node, SharpGltfNode? parentRenderNode, Dictionary<SharpGLTF.Schema2.Mesh, int> meshMap, Dictionary<Node, int> nodeIndexMap, ModelRoot modelRoot)
         {
             // Get node's local transform from glTF node
             var localMatrix = node.LocalMatrix;
@@ -358,6 +358,19 @@ namespace Sokol
                         Meshes[primMeshIndex].SkinIndex = skinIndex;
                     }
                     
+                    // Cache physics data (parse body and resolve shape)
+                    var physicsBody = PhysicsExtensionParser.ParsePhysicsBodyExtension(node);
+                    OMI_physics_shape.PhysicsShape? resolvedShape = null;
+                    if (physicsBody?.Collider != null)
+                    {
+                        var physicsShapeExt = PhysicsExtensionParser.ParsePhysicsShapeExtension(modelRoot);
+                        if (physicsShapeExt?.Shapes != null && physicsBody.Collider.Shape >= 0 && 
+                            physicsBody.Collider.Shape < physicsShapeExt.Shapes.Length)
+                        {
+                            resolvedShape = physicsShapeExt.Shapes[physicsBody.Collider.Shape];
+                        }
+                    }
+                    
                     var renderNode = new SharpGltfNode
                     {
                         Position = position,
@@ -370,7 +383,9 @@ namespace Sokol
                         Parent = parentRenderNode,  // Set parent relationship
                         NodeIndex = nodeIndex,  // Store node index for morph weight animation lookup
                         NodeMorphWeights = nodeMorphWeights,  // Node-level weights
-                        MeshMorphWeights = meshMorphWeights   // Mesh-level weights (fallback)
+                        MeshMorphWeights = meshMorphWeights,  // Mesh-level weights (fallback)
+                        PhysicsBody = physicsBody,  // Cache physics body
+                        PhysicsShape = resolvedShape  // Cache resolved shape
                     };
                     Nodes.Add(renderNode);
                     
@@ -388,6 +403,19 @@ namespace Sokol
                 
                 if (hasChildren || mightBeAnimated)
                 {
+                    // Cache physics data (parse body and resolve shape)
+                    var physicsBody = PhysicsExtensionParser.ParsePhysicsBodyExtension(node);
+                    OMI_physics_shape.PhysicsShape? resolvedShape = null;
+                    if (physicsBody?.Collider != null)
+                    {
+                        var physicsShapeExt = PhysicsExtensionParser.ParsePhysicsShapeExtension(modelRoot);
+                        if (physicsShapeExt?.Shapes != null && physicsBody.Collider.Shape >= 0 && 
+                            physicsBody.Collider.Shape < physicsShapeExt.Shapes.Length)
+                        {
+                            resolvedShape = physicsShapeExt.Shapes[physicsBody.Collider.Shape];
+                        }
+                    }
+                    
                     currentRenderNode = new SharpGltfNode
                     {
                         Position = position,
@@ -398,7 +426,11 @@ namespace Sokol
                         HasAnimation = false,
                         IsSkinned = isSkinned,  // Mark if this is a skinned node
                         Parent = parentRenderNode,
-                        NodeIndex = nodeIndex  // Store even for transform-only nodes
+                        NodeIndex = nodeIndex,  // Store node index for animations
+                        NodeMorphWeights = nodeMorphWeights,
+                        MeshMorphWeights = meshMorphWeights,
+                        PhysicsBody = physicsBody,  // Cache physics body
+                        PhysicsShape = resolvedShape  // Cache resolved shape
                     };
                     Nodes.Add(currentRenderNode);
                 }
@@ -407,7 +439,7 @@ namespace Sokol
             // Recursively process children with proper parent
             foreach (var child in node.VisualChildren)
             {
-                ProcessNodeWithParent(child, currentRenderNode ?? parentRenderNode, meshMap, nodeIndexMap);
+                ProcessNodeWithParent(child, currentRenderNode ?? parentRenderNode, meshMap, nodeIndexMap, modelRoot);
             }
         }
 

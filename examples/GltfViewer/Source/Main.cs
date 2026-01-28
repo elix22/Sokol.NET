@@ -196,6 +196,12 @@ public static unsafe partial class GltfViewer
         public ModelRoot? pendingModelRoot = null;
         public SharpGLTF.Schema2.ModelRoot.AsyncSatelliteLoadState? asyncLoadState = null;
         public string? pendingModelPath = null;
+        
+        // Store the loaded ModelRoot for accessing glTF extensions (like physics)
+        public ModelRoot? modelRoot = null;
+        
+        // Cached physics shape extension (document-level, shared by all nodes)
+        public OMI_physics_shape? physicsShapeExtension = null;
 
         // Model rotation (middle mouse button)
         public float modelRotationX = 0.0f;     // Rotation around X-axis (vertical mouse movement)
