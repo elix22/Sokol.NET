@@ -954,6 +954,10 @@ public static unsafe partial class GltfViewer
         state.modelLoaded = false;
         state.cameraInitialized = false;
         
+        // Reset node hierarchy UI state
+        state.ui.selected_node_index = -1;
+        state.ui.node_open_state.Clear();
+        
         // Cleanup joint matrix texture if it exists
         if (state.jointMatrixTexture.id != 0)
         {

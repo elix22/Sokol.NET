@@ -420,7 +420,7 @@ public static unsafe partial class GltfViewer
         
         // Transform header with icon and color
         string transformSpace = state.ui.show_world_transforms ? "World" : "Local";
-        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"  🌐 {transformSpace} Transform:");
+        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"  [{transformSpace}] Transform:");
         
         // Position with color coding (cyan for X, green for Y, blue for Z)
         igText("    Position:");
@@ -451,14 +451,14 @@ public static unsafe partial class GltfViewer
         igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{scale.Z:F2}");
         
         // Content information with styled header
-        igTextColored(new Vector4(1.0f, 0.85f, 0.4f, 1.0f), "  📦 Content:");
+        igTextColored(new Vector4(1.0f, 0.85f, 0.4f, 1.0f), "  [Content]:");
         bool hasContent = false;
         
         // Check for mesh
         if (node.MeshIndex >= 0 && node.MeshIndex < state.model.Meshes.Count)
         {
             var mesh = state.model.Meshes[node.MeshIndex];
-            igTextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "    ▪ Mesh");
+            igTextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "    > Mesh");
             igSameLine(0, 5);
             igTextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"({mesh.VertexCount:N0} verts)");
             hasContent = true;
@@ -467,21 +467,21 @@ public static unsafe partial class GltfViewer
         // Check for camera (nodes don't directly expose CameraIndex, check node name patterns)
         if (node.NodeName != null && node.NodeName.ToLower().Contains("camera"))
         {
-            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "    ▪ Camera");
+            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "    > Camera");
             hasContent = true;
         }
         
         // Check for light (check node name patterns)
         if (node.NodeName != null && (node.NodeName.ToLower().Contains("light") || node.NodeName.ToLower().Contains("lamp")))
         {
-            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "    ▪ Light");
+            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "    > Light");
             hasContent = true;
         }
         
         // Check for physics (OMI_physics_body extension - check if node is skinned as proxy)
         if (node.IsSkinned)
         {
-            igTextColored(new Vector4(1.0f, 0.6f, 0.4f, 1.0f), "    ▪ Skinned Mesh");
+            igTextColored(new Vector4(1.0f, 0.6f, 0.4f, 1.0f), "    > Skinned Mesh");
             hasContent = true;
         }
         
@@ -489,6 +489,11 @@ public static unsafe partial class GltfViewer
         {
             igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1.0f), "    (Empty Node)");
         }
+        
+        // Add a subtle separator line after node content (before children or next sibling)
+        igSpacing();
+        igSeparator();
+        igSpacing();
         
         // Recursively draw children only if node is open
         if (nodeOpen && hasChildren)
