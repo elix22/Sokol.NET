@@ -582,7 +582,8 @@ public static unsafe partial class GltfViewer
         // Check for camera
         if (node.Camera != null)
         {
-            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), $"  > Camera");
+            var IsOrthographic = node.Camera.GetCamera()?.IsOrthographic;
+            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), $"  > Camera ({(IsOrthographic.HasValue && IsOrthographic.Value ? "Orthographic" : "Perspective")})");
             hasContent = true;
         }
         

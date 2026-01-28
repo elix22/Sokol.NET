@@ -105,7 +105,8 @@ public static partial class GltfViewer
         // Camera component
         if (node.Camera != null)
         {
-            dumpOutput.AppendLine($"{propIndent}│ ├─ Camera");
+            var IsOrthographic = node.Camera.GetCamera()?.IsOrthographic;
+            dumpOutput.AppendLine($"{propIndent}│ ├─ Camera ({(IsOrthographic.HasValue && IsOrthographic.Value ? "Orthographic" : "Perspective")})");
         }
         
         // Light component
