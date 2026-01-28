@@ -273,6 +273,13 @@ public static unsafe partial class GltfViewer
                     state.modelRotationY = 0.0f;
                     state.modelRotationX = 0.0f;
                 }
+
+                igSameLine(0, 10);
+                
+                if (igButton("Dump Model Info", Vector2.Zero))
+                {
+                    DumpModelInfoToLog();
+                }
                 
                 igSeparator();
                 
