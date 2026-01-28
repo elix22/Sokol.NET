@@ -75,11 +75,11 @@ public static partial class GltfViewer
         // Properties section - visually distinct from children with │
         string propIndent = indent + (depth > 0 ? "    " : "");
         
-        // Always show transforms for every node
-        var worldTransform = node.WorldTransform;
+        // Always show transforms for every node (use GetLocalTransform for relative transforms)
+        var localTransform = node.GetLocalTransform();
         Vector3 pos, scale;
         Quaternion rot;
-        Matrix4x4.Decompose(worldTransform, out scale, out rot, out pos);
+        Matrix4x4.Decompose(localTransform, out scale, out rot, out pos);
         Vector3 euler = QuaternionToEuler(rot);
         dumpOutput.AppendLine($"{propIndent}│ Position: ({pos.X:F2}, {pos.Y:F2}, {pos.Z:F2})");
         dumpOutput.AppendLine($"{propIndent}│ Rotation: ({euler.X:F0}°, {euler.Y:F0}°, {euler.Z:F0}°)");
