@@ -142,6 +142,10 @@ public static unsafe partial class GltfViewer
         public bool debug_view_open;
         public bool physics_open;
         public bool show_body_details;       // Show detailed body information
+        public bool show_node_hierarchy;     // Show node hierarchy in Model Info
+        public bool show_world_transforms;   // Show world transforms instead of local
+        public int selected_node_index;      // Currently selected node in hierarchy (-1 = none)
+        public Dictionary<int, bool> node_open_state; // Track which nodes are expanded
         public int theme;
 
         // Debug view state

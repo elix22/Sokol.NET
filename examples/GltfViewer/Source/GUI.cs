@@ -230,7 +230,7 @@ public static unsafe partial class GltfViewer
 
     static void DrawModelInfoWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(250, 180), ImGuiCond.Once);
+        igSetNextWindowSize(new Vector2(400, 600), ImGuiCond.Once);
         igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
         byte open = 1;
         if (igBegin("Model Info", ref open, ImGuiWindowFlags.None))
@@ -245,6 +245,16 @@ public static unsafe partial class GltfViewer
                 igText($"Bones: {state.model.BoneCounter}");
                 
                 igSeparator();
+                
+                // Scene Bounding Box
+                igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Scene Bounds:");
+                var sceneBounds = CalculateSceneBounds();
+                igText($"Min: ({sceneBounds.min.X:F2}, {sceneBounds.min.Y:F2}, {sceneBounds.min.Z:F2})");
+                igText($"Max: ({sceneBounds.max.X:F2}, {sceneBounds.max.Y:F2}, {sceneBounds.max.Z:F2})");
+                Vector3 size = sceneBounds.max - sceneBounds.min;
+                igText($"Size: ({size.X:F2}, {size.Y:F2}, {size.Z:F2})");
+                
+                igSeparator();
                 igText("Model Rotation:");
                 igText("Middle Mouse: Rotate");
                 float rotationYDegrees = state.modelRotationY * 180.0f / MathF.PI;
@@ -257,6 +267,69 @@ public static unsafe partial class GltfViewer
                     state.modelRotationY = 0.0f;
                     state.modelRotationX = 0.0f;
                 }
+                
+                igSeparator();
+                
+                // Node Hierarchy Viewer
+                byte showNodes = (byte)(state.ui.show_node_hierarchy ? 1 : 0);
+                if (igCheckbox("Show Node Hierarchy", ref showNodes))
+                {
+                    state.ui.show_node_hierarchy = showNodes != 0;
+                }
+                
+                if (state.ui.show_node_hierarchy)
+                {
+                    igSeparator();
+                    igTextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Node Hierarchy:");
+                    
+                    // Transform space toggle
+                    byte showWorld = (byte)(state.ui.show_world_transforms ? 1 : 0);
+                    if (igCheckbox("Show World Transforms", ref showWorld))
+                    {
+                        state.ui.show_world_transforms = showWorld != 0;
+                    }
+                    
+                    igSeparator();
+                    
+                    // Keyboard shortcuts info
+                    igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "⌥ + ←/→: Collapse/Expand");
+                    
+                    // Scrollable child window for node tree (with horizontal scrollbar)
+                    // Height of 0 makes it fill remaining space in parent window
+                    if (igBeginChild_Str("##nodeHierarchyScroll", new Vector2(0, 0), ImGuiChildFlags.Borders, ImGuiWindowFlags.HorizontalScrollbar))
+                    {
+                        // Handle keyboard shortcuts for expand/collapse
+                        var io = igGetIO_Nil();
+                        bool altPressed = io->KeyAlt != 0;
+                        if (altPressed && state.ui.selected_node_index >= 0 && state.ui.selected_node_index < state.model.Nodes.Count)
+                        {
+                            var selectedNode = state.model.Nodes[state.ui.selected_node_index];
+                            bool hasChildren = selectedNode.Children.Count > 0;
+                            
+                            // Option + Right Arrow: Expand
+                            if (hasChildren && igIsKeyPressed_Bool(ImGuiKey.RightArrow, false))
+                            {
+                                state.ui.node_open_state[state.ui.selected_node_index] = true;
+                            }
+                            // Option + Left Arrow: Collapse
+                            else if (hasChildren && igIsKeyPressed_Bool(ImGuiKey.LeftArrow, false))
+                            {
+                                state.ui.node_open_state[state.ui.selected_node_index] = false;
+                            }
+                        }
+                        
+                        // Find root nodes (nodes without parents)
+                        for (int i = 0; i < state.model.Nodes.Count; i++)
+                        {
+                            var node = state.model.Nodes[i];
+                            if (node.Parent == null)
+                            {
+                                DrawNodeTreeRecursive(node, i, 0);
+                            }
+                        }
+                    }
+                    igEndChild();
+                }
             }
             else
             {
@@ -264,6 +337,207 @@ public static unsafe partial class GltfViewer
             }
         }
         igEnd();
+    }
+    
+    static (Vector3 min, Vector3 max) CalculateSceneBounds()
+    {
+        if (state.model == null || state.model.Meshes.Count == 0)
+        {
+            return (Vector3.Zero, Vector3.Zero);
+        }
+        
+        Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+        Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+        
+        foreach (var mesh in state.model.Meshes)
+        {
+            var bounds = mesh.Bounds;
+            min = Vector3.Min(min, bounds.Min);
+            max = Vector3.Max(max, bounds.Max);
+        }
+        
+        return (min, max);
+    }
+    
+    static void DrawNodeTreeRecursive(SharpGltfNode node, int nodeIndex, int depth)
+    {
+        igPushID_Int(nodeIndex);
+        
+        // Node header with tree icon and name
+        string nodeName = !string.IsNullOrEmpty(node.NodeName) ? node.NodeName : $"Node_{nodeIndex}";
+        bool hasChildren = node.Children.Count > 0;
+        
+        // Track selection state
+        bool isSelected = state.ui.selected_node_index == nodeIndex;
+        
+        // Build tree node flags
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.OpenOnDoubleClick;
+        if (isSelected)
+        {
+            flags |= ImGuiTreeNodeFlags.Selected;
+        }
+        if (!hasChildren)
+        {
+            flags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
+        }
+        
+        // Set open state from dictionary (for keyboard control)
+        if (hasChildren && state.ui.node_open_state.TryGetValue(nodeIndex, out bool shouldBeOpen))
+        {
+            igSetNextItemOpen(shouldBeOpen, ImGuiCond.Always);
+        }
+        
+        // Use TreeNode for collapsible hierarchy
+        bool nodeOpen = false;
+        if (hasChildren)
+        {
+            // Nodes with children use TreeNodeEx for expand/collapse
+            nodeOpen = igTreeNodeEx_Str($"[{nodeIndex}] {nodeName}", flags);
+            
+            // Update our state dictionary when user clicks
+            if (igIsItemClicked(ImGuiMouseButton.Left))
+            {
+                state.ui.node_open_state[nodeIndex] = nodeOpen;
+                state.ui.selected_node_index = nodeIndex;
+            }
+        }
+        else
+        {
+            // Leaf nodes
+            igTreeNodeEx_Str($"[{nodeIndex}] {nodeName}", flags);
+            nodeOpen = false;
+            
+            // Handle selection for leaf nodes
+            if (igIsItemClicked(ImGuiMouseButton.Left))
+            {
+                state.ui.selected_node_index = nodeIndex;
+            }
+        }
+        
+        // Transform information - use world or local based on toggle
+        Matrix4x4 transform = state.ui.show_world_transforms ? node.WorldTransform : node.GetLocalTransform();
+        Matrix4x4.Decompose(transform, out Vector3 scale, out Quaternion rotation, out Vector3 position);
+        
+        // Transform header with icon and color
+        string transformSpace = state.ui.show_world_transforms ? "World" : "Local";
+        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"  🌐 {transformSpace} Transform:");
+        
+        // Position with color coding (cyan for X, green for Y, blue for Z)
+        igText("    Position:");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{position.X:F2}");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 1.0f, 0.3f, 1.0f), $"Y:{position.Y:F2}");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{position.Z:F2}");
+        
+        // Rotation with euler angles
+        var euler = QuaternionToEuler(rotation);
+        igText("    Rotation:");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{euler.X:F1}°");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 1.0f, 0.3f, 1.0f), $"Y:{euler.Y:F1}°");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{euler.Z:F1}°");
+        
+        // Scale with color coding
+        igText("    Scale:");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{scale.X:F2}");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 1.0f, 0.3f, 1.0f), $"Y:{scale.Y:F2}");
+        igSameLine(0, 5);
+        igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{scale.Z:F2}");
+        
+        // Content information with styled header
+        igTextColored(new Vector4(1.0f, 0.85f, 0.4f, 1.0f), "  📦 Content:");
+        bool hasContent = false;
+        
+        // Check for mesh
+        if (node.MeshIndex >= 0 && node.MeshIndex < state.model.Meshes.Count)
+        {
+            var mesh = state.model.Meshes[node.MeshIndex];
+            igTextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "    ▪ Mesh");
+            igSameLine(0, 5);
+            igTextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"({mesh.VertexCount:N0} verts)");
+            hasContent = true;
+        }
+        
+        // Check for camera (nodes don't directly expose CameraIndex, check node name patterns)
+        if (node.NodeName != null && node.NodeName.ToLower().Contains("camera"))
+        {
+            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "    ▪ Camera");
+            hasContent = true;
+        }
+        
+        // Check for light (check node name patterns)
+        if (node.NodeName != null && (node.NodeName.ToLower().Contains("light") || node.NodeName.ToLower().Contains("lamp")))
+        {
+            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "    ▪ Light");
+            hasContent = true;
+        }
+        
+        // Check for physics (OMI_physics_body extension - check if node is skinned as proxy)
+        if (node.IsSkinned)
+        {
+            igTextColored(new Vector4(1.0f, 0.6f, 0.4f, 1.0f), "    ▪ Skinned Mesh");
+            hasContent = true;
+        }
+        
+        if (!hasContent)
+        {
+            igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1.0f), "    (Empty Node)");
+        }
+        
+        // Recursively draw children only if node is open
+        if (nodeOpen && hasChildren)
+        {
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                var child = node.Children[i];
+                // Find the index of this child in the model's Nodes list
+                int childIndex = state.model.Nodes.IndexOf(child);
+                if (childIndex >= 0)
+                {
+                    DrawNodeTreeRecursive(child, childIndex, depth + 1);
+                }
+            }
+            
+            // Pop the tree node
+            igTreePop();
+        }
+        
+        igPopID();
+    }
+    
+    static Vector3 QuaternionToEuler(System.Numerics.Quaternion q)
+    {
+        Vector3 euler;
+        
+        // Roll (x-axis rotation)
+        float sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
+        float cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+        euler.X = MathF.Atan2(sinr_cosp, cosr_cosp);
+        
+        // Pitch (y-axis rotation)
+        float sinp = 2 * (q.W * q.Y - q.Z * q.X);
+        if (MathF.Abs(sinp) >= 1)
+            euler.Y = MathF.CopySign(MathF.PI / 2, sinp);
+        else
+            euler.Y = MathF.Asin(sinp);
+        
+        // Yaw (z-axis rotation)
+        float siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
+        float cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+        euler.Z = MathF.Atan2(siny_cosp, cosy_cosp);
+        
+        // Convert to degrees
+        return new Vector3(
+            euler.X * 180.0f / MathF.PI,
+            euler.Y * 180.0f / MathF.PI,
+            euler.Z * 180.0f / MathF.PI
+        );
     }
 
     static void DrawModelBrowserWindow(ref Vector2 pos)
@@ -509,7 +783,9 @@ public static unsafe partial class GltfViewer
                         if (igButton("<- Previous", new Vector2(110, 0)))
                         {
                             state.model.PreviousAnimation();
+#pragma warning disable CS0618 // Legacy animator support
                             state.animator.SetAnimation(state.model.Animation);
+#pragma warning restore CS0618
                         }
 
                         igSameLine(0, 10);
@@ -517,7 +793,9 @@ public static unsafe partial class GltfViewer
                         if (igButton("Next ->", new Vector2(110, 0)))
                         {
                             state.model.NextAnimation();
+#pragma warning disable CS0618 // Legacy animator support
                             state.animator.SetAnimation(state.model.Animation);
+#pragma warning restore CS0618
                         }
                     }
 
