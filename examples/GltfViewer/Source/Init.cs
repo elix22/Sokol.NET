@@ -50,10 +50,12 @@ public static unsafe partial class GltfViewer
             Longitude = 0.0f,
         });
 
-        // Initialize UI state - show model browser by default
+        // Initialize UI state - show model browser and model info by default
         state.ui.model_browser_open = true;
+        state.ui.model_info_open = true;
         state.ui.selected_node_index = -1;
         state.ui.node_open_state = new Dictionary<int, bool>();
+        state.ui.node_search_filter = "";
 
         // Initialize lighting system
         // Note: Maximum lights is limited to RenderingConstants.MAX_LIGHTS

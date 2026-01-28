@@ -230,8 +230,14 @@ public static unsafe partial class GltfViewer
 
     static void DrawModelInfoWindow(ref Vector2 pos)
     {
-        igSetNextWindowSize(new Vector2(400, 600), ImGuiCond.Once);
-        igSetNextWindowPos(pos, ImGuiCond.Once, Vector2.Zero);
+        // Position on the right side of the screen with full height
+        float windowWidth = 400;
+        float screenWidth = sapp_widthf();
+        float screenHeight = sapp_heightf();
+        float menuBarHeight = igGetFrameHeight();
+        
+        igSetNextWindowSize(new Vector2(windowWidth, screenHeight - menuBarHeight), ImGuiCond.Always);
+        igSetNextWindowPos(new Vector2(screenWidth - windowWidth, menuBarHeight), ImGuiCond.Always, Vector2.Zero);
         byte open = 1;
         if (igBegin("Model Info", ref open, ImGuiWindowFlags.None))
         {
@@ -291,8 +297,43 @@ public static unsafe partial class GltfViewer
                     
                     igSeparator();
                     
+                    // Search/Filter input
+                    igText("Search:");
+                    igSameLine(0, 5);
+                    
+                    // Create a buffer for the search text (ImGui needs a fixed-size buffer)
+                    byte[] searchBuffer = new byte[256];
+                    if (!string.IsNullOrEmpty(state.ui.node_search_filter))
+                    {
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(state.ui.node_search_filter);
+                        Array.Copy(bytes, searchBuffer, Math.Min(bytes.Length, searchBuffer.Length - 1));
+                    }
+                    
+                    fixed (byte* searchPtr = searchBuffer)
+                    {
+                        igPushItemWidth(-1);
+                        if (igInputText("##nodeSearch", ref searchPtr[0], (uint)searchBuffer.Length, ImGuiInputTextFlags.None, null, null))
+                        {
+                            // Update search filter from buffer
+                            int nullIndex = Array.IndexOf(searchBuffer, (byte)0);
+                            if (nullIndex >= 0)
+                            {
+                                state.ui.node_search_filter = System.Text.Encoding.UTF8.GetString(searchBuffer, 0, nullIndex);
+                            }
+                        }
+                        igPopItemWidth();
+                    }
+                    
+                    igSameLine(0, 5);
+                    if (igButton("Clear", new Vector2(50, 0)))
+                    {
+                        state.ui.node_search_filter = "";
+                    }
+                    
                     // Keyboard shortcuts info
                     igTextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "⌥ + ←/→: Collapse/Expand");
+                    
+                    igSeparator();
                     
                     // Scrollable child window for node tree (with horizontal scrollbar)
                     // Height of 0 makes it fill remaining space in parent window
@@ -359,8 +400,39 @@ public static unsafe partial class GltfViewer
         return (min, max);
     }
     
+    static bool NodeMatchesFilter(SharpGltfNode node, int nodeIndex, string filter)
+    {
+        if (string.IsNullOrWhiteSpace(filter))
+            return true;
+        
+        string nodeName = !string.IsNullOrEmpty(node.NodeName) ? node.NodeName : $"Node_{nodeIndex}";
+        return nodeName.Contains(filter, StringComparison.OrdinalIgnoreCase);
+    }
+    
+    static bool NodeOrDescendantsMatchFilter(SharpGltfNode node, int nodeIndex, string filter)
+    {
+        if (NodeMatchesFilter(node, nodeIndex, filter))
+            return true;
+        
+        // Check if any child or descendant matches
+        int childIndex = 0;
+        foreach (var child in node.Children)
+        {
+            int childNodeIndex = state.model.Nodes.IndexOf(child);
+            if (NodeOrDescendantsMatchFilter(child, childNodeIndex, filter))
+                return true;
+            childIndex++;
+        }
+        
+        return false;
+    }
+    
     static void DrawNodeTreeRecursive(SharpGltfNode node, int nodeIndex, int depth)
     {
+        // Skip this node if it doesn't match the filter (and no descendants match)
+        if (!NodeOrDescendantsMatchFilter(node, nodeIndex, state.ui.node_search_filter))
+            return;
+        
         igPushID_Int(nodeIndex);
         
         // Node header with tree icon and name
@@ -381,10 +453,36 @@ public static unsafe partial class GltfViewer
             flags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
         }
         
-        // Set open state from dictionary (for keyboard control)
-        if (hasChildren && state.ui.node_open_state.TryGetValue(nodeIndex, out bool shouldBeOpen))
+        // Auto-expand nodes when search filter is active and this node has matching descendants
+        bool shouldAutoExpand = false;
+        if (hasChildren && !string.IsNullOrWhiteSpace(state.ui.node_search_filter))
         {
-            igSetNextItemOpen(shouldBeOpen, ImGuiCond.Always);
+            // Check if any child matches the filter
+            foreach (var child in node.Children)
+            {
+                int childNodeIndex = state.model.Nodes.IndexOf(child);
+                if (NodeOrDescendantsMatchFilter(child, childNodeIndex, state.ui.node_search_filter))
+                {
+                    shouldAutoExpand = true;
+                    break;
+                }
+            }
+        }
+        
+        // Set open state from dictionary (for keyboard control) or auto-expand for search
+        if (hasChildren)
+        {
+            if (shouldAutoExpand)
+            {
+                // Auto-expand when filtering
+                igSetNextItemOpen(true, ImGuiCond.Always);
+                state.ui.node_open_state[nodeIndex] = true;
+            }
+            else if (state.ui.node_open_state.TryGetValue(nodeIndex, out bool shouldBeOpen))
+            {
+                // Use stored state
+                igSetNextItemOpen(shouldBeOpen, ImGuiCond.Always);
+            }
         }
         
         // Use TreeNode for collapsible hierarchy
@@ -418,12 +516,15 @@ public static unsafe partial class GltfViewer
         Matrix4x4 transform = state.ui.show_world_transforms ? node.WorldTransform : node.GetLocalTransform();
         Matrix4x4.Decompose(transform, out Vector3 scale, out Quaternion rotation, out Vector3 position);
         
+        // Indent content relative to tree level
+        igIndent(20);
+        
         // Transform header with icon and color
         string transformSpace = state.ui.show_world_transforms ? "World" : "Local";
-        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"  [{transformSpace}] Transform:");
+        igTextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"[{transformSpace}] Transform:");
         
         // Position with color coding (cyan for X, green for Y, blue for Z)
-        igText("    Position:");
+        igText("  Position:");
         igSameLine(0, 5);
         igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{position.X:F2}");
         igSameLine(0, 5);
@@ -433,7 +534,7 @@ public static unsafe partial class GltfViewer
         
         // Rotation with euler angles
         var euler = QuaternionToEuler(rotation);
-        igText("    Rotation:");
+        igText("  Rotation:");
         igSameLine(0, 5);
         igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{euler.X:F1}°");
         igSameLine(0, 5);
@@ -442,7 +543,7 @@ public static unsafe partial class GltfViewer
         igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{euler.Z:F1}°");
         
         // Scale with color coding
-        igText("    Scale:");
+        igText("  Scale:");
         igSameLine(0, 5);
         igTextColored(new Vector4(1.0f, 0.3f, 0.3f, 1.0f), $"X:{scale.X:F2}");
         igSameLine(0, 5);
@@ -451,14 +552,14 @@ public static unsafe partial class GltfViewer
         igTextColored(new Vector4(0.3f, 0.5f, 1.0f, 1.0f), $"Z:{scale.Z:F2}");
         
         // Content information with styled header
-        igTextColored(new Vector4(1.0f, 0.85f, 0.4f, 1.0f), "  [Content]:");
+        igTextColored(new Vector4(1.0f, 0.85f, 0.4f, 1.0f), "[Content]:");
         bool hasContent = false;
         
         // Check for mesh
         if (node.MeshIndex >= 0 && node.MeshIndex < state.model.Meshes.Count)
         {
             var mesh = state.model.Meshes[node.MeshIndex];
-            igTextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "    > Mesh");
+            igTextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "  > Mesh");
             igSameLine(0, 5);
             igTextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"({mesh.VertexCount:N0} verts)");
             hasContent = true;
@@ -467,28 +568,31 @@ public static unsafe partial class GltfViewer
         // Check for camera (nodes don't directly expose CameraIndex, check node name patterns)
         if (node.NodeName != null && node.NodeName.ToLower().Contains("camera"))
         {
-            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "    > Camera");
+            igTextColored(new Vector4(0.5f, 0.9f, 1.0f, 1.0f), "  > Camera");
             hasContent = true;
         }
         
         // Check for light (check node name patterns)
         if (node.NodeName != null && (node.NodeName.ToLower().Contains("light") || node.NodeName.ToLower().Contains("lamp")))
         {
-            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "    > Light");
+            igTextColored(new Vector4(1.0f, 1.0f, 0.5f, 1.0f), "  > Light");
             hasContent = true;
         }
         
         // Check for physics (OMI_physics_body extension - check if node is skinned as proxy)
         if (node.IsSkinned)
         {
-            igTextColored(new Vector4(1.0f, 0.6f, 0.4f, 1.0f), "    > Skinned Mesh");
+            igTextColored(new Vector4(1.0f, 0.6f, 0.4f, 1.0f), "  > Skinned Mesh");
             hasContent = true;
         }
         
         if (!hasContent)
         {
-            igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1.0f), "    (Empty Node)");
+            igTextColored(new Vector4(0.5f, 0.5f, 0.5f, 1.0f), "  (Empty Node)");
         }
+        
+        // Unindent content
+        igUnindent(20);
         
         // Add a subtle separator line after node content (before children or next sibling)
         igSpacing();

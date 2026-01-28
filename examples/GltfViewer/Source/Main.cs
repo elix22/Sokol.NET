@@ -146,6 +146,7 @@ public static unsafe partial class GltfViewer
         public bool show_world_transforms;   // Show world transforms instead of local
         public int selected_node_index;      // Currently selected node in hierarchy (-1 = none)
         public Dictionary<int, bool> node_open_state; // Track which nodes are expanded
+        public string node_search_filter;    // Search filter for node names (empty = show all)
         public int theme;
 
         // Debug view state
