@@ -75,15 +75,21 @@ public static partial class GltfViewer
         // Properties section - visually distinct from children with │
         string propIndent = indent + (depth > 0 ? "    " : "");
         
-        // Always show transforms for every node (use GetLocalTransform for relative transforms)
+        // Show both local and world transforms
         var localTransform = node.GetLocalTransform();
-        Vector3 pos, scale;
-        Quaternion rot;
-        Matrix4x4.Decompose(localTransform, out scale, out rot, out pos);
-        Vector3 euler = QuaternionToEuler(rot);
-        dumpOutput.AppendLine($"{propIndent}│ Position: ({pos.X:F2}, {pos.Y:F2}, {pos.Z:F2})");
-        dumpOutput.AppendLine($"{propIndent}│ Rotation: ({euler.X:F0}°, {euler.Y:F0}°, {euler.Z:F0}°)");
-        dumpOutput.AppendLine($"{propIndent}│ Scale: ({scale.X:F2}, {scale.Y:F2}, {scale.Z:F2})");
+        var worldTransform = node.WorldTransform;
+        
+        Vector3 localPos, localScale, worldPos, worldScale;
+        Quaternion localRot, worldRot;
+        Matrix4x4.Decompose(localTransform, out localScale, out localRot, out localPos);
+        Matrix4x4.Decompose(worldTransform, out worldScale, out worldRot, out worldPos);
+        
+        Vector3 localEuler = QuaternionToEuler(localRot);
+        Vector3 worldEuler = QuaternionToEuler(worldRot);
+        
+        dumpOutput.AppendLine($"{propIndent}│ Position: ({localPos.X:F2}, {localPos.Y:F2}, {localPos.Z:F2}) | World: ({worldPos.X:F2}, {worldPos.Y:F2}, {worldPos.Z:F2})");
+        dumpOutput.AppendLine($"{propIndent}│ Rotation: ({localEuler.X:F0}°, {localEuler.Y:F0}°, {localEuler.Z:F0}°) | World: ({worldEuler.X:F0}°, {worldEuler.Y:F0}°, {worldEuler.Z:F0}°)");
+        dumpOutput.AppendLine($"{propIndent}│ Scale: ({localScale.X:F2}, {localScale.Y:F2}, {localScale.Z:F2}) | World: ({worldScale.X:F2}, {worldScale.Y:F2}, {worldScale.Z:F2})");
         
         // Component details section - all components on separate lines
         
