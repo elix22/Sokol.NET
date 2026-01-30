@@ -1079,9 +1079,33 @@ public static unsafe partial class GltfViewer
                     // should ONLY contain the user's scene rotation/centering, NOT node transforms.
                     if (mesh.HasSkinning)
                     {
-                        // Use only user's model transform (rotation/centering), not node hierarchy
-                        // Node transforms are already baked into bone matrices via globalTransformation
-                        modelMatrix = model;
+                        if (Matrix4x4.Decompose(nodeTransform, out Vector3 scale, out Quaternion rot, out Vector3 trans))
+                        {
+                            bool isIdentityRotation = Math.Abs(rot.X) < 0.001f && Math.Abs(rot.Y) < 0.001f &&
+                                                      Math.Abs(rot.Z) < 0.001f && Math.Abs(rot.W) > 0.999f;
+                            bool isZeroTranslation = trans.LengthSquared() < 0.001f;
+                            bool hasScale = Math.Abs(scale.X - 1.0f) > 0.001f ||
+                                            Math.Abs(scale.Y - 1.0f) > 0.001f ||
+                                            Math.Abs(scale.Z - 1.0f) > 0.001f;
+
+                            if (hasScale && isIdentityRotation && isZeroTranslation)
+                            {
+                                // Apply pure scale (Unit Conversion)
+                                modelMatrix = Matrix4x4.CreateScale(scale) * model;
+                                if (shouldLogMeshInfo) Info($"[Skinning] Applying Pure Scale {scale} for node With MeshIndex {node.MeshIndex}");
+                            }
+                            else
+                            {
+                                // Ignore transform (Placement Node or no transform)
+                                modelMatrix = model;
+                                if (shouldLogMeshInfo && (hasScale || !isIdentityRotation || !isZeroTranslation))
+                                    Info($"[Skinning] Ignoring Transform (S:{scale} R:{rot} T:{trans}) for node With MeshIndex {node.MeshIndex}");
+                            }
+                        }
+                        else
+                        {
+                            modelMatrix = model;
+                        }
                     }
                     else
                     {
