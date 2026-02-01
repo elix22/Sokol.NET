@@ -614,6 +614,11 @@ public static unsafe partial class GltfViewer
                 state.asyncLoadState = null;
                 state.pendingModelPath = null;
                 Info($"[SharpGLTF] Model loaded successfully!");
+                // TBD ELI , DEBUG:
+                if (enableDumpToFile)
+                {
+                    DumpModelInfoToFile();
+                }
             }
             else
             {

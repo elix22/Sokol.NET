@@ -54,7 +54,8 @@ public static partial class GltfViewer
         try
         {
             string outputFileName = Path.GetFileNameWithoutExtension(filename) + "_dump.txt";
-            string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
+            Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, "dumps"));
+            string outputPath = Path.Combine(Environment.CurrentDirectory, "dumps", outputFileName);
             File.WriteAllText(outputPath, dumpOutput.ToString());
             Info($"Model info dumped to: {outputPath}");
         }
