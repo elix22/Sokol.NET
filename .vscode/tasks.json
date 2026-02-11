@@ -848,6 +848,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-MediaPipeTest",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/MediaPipeTest"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-MediaPipeTest-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/MediaPipeTest"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Create New Example",
 			"type": "shell",
 			"command": "dotnet",
@@ -931,6 +945,7 @@
 			"type": "pickString",
 			"description": "Select an example",
 			"options": [
+				"MediaPipeTest",
 				"SampleBrowser",
 				"SkiaSokolApp",
 				"ShaderToyApp",
@@ -982,6 +997,7 @@
 			"type": "pickString",
 			"description": "Select an example to build",
 			"options": [
+				"examples/MediaPipeTest",
 				"examples/SampleBrowser",
 				"examples/SkiaSokolApp",
 				"examples/ShaderToyApp",
@@ -1067,6 +1083,7 @@
 			"type": "pickString",
 			"description": "⚠️ WARNING: Select an example to PERMANENTLY DELETE",
 			"options": [
+				"MediaPipeTest",
 				"SampleBrowser",
 				"SkiaSokolApp",
 				"ShaderToyApp",

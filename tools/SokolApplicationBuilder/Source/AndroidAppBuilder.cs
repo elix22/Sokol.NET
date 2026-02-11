@@ -660,6 +660,49 @@ namespace SokolApplicationBuilder
                 // CMake requires forward slashes or escaped backslashes on Windows
                 extPath = extPath.Replace("\\", "/");
                 content = content.Replace("set(EXT_ROOT_DIR \"../../../../../../../../ext\")", $"set(EXT_ROOT_DIR \"{extPath}\")");
+                
+                // Add RPATH configuration to prevent absolute paths from being embedded in the .so file
+                // This ensures libraries are found relative to the binary location on the device
+                if (!content.Contains("CMAKE_BUILD_WITH_INSTALL_RPATH"))
+                {
+                    // Insert CMAKE RPATH settings after PREBUILT_LIB_PATH
+                    var preBuitLibPathPattern = new System.Text.RegularExpressions.Regex(
+                        @"(set\(PREBUILT_LIB_PATH[^\)]+\))",
+                        System.Text.RegularExpressions.RegexOptions.Multiline);
+                    
+                    if (preBuitLibPathPattern.IsMatch(content))
+                    {
+                        content = preBuitLibPathPattern.Replace(content, 
+                            "$1\n\n# Set RPATH to use $ORIGIN so libraries are found relative to the binary location\n" +
+                            "# This prevents absolute paths from being embedded in the .so file\n" +
+                            "set(CMAKE_SKIP_BUILD_RPATH FALSE)\n" +
+                            "set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)\n" +
+                            "set(CMAKE_INSTALL_RPATH \"$ORIGIN\")", 1);
+                    }
+                    
+                    // Add target_link_options for sokol to set RPATH
+                    var targetLinkPattern = new System.Text.RegularExpressions.Regex(
+                        @"(set_target_properties\(sokol PROPERTIES[^\)]+\))",
+                        System.Text.RegularExpressions.RegexOptions.Multiline);
+                    
+                    if (targetLinkPattern.IsMatch(content))
+                    {
+                        content = targetLinkPattern.Replace(content,
+                            "$1\n\n# Set RPATH to $ORIGIN so shared libraries are found relative to the binary\n" +
+                            "# This prevents absolute paths from being embedded which would break on device\n" +
+                            "target_link_options(sokol PRIVATE \"-Wl,-rpath,'\\$ORIGIN'\")", 1);
+                    }
+                }
+                
+                // Add IMPORTED_NO_SONAME FALSE to all imported libraries to prevent absolute path embedding
+                // This ensures CMake uses only the SONAME (library name) instead of full paths in DT_NEEDED entries
+                var importedLibPattern = new System.Text.RegularExpressions.Regex(
+                    @"(IMPORTED_SONAME\s+""[^""]+"")\)",
+                    System.Text.RegularExpressions.RegexOptions.Multiline);
+                
+                // Always apply the replacement to ensure all libraries have this property
+                content = importedLibPattern.Replace(content, "$1\n    IMPORTED_NO_SONAME FALSE)");
+                
                 // Don't replace ANativeActivity_onCreate - it must remain unchanged
                 File.WriteAllText(cmakePath, content);
             }
@@ -1065,7 +1108,12 @@ namespace SokolApplicationBuilder
                     // AndroidNativeLibrary_OzzUtilPath -> OzzUtil -> ozzutil
                     string libraryNamePart = property.Key.Substring("AndroidNativeLibrary_".Length);
                     libraryNamePart = libraryNamePart.Substring(0, libraryNamePart.Length - "Path".Length);
-                    string libraryName = libraryNamePart.ToLowerInvariant();
+                    
+                    // Check if there's an explicit library name override (for names with special characters like c++)
+                    string libraryNamePropertyKey = $"AndroidNativeLibrary_{libraryNamePart}LibraryName";
+                    string libraryName = androidProperties.ContainsKey(libraryNamePropertyKey)
+                        ? androidProperties[libraryNamePropertyKey]
+                        : libraryNamePart.ToLowerInvariant();
                     
                     string libraryBasePath = property.Value;
                     
@@ -1165,9 +1213,10 @@ namespace SokolApplicationBuilder
 
             string cmakeContent = File.ReadAllText(cmakeListsPath);
             
-            // Build the additional library configurations
-            var additionalLibraries = new List<string>();
+            // Build the library directory addition and link library names
+            var libraryNames = new List<string>();
             var additionalLinkLibraries = new List<string>();
+            bool hasLinkDirectories = false;
 
             foreach (var property in androidProperties)
             {
@@ -1177,49 +1226,54 @@ namespace SokolApplicationBuilder
                     // Extract library name
                     string libraryNamePart = property.Key.Substring("AndroidNativeLibrary_".Length);
                     libraryNamePart = libraryNamePart.Substring(0, libraryNamePart.Length - "Path".Length);
-                    string libraryName = libraryNamePart.ToLowerInvariant();
                     
-                    additionalLibraries.Add($@"
-# Add {libraryName} library
-add_library({libraryName} SHARED IMPORTED)
-set_target_properties({libraryName} PROPERTIES 
-    IMPORTED_LOCATION ${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}}/lib{libraryName}.so
-    IMPORTED_SONAME ""lib{libraryName}.so"")");
+                    // Check if there's an explicit library name override (for names with special characters like c++)
+                    string libraryNamePropertyKey = $"AndroidNativeLibrary_{libraryNamePart}LibraryName";
+                    string libraryName = androidProperties.ContainsKey(libraryNamePropertyKey)
+                        ? androidProperties[libraryNamePropertyKey]
+                        : libraryNamePart.ToLowerInvariant();
                     
+                    libraryNames.Add(libraryName);
+                    
+                    // For linking, use just the library name (without lib prefix or .so suffix)
+                    // CMake will add -l<name> which will use runtime library search paths
                     additionalLinkLibraries.Add($"    {libraryName}");
+                    
+                    if (!hasLinkDirectories)
+                    {
+                        hasLinkDirectories = true;
+                    }
                 }
             }
 
-            if (additionalLibraries.Count > 0)
+            if (libraryNames.Count > 0)
             {
-                // Insert additional libraries after the main app library definition
-                string insertionPoint = "set_target_properties(";
-                int lastSetTargetProps = cmakeContent.LastIndexOf(insertionPoint);
+                // Add link_directories command BEFORE add_library(sokol ...) so it takes effect
+                // link_directories only affects targets defined AFTER it's called
+                string insertionPoint = "set(CMAKE_SHARED_LINKER_FLAGS";
+                int insertIndex = cmakeContent.IndexOf(insertionPoint);
                 
-                if (lastSetTargetProps >= 0)
+                if (insertIndex >= 0)
                 {
-                    // Find the closing ) for this set_target_properties
-                    int openParen = cmakeContent.IndexOf('(', lastSetTargetProps);
-                    int closeParen = -1;
-                    int parenCount = 0;
-                    for (int i = openParen; i < cmakeContent.Length; i++)
+                    // Find the end of the next line (after the closing parenthesis)
+                    int searchStart = cmakeContent.IndexOf(')', insertIndex) + 1;
+                    int lineEnd = cmakeContent.IndexOf('\n', searchStart);
+                    if (lineEnd >= 0)
                     {
-                        if (cmakeContent[i] == '(') parenCount++;
-                        else if (cmakeContent[i] == ')')
-                        {
-                            parenCount--;
-                            if (parenCount == 0)
-                            {
-                                closeParen = i;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (closeParen >= 0)
-                    {
-                        string additionalLibsText = string.Join("", additionalLibraries);
-                        cmakeContent = cmakeContent.Insert(closeParen + 1, additionalLibsText);
+                        string linkDirectoriesText = $@"
+
+# Define library path for prebuilt libraries
+set(PREBUILT_LIB_PATH ${{CMAKE_CURRENT_SOURCE_DIR}}/../../../libs)
+
+# Add search directory for native libraries so they are linked with -l instead of absolute paths
+# This prevents absolute build paths from being embedded in the .so file
+# IMPORTANT: This must come BEFORE add_library(sokol ...) to take effect
+link_directories(${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}})
+
+# Note: Libraries will be linked by name (e.g., -lmediapipe_jni) which uses runtime linker
+# The runtime linker will search using RPATH ($ORIGIN) set in target_link_options below
+";
+                        cmakeContent = cmakeContent.Insert(lineEnd + 1, linkDirectoriesText);
                         
                         // Also add to target_link_libraries
                         string linkLibrariesPattern = "target_link_libraries(sokol";
@@ -1237,12 +1291,17 @@ set_target_properties({libraryName} PROPERTIES
                         }
                         
                         File.WriteAllText(cmakeListsPath, cmakeContent);
-                        Log.LogMessage(MessageImportance.Normal, $"📝 Updated CMakeLists.txt with {additionalLibraries.Count} additional native libraries");
+                        Log.LogMessage(MessageImportance.Normal, $"📝 Updated CMakeLists.txt with {libraryNames.Count} additional native libraries using link_directories");
+                        Log.LogMessage(MessageImportance.Normal, $"   Libraries: {string.Join(", ", libraryNames)}");
                     }
                     else
                     {
-                        Log.LogMessage(MessageImportance.Normal, "⚠️  Could not find insertion point in CMakeLists.txt");
+                        Log.LogMessage(MessageImportance.Normal, "⚠️  Could not find line end after CMAKE_SHARED_LINKER_FLAGS");
                     }
+                }
+                else
+                {
+                    Log.LogMessage(MessageImportance.Normal, "⚠️  Could not find CMAKE_SHARED_LINKER_FLAGS in CMakeLists.txt");
                 }
             }
         }

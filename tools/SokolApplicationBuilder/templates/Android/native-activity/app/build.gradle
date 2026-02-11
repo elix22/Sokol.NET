@@ -35,6 +35,13 @@ android {
         }
     }
 
+    sourceSets {
+        main {
+            // Include prebuilt native libraries from libs folder
+            jniLibs.srcDirs = ['libs']
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
