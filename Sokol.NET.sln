@@ -208,6 +208,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sokol_gp_benchWeb", "exampl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameEditor", "examples\GameEditor\GameEditor.csproj", "{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "testProject", "examples\testProject\testProject.csproj", "{56888DE0-B8D3-4AAC-A3F6-0EAA9FF5B62A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "testProjectWeb", "examples\testProject\testProjectWeb.csproj", "{58652040-2005-4104-A3AC-2F58F2291E70}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

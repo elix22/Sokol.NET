@@ -49,6 +49,7 @@
             "type": "pickString",
             "description": "Select an example to launch",
             "options": [
+                "testProject",
                 "GameEditor",
                 "camera_hardware",
                 "sokol_gp_sdf",

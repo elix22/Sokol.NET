@@ -468,7 +468,7 @@ namespace GameEditor.UI
         private static void StartCreateProject(string name, string dest)
         {
             string builderPath = ConfigManager.GetSokolAppBuilderPath();
-            string args = $"run --project \"{builderPath}\" -- --task create "
+            string args = $"run --project \"{builderPath}\" -- --task createproject "
                         + $"--project \"{name}\" --destination \"{dest}\"";
             Logger.Info($"[Create Project] dotnet {args}");
 
