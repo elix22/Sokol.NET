@@ -206,6 +206,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sokol_gp_bench", "examples\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sokol_gp_benchWeb", "examples\sokol_gp_bench\sokol_gp_benchWeb.csproj", "{8EC430AE-BFD9-40F3-9A04-B4F15B3EE7C0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameEditor", "examples\GameEditor\GameEditor.csproj", "{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -616,6 +618,10 @@ Global
 		{8EC430AE-BFD9-40F3-9A04-B4F15B3EE7C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8EC430AE-BFD9-40F3-9A04-B4F15B3EE7C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8EC430AE-BFD9-40F3-9A04-B4F15B3EE7C0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -722,6 +728,7 @@ Global
 		{A22B7197-3C36-4CAE-88D1-836FA0265250} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{5BA08E52-87FC-45A7-8255-3138EB6A7865} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{8EC430AE-BFD9-40F3-9A04-B4F15B3EE7C0} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{AF4C7D33-3D93-48ED-9F5C-0B703C2C20C0} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E698CF8-2571-44C4-BDB3-0CAAE475F5DF}

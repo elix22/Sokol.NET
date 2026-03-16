@@ -960,6 +960,20 @@
 			"problemMatcher": "$msCompile"
 		},
 		{
+			"label": "prepare-GameEditor",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "desktop", "--path", "${workspaceFolder}/examples/GameEditor"],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prepare-GameEditor-web",
+			"type": "shell",
+			"command": "dotnet",
+			"args": ["run", "--project", "${workspaceFolder}/tools/SokolApplicationBuilder", "--", "--task", "prepare", "--architecture", "web", "--path", "${workspaceFolder}/examples/GameEditor"],
+			"problemMatcher": "$msCompile"
+		},
+		{
 			"label": "Create New Example",
 			"type": "shell",
 			"command": "dotnet",
@@ -1043,6 +1057,7 @@
 			"type": "pickString",
 			"description": "Select an example",
 			"options": [
+				"GameEditor",
 				"camera_hardware",
 				"sokol_gp_sdf",
 				"sokol_gp_primitives",
@@ -1102,6 +1117,7 @@
 			"type": "pickString",
 			"description": "Select an example to build",
 			"options": [
+				"examples/GameEditor",
 				"examples/camera_hardware",
 				"examples/sokol_gp_sdf",
 				"examples/sokol_gp_primitives",
@@ -1195,6 +1211,7 @@
 			"type": "pickString",
 			"description": "⚠️ WARNING: Select an example to PERMANENTLY DELETE",
 			"options": [
+				"GameEditor",
 				"camera_hardware",
 				"sokol_gp_sdf",
 				"sokol_gp_primitives",

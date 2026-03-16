@@ -26,3 +26,6 @@
 [submodule "ext/cgltf"]
 	path = ext/cgltf
 	url = https://github.com/elix22/cgltf.git
+[submodule "ext/ImGuizmo"]
+	path = ext/ImGuizmo
+	url = https://github.com/elix22/ImGuizmo.git
