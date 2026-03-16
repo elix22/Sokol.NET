@@ -60,6 +60,11 @@ namespace GameEditor.UI
             };
 
             EventBus.EntitySelected += id => _primaryEntity = id;
+            EventBus.SceneUnloaded += () =>
+            {
+                SelectedEntities.Clear();
+                _primaryEntity = -1;
+            };
             EventBus.EntityDestroyed += id =>
             {
                 SelectedEntities.Remove(id);

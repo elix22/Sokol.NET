@@ -205,16 +205,6 @@ namespace GameEditor.UI
             _dialog = mode;
             _dialogPathBuf = new byte[512];
 
-            string popupId = mode switch
-            {
-                DialogMode.SaveAs          => "##SaveAs",
-                DialogMode.Open            => "##OpenScene",
-                DialogMode.NewProject      => "##NewProject",
-                DialogMode.OpenProject     => "##OpenProject",
-                DialogMode.ProjectSettings => "##ProjSettings",
-                _                          => "##Dialog"
-            };
-
             if (mode == DialogMode.SaveAs)
             {
                 string initial = initialPath.EndsWith(".scene.json") ? initialPath : initialPath + ".scene.json";
@@ -223,7 +213,6 @@ namespace GameEditor.UI
             else if (mode == DialogMode.NewProject)
             {
                 _newProjectNameBuf = new byte[128];
-                // _dialogPathBuf holds destination path — starts empty
             }
             else if (mode == DialogMode.ProjectSettings)
             {
@@ -243,8 +232,6 @@ namespace GameEditor.UI
             {
                 FillBuffer(ref _dialogPathBuf, initialPath);
             }
-
-            igOpenPopup_Str(popupId, ImGuiPopupFlags.None);
         }
 
         private static void FillBuffer(ref byte[] buf, string text)
@@ -272,228 +259,210 @@ namespace GameEditor.UI
                 {
                     ConfigManager.Load(_createResultFolder);
                     _createResultFolder = null;
-                    igCloseCurrentPopup();
-                }
-            }
-
-            byte unused = 1;
-
-            // --- Save As ---
-            if (igBeginPopupModal("##SaveAs", ref unused, ImGuiWindowFlags.AlwaysAutoResize))
-            {
-                igText("Save Scene As");
-                igSeparator();
-                igText("Path:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(400f);
-                igInputText("##savepath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igSpacing();
-                if (igButton("Save", new Vector2(80, 0)))
-                {
-                    string path = GetStringFromBuffer(_dialogPathBuf);
-                    if (path.Length > 0)
-                    {
-                        SceneManager.SaveScene(path);
-                        igCloseCurrentPopup();
-                        _dialog = DialogMode.None;
-                    }
-                }
-                igSameLine(0, 8);
-                if (igButton("Cancel", new Vector2(80, 0)))
-                {
-                    igCloseCurrentPopup();
                     _dialog = DialogMode.None;
                 }
-                igEndPopup();
             }
 
-            // --- Open ---
-            if (igBeginPopupModal("##OpenScene", ref unused, ImGuiWindowFlags.AlwaysAutoResize))
+            if (_dialog == DialogMode.None) return;
+
+            // Position dialogs centered on screen
+            var vp = igGetMainViewport();
+            var center = new Vector2(vp->Pos.X + vp->Size.X * 0.5f,
+                                     vp->Pos.Y + vp->Size.Y * 0.5f);
+
+            igSetNextWindowPos(center, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+            igSetNextWindowSize(Vector2.Zero, ImGuiCond.Always); // auto-size
+
+            string title = _dialog switch
             {
-                igText("Open Scene");
-                igSeparator();
-                igText("Path:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(400f);
-                igInputText("##openpath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
+                DialogMode.SaveAs          => "Save Scene As",
+                DialogMode.Open            => "Open Scene",
+                DialogMode.NewProject      => "New Project",
+                DialogMode.OpenProject     => "Open Project",
+                DialogMode.ProjectSettings => "Project Settings",
+                _                          => "Dialog"
+            };
 
-                igSpacing();
-                if (igButton("Open", new Vector2(80, 0)))
-                {
-                    string path = GetStringFromBuffer(_dialogPathBuf);
-                    if (path.Length > 0)
-                    {
-                        SceneManager.LoadScene(path);
-                        igCloseCurrentPopup();
-                        _dialog = DialogMode.None;
-                    }
-                }
-                igSameLine(0, 8);
-                if (igButton("Cancel", new Vector2(80, 0)))
-                {
-                    igCloseCurrentPopup();
-                    _dialog = DialogMode.None;
-                }
-                igEndPopup();
-            }
+            byte dlgOpen = 1;
+            bool showing = igBegin(title + "##Editor_dlg", ref dlgOpen,
+                ImGuiWindowFlags.NoCollapse    |
+                ImGuiWindowFlags.AlwaysAutoResize |
+                ImGuiWindowFlags.NoDocking     |
+                ImGuiWindowFlags.NoSavedSettings);
 
-            // --- New Project ---
-            if (igBeginPopupModal("##NewProject", ref unused, ImGuiWindowFlags.AlwaysAutoResize))
+            // 'X' button closes the dialog
+            if (dlgOpen == 0) { _dialog = DialogMode.None; igEnd(); return; }
+
+            if (showing)
             {
-                igText("New Project");
-                igSeparator();
-
-                igText("Name:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(280f);
-                igInputText("##npName", ref _newProjectNameBuf[0], (uint)_newProjectNameBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igText("Destination:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(280f);
-                igInputText("##npDest", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igSpacing();
-
-                if (_isCreating)
+                switch (_dialog)
                 {
-                    igTextColored(new Vector4(0.3f, 1f, 0.3f, 1f), "Creating project...");
-                    igSameLine(0, 8);
-                    if (igButton("Cancel##npc", new Vector2(70, 0)))
+                    case DialogMode.SaveAs:
                     {
-                        try { _createProcess?.Kill(entireProcessTree: true); } catch { }
-                        Logger.Warning("Project creation cancelled.");
-                        _isCreating = false;
+                        igText("Path:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(400f);
+                        igInputText("##savepath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igSpacing();
+                        if (igButton("Save", new Vector2(80, 0)))
+                        {
+                            string path = GetStringFromBuffer(_dialogPathBuf);
+                            if (path.Length > 0)
+                            {
+                                SceneManager.SaveScene(path);
+                                _dialog = DialogMode.None;
+                            }
+                        }
+                        igSameLine(0, 8);
+                        if (igButton("Cancel", new Vector2(80, 0)))
+                            _dialog = DialogMode.None;
+                        break;
+                    }
+                    case DialogMode.Open:
+                    {
+                        igText("Path:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(400f);
+                        igInputText("##openpath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igSpacing();
+                        if (igButton("Open", new Vector2(80, 0)))
+                        {
+                            string path = GetStringFromBuffer(_dialogPathBuf);
+                            if (path.Length > 0)
+                            {
+                                SceneManager.LoadScene(path);
+                                _dialog = DialogMode.None;
+                            }
+                        }
+                        igSameLine(0, 8);
+                        if (igButton("Cancel", new Vector2(80, 0)))
+                            _dialog = DialogMode.None;
+                        break;
+                    }
+                    case DialogMode.NewProject:
+                    {
+                        igText("Name:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(280f);
+                        igInputText("##npName", ref _newProjectNameBuf[0], (uint)_newProjectNameBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igText("Destination:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(280f);
+                        igInputText("##npDest", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igSpacing();
+                        if (_isCreating)
+                        {
+                            igTextColored(new Vector4(0.3f, 1f, 0.3f, 1f), "Creating project...");
+                            igSameLine(0, 8);
+                            if (igButton("Cancel##npc", new Vector2(70, 0)))
+                            {
+                                try { _createProcess?.Kill(entireProcessTree: true); } catch { }
+                                Logger.Warning("Project creation cancelled.");
+                                _isCreating = false;
+                                _dialog = DialogMode.None;
+                            }
+                        }
+                        else
+                        {
+                            if (igButton("Create##np", new Vector2(80, 0)))
+                            {
+                                string name = GetStringFromBuffer(_newProjectNameBuf);
+                                string dest = GetStringFromBuffer(_dialogPathBuf);
+                                if (name.Length > 0 && dest.Length > 0)
+                                    StartCreateProject(name, dest);
+                            }
+                            igSameLine(0, 8);
+                            if (igButton("Cancel##npcancel", new Vector2(80, 0)))
+                                _dialog = DialogMode.None;
+                        }
+                        break;
+                    }
+                    case DialogMode.OpenProject:
+                    {
+                        igText("Project folder (contains config.json):");
+                        igSetNextItemWidth(400f);
+                        igInputText("##opPath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igSpacing();
+                        if (igButton("Open##op", new Vector2(80, 0)))
+                        {
+                            string path = GetStringFromBuffer(_dialogPathBuf);
+                            if (path.Length > 0)
+                            {
+                                ConfigManager.Load(path);
+                                _dialog = DialogMode.None;
+                            }
+                        }
+                        igSameLine(0, 8);
+                        if (igButton("Cancel##opcancel", new Vector2(80, 0)))
+                            _dialog = DialogMode.None;
+                        break;
+                    }
+                    case DialogMode.ProjectSettings:
+                    {
+                        igText("Project Name:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(260f);
+                        igInputText("##psName", ref _cfgNameBuf[0], (uint)_cfgNameBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igText("Default Scene:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(260f);
+                        igInputText("##psScene", ref _cfgSceneBuf[0], (uint)_cfgSceneBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igText("Default Camera:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(260f);
+                        igInputText("##psCam", ref _cfgCamBuf[0], (uint)_cfgCamBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igText("Screen Width:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(100f);
+                        igInputInt("##psW", ref _cfgWidth, 1, 10, ImGuiInputTextFlags.None);
+                        igText("Screen Height:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(100f);
+                        igInputInt("##psH", ref _cfgHeight, 1, 10, ImGuiInputTextFlags.None);
+                        igText("Physics 3D:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(100f);
+                        igInputText("##psP3", ref _cfgPhys3DBuf[0], (uint)_cfgPhys3DBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igText("Physics 2D:");
+                        igSameLine(0, 6);
+                        igSetNextItemWidth(100f);
+                        igInputText("##psP2", ref _cfgPhys2DBuf[0], (uint)_cfgPhys2DBuf.Length,
+                            ImGuiInputTextFlags.None, null, null);
+                        igSpacing();
+                        if (igButton("Save##psSave", new Vector2(80, 0)))
+                        {
+                            var cfg = ConfigManager.Config;
+                            if (cfg != null)
+                            {
+                                cfg.ProjectName   = GetStringFromBuffer(_cfgNameBuf);
+                                cfg.DefaultScene  = GetStringFromBuffer(_cfgSceneBuf);
+                                cfg.DefaultCamera = GetStringFromBuffer(_cfgCamBuf);
+                                cfg.ScreenWidth   = _cfgWidth;
+                                cfg.ScreenHeight  = _cfgHeight;
+                                cfg.Physics3D     = GetStringFromBuffer(_cfgPhys3DBuf);
+                                cfg.Physics2D     = GetStringFromBuffer(_cfgPhys2DBuf);
+                                ConfigManager.Save();
+                            }
+                            _dialog = DialogMode.None;
+                        }
+                        igSameLine(0, 8);
+                        if (igButton("Cancel##psCancel", new Vector2(80, 0)))
+                            _dialog = DialogMode.None;
+                        break;
                     }
                 }
-                else
-                {
-                    if (igButton("Create##np", new Vector2(80, 0)))
-                    {
-                        string name = GetStringFromBuffer(_newProjectNameBuf);
-                        string dest = GetStringFromBuffer(_dialogPathBuf);
-                        if (name.Length > 0 && dest.Length > 0)
-                            StartCreateProject(name, dest);
-                    }
-                    igSameLine(0, 8);
-                    if (igButton("Cancel##npcancel", new Vector2(80, 0)))
-                    {
-                        igCloseCurrentPopup();
-                        _dialog = DialogMode.None;
-                    }
-                }
-
-                igEndPopup();
             }
 
-            // --- Open Project ---
-            if (igBeginPopupModal("##OpenProject", ref unused, ImGuiWindowFlags.AlwaysAutoResize))
-            {
-                igText("Open Project");
-                igSeparator();
-                igText("Project folder (contains config.json):");
-                igSetNextItemWidth(400f);
-                igInputText("##opPath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igSpacing();
-                if (igButton("Open##op", new Vector2(80, 0)))
-                {
-                    string path = GetStringFromBuffer(_dialogPathBuf);
-                    if (path.Length > 0)
-                    {
-                        ConfigManager.Load(path);
-                        igCloseCurrentPopup();
-                        _dialog = DialogMode.None;
-                    }
-                }
-                igSameLine(0, 8);
-                if (igButton("Cancel##opcancel", new Vector2(80, 0)))
-                {
-                    igCloseCurrentPopup();
-                    _dialog = DialogMode.None;
-                }
-                igEndPopup();
-            }
-
-            // --- Project Settings ---
-            if (igBeginPopupModal("##ProjSettings", ref unused, ImGuiWindowFlags.AlwaysAutoResize))
-            {
-                igText("Project Settings");
-                igSeparator();
-
-                igText("Project Name:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(260f);
-                igInputText("##psName", ref _cfgNameBuf[0], (uint)_cfgNameBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igText("Default Scene:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(260f);
-                igInputText("##psScene", ref _cfgSceneBuf[0], (uint)_cfgSceneBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igText("Default Camera:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(260f);
-                igInputText("##psCam", ref _cfgCamBuf[0], (uint)_cfgCamBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igText("Screen Width:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(100f);
-                igInputInt("##psW", ref _cfgWidth, 1, 10, ImGuiInputTextFlags.None);
-
-                igText("Screen Height:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(100f);
-                igInputInt("##psH", ref _cfgHeight, 1, 10, ImGuiInputTextFlags.None);
-
-                igText("Physics 3D:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(100f);
-                igInputText("##psP3", ref _cfgPhys3DBuf[0], (uint)_cfgPhys3DBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igText("Physics 2D:");
-                igSameLine(0, 6);
-                igSetNextItemWidth(100f);
-                igInputText("##psP2", ref _cfgPhys2DBuf[0], (uint)_cfgPhys2DBuf.Length,
-                    ImGuiInputTextFlags.None, null, null);
-
-                igSpacing();
-
-                if (igButton("Save##psSave", new Vector2(80, 0)))
-                {
-                    var cfg = ConfigManager.Config;
-                    if (cfg != null)
-                    {
-                        cfg.ProjectName   = GetStringFromBuffer(_cfgNameBuf);
-                        cfg.DefaultScene  = GetStringFromBuffer(_cfgSceneBuf);
-                        cfg.DefaultCamera = GetStringFromBuffer(_cfgCamBuf);
-                        cfg.ScreenWidth   = _cfgWidth;
-                        cfg.ScreenHeight  = _cfgHeight;
-                        cfg.Physics3D     = GetStringFromBuffer(_cfgPhys3DBuf);
-                        cfg.Physics2D     = GetStringFromBuffer(_cfgPhys2DBuf);
-                        ConfigManager.Save();
-                    }
-                    igCloseCurrentPopup();
-                    _dialog = DialogMode.None;
-                }
-                igSameLine(0, 8);
-                if (igButton("Cancel##psCancel", new Vector2(80, 0)))
-                {
-                    igCloseCurrentPopup();
-                    _dialog = DialogMode.None;
-                }
-                igEndPopup();
-            }
+            igEnd();
         }
 
         private static void StartCreateProject(string name, string dest)
