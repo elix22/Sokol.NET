@@ -208,11 +208,32 @@ namespace GameEditor.UI
             if (mode == DialogMode.SaveAs)
             {
                 string initial = initialPath.EndsWith(".scene.json") ? initialPath : initialPath + ".scene.json";
-                FillBuffer(ref _dialogPathBuf, initial);
+                string dir  = System.IO.Path.GetDirectoryName(initial) ?? "";
+                string fname = System.IO.Path.GetFileName(initial);
+                if (!System.IO.Directory.Exists(dir))
+                    dir = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+                ImFileDialog.OpenDialog("ifd_saveas", "Save Scene As",
+                    "Scene Files{.scene.json},All Files{.*}", dir, fname, ImFileDialog.Mode.SaveFile);
+            }
+            else if (mode == DialogMode.Open)
+            {
+                string dir = !string.IsNullOrEmpty(initialPath)
+                    ? (System.IO.Directory.Exists(initialPath) ? initialPath
+                       : System.IO.Path.GetDirectoryName(initialPath) ?? "")
+                    : "";
+                ImFileDialog.OpenDialog("ifd_open", "Open Scene",
+                    "Scene Files{.scene.json},All Files{.*}", dir, "", ImFileDialog.Mode.OpenFile);
+            }
+            else if (mode == DialogMode.OpenProject)
+            {
+                ImFileDialog.OpenDialog("ifd_openproject", "Open Project Folder",
+                    null, initialPath, "", ImFileDialog.Mode.SelectFolder);
             }
             else if (mode == DialogMode.NewProject)
             {
                 _newProjectNameBuf = new byte[128];
+                FillBuffer(ref _dialogPathBuf,
+                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile));
             }
             else if (mode == DialogMode.ProjectSettings)
             {
@@ -227,10 +248,6 @@ namespace GameEditor.UI
                     FillBuffer(ref _cfgPhys3DBuf, cfg.Physics3D);
                     FillBuffer(ref _cfgPhys2DBuf, cfg.Physics2D);
                 }
-            }
-            else
-            {
-                FillBuffer(ref _dialogPathBuf, initialPath);
             }
         }
 
@@ -263,84 +280,81 @@ namespace GameEditor.UI
                 }
             }
 
+            // New-project destination folder browser (can be open alongside NewProject dialog)
+            if (ImFileDialog.Display("ifd_np_dest"))
+            {
+                if (ImFileDialog.IsOk())
+                    FillBuffer(ref _dialogPathBuf, ImFileDialog.GetFilePathName());
+                ImFileDialog.Close();
+            }
+
             if (_dialog == DialogMode.None) return;
 
-            // Position dialogs centered on screen
+            // ── File-picker dialogs (render their own window) ─────────────────
+            if (_dialog == DialogMode.SaveAs)
+            {
+                if (ImFileDialog.Display("ifd_saveas"))
+                {
+                    if (ImFileDialog.IsOk())
+                        SceneManager.SaveScene(ImFileDialog.GetFilePathName());
+                    ImFileDialog.Close();
+                    _dialog = DialogMode.None;
+                }
+                return;
+            }
+
+            if (_dialog == DialogMode.Open)
+            {
+                if (ImFileDialog.Display("ifd_open"))
+                {
+                    if (ImFileDialog.IsOk())
+                        SceneManager.LoadScene(ImFileDialog.GetFilePathName());
+                    ImFileDialog.Close();
+                    _dialog = DialogMode.None;
+                }
+                return;
+            }
+
+            if (_dialog == DialogMode.OpenProject)
+            {
+                if (ImFileDialog.Display("ifd_openproject"))
+                {
+                    if (ImFileDialog.IsOk())
+                        ConfigManager.Load(ImFileDialog.GetFilePathName());
+                    ImFileDialog.Close();
+                    _dialog = DialogMode.None;
+                }
+                return;
+            }
+
+            // ── Window-based dialogs (NewProject, ProjectSettings) ────────────
             var vp = igGetMainViewport();
             var center = new Vector2(vp->Pos.X + vp->Size.X * 0.5f,
                                      vp->Pos.Y + vp->Size.Y * 0.5f);
 
             igSetNextWindowPos(center, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
-            igSetNextWindowSize(Vector2.Zero, ImGuiCond.Always); // auto-size
+            igSetNextWindowSize(Vector2.Zero, ImGuiCond.Always);
 
             string title = _dialog switch
             {
-                DialogMode.SaveAs          => "Save Scene As",
-                DialogMode.Open            => "Open Scene",
                 DialogMode.NewProject      => "New Project",
-                DialogMode.OpenProject     => "Open Project",
                 DialogMode.ProjectSettings => "Project Settings",
                 _                          => "Dialog"
             };
 
             byte dlgOpen = 1;
             bool showing = igBegin(title + "##Editor_dlg", ref dlgOpen,
-                ImGuiWindowFlags.NoCollapse    |
+                ImGuiWindowFlags.NoCollapse       |
                 ImGuiWindowFlags.AlwaysAutoResize |
-                ImGuiWindowFlags.NoDocking     |
+                ImGuiWindowFlags.NoDocking        |
                 ImGuiWindowFlags.NoSavedSettings);
 
-            // 'X' button closes the dialog
             if (dlgOpen == 0) { _dialog = DialogMode.None; igEnd(); return; }
 
             if (showing)
             {
                 switch (_dialog)
                 {
-                    case DialogMode.SaveAs:
-                    {
-                        igText("Path:");
-                        igSameLine(0, 6);
-                        igSetNextItemWidth(400f);
-                        igInputText("##savepath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
-                        igSpacing();
-                        if (igButton("Save", new Vector2(80, 0)))
-                        {
-                            string path = GetStringFromBuffer(_dialogPathBuf);
-                            if (path.Length > 0)
-                            {
-                                SceneManager.SaveScene(path);
-                                _dialog = DialogMode.None;
-                            }
-                        }
-                        igSameLine(0, 8);
-                        if (igButton("Cancel", new Vector2(80, 0)))
-                            _dialog = DialogMode.None;
-                        break;
-                    }
-                    case DialogMode.Open:
-                    {
-                        igText("Path:");
-                        igSameLine(0, 6);
-                        igSetNextItemWidth(400f);
-                        igInputText("##openpath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
-                        igSpacing();
-                        if (igButton("Open", new Vector2(80, 0)))
-                        {
-                            string path = GetStringFromBuffer(_dialogPathBuf);
-                            if (path.Length > 0)
-                            {
-                                SceneManager.LoadScene(path);
-                                _dialog = DialogMode.None;
-                            }
-                        }
-                        igSameLine(0, 8);
-                        if (igButton("Cancel", new Vector2(80, 0)))
-                            _dialog = DialogMode.None;
-                        break;
-                    }
                     case DialogMode.NewProject:
                     {
                         igText("Name:");
@@ -350,9 +364,16 @@ namespace GameEditor.UI
                             ImGuiInputTextFlags.None, null, null);
                         igText("Destination:");
                         igSameLine(0, 6);
-                        igSetNextItemWidth(280f);
+                        igSetNextItemWidth(250f);
                         igInputText("##npDest", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
                             ImGuiInputTextFlags.None, null, null);
+                        igSameLine(0, 4);
+                        if (igButton("...##npBrowse", new Vector2(28, 0)))
+                        {
+                            string cur = GetStringFromBuffer(_dialogPathBuf);
+                            ImFileDialog.OpenDialog("ifd_np_dest", "Select Destination Folder",
+                                null, cur, "", ImFileDialog.Mode.SelectFolder);
+                        }
                         igSpacing();
                         if (_isCreating)
                         {
@@ -379,27 +400,6 @@ namespace GameEditor.UI
                             if (igButton("Cancel##npcancel", new Vector2(80, 0)))
                                 _dialog = DialogMode.None;
                         }
-                        break;
-                    }
-                    case DialogMode.OpenProject:
-                    {
-                        igText("Project folder (contains config.json):");
-                        igSetNextItemWidth(400f);
-                        igInputText("##opPath", ref _dialogPathBuf[0], (uint)_dialogPathBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
-                        igSpacing();
-                        if (igButton("Open##op", new Vector2(80, 0)))
-                        {
-                            string path = GetStringFromBuffer(_dialogPathBuf);
-                            if (path.Length > 0)
-                            {
-                                ConfigManager.Load(path);
-                                _dialog = DialogMode.None;
-                            }
-                        }
-                        igSameLine(0, 8);
-                        if (igButton("Cancel##opcancel", new Vector2(80, 0)))
-                            _dialog = DialogMode.None;
                         break;
                     }
                     case DialogMode.ProjectSettings:
