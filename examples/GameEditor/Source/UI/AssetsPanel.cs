@@ -39,6 +39,9 @@ namespace GameEditor.UI
         private const string IconScene       = "\uF008";   // film strip
         private const string IconRefresh     = "\uF021";
         private const string IconSearch      = "\uF002";
+        private const string IconHome        = "\uF015";
+        private const string IconArrowUp     = "\uF062";
+        private const string IconArrowLeft   = "\uF060";
 
         // ── State ────────────────────────────────────────────────────────────
         private static string? _selectedFolder;    // highlighted in left pane
@@ -57,6 +60,15 @@ namespace GameEditor.UI
         private static string?       _cachedFolderPath;
         private static List<string>  _cachedSubDirs  = new();
         private static List<string>  _cachedFiles    = new();
+
+        // Navigation history for Back button
+        private static Stack<string> _navHistory = new();
+
+        // Pending delete — set before opening confirmation modal
+        private static string? _pendingDeletePath;
+        private static bool    _pendingDeleteIsFolder;
+        private static bool    _shouldOpenDeleteModal;   // deferred: open popup outside any popup context
+        private static byte    _deleteModalOpen = 1;
 
         // Auto-refresh (only on button click or after file ops — no timer-based I/O)
 
@@ -80,6 +92,7 @@ namespace GameEditor.UI
 
             // ── Toolbar ──────────────────────────────────────────────────────
             DrawToolbar(root);
+            DrawDeleteConfirmModal();
             igSeparator();
 
             // ── Two panes ────────────────────────────────────────────────────
@@ -108,7 +121,37 @@ namespace GameEditor.UI
         // ── Toolbar ──────────────────────────────────────────────────────────
         private static void DrawToolbar(string root)
         {
-            // Refresh button
+            string cur = _selectedFolder ?? root;
+
+            // Back
+            bool canGoBack = _navHistory.Count > 0;
+            if (!canGoBack) igBeginDisabled(true);
+            if (igSmallButton($"{IconArrowLeft}##nav_back") && canGoBack)
+            {
+                string prev = _navHistory.Pop();
+                SelectFolder(prev);
+            }
+            if (!canGoBack) igEndDisabled();
+            igSameLine(0, 4);
+
+            // Home
+            bool atRoot = cur == root;
+            if (atRoot) igBeginDisabled(true);
+            if (igSmallButton($"{IconHome}##nav_home") && !atRoot)
+                NavigateTo(root);
+            if (atRoot) igEndDisabled();
+            igSameLine(0, 4);
+
+            // Up
+            string? parentFolder = (cur != root) ? Path.GetDirectoryName(cur) : null;
+            bool canGoUp = parentFolder != null && parentFolder != cur;
+            if (!canGoUp) igBeginDisabled(true);
+            if (igSmallButton($"{IconArrowUp}##nav_up") && canGoUp)
+                NavigateTo(parentFolder!);
+            if (!canGoUp) igEndDisabled();
+            igSameLine(0, 8);
+
+            // Refresh
             if (igSmallButton($"{IconRefresh} Refresh"))
                 _cachedFolderPath = null;
             igSameLine(0, 8);
@@ -210,11 +253,7 @@ namespace GameEditor.UI
                 if (igSelectable_Bool($"{IconFolder}  {name}##{sub}", sel,
                     ImGuiSelectableFlags.None, Vector2.Zero))
                 {
-                    SelectFolder(sub);
-                }
-                if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
-                {
-                    SelectFolder(sub);
+                    NavigateTo(sub);
                 }
                 DrawFolderContextMenu(sub);
             }
@@ -260,6 +299,13 @@ namespace GameEditor.UI
                     TryCreateFolder(dirPath);
                     igCloseCurrentPopup();
                 }
+                if (igMenuItem_Bool("Delete Folder", null, false, true))
+                {
+                    _pendingDeletePath = dirPath;
+                    _pendingDeleteIsFolder = true;
+                    _shouldOpenDeleteModal = true;
+                    igCloseCurrentPopup();
+                }
                 if (igMenuItem_Bool("Reveal in Finder", null, false, true))
                 {
                     RevealPath(dirPath);
@@ -294,7 +340,9 @@ namespace GameEditor.UI
                 }
                 if (igMenuItem_Bool("Delete", null, false, true))
                 {
-                    TryDeleteFile(filePath);
+                    _pendingDeletePath = filePath;
+                    _pendingDeleteIsFolder = false;
+                    _shouldOpenDeleteModal = true;
                     igCloseCurrentPopup();
                 }
                 if (igMenuItem_Bool("Reveal in Finder", null, false, true))
@@ -343,6 +391,14 @@ namespace GameEditor.UI
             if (name.EndsWith(".zip",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             if (name.EndsWith(".tar",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             return IconFile;
+        }
+
+        // Navigates to a folder, recording the current location in history (for Back).
+        private static void NavigateTo(string path)
+        {
+            if (_selectedFolder != null && _selectedFolder != path)
+                _navHistory.Push(_selectedFolder);
+            SelectFolder(path);
         }
 
         // Selects a folder and ensures every ancestor up to root is expanded in the left tree.
@@ -395,6 +451,65 @@ namespace GameEditor.UI
                 _cachedFolderPath = null;
             }
             catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
+        }
+
+        private static void TryDeleteFolder(string dirPath)
+        {
+            try
+            {
+                Directory.Delete(dirPath, recursive: true);
+                _cachedFolderPath = null;
+                if (_selectedFolder == dirPath)
+                    _selectedFolder = Path.GetDirectoryName(dirPath);
+                _navHistory.Clear();
+            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
+        }
+
+        private static void DrawDeleteConfirmModal()
+        {
+            // Must call igOpenPopup at the root window level (not inside any popup)
+            // so the modal is not parented to and dismissed with the context menu.
+            if (_shouldOpenDeleteModal)
+            {
+                _shouldOpenDeleteModal = false;
+                _deleteModalOpen = 1;
+                igOpenPopup_Str("Delete?##modal", ImGuiPopupFlags.None);
+            }
+
+            igSetNextWindowSize(new Vector2(360, 0), ImGuiCond.Always);
+            if (igBeginPopupModal("Delete?##modal", ref _deleteModalOpen, ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                igTextWrapped($"Delete '{Path.GetFileName(_pendingDeletePath)}'?");
+                if (_pendingDeleteIsFolder)
+                    igTextWrapped("All folder contents will be permanently deleted.");
+                igSpacing();
+                igSeparator();
+                igSpacing();
+
+                if (igButton("Delete", new Vector2(120, 0)))
+                {
+                    if (_pendingDeleteIsFolder)
+                        TryDeleteFolder(_pendingDeletePath);
+                    else
+                        TryDeleteFile(_pendingDeletePath);
+                    _pendingDeletePath = null;
+                    igCloseCurrentPopup();
+                }
+                igSameLine(0, 8);
+                if (igButton("Cancel", new Vector2(120, 0)))
+                {
+                    _pendingDeletePath = null;
+                    igCloseCurrentPopup();
+                }
+                igEndPopup();
+            }
+            // If user dismissed via the X button
+            if (_deleteModalOpen == 0)
+            {
+                _pendingDeletePath = null;
+                _deleteModalOpen = 1;
+            }
         }
 
         private static void TryDeleteFile(string filePath)
