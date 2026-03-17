@@ -37,6 +37,7 @@
 | 10a — ImGuizmo / picking | ✅ | `ext/ImGuizmo` submodule; `ext/imguizmo_wrapper.cpp` C wrapper; `src/imgui/ImGuizmo.cs` P/Invoke bindings; gizmo overlay in `SceneWindow` with undo; W/E/R shortcuts; T/R/S + Local/World toolbar buttons. **Requires native lib rebuild** (`scripts/build-xcode-macos.sh`). |
 | 10b — Undo/Redo | ✅ | `IEditorCommand`, `DelegateCommand`, `UndoStack` (100-step); Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z |
 | 10c — Prefabs | ⬜ | Not started |
+| 10d — Assets Panel | ✅ | Full two-pane browser; Font Awesome 4 icons; navigation (Back/Home/Up); folder tree stable expand/collapse; rename (double-click + context menu, folders + files); delete with confirmation modal; drag-drop `.scene.json` onto Scene viewport |
 
 ---
 
@@ -763,11 +764,63 @@ The editor UI presents a **Build & Deploy** panel that fills in `SokolApplicatio
 
 ## Phase 10 — Editor-Specific Features
 
-### 10.1 Asset Browser Panel (future)
+### 10.1 Asset Browser Panel ✅
 
-- File tree rooted at project `Assets/` folder
-- Drag-and-drop to Hierarchy or Inspector fields
-- Thumbnail preview for textures (render via sokol → `igImage`)
+> **Implemented** in `examples/GameEditor/Source/UI/AssetsPanel.cs`.
+
+**Layout**: Unity-style two-pane layout.
+- **Left pane** (28% width, min 140px): recursive folder tree using `igTreeNodeEx_StrStr` with stable `dirPath` ID to prevent icon-change-induced collapses.
+- **Right pane**: contents of the selected folder — sub-directories and files as `igSelectable` rows.
+
+**Toolbar** (left to right):
+- `←` Back (`\uF060`) — grayed at stack bottom; pops `_navHistory` stack
+- `⌂` Home (`\uF015`) — grayed at root; jumps directly to project root
+- `↑` Up (`\uF062`) — grayed at root; navigates to parent folder  
+- Refresh (`\uF021`) — clears `_cachedFolderPath` to force right-pane rebuild
+- Search input — live filter by filename substring
+
+**Navigation**:
+- Navigation state: `_navHistory: Stack<string>`. `NavigateTo(path)` pushes current folder before moving; clicking Back pops and calls `SelectFolder` (not `NavigateTo`) to avoid polluting history.
+- `SelectFolder(path)` walks the ancestor chain and adds every ancestor to `_openFolders: HashSet<string>` so the left tree auto-expands to show the selected folder.
+
+**Folder tree stability** (critical design):
+- `igTreeNodeEx_StrStr(dirPath, flags, displayLabel)` — uses `dirPath` as the stable ID separate from the display label (which includes the font-awesome icon prefix). Without this, changing the icon (closed→open) creates a new ImGui node, collapsing the tree.
+- Open/close state is fully owned by `_openFolders: HashSet<string>`. `igSetNextItemOpen(isOpen, ImGuiCond.Always)` is called every frame to override ImGui's internal state.
+- Arrow-toggle detected via `igIsItemToggledOpen()` to add/remove from `_openFolders`.
+
+**Rename** (inline `igInputText` replaces the row in-place):
+- Trigger: double-click label (folders in tree + files in right pane) or right-click → Rename
+- `BeginRename(path, isFolder)` copies current name into `_renameBuffer`, sets `_renameFocusPending = true`
+- `DrawRenameInput(path)` renders `InputText` with `EnterReturnsTrue | AutoSelectAll`; dispatches to `TryRenameFolder` or `TryRenameFile` on confirm; clears `_renamingPath` on deactivate
+- `TryRenameFolder`: `Directory.Move`, updates `_openFolders` + `_selectedFolder`, clears `_navHistory`
+- `TryRenameFile`: `File.Move`, updates `_selectedFile`
+- `.scene.json` files: double-click **loads** scene (not rename); context menu has separate Rename item
+
+**Delete confirmation modal** (critical ImGui popup parenting fix):
+- Context menu sets `_pendingDeletePath`, `_pendingDeleteIsFolder`, `_shouldOpenDeleteModal = true`, then calls `igCloseCurrentPopup()`.
+- `DrawDeleteConfirmModal()` is called at the root window level (outside any popup). It detects `_shouldOpenDeleteModal`, then calls `igOpenPopup_Str` there — ensuring the modal is parented to the main window, not the (now-closed) context menu.
+- Modal shows item name + folder warning, with Delete/Cancel buttons (`igBeginPopupModal` + `igEndPopup`).
+- `TryDeleteFolder`: `Directory.Delete(path, recursive: true)`, updates `_selectedFolder` to parent, clears `_navHistory`.
+
+**Drag-drop** (scene loading):
+- Source: `.scene.json` files call `igBeginDragDropSource` after their `igSelectable`. Payload type `"SCENE_PATH"` carries the UTF-8 null-terminated file path as raw bytes via `igSetDragDropPayload`.
+- Target: `SceneWindow.Draw()` calls `igBeginDragDropTarget()` immediately after `igImage` (the viewport texture). `igAcceptDragDropPayload("SCENE_PATH", ...)` on delivery decodes the path and calls `SceneManager.LoadScene` + `EditorPersistence.SetLastScene`.
+
+**Font Awesome 4 icons used in AssetsPanel**:
+| Constant | Codepoint | Usage |
+|---|---|---|
+| `IconFolder` | `\uF07B` | Closed folder |
+| `IconFolderOpen` | `\uF07C` | Open folder with children |
+| `IconFile` | `\uF15B` | Generic file |
+| `IconFileCode` | `\uF1C9` | `.cs`, `.json`, `.glsl`, `.hlsl`, `.metal` |
+| `IconFileImage` | `\uF1C5` | `.png`, `.jpg`, `.jpeg`, `.tga`, `.bmp` |
+| `IconFileArchive` | `\uF1C6` | `.zip`, `.tar` |
+| `IconScene` | `\uF008` | `.scene.json` files |
+| `IconRefresh` | `\uF021` | Refresh button |
+| `IconSearch` | `\uF002` | Search input prefix |
+| `IconHome` | `\uF015` | Home button |
+| `IconArrowUp` | `\uF062` | Up button |
+| `IconArrowLeft` | `\uF060` | Back button |
 
 ### 10.2 Undo/Redo System ✅
 
@@ -825,6 +878,7 @@ Each open scene gets its own tab in the Scene Window area (via ImGui tab bar). S
 | 10a | Editor features: ImGuizmo, picking | Phase 8b | ✅ Done — native rebuild needed |
 | 10b | Editor features: Undo/Redo | Phase 8c | ✅ Done |
 | 10c | Editor features: Prefabs | Phase 6b | ⬜ Not started |
+| 10d | Editor features: Assets Panel | Phase 8a | ✅ Done — two-pane browser, navigation, rename, delete, drag-drop |
 
 **Recommended starting point**: Phases 0 → 1a → 2a → 8a → 8b in sequence. This gives a visible editor shell with a working Scene viewport in the shortest time, proving the offscreen render + imgui composition works before adding game logic layers.
 
