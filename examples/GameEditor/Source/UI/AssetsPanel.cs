@@ -43,6 +43,9 @@ namespace GameEditor.UI
         // ── State ────────────────────────────────────────────────────────────
         private static string? _selectedFolder;    // highlighted in left pane
         private static string? _selectedFile;
+        // Explicitly track which folders are expanded so ImGui state changes
+        // (e.g. icon prefix in label changing) never accidentally collapse a node.
+        private static HashSet<string> _openFolders = new();
 
         private static string? _renamingPath;
         private static byte[]  _renameBuffer = new byte[256];
@@ -55,9 +58,7 @@ namespace GameEditor.UI
         private static List<string>  _cachedSubDirs  = new();
         private static List<string>  _cachedFiles    = new();
 
-        // Auto-refresh
-        private const float RefreshInterval = 2.0f;
-        private static float _timeSinceRefresh = RefreshInterval;
+        // Auto-refresh (only on button click or after file ops — no timer-based I/O)
 
         // ── Entry point ──────────────────────────────────────────────────────
         public static void Draw()
@@ -108,12 +109,8 @@ namespace GameEditor.UI
         private static void DrawToolbar(string root)
         {
             // Refresh button
-            _timeSinceRefresh += Time.DeltaTime;
-            if (igSmallButton($"{IconRefresh} Refresh") || _timeSinceRefresh >= RefreshInterval)
-            {
+            if (igSmallButton($"{IconRefresh} Refresh"))
                 _cachedFolderPath = null;
-                _timeSinceRefresh = 0f;
-            }
             igSameLine(0, 8);
 
             // Search filter
@@ -131,35 +128,47 @@ namespace GameEditor.UI
                 : Path.GetFileName(dirPath);
 
             bool isSelected = _selectedFolder == dirPath;
-            bool hasSubDirs = HasSubDirectories(dirPath);
+            List<string> subDirs = SortedDirs(dirPath);
+            bool hasSubDirs = subDirs.Count > 0;
+
+            // Auto-open root on first visit
+            if (dirPath == root && !_openFolders.Contains(dirPath))
+                _openFolders.Add(dirPath);
 
             var flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.OpenOnArrow;
             if (!hasSubDirs)
                 flags |= ImGuiTreeNodeFlags.Leaf;
             if (isSelected)
                 flags |= ImGuiTreeNodeFlags.Selected;
-            if (dirPath == root)
-                flags |= ImGuiTreeNodeFlags.DefaultOpen;
 
-            string icon = (isSelected && hasSubDirs) ? IconFolderOpen : IconFolder;
-            bool expanded = igTreeNodeEx_Str($"{icon} {label}##{dirPath}", flags);
+            // Drive open/close from our own state so ImGui never collapses a node
+            // because the display label (icon prefix) changed.
+            bool isOpen = _openFolders.Contains(dirPath);
+            igSetNextItemOpen(isOpen, ImGuiCond.Always);
 
-            if (igIsItemClicked(ImGuiMouseButton.Left))
+            string icon = (isOpen && hasSubDirs) ? IconFolderOpen : IconFolder;
+            // Use igTreeNodeEx_StrStr: stable str_id (dirPath) separate from display label.
+            bool expanded = igTreeNodeEx_StrStr(dirPath, flags, $"{icon}  {label}");
+
+            // Let the user toggle open/close via the arrow only
+            if (igIsItemToggledOpen())
+            {
+                if (isOpen) _openFolders.Remove(dirPath);
+                else        _openFolders.Add(dirPath);
+            }
+
+            if (igIsItemClicked(ImGuiMouseButton.Left) && !igIsItemToggledOpen())
             {
                 _selectedFolder = dirPath;
-                _cachedFolderPath = null; // force refresh of right pane
+                _cachedFolderPath = null;
             }
 
             DrawFolderContextMenu(dirPath);
 
             if (expanded)
             {
-                try
-                {
-                    foreach (string sub in SortedDirs(dirPath))
-                        DrawFolderTree(sub, root);
-                }
-                catch { }
+                foreach (string sub in subDirs)
+                    DrawFolderTree(sub, root);
                 igTreePop();
             }
         }
@@ -338,25 +347,26 @@ namespace GameEditor.UI
             return IconFile;
         }
 
-        // ── File system helpers ──────────────────────────────────────────────
-        private static bool HasSubDirectories(string path)
+        private static List<string> SortedDirs(string path)
         {
-            try { return Directory.EnumerateDirectories(path).GetEnumerator().MoveNext(); }
-            catch { return false; }
+            try
+            {
+                var list = new List<string>(Directory.EnumerateDirectories(path));
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+                return list;
+            }
+            catch { return new List<string>(); }
         }
 
-        private static IEnumerable<string> SortedDirs(string path)
+        private static List<string> SortedFiles(string path)
         {
-            var list = new List<string>(Directory.EnumerateDirectories(path));
-            list.Sort(StringComparer.OrdinalIgnoreCase);
-            return list;
-        }
-
-        private static IEnumerable<string> SortedFiles(string path)
-        {
-            var list = new List<string>(Directory.EnumerateFiles(path));
-            list.Sort(StringComparer.OrdinalIgnoreCase);
-            return list;
+            try
+            {
+                var list = new List<string>(Directory.EnumerateFiles(path));
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+                return list;
+            }
+            catch { return new List<string>(); }
         }
 
         private static void TryCreateFolder(string parentDir)

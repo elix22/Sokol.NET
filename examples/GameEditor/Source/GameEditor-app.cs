@@ -379,6 +379,7 @@ public static unsafe class GameeditorApp
             cleanup_cb  = &Cleanup,
             width       = 1600,
             height      = 900,
+            fullscreen   = false,
             sample_count = 1,
             window_title = "GameEditor",
             icon             = { sokol_default = true },
