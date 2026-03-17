@@ -210,13 +210,11 @@ namespace GameEditor.UI
                 if (igSelectable_Bool($"{IconFolder}  {name}##{sub}", sel,
                     ImGuiSelectableFlags.None, Vector2.Zero))
                 {
-                    _selectedFolder = sub;
-                    _cachedFolderPath = null;
+                    SelectFolder(sub);
                 }
                 if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
                 {
-                    _selectedFolder = sub;
-                    _cachedFolderPath = null;
+                    SelectFolder(sub);
                 }
                 DrawFolderContextMenu(sub);
             }
@@ -345,6 +343,22 @@ namespace GameEditor.UI
             if (name.EndsWith(".zip",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             if (name.EndsWith(".tar",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             return IconFile;
+        }
+
+        // Selects a folder and ensures every ancestor up to root is expanded in the left tree.
+        private static void SelectFolder(string path)
+        {
+            _selectedFolder = path;
+            _cachedFolderPath = null;
+            // Walk up and open all ancestors
+            string? cur = Path.GetDirectoryName(path);
+            while (cur != null)
+            {
+                _openFolders.Add(cur);
+                string? parent = Path.GetDirectoryName(cur);
+                if (parent == cur) break; // filesystem root
+                cur = parent;
+            }
         }
 
         private static List<string> SortedDirs(string path)
