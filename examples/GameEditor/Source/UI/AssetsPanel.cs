@@ -1,7 +1,19 @@
 // AssetsPanel.cs
-// Unity-style Assets browser panel for the GameEditor.
-// Shows the file/folder tree of the currently loaded project root.
-// Double-clicking a .scene.json file loads that scene.
+// Unity-style two-pane Assets browser.
+//   Left pane  : folder tree
+//   Right pane : contents of the selected folder (icons + names)
+//
+// Icons use Font Awesome 4 codepoints merged onto the main font.
+// FA4 relevant codepoints:
+//   folder         \uF07B
+//   folder-open    \uF07C
+//   file           \uF15B
+//   file-code      \uF1C9
+//   file-image     \uF1C5
+//   file-archive   \uF1C6
+//   film (scene)   \uF008
+//   refresh        \uF021
+//   search         \uF002
 
 using System;
 using System.IO;
@@ -17,22 +29,37 @@ namespace GameEditor.UI
 {
     public static unsafe class AssetsPanel
     {
-        // ── Selection / rename state ─────────────────────────────────────────
+        // ── FA4 icon codepoints ──────────────────────────────────────────────
+        private const string IconFolder      = "\uF07B";
+        private const string IconFolderOpen  = "\uF07C";
+        private const string IconFile        = "\uF15B";
+        private const string IconFileCode    = "\uF1C9";
+        private const string IconFileImage   = "\uF1C5";
+        private const string IconFileArchive = "\uF1C6";
+        private const string IconScene       = "\uF008";   // film strip
+        private const string IconRefresh     = "\uF021";
+        private const string IconSearch      = "\uF002";
 
-        private static string? _selectedPath;
+        // ── State ────────────────────────────────────────────────────────────
+        private static string? _selectedFolder;    // highlighted in left pane
+        private static string? _selectedFile;
+
         private static string? _renamingPath;
         private static byte[]  _renameBuffer = new byte[256];
+        private static bool    _renameFocusPending;
 
-        // ── Refresh throttling ───────────────────────────────────────────────
+        private static byte[]  _searchBuf = new byte[128];
 
-        private const float RefreshInterval = 2.0f; // seconds
-        private static float _timeSinceRefresh = RefreshInterval; // force first refresh
-        private static List<string>? _cachedTopDirs;
-        private static List<string>? _cachedTopFiles;
-        private static readonly Dictionary<string, (List<string> dirs, List<string> files)> _dirCache = new();
+        // Cached directory content for right pane
+        private static string?       _cachedFolderPath;
+        private static List<string>  _cachedSubDirs  = new();
+        private static List<string>  _cachedFiles    = new();
 
-        // ── Panel entry ──────────────────────────────────────────────────────
+        // Auto-refresh
+        private const float RefreshInterval = 2.0f;
+        private static float _timeSinceRefresh = RefreshInterval;
 
+        // ── Entry point ──────────────────────────────────────────────────────
         public static void Draw()
         {
             byte open = 1;
@@ -43,7 +70,6 @@ namespace GameEditor.UI
             }
 
             string? root = ConfigManager.HasProject ? ConfigManager.ProjectFolder : null;
-
             if (root == null || !Directory.Exists(root))
             {
                 igTextDisabled("No project loaded.");
@@ -51,117 +77,176 @@ namespace GameEditor.UI
                 return;
             }
 
-            // Refresh button + auto-refresh timer  
-            _timeSinceRefresh += Time.DeltaTime;
-            if (igSmallButton("⟳ Refresh") || _timeSinceRefresh >= RefreshInterval)
-            {
-                _dirCache.Clear();
-                _cachedTopDirs  = null;
-                _cachedTopFiles = null;
-                _timeSinceRefresh = 0f;
-            }
-
+            // ── Toolbar ──────────────────────────────────────────────────────
+            DrawToolbar(root);
             igSeparator();
 
-            // Populate top-level cache
-            if (_cachedTopDirs == null)
-                RefreshDir(root, out _cachedTopDirs, out _cachedTopFiles);
+            // ── Two panes ────────────────────────────────────────────────────
+            Vector2 avail = default;
+            igGetContentRegionAvail(ref avail);
+            float leftW = MathF.Max(avail.X * 0.28f, 140f);
 
-            // Breadcrumb / path bar (project name as root label)
-            string rootLabel = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
-            igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.8f, 0.8f, 0.3f, 1f));
-            igText(rootLabel);
-            igPopStyleColor(1);
+            // Left: folder tree
+            igBeginChild_Str("##assets_tree", new Vector2(leftW, 0),
+                ImGuiChildFlags.Borders, ImGuiWindowFlags.None);
+            DrawFolderTree(root, root);
+            igEndChild();
 
-            igSeparator();
+            igSameLine(0, 4);
 
-            // Scrollable tree area
-            igBeginChild_Str("##assets_tree", Vector2.Zero, ImGuiChildFlags.None, ImGuiWindowFlags.None);
-            DrawDirectory(root, _cachedTopDirs, _cachedTopFiles);
+            // Right: folder contents
+            igBeginChild_Str("##assets_content", new Vector2(0, 0),
+                ImGuiChildFlags.None, ImGuiWindowFlags.None);
+            string displayFolder = _selectedFolder ?? root;
+            DrawFolderContents(displayFolder);
             igEndChild();
 
             igEnd();
         }
 
-        // ── Directory node ───────────────────────────────────────────────────
-
-        private static void DrawDirectory(string dirPath, List<string> dirs, List<string> files)
+        // ── Toolbar ──────────────────────────────────────────────────────────
+        private static void DrawToolbar(string root)
         {
-            // Sub-directories first
-            foreach (string sub in dirs)
+            // Refresh button
+            _timeSinceRefresh += Time.DeltaTime;
+            if (igSmallButton($"{IconRefresh} Refresh") || _timeSinceRefresh >= RefreshInterval)
             {
-                if (!_dirCache.TryGetValue(sub, out var subContent))
+                _cachedFolderPath = null;
+                _timeSinceRefresh = 0f;
+            }
+            igSameLine(0, 8);
+
+            // Search filter
+            igPushItemWidth(180f);
+            igInputText($"{IconSearch}##assets_search", ref _searchBuf[0],
+                (uint)_searchBuf.Length, ImGuiInputTextFlags.None, null, null);
+            igPopItemWidth();
+        }
+
+        // ── Left pane: recursive folder tree ────────────────────────────────
+        private static void DrawFolderTree(string dirPath, string root)
+        {
+            string label = dirPath == root
+                ? Path.GetFileName(dirPath.TrimEnd(Path.DirectorySeparatorChar))
+                : Path.GetFileName(dirPath);
+
+            bool isSelected = _selectedFolder == dirPath;
+            bool hasSubDirs = HasSubDirectories(dirPath);
+
+            var flags = ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.OpenOnArrow;
+            if (!hasSubDirs)
+                flags |= ImGuiTreeNodeFlags.Leaf;
+            if (isSelected)
+                flags |= ImGuiTreeNodeFlags.Selected;
+            if (dirPath == root)
+                flags |= ImGuiTreeNodeFlags.DefaultOpen;
+
+            string icon = (isSelected && hasSubDirs) ? IconFolderOpen : IconFolder;
+            bool expanded = igTreeNodeEx_Str($"{icon} {label}##{dirPath}", flags);
+
+            if (igIsItemClicked(ImGuiMouseButton.Left))
+            {
+                _selectedFolder = dirPath;
+                _cachedFolderPath = null; // force refresh of right pane
+            }
+
+            DrawFolderContextMenu(dirPath);
+
+            if (expanded)
+            {
+                try
                 {
-                    RefreshDir(sub, out var sd, out var sf);
-                    subContent = (sd, sf);
-                    _dirCache[sub] = subContent;
+                    foreach (string sub in SortedDirs(dirPath))
+                        DrawFolderTree(sub, root);
                 }
+                catch { }
+                igTreePop();
+            }
+        }
 
-                string label = Path.GetFileName(sub);
-                bool hasChildren = subContent.dirs.Count > 0 || subContent.files.Count > 0;
-                var flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
-                if (!hasChildren)
-                    flags |= ImGuiTreeNodeFlags.Leaf;
-                if (_selectedPath == sub)
-                    flags |= ImGuiTreeNodeFlags.Selected;
-
-                bool open = igTreeNodeEx_Str($"📁 {label}##{sub}", flags);
-
-                if (igIsItemClicked(ImGuiMouseButton.Left))
-                    _selectedPath = sub;
-
-                DrawContextMenuDir(sub);
-
-                if (open)
+        // ── Right pane: contents of selected folder ──────────────────────────
+        private static void DrawFolderContents(string folder)
+        {
+            // Rebuild cache when folder changes or refresh triggered
+            if (_cachedFolderPath != folder)
+            {
+                _cachedFolderPath = folder;
+                _cachedSubDirs.Clear();
+                _cachedFiles.Clear();
+                try
                 {
-                    DrawDirectory(sub, subContent.dirs, subContent.files);
-                    igTreePop();
+                    foreach (string d in SortedDirs(folder)) _cachedSubDirs.Add(d);
+                    foreach (string f in SortedFiles(folder)) _cachedFiles.Add(f);
                 }
+                catch { }
+            }
+
+            string searchText = System.Text.Encoding.UTF8.GetString(_searchBuf).TrimEnd('\0');
+            bool filtering = !string.IsNullOrEmpty(searchText);
+
+            // Path breadcrumb
+            igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.55f, 0.75f, 1f, 1f));
+            igText(folder);
+            igPopStyleColor(1);
+            igSeparator();
+
+            // Sub-directories
+            foreach (string sub in _cachedSubDirs)
+            {
+                string name = Path.GetFileName(sub);
+                if (filtering && !name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                bool sel = _selectedFolder == sub;
+                if (igSelectable_Bool($"{IconFolder}  {name}##{sub}", sel,
+                    ImGuiSelectableFlags.None, Vector2.Zero))
+                {
+                    _selectedFolder = sub;
+                    _cachedFolderPath = null;
+                }
+                if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
+                {
+                    _selectedFolder = sub;
+                    _cachedFolderPath = null;
+                }
+                DrawFolderContextMenu(sub);
             }
 
             // Files
-            foreach (string file in files)
+            foreach (string file in _cachedFiles)
             {
                 string name = Path.GetFileName(file);
-                bool isScene = name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase);
+                if (filtering && !name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-                // Renaming in-place
+                // Inline rename
                 if (_renamingPath == file)
                 {
                     DrawRenameInput(file);
                     continue;
                 }
 
-                string icon = isScene ? "🎬" : "📄";
-                var flags = ImGuiTreeNodeFlags.Leaf     |
-                            ImGuiTreeNodeFlags.NoTreePushOnOpen |
-                            ImGuiTreeNodeFlags.SpanAvailWidth;
-                if (_selectedPath == file)
-                    flags |= ImGuiTreeNodeFlags.Selected;
-
-                igTreeNodeEx_Str($"{icon} {name}##{file}", flags);
-
-                if (igIsItemClicked(ImGuiMouseButton.Left))
-                    _selectedPath = file;
+                bool sel = _selectedFile == file;
+                if (igSelectable_Bool($"{GetFileIcon(name)}  {name}##{file}", sel,
+                    ImGuiSelectableFlags.None, Vector2.Zero))
+                    _selectedFile = file;
 
                 if (igIsItemHovered(ImGuiHoveredFlags.None) &&
                     igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left) &&
-                    isScene)
+                    name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase))
                 {
                     SceneManager.LoadScene(file);
                     EditorPersistence.SetLastScene(file);
                 }
 
-                DrawContextMenuFile(file);
+                DrawFileContextMenu(file);
             }
         }
 
-        // ── Context menu – directory ─────────────────────────────────────────
-
-        private static void DrawContextMenuDir(string dirPath)
+        // ── Context menu – folder ────────────────────────────────────────────
+        private static void DrawFolderContextMenu(string dirPath)
         {
-            string popupId = $"##ctx_dir_{dirPath}";
-            if (igBeginPopupContextItem(popupId, ImGuiPopupFlags.MouseButtonRight))
+            if (igBeginPopupContextItem($"##ctx_{dirPath}", ImGuiPopupFlags.MouseButtonRight))
             {
                 if (igMenuItem_Bool("New Folder", null, false, true))
                 {
@@ -170,7 +255,7 @@ namespace GameEditor.UI
                 }
                 if (igMenuItem_Bool("Reveal in Finder", null, false, true))
                 {
-                    RevealInExplorer(dirPath);
+                    RevealPath(dirPath);
                     igCloseCurrentPopup();
                 }
                 igEndPopup();
@@ -178,14 +263,11 @@ namespace GameEditor.UI
         }
 
         // ── Context menu – file ──────────────────────────────────────────────
-
-        private static void DrawContextMenuFile(string filePath)
+        private static void DrawFileContextMenu(string filePath)
         {
-            string popupId = $"##ctx_file_{filePath}";
-            if (igBeginPopupContextItem(popupId, ImGuiPopupFlags.MouseButtonRight))
+            if (igBeginPopupContextItem($"##ctx_{filePath}", ImGuiPopupFlags.MouseButtonRight))
             {
                 bool isScene = filePath.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase);
-
                 if (isScene && igMenuItem_Bool("Load Scene", null, false, true))
                 {
                     SceneManager.LoadScene(filePath);
@@ -195,11 +277,12 @@ namespace GameEditor.UI
                 if (igMenuItem_Bool("Rename", null, false, true))
                 {
                     _renamingPath = filePath;
-                    string curName = Path.GetFileName(filePath);
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(curName);
-                    int copyLen = Math.Min(bytes.Length, _renameBuffer.Length - 1);
-                    bytes.AsSpan(0, copyLen).CopyTo(_renameBuffer);
-                    _renameBuffer[copyLen] = 0;
+                    _renameFocusPending = true;
+                    string cur = Path.GetFileName(filePath);
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(cur);
+                    int len = Math.Min(bytes.Length, _renameBuffer.Length - 1);
+                    bytes.AsSpan(0, len).CopyTo(_renameBuffer);
+                    _renameBuffer[len] = 0;
                     igCloseCurrentPopup();
                 }
                 if (igMenuItem_Bool("Delete", null, false, true))
@@ -209,47 +292,71 @@ namespace GameEditor.UI
                 }
                 if (igMenuItem_Bool("Reveal in Finder", null, false, true))
                 {
-                    RevealInExplorer(Path.GetDirectoryName(filePath) ?? filePath);
+                    RevealPath(Path.GetDirectoryName(filePath) ?? filePath);
                     igCloseCurrentPopup();
                 }
                 igEndPopup();
             }
         }
 
-        // ── Rename input ─────────────────────────────────────────────────────
-
+        // ── Inline rename ────────────────────────────────────────────────────
         private static void DrawRenameInput(string filePath)
         {
             igSetNextItemWidth(-1);
+            if (_renameFocusPending)
+            {
+                igSetKeyboardFocusHere(0);
+                _renameFocusPending = false;
+            }
             if (igInputText($"##rename_{filePath}", ref _renameBuffer[0], (uint)_renameBuffer.Length,
-                ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll,
-                null, null))
+                ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll, null, null))
             {
                 string newName = System.Text.Encoding.UTF8.GetString(_renameBuffer).TrimEnd('\0');
                 TryRenameFile(filePath, newName);
                 _renamingPath = null;
             }
             if (igIsItemDeactivated())
-                _renamingPath = null; // cancelled
+                _renamingPath = null;
+        }
+
+        // ── Icon selection ───────────────────────────────────────────────────
+        private static string GetFileIcon(string name)
+        {
+            if (name.EndsWith(".scene.json",  StringComparison.OrdinalIgnoreCase)) return IconScene;
+            if (name.EndsWith(".json",        StringComparison.OrdinalIgnoreCase)) return IconFileCode;
+            if (name.EndsWith(".cs",          StringComparison.OrdinalIgnoreCase)) return IconFileCode;
+            if (name.EndsWith(".glsl",        StringComparison.OrdinalIgnoreCase)) return IconFileCode;
+            if (name.EndsWith(".hlsl",        StringComparison.OrdinalIgnoreCase)) return IconFileCode;
+            if (name.EndsWith(".metal",       StringComparison.OrdinalIgnoreCase)) return IconFileCode;
+            if (name.EndsWith(".png",         StringComparison.OrdinalIgnoreCase)) return IconFileImage;
+            if (name.EndsWith(".jpg",         StringComparison.OrdinalIgnoreCase)) return IconFileImage;
+            if (name.EndsWith(".jpeg",        StringComparison.OrdinalIgnoreCase)) return IconFileImage;
+            if (name.EndsWith(".tga",         StringComparison.OrdinalIgnoreCase)) return IconFileImage;
+            if (name.EndsWith(".bmp",         StringComparison.OrdinalIgnoreCase)) return IconFileImage;
+            if (name.EndsWith(".zip",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
+            if (name.EndsWith(".tar",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
+            return IconFile;
         }
 
         // ── File system helpers ──────────────────────────────────────────────
-
-        private static void RefreshDir(string dirPath, out List<string> dirs, out List<string> files)
+        private static bool HasSubDirectories(string path)
         {
-            dirs  = new List<string>();
-            files = new List<string>();
-            try
-            {
-                foreach (string d in Directory.EnumerateDirectories(dirPath))
-                    dirs.Add(d);
-                dirs.Sort(StringComparer.OrdinalIgnoreCase);
+            try { return Directory.EnumerateDirectories(path).GetEnumerator().MoveNext(); }
+            catch { return false; }
+        }
 
-                foreach (string f in Directory.EnumerateFiles(dirPath))
-                    files.Add(f);
-                files.Sort(StringComparer.OrdinalIgnoreCase);
-            }
-            catch { /* ignore permission errors */ }
+        private static IEnumerable<string> SortedDirs(string path)
+        {
+            var list = new List<string>(Directory.EnumerateDirectories(path));
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
+        }
+
+        private static IEnumerable<string> SortedFiles(string path)
+        {
+            var list = new List<string>(Directory.EnumerateFiles(path));
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
         }
 
         private static void TryCreateFolder(string parentDir)
@@ -261,12 +368,9 @@ namespace GameEditor.UI
             try
             {
                 Directory.CreateDirectory(newPath);
-                _dirCache.Remove(parentDir);
+                _cachedFolderPath = null;
             }
-            catch (Exception ex)
-            {
-                Logger.Warning($"[Assets] Could not create folder: {ex.Message}");
-            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
         }
 
         private static void TryDeleteFile(string filePath)
@@ -274,34 +378,27 @@ namespace GameEditor.UI
             try
             {
                 File.Delete(filePath);
-                string? parent = Path.GetDirectoryName(filePath);
-                if (parent != null) _dirCache.Remove(parent);
-                if (_selectedPath == filePath) _selectedPath = null;
+                _cachedFolderPath = null;
+                if (_selectedFile == filePath) _selectedFile = null;
             }
-            catch (Exception ex)
-            {
-                Logger.Warning($"[Assets] Could not delete file: {ex.Message}");
-            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
         }
 
         private static void TryRenameFile(string filePath, string newName)
         {
             try
             {
-                string? dir  = Path.GetDirectoryName(filePath);
+                string? dir = Path.GetDirectoryName(filePath);
                 if (dir == null) return;
-                string dest = Path.Combine(dir, newName);
-                File.Move(filePath, dest);
-                _dirCache.Remove(dir);
-                if (_selectedPath == filePath) _selectedPath = dest;
+                File.Move(filePath, Path.Combine(dir, newName));
+                _cachedFolderPath = null;
+                if (_selectedFile == filePath)
+                    _selectedFile = Path.Combine(dir, newName);
             }
-            catch (Exception ex)
-            {
-                Logger.Warning($"[Assets] Could not rename: {ex.Message}");
-            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
         }
 
-        private static void RevealInExplorer(string path)
+        private static void RevealPath(string path)
         {
             try
             {
@@ -312,7 +409,7 @@ namespace GameEditor.UI
                 else
                     System.Diagnostics.Process.Start("xdg-open", $"\"{path}\"");
             }
-            catch { /* best-effort */ }
+            catch { }
         }
     }
 }

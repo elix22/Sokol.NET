@@ -27,6 +27,7 @@ public static unsafe class GameeditorApp
     }
 
     static _state state = default;
+    static SharedBuffer? _iconGlyphRange; // pinned buffer for FA glyph range — must outlive atlas build
 
     [UnmanagedCallersOnly]
     private static void Init()
@@ -39,6 +40,7 @@ public static unsafe class GameeditorApp
 
         simgui_setup(new simgui_desc_t
         {
+            no_default_font = true,   // we supply Roboto + FA as font 0 below
             logger = { func = &slog_func }
         });
 
@@ -51,6 +53,34 @@ public static unsafe class GameeditorApp
         {
             ushort rangeEnd = 0;  // null-terminator — use default glyph range (Latin + common symbols)
             ImFontAtlas_AddFontFromFileTTF(io->Fonts, fontPath, 14.0f, null, ref rangeEnd);
+
+            // Merge Font Awesome icons onto Roboto (same font size, merge mode)
+            string iconFontPath = System.IO.Path.Combine(
+                System.AppContext.BaseDirectory, "fonts", "fa-solid-900.ttf");
+            if (System.IO.File.Exists(iconFontPath))
+            {
+                var cfg = new Imgui.ImFontConfig
+                {
+                    MergeMode           = 1,    // merge into previous font
+                    PixelSnapH          = 1,
+                    OversampleH         = 3,    // ImGui default (must be non-zero)
+                    OversampleV         = 1,    // ImGui default (must be non-zero)
+                    RasterizerMultiply  = 1.0f, // C# zero-init → 0.0f = invisible glyphs; must be 1.0f
+                    RasterizerDensity   = 1.0f, // required > 0 or assertion fires
+                    GlyphOffset         = new System.Numerics.Vector2(0, 1f),
+                    GlyphMinAdvanceX    = 13f,
+                };
+                // Pin the FA glyph range (U+F000–U+F8FF) in a SharedBuffer so the
+                // pointer stays valid until ImGui builds the atlas on the first frame.
+                _iconGlyphRange = SharedBuffer.Create(6u); // 3 × ushort
+                var rgBuf = _iconGlyphRange.Buffer;
+                rgBuf[0] = 0x00; rgBuf[1] = 0xF0; // 0xF000 little-endian
+                rgBuf[2] = 0xFF; rgBuf[3] = 0xF8; // 0xF8FF little-endian
+                rgBuf[4] = 0x00; rgBuf[5] = 0x00; // null terminator
+                ushort* iconRange = (ushort*)_iconGlyphRange.GetBufferPointer();
+                cfg.GlyphRanges = iconRange;
+                ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconFontPath, 13.0f, &cfg, ref *iconRange);
+            }
         }
         io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         igStyleColorsDark(null);
