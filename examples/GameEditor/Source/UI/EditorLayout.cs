@@ -92,8 +92,9 @@ namespace GameEditor.UI
             DockBuilder.igDockBuilderDockWindow("Scene",     dockScene);
             DockBuilder.igDockBuilderDockWindow("Game",      dockScene);  // tab alongside Scene
             DockBuilder.igDockBuilderDockWindow("Inspector", dockInspector);
-            DockBuilder.igDockBuilderDockWindow("Console",   dockConsole);
+            DockBuilder.igDockBuilderDockWindow("Console",      dockConsole);
             DockBuilder.igDockBuilderDockWindow("Build & Deploy", dockConsole);  // tab alongside Console
+            DockBuilder.igDockBuilderDockWindow("Assets",        dockConsole);  // tab alongside Console
 
             DockBuilder.igDockBuilderFinish(_dockspaceId);
         }

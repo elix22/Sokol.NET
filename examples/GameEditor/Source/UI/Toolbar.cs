@@ -6,6 +6,7 @@ using Imgui;
 using static Imgui.ImguiNative;
 using GameEditor.Framework.Scene;
 using GameEditor.Framework.Core;
+using GameEditor;
 
 namespace GameEditor.UI
 {
@@ -29,6 +30,7 @@ namespace GameEditor.UI
         private static Process? _createProcess = null;
         private static bool     _isCreating    = false;
         private static string?  _createResultFolder = null;
+        private static string   _createProjectName  = "";
         private static readonly ConcurrentQueue<(bool isErr, string msg)> _createOutput = new();
 
         public static void Draw()
@@ -210,8 +212,21 @@ namespace GameEditor.UI
                 string initial = initialPath.EndsWith(".scene.json") ? initialPath : initialPath + ".scene.json";
                 string dir  = System.IO.Path.GetDirectoryName(initial) ?? "";
                 string fname = System.IO.Path.GetFileName(initial);
-                if (!System.IO.Directory.Exists(dir))
-                    dir = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+
+                // Default save location: project's Assets/ folder when a project is loaded
+                if (!System.IO.Directory.Exists(dir) || string.IsNullOrEmpty(dir))
+                {
+                    if (ConfigManager.HasProject)
+                    {
+                        dir = System.IO.Path.Combine(ConfigManager.ProjectFolder!, "Assets");
+                        System.IO.Directory.CreateDirectory(dir);
+                    }
+                    else
+                    {
+                        dir = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+                    }
+                }
+
                 ImFileDialog.OpenDialog("ifd_saveas", "Save Scene As",
                     "Scene Files{.scene.json},All Files{.*}", dir, fname, ImFileDialog.Mode.SaveFile);
             }
@@ -274,6 +289,12 @@ namespace GameEditor.UI
                 _isCreating = false;
                 if (_createProcess.ExitCode == 0 && _createResultFolder != null)
                 {
+                    // Create a default config.json in the new project (template has none)
+                    var defaultCfg = new ProjectConfig
+                    {
+                        ProjectName = _createProjectName,
+                    };
+                    ConfigManager.Save(_createResultFolder, defaultCfg);
                     ConfigManager.Load(_createResultFolder);
                     _createResultFolder = null;
                     _dialog = DialogMode.None;
@@ -320,7 +341,11 @@ namespace GameEditor.UI
                 if (ImFileDialog.Display("ifd_openproject"))
                 {
                     if (ImFileDialog.IsOk())
-                        ConfigManager.Load(ImFileDialog.GetFilePathName());
+                    {
+                        string projFolder = ImFileDialog.GetFilePathName();
+                        ConfigManager.Load(projFolder);
+                        EditorPersistence.AddRecentProject(projFolder);
+                    }
                     ImFileDialog.Close();
                     _dialog = DialogMode.None;
                 }
@@ -488,6 +513,7 @@ namespace GameEditor.UI
             }
 
             _isCreating = true;
+            _createProjectName  = name;
             _createResultFolder = System.IO.Path.Combine(dest, name);
 
             _createProcess.OutputDataReceived += (_, e) =>

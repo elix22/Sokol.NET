@@ -16,6 +16,7 @@ using GameEditor.Framework.Renderer;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
 using GameEditor.UI;
+using GameEditor;
 using System.Diagnostics;
 
 public static unsafe class GameeditorApp
@@ -67,6 +68,11 @@ public static unsafe class GameeditorApp
         SceneRenderer.Init();
 
         _ = EditorState.SelectedEntity; // trigger static ctor
+
+        // Restore last project + scene from previous session
+        EditorPersistence.Load();
+        EditorPersistence.RestoreSession();
+
         Logger.Info("GameEditor initialized.");
     }
 
@@ -161,6 +167,7 @@ public static unsafe class GameeditorApp
         GameWindow.Draw();
         ConsoleWindow.Draw();
         BuildDeployPanel.Draw();
+        AssetsPanel.Draw();
 
         simgui_render();
         sg_end_pass();
@@ -317,6 +324,7 @@ public static unsafe class GameeditorApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
+        EditorPersistence.Save();
         SceneRenderer.Cleanup();
         GridRenderer.Cleanup();
         GameWindow.Cleanup();
