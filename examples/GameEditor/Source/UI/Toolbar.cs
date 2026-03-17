@@ -162,7 +162,7 @@ namespace GameEditor.UI
 
             // ── Overlays dropdown (like Unity's "Gizmos" button) ─────────────
             igSameLine(0, 8);
-            if (igButton("Overlays \u25bc", new Vector2(80, 0)))
+            if (igButton("Overlays  \uF078", new Vector2(92, 0)))  // \uF078 = FA chevron-down; two spaces so icon doesn't crowd 's'
                 igOpenPopup_Str("##overlays_popup", ImGuiPopupFlags.None);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Toggle scene overlays");
 

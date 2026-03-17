@@ -59,16 +59,19 @@ public static unsafe class GameeditorApp
                 System.AppContext.BaseDirectory, "fonts", "fa-solid-900.ttf");
             if (System.IO.File.Exists(iconFontPath))
             {
+                const float fontSize = 14.0f; // must match Roboto size so icons are same height as text
+                const float iconAdvance = fontSize + 2f; // 2px wider than text = right buffer prevents right-bleed
                 var cfg = new Imgui.ImFontConfig
                 {
-                    MergeMode           = 1,    // merge into previous font
-                    PixelSnapH          = 1,
-                    OversampleH         = 3,    // ImGui default (must be non-zero)
-                    OversampleV         = 1,    // ImGui default (must be non-zero)
-                    RasterizerMultiply  = 1.0f, // C# zero-init → 0.0f = invisible glyphs; must be 1.0f
-                    RasterizerDensity   = 1.0f, // required > 0 or assertion fires
-                    GlyphOffset         = new System.Numerics.Vector2(0, 1f),
-                    GlyphMinAdvanceX    = 13f,
+                    MergeMode          = 1,           // merge into previous font
+                    PixelSnapH         = 1,
+                    OversampleH        = 3,           // must be non-zero
+                    OversampleV        = 1,           // must be non-zero
+                    RasterizerMultiply = 1.0f,        // C# zero-init → 0.0f = invisible; must be 1.0f
+                    RasterizerDensity  = 1.0f,        // must be > 0
+                    GlyphMinAdvanceX   = iconAdvance, // monospace: min advance
+                    GlyphMaxAdvanceX   = iconAdvance, // monospace: max advance (strictly 16px)
+                    GlyphOffset        = new System.Numerics.Vector2(1f, 0f), // 1px left-pad prevents left-bearing bleed into preceding char
                 };
                 // Pin the FA glyph range (U+F000–U+F8FF) in a SharedBuffer so the
                 // pointer stays valid until ImGui builds the atlas on the first frame.
@@ -79,7 +82,7 @@ public static unsafe class GameeditorApp
                 rgBuf[4] = 0x00; rgBuf[5] = 0x00; // null terminator
                 ushort* iconRange = (ushort*)_iconGlyphRange.GetBufferPointer();
                 cfg.GlyphRanges = iconRange;
-                ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconFontPath, 13.0f, &cfg, ref *iconRange);
+                ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconFontPath, fontSize, &cfg, ref *iconRange);
             }
         }
         io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;
