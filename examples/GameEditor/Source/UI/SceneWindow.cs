@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using System.Collections.Generic;
 using Imgui;
@@ -7,6 +8,7 @@ using GameEditor.Framework.Renderer;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Core;
+using GameEditor.Framework.Scene;
 using static Sokol.SApp;
 
 namespace GameEditor.UI
@@ -85,6 +87,21 @@ namespace GameEditor.UI
                 ulong texId = simgui_imtextureid(Target.TexView);
                 var texRef = new ImTextureRef { _TexData = null, _TexID = texId };
                 igImage(texRef, avail, Vector2.Zero, Vector2.One);
+
+                // ── Accept scene drag-drop onto the viewport ──────────────────
+                if (igBeginDragDropTarget())
+                {
+                    var payload = igAcceptDragDropPayload("SCENE_PATH", ImGuiDragDropFlags.None);
+                    if (payload != null && payload->Delivery != 0)
+                    {
+                        string scenePath = System.Text.Encoding.UTF8.GetString(
+                            new ReadOnlySpan<byte>((byte*)payload->Data, payload->DataSize))
+                            .TrimEnd('\0');
+                        SceneManager.LoadScene(scenePath);
+                        EditorPersistence.SetLastScene(scenePath);
+                    }
+                    igEndDragDropTarget();
+                }
 
                 // ── ImGuizmo overlay (drawn on top of the viewport image) ──────
                 DrawGizmo();

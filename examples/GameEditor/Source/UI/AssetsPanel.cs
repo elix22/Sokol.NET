@@ -294,9 +294,20 @@ namespace GameEditor.UI
                     ImGuiSelectableFlags.None, Vector2.Zero))
                     _selectedFile = file;
 
+                // Drag source for .scene.json files
+                bool isScene = name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase);
+                if (isScene && igBeginDragDropSource(ImGuiDragDropFlags.None))
+                {
+                    var pathBytes = System.Text.Encoding.UTF8.GetBytes(file + "\0");
+                    fixed (byte* p = pathBytes)
+                        igSetDragDropPayload("SCENE_PATH", p, (uint)pathBytes.Length, ImGuiCond.Once);
+                    igText($"{IconScene}  {name}");
+                    igEndDragDropSource();
+                }
+
                 if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
                 {
-                    if (name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase))
+                    if (isScene)
                     {
                         SceneManager.LoadScene(file);
                         EditorPersistence.SetLastScene(file);
