@@ -51,6 +51,7 @@ namespace GameEditor.UI
         private static HashSet<string> _openFolders = new();
 
         private static string? _renamingPath;
+        private static bool    _renamingIsFolder;
         private static byte[]  _renameBuffer = new byte[256];
         private static bool    _renameFocusPending;
 
@@ -166,6 +167,13 @@ namespace GameEditor.UI
         // ── Left pane: recursive folder tree ────────────────────────────────
         private static void DrawFolderTree(string dirPath, string root)
         {
+            // Inline rename: replace tree node row with an input field
+            if (_renamingPath == dirPath)
+            {
+                DrawRenameInput(dirPath);
+                return;
+            }
+
             string label = dirPath == root
                 ? Path.GetFileName(dirPath.TrimEnd(Path.DirectorySeparatorChar))
                 : Path.GetFileName(dirPath);
@@ -205,6 +213,11 @@ namespace GameEditor.UI
                 _selectedFolder = dirPath;
                 _cachedFolderPath = null;
             }
+            // Double-click on the label (not the arrow) starts rename
+            if (igIsItemHovered(ImGuiHoveredFlags.None) &&
+                igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left) &&
+                !igIsItemToggledOpen())
+                BeginRename(dirPath, isFolder: true);
 
             DrawFolderContextMenu(dirPath);
 
@@ -249,12 +262,16 @@ namespace GameEditor.UI
                 if (filtering && !name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     continue;
 
+                if (_renamingPath == sub)
+                {
+                    DrawRenameInput(sub);
+                    continue;
+                }
+
                 bool sel = _selectedFolder == sub;
                 if (igSelectable_Bool($"{IconFolder}  {name}##{sub}", sel,
                     ImGuiSelectableFlags.None, Vector2.Zero))
-                {
                     NavigateTo(sub);
-                }
                 DrawFolderContextMenu(sub);
             }
 
@@ -277,12 +294,15 @@ namespace GameEditor.UI
                     ImGuiSelectableFlags.None, Vector2.Zero))
                     _selectedFile = file;
 
-                if (igIsItemHovered(ImGuiHoveredFlags.None) &&
-                    igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left) &&
-                    name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase))
+                if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
                 {
-                    SceneManager.LoadScene(file);
-                    EditorPersistence.SetLastScene(file);
+                    if (name.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SceneManager.LoadScene(file);
+                        EditorPersistence.SetLastScene(file);
+                    }
+                    else
+                        BeginRename(file, isFolder: false);
                 }
 
                 DrawFileContextMenu(file);
@@ -297,6 +317,11 @@ namespace GameEditor.UI
                 if (igMenuItem_Bool("New Folder", null, false, true))
                 {
                     TryCreateFolder(dirPath);
+                    igCloseCurrentPopup();
+                }
+                if (igMenuItem_Bool("Rename", null, false, true))
+                {
+                    BeginRename(dirPath, isFolder: true);
                     igCloseCurrentPopup();
                 }
                 if (igMenuItem_Bool("Delete Folder", null, false, true))
@@ -329,13 +354,7 @@ namespace GameEditor.UI
                 }
                 if (igMenuItem_Bool("Rename", null, false, true))
                 {
-                    _renamingPath = filePath;
-                    _renameFocusPending = true;
-                    string cur = Path.GetFileName(filePath);
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(cur);
-                    int len = Math.Min(bytes.Length, _renameBuffer.Length - 1);
-                    bytes.AsSpan(0, len).CopyTo(_renameBuffer);
-                    _renameBuffer[len] = 0;
+                    BeginRename(filePath, isFolder: false);
                     igCloseCurrentPopup();
                 }
                 if (igMenuItem_Bool("Delete", null, false, true))
@@ -355,7 +374,7 @@ namespace GameEditor.UI
         }
 
         // ── Inline rename ────────────────────────────────────────────────────
-        private static void DrawRenameInput(string filePath)
+        private static void DrawRenameInput(string path)
         {
             igSetNextItemWidth(-1);
             if (_renameFocusPending)
@@ -363,11 +382,14 @@ namespace GameEditor.UI
                 igSetKeyboardFocusHere(0);
                 _renameFocusPending = false;
             }
-            if (igInputText($"##rename_{filePath}", ref _renameBuffer[0], (uint)_renameBuffer.Length,
+            if (igInputText($"##rename_{path}", ref _renameBuffer[0], (uint)_renameBuffer.Length,
                 ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll, null, null))
             {
                 string newName = System.Text.Encoding.UTF8.GetString(_renameBuffer).TrimEnd('\0');
-                TryRenameFile(filePath, newName);
+                if (_renamingIsFolder)
+                    TryRenameFolder(path, newName);
+                else
+                    TryRenameFile(path, newName);
                 _renamingPath = null;
             }
             if (igIsItemDeactivated())
@@ -391,6 +413,21 @@ namespace GameEditor.UI
             if (name.EndsWith(".zip",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             if (name.EndsWith(".tar",         StringComparison.OrdinalIgnoreCase)) return IconFileArchive;
             return IconFile;
+        }
+
+        // Starts an inline rename for a file or folder.
+        private static void BeginRename(string path, bool isFolder)
+        {
+            _renamingPath = path;
+            _renamingIsFolder = isFolder;
+            _renameFocusPending = true;
+            string name = isFolder
+                ? (Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) ?? path)
+                : Path.GetFileName(path);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(name);
+            int len = Math.Min(bytes.Length, _renameBuffer.Length - 1);
+            Array.Clear(_renameBuffer, 0, _renameBuffer.Length);
+            bytes.AsSpan(0, len).CopyTo(_renameBuffer);
         }
 
         // Navigates to a folder, recording the current location in history (for Back).
@@ -448,6 +485,24 @@ namespace GameEditor.UI
             try
             {
                 Directory.CreateDirectory(newPath);
+                _cachedFolderPath = null;
+            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
+        }
+
+        private static void TryRenameFolder(string dirPath, string newName)
+        {
+            try
+            {
+                string? parent = Path.GetDirectoryName(dirPath);
+                if (parent == null || string.IsNullOrWhiteSpace(newName)) return;
+                string newPath = Path.Combine(parent, newName);
+                if (Directory.Exists(newPath)) return;
+                Directory.Move(dirPath, newPath);
+                _openFolders.Remove(dirPath);
+                _openFolders.Add(newPath);
+                if (_selectedFolder == dirPath) SelectFolder(newPath);
+                _navHistory.Clear();
                 _cachedFolderPath = null;
             }
             catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
