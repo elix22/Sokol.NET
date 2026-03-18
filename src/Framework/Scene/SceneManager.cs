@@ -1,5 +1,6 @@
 using System.IO;
 using GameEditor.Framework.Core;
+using GameEditor.Framework.Scripting;
 
 namespace GameEditor.Framework.Scene
 {
@@ -7,6 +8,9 @@ namespace GameEditor.Framework.Scene
     {
         public static Scene? ActiveScene { get; private set; }
         public static PlayModeState PlayMode { get; private set; } = PlayModeState.Stopped;
+
+        // JSON snapshot of the scene captured when Play() is called; restored on Stop().
+        private static string? _playSnapshot;
 
         public static void NewScene(string name = "Untitled")
         {
@@ -51,8 +55,71 @@ namespace GameEditor.Framework.Scene
             EventBus.RaisePlayModeChanged(state);
         }
 
-        public static void Play()  => SetPlayMode(PlayModeState.Playing);
-        public static void Pause() => SetPlayMode(PlayModeState.Paused);
-        public static void Stop()  => SetPlayMode(PlayModeState.Stopped);
+        /// <summary>
+        /// Saves a scene snapshot, populates the ScriptSystem from current entities,
+        /// starts all behaviours and transitions to Playing state.
+        /// </summary>
+        public static void Play()
+        {
+            if (PlayMode == PlayModeState.Playing) return;
+
+            if (PlayMode == PlayModeState.Stopped)
+            {
+                // Snapshot the scene so we can restore it on Stop()
+                if (ActiveScene != null)
+                {
+                    _playSnapshot = SceneSerializer.Serialize(ActiveScene);
+                    Logger.Info("[SceneManager] Play snapshot saved.");
+                }
+
+                // Populate script behaviours from current scene entities
+                ScriptSystem.PopulateFromScene(ECS.ECSWorld.Instance);
+
+                SetPlayMode(PlayModeState.Playing);
+
+                // Start all registered behaviours
+                ScriptSystem.StartAll();
+                Logger.Info($"[SceneManager] Play started. {ScriptSystem.Count} script(s) running.");
+            }
+            else if (PlayMode == PlayModeState.Paused)
+            {
+                // Resume without restarting scripts
+                SetPlayMode(PlayModeState.Playing);
+            }
+        }
+
+        /// <summary>Freezes script execution without destroying behaviours.</summary>
+        public static void Pause()
+        {
+            if (PlayMode != PlayModeState.Playing) return;
+            SetPlayMode(PlayModeState.Paused);
+        }
+
+        /// <summary>
+        /// Stops all scripts, transitions to Stopped state and restores the pre-play
+        /// scene snapshot so the editor sees the original unmodified scene.
+        /// </summary>
+        public static void Stop()
+        {
+            if (PlayMode == PlayModeState.Stopped) return;
+
+            // Destroy all running scripts
+            ScriptSystem.StopAll();
+
+            SetPlayMode(PlayModeState.Stopped);
+
+            // Restore the pre-play snapshot
+            if (_playSnapshot != null && ActiveScene != null)
+            {
+                EventBus.RaiseSceneUnloaded();
+                SceneSerializer.Deserialize(_playSnapshot, ActiveScene);
+                ActiveScene.IsDirty = false;
+                _playSnapshot = null;
+                EventBus.RaiseSceneLoaded();
+                Logger.Info("[SceneManager] Scene restored from play snapshot.");
+            }
+
+            UndoStack.Clear();
+        }
     }
 }

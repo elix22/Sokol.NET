@@ -89,6 +89,25 @@ namespace GameEditor.Framework.Scene
                       .Append(",\"Gravity\":").Append(rb.UseGravity ? "true" : "false").Append('}');
                 }
 
+                if (world.TryGetComponent<ScriptComponent>(id, out var sc))
+                {
+                    Comma(sb, ref fc);
+                    sb.Append("\"Script\":{\"Type\":\"").Append(Esc(sc.TypeName ?? "")).Append('"');
+                    if (sc.Properties != null && sc.Properties.Count > 0)
+                    {
+                        sb.Append(",\"Props\":{");
+                        bool fp = true;
+                        foreach (var kvp in sc.Properties)
+                        {
+                            if (!fp) sb.Append(',');
+                            fp = false;
+                            sb.Append('"').Append(Esc(kvp.Key)).Append("\":\"").Append(Esc(kvp.Value)).Append('"');
+                        }
+                        sb.Append('}');
+                    }
+                    sb.Append('}');
+                }
+
                 sb.Append("}}"); // close components + entity
             }
 
@@ -178,6 +197,21 @@ namespace GameEditor.Framework.Scene
                         Mass       = rbEl.GetProperty("Mass").GetSingle(),
                         UseGravity = rbEl.GetProperty("Gravity").GetBoolean()
                     });
+
+                if (c.TryGetProperty("Script", out var sEl))
+                {
+                    var sc = new ScriptComponent
+                    {
+                        TypeName = sEl.GetProperty("Type").GetString() ?? ""
+                    };
+                    if (sEl.TryGetProperty("Props", out var propsEl))
+                    {
+                        sc.Properties = new Dictionary<string, string>();
+                        foreach (var p in propsEl.EnumerateObject())
+                            sc.Properties[p.Name] = p.Value.GetString() ?? "";
+                    }
+                    world.AddComponent(newId, sc);
+                }
             }
 
             // Second pass — remap parent IDs

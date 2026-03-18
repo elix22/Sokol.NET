@@ -36,6 +36,32 @@
     <AssetsSourceFiles Include="Assets/**/*.*" />
   </ItemGroup>
 
+  <!-- ── Game Framework (from Sokol.NET home, game-runtime layers only) ── -->
+  <!-- Renderer/ is excluded because it requires compiled shaders that are
+       only present in the GameEditor project (GridRenderer, SceneRenderer).
+       OffscreenTarget, ViewportCamera and PrimitiveMeshSpec are still included. -->
+  <ItemGroup Condition="'$(SokolNetHome)' != ''">
+    <Compile Include="$(SokolNetHome)/src/Framework/Core/**/*.cs"
+             Link="Framework/Core/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(SokolNetHome)/src/Framework/ECS/**/*.cs"
+             Link="Framework/ECS/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Scene/**/*.cs"
+             Link="Framework/Scene/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Scripting/**/*.cs"
+             Link="Framework/Scripting/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Assets/**/*.cs"
+             Link="Framework/Assets/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Physics/**/*.cs"
+             Link="Framework/Physics/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Renderer utilities that have no shader dependencies -->
+    <Compile Include="$(SokolNetHome)/src/Framework/Renderer/OffscreenTarget.cs"
+             Link="Framework/Renderer/OffscreenTarget.cs" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Renderer/ViewportCamera.cs"
+             Link="Framework/Renderer/ViewportCamera.cs" />
+    <Compile Include="$(SokolNetHome)/src/Framework/Renderer/PrimitiveMeshSpec.cs"
+             Link="Framework/Renderer/PrimitiveMeshSpec.cs" />
+  </ItemGroup>
+
    <!-- Compile shaders into the host-specific folder before build -->
   <Target Name="CompileShaders" BeforeTargets="BeforeBuild"
           Inputs="@(ShaderFiles)"

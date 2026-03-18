@@ -102,8 +102,19 @@ namespace GameEditor.UI
 
             if (stopped || paused)
             {
+                // Disable while building or after a failed build (with a project loaded)
+                bool playBlocked = GameAssemblyRunner.IsBuilding ||
+                    (!GameAssemblyRunner.LastBuildSucceeded && ConfigManager.HasProject);
+                if (playBlocked) igBeginDisabled(true);
                 if (igButton(stopped ? "Play" : "Resume", new Vector2(60, 0)))
+                {
+                    // When transitioning from Stopped → Playing, build and load
+                    // the game project's script assembly if a project is open.
+                    if (stopped && ConfigManager.HasProject)
+                        GameAssemblyRunner.EnsureLoaded(ConfigManager.ProjectFolder!);
                     SceneManager.Play();
+                }
+                if (playBlocked) igEndDisabled();
             }
             else
             {
@@ -124,7 +135,22 @@ namespace GameEditor.UI
             {
                 igSameLine(0, 4);
                 if (igButton("Stop", new Vector2(50, 0)))
+                {
                     SceneManager.Stop();
+                    // Keep the assembly loaded (warm cache) — Unload() only on project close
+                }
+            }
+
+            // Build status indicator
+            if (GameAssemblyRunner.IsBuilding)
+            {
+                igSameLine(0, 12);
+                igTextColored(new Vector4(1f, 0.85f, 0.2f, 1f), "[Building...]");
+            }
+            else if (!GameAssemblyRunner.LastBuildSucceeded)
+            {
+                igSameLine(0, 12);
+                igTextColored(new Vector4(1f, 0.35f, 0.35f, 1f), "[Build Failed]");
             }
 
             // ── Gizmo operation buttons (right side of menu bar) ──────────────
@@ -289,15 +315,24 @@ namespace GameEditor.UI
                 _isCreating = false;
                 if (_createProcess.ExitCode == 0 && _createResultFolder != null)
                 {
-                    // Create a default config.json in the new project (template has none)
-                    var defaultCfg = new ProjectConfig
+                    // The template already ships a config.json — just load it.
+                    // Patch the project name to match what the user typed.
+                    var cfg = ConfigManager.Load(_createResultFolder);
+                    if (cfg != null)
                     {
-                        ProjectName = _createProjectName,
-                    };
-                    ConfigManager.Save(_createResultFolder, defaultCfg);
-                    ConfigManager.Load(_createResultFolder);
-                    _createResultFolder = null;
-                    _dialog = DialogMode.None;
+                        cfg.ProjectName = _createProjectName;
+                        ConfigManager.Save();
+                        LoadProjectDefaultScene();
+                        string watchFolder = _createResultFolder;
+                        _createResultFolder = null;
+                        _dialog = DialogMode.None;
+                        GameAssemblyRunner.StartWatcher(watchFolder);
+                    }
+                    else
+                    {
+                        _createResultFolder = null;
+                        _dialog = DialogMode.None;
+                    }
                 }
             }
 
@@ -343,8 +378,16 @@ namespace GameEditor.UI
                     if (ImFileDialog.IsOk())
                     {
                         string projFolder = ImFileDialog.GetFilePathName();
-                        ConfigManager.Load(projFolder);
-                        EditorPersistence.AddRecentProject(projFolder);
+                        // Unload any old game assembly before switching projects
+                        GameAssemblyRunner.StopWatcher();
+                        GameAssemblyRunner.Unload();
+                        var cfg = ConfigManager.Load(projFolder);
+                        if (cfg != null)
+                        {
+                            EditorPersistence.AddRecentProject(projFolder);
+                            LoadProjectDefaultScene();
+                            GameAssemblyRunner.StartWatcher(projFolder);
+                        }
                     }
                     ImFileDialog.Close();
                     _dialog = DialogMode.None;
@@ -532,6 +575,34 @@ namespace GameEditor.UI
         {
             int len = System.Array.IndexOf(buf, (byte)0);
             return len > 0 ? System.Text.Encoding.UTF8.GetString(buf, 0, len) : string.Empty;
+        }
+
+        /// <summary>
+        /// After a project is loaded, load its default scene (if any) into the editor.
+        /// </summary>
+        private static void LoadProjectDefaultScene()
+        {
+            var cfg = ConfigManager.Config;
+            var folder = ConfigManager.ProjectFolder;
+            if (cfg == null || folder == null) return;
+
+            string? scenePath = cfg.DefaultScene;
+            if (string.IsNullOrWhiteSpace(scenePath)) return;
+
+            // DefaultScene may be relative to the project folder or absolute
+            string fullPath = System.IO.Path.IsPathRooted(scenePath)
+                ? scenePath
+                : System.IO.Path.Combine(folder, scenePath);
+
+            if (System.IO.File.Exists(fullPath))
+            {
+                Logger.Info($"[Project] Loading default scene: {fullPath}");
+                SceneManager.LoadScene(fullPath);
+            }
+            else
+            {
+                Logger.Warning($"[Project] Default scene not found: {fullPath}");
+            }
         }
     }
 }

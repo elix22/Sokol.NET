@@ -114,6 +114,10 @@ public static unsafe class GameeditorApp
     {
         Time.Update();
 
+        // Tick script system when in play mode (scripts run before rendering)
+        if (SceneManager.PlayMode == PlayModeState.Playing)
+            GameEditor.Framework.Scripting.ScriptSystem.UpdateAll(Time.DeltaTime);
+
         int w = sapp_width();
         int h = sapp_height();
 
@@ -357,6 +361,25 @@ public static unsafe class GameeditorApp
     [UnmanagedCallersOnly]
     static void Cleanup()
     {
+        // Auto-save current scene on exit (Unity-like behavior).
+        // If exiting while Playing, stop first so pre-play snapshot is restored.
+        if (SceneManager.PlayMode != PlayModeState.Stopped)
+            SceneManager.Stop();
+
+        var active = SceneManager.ActiveScene;
+        if (active != null && !string.IsNullOrWhiteSpace(active.FilePath))
+        {
+            try
+            {
+                SceneManager.SaveScene(active.FilePath!);
+                Logger.Info($"[AutoSave] Scene saved on exit: {active.FilePath}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"[AutoSave] Failed to save scene on exit: {ex.Message}");
+            }
+        }
+
         EditorPersistence.Save();
         SceneRenderer.Cleanup();
         GridRenderer.Cleanup();

@@ -12,7 +12,17 @@ namespace GameEditor.Framework.ECS
         private readonly List<int> _entities = new();
         private readonly Dictionary<Type, object> _stores = new();
 
-        public static readonly ECSWorld Instance = new ECSWorld();
+        public static ECSWorld Instance { get; private set; } = new ECSWorld();
+
+        /// <summary>
+        /// Replaces the global singleton. Called by the GameEditor's GameAssemblyRunner
+        /// to ensure the dynamically-loaded game assembly shares the editor's ECS world
+        /// instead of its own statically-initialised copy.
+        /// </summary>
+        public static void SetInstance(ECSWorld world)
+        {
+            Instance = world;
+        }
 
         private ECSWorld() { }
 

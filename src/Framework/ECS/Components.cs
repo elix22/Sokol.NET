@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace GameEditor.Framework.ECS.Components
@@ -24,6 +25,18 @@ namespace GameEditor.Framework.ECS.Components
                 EulerAngles.X * MathF.PI / 180f,
                 EulerAngles.Z * MathF.PI / 180f) *
             Matrix4x4.CreateTranslation(Position);
+
+        public Vector3 Forward
+        {
+            get
+            {
+                var rot = Matrix4x4.CreateFromYawPitchRoll(
+                    EulerAngles.Y * MathF.PI / 180f,
+                    EulerAngles.X * MathF.PI / 180f,
+                    EulerAngles.Z * MathF.PI / 180f);
+                return new Vector3(rot.M31, rot.M32, rot.M33);
+            }
+        }
     }
 
     public struct NameTag
@@ -74,5 +87,7 @@ namespace GameEditor.Framework.ECS.Components
     public struct ScriptComponent
     {
         public string TypeName;
+        /// <summary>Serialized public field values, keyed by field name. Null = no overrides.</summary>
+        public Dictionary<string, string>? Properties;
     }
 }

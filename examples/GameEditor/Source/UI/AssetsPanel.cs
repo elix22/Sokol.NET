@@ -305,6 +305,17 @@ namespace GameEditor.UI
                     igEndDragDropSource();
                 }
 
+                // Drag source for .cs script files
+                bool isScript = name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+                if (isScript && igBeginDragDropSource(ImGuiDragDropFlags.None))
+                {
+                    var pathBytes = System.Text.Encoding.UTF8.GetBytes(file);
+                    fixed (byte* p = pathBytes)
+                        igSetDragDropPayload("SCRIPT_FILE", p, (uint)pathBytes.Length, ImGuiCond.Once);
+                    igText($"{IconFileCode}  {name}");
+                    igEndDragDropSource();
+                }
+
                 if (igIsItemHovered(ImGuiHoveredFlags.None) && igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
                 {
                     if (isScene)

@@ -16,6 +16,42 @@ namespace GameEditor.UI
             if (!igBegin("Inspector", ref open, ImGuiWindowFlags.None))
             { igEnd(); return; }
 
+            // Window-level drop target — must be called immediately after igBegin()
+            // while the window is the "last item" so ImGui registers the hover correctly.
+            if (igBeginDragDropTarget())
+            {
+                int curId = EditorState.SelectedEntity;
+                if (curId >= 0)
+                {
+                    var sfp = igAcceptDragDropPayload("SCRIPT_FILE", ImGuiDragDropFlags.None);
+                    if (sfp != null && sfp->DataSize > 0)
+                    {
+                        string droppedPath = System.Text.Encoding.UTF8.GetString((byte*)sfp->Data, sfp->DataSize);
+                        string className   = System.IO.Path.GetFileNameWithoutExtension(droppedPath);
+                        if (!string.IsNullOrEmpty(className))
+                        {
+                            var w = ECSWorld.Instance;
+                            w.TryGetComponent<ScriptComponent>(curId, out var existing);
+                            w.AddComponent(curId, new ScriptComponent { TypeName = className, Properties = existing.Properties });
+                            SceneManager.ActiveScene!.IsDirty = true;
+                        }
+                    }
+                    var stp = igAcceptDragDropPayload("SCRIPT_TYPE", ImGuiDragDropFlags.None);
+                    if (stp != null && stp->DataSize > 0)
+                    {
+                        string droppedType = System.Text.Encoding.UTF8.GetString((byte*)stp->Data, stp->DataSize);
+                        if (!string.IsNullOrEmpty(droppedType))
+                        {
+                            var w = ECSWorld.Instance;
+                            w.TryGetComponent<ScriptComponent>(curId, out var existing);
+                            w.AddComponent(curId, new ScriptComponent { TypeName = droppedType, Properties = existing.Properties });
+                            SceneManager.ActiveScene!.IsDirty = true;
+                        }
+                    }
+                }
+                igEndDragDropTarget();
+            }
+
             int id = EditorState.SelectedEntity;
             if (id < 0)
             { igText("No entity selected"); igEnd(); return; }

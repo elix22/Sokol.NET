@@ -224,7 +224,7 @@ namespace GameEditor.UI
                     igEndDragDropSource();
                 }
 
-                // Drop target: make dragged entity a child of this one
+                // Drop target: make dragged entity a child of this one, or assign a script type
                 if (igBeginDragDropTarget())
                 {
                     var payload = igAcceptDragDropPayload("ENTITY_ID", ImGuiDragDropFlags.None);
@@ -238,6 +238,36 @@ namespace GameEditor.UI
                             scene.IsDirty = true;
                         }
                     }
+
+                    // Accept a script type dropped from the inspector
+                    var sp = igAcceptDragDropPayload("SCRIPT_TYPE", ImGuiDragDropFlags.None);
+                    if (sp != null && sp->DataSize > 0)
+                    {
+                        string droppedType = System.Text.Encoding.UTF8.GetString((byte*)sp->Data, sp->DataSize);
+                        if (!string.IsNullOrEmpty(droppedType))
+                        {
+                            world.TryGetComponent<ScriptComponent>(id, out var existing);
+                            world.AddComponent(id, new ScriptComponent { TypeName = droppedType, Properties = existing.Properties });
+                            EditorState.SelectEntity(id);
+                            scene.IsDirty = true;
+                        }
+                    }
+
+                    // Accept a .cs file dragged from the Assets panel
+                    var sfp = igAcceptDragDropPayload("SCRIPT_FILE", ImGuiDragDropFlags.None);
+                    if (sfp != null && sfp->DataSize > 0)
+                    {
+                        string droppedPath = System.Text.Encoding.UTF8.GetString((byte*)sfp->Data, sfp->DataSize);
+                        string className   = System.IO.Path.GetFileNameWithoutExtension(droppedPath);
+                        if (!string.IsNullOrEmpty(className))
+                        {
+                            world.TryGetComponent<ScriptComponent>(id, out var existing);
+                            world.AddComponent(id, new ScriptComponent { TypeName = className, Properties = existing.Properties });
+                            EditorState.SelectEntity(id);
+                            scene.IsDirty = true;
+                        }
+                    }
+
                     igEndDragDropTarget();
                 }
 

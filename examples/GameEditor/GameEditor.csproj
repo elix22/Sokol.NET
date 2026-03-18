@@ -12,6 +12,8 @@
     <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
     <TrimMode>partial</TrimMode>
     <TrimmerRemoveSymbols>false</TrimmerRemoveSymbols>
+    <!-- GameAssemblyRunner uses intentional reflection for JIT hot-reload; suppress ILLink trim warnings. -->
+    <NoWarn>$(NoWarn);IL2026;IL2065;IL2067;IL2070;IL2072;IL2077</NoWarn>
     <IsAndroid Condition="$(DefineConstants.Contains('__ANDROID__'))">true</IsAndroid>
     <IsAndroid>$(RuntimeIdentifier.ToLower().StartsWith('android'))</IsAndroid>
 		<IsAndroid Condition="'$(IsAndroid)'=='false'">$(RuntimeIdentifier.ToLower().StartsWith('linux-bionic'))</IsAndroid>
