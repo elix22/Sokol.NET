@@ -92,7 +92,7 @@ namespace GameEditor.UI
                 igEndMenu();
             }
 
-            // Play/Pause/Stop buttons centred
+            // Play/Pause/Stop buttons centred (Font Awesome icons)
             var state = SceneManager.PlayMode;
             igSetCursorPosX((igGetWindowWidth() - 110f) * 0.5f);
 
@@ -106,7 +106,7 @@ namespace GameEditor.UI
                 bool playBlocked = GameAssemblyRunner.IsBuilding ||
                     (!GameAssemblyRunner.LastBuildSucceeded && ConfigManager.HasProject);
                 if (playBlocked) igBeginDisabled(true);
-                if (igButton(stopped ? "Play" : "Resume", new Vector2(60, 0)))
+                if (igButton("\uF04B##play", new Vector2(32, 0)))
                 {
                     // When transitioning from Stopped → Playing, build and load
                     // the game project's script assembly if a project is open.
@@ -115,12 +115,14 @@ namespace GameEditor.UI
                     SceneManager.Play();
                     GameWindow.FocusWindow();
                 }
+                if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    igSetTooltip(stopped ? "Play" : "Resume");
                 if (playBlocked) igEndDisabled();
             }
             else
             {
                 igBeginDisabled(false);
-                igButton("Play", new Vector2(60, 0));
+                igButton("\uF04B##play_dis", new Vector2(32, 0));
                 igEndDisabled();
             }
 
@@ -128,19 +130,23 @@ namespace GameEditor.UI
 
             if (playing)
             {
-                if (igButton("||", new Vector2(30, 0)))
+                if (igButton("\uF04C##pause", new Vector2(32, 0)))
                     SceneManager.Pause();
+                if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    igSetTooltip("Pause");
             }
 
             if (playing || paused)
             {
                 igSameLine(0, 4);
-                if (igButton("Stop", new Vector2(50, 0)))
+                if (igButton("\uF04D##stop", new Vector2(32, 0)))
                 {
                     SceneManager.Stop();
                     // Keep the assembly loaded (warm cache) — Unload() only on project close
                     SceneWindow.FocusWindow();
                 }
+                if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    igSetTooltip("Stop");
             }
 
             // Build status indicator
