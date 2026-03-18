@@ -18,7 +18,6 @@ namespace GameEditor.UI
         private static int          _pendingW = 1280;
         private static int          _pendingH = 720;
         private static bool         _hasCamera;   // set by PrepareRenderTarget, read by Draw
-        private static bool         _requestUndock;
 
         public static int ViewWidth  => _viewW;
         public static int ViewHeight => _viewH;
@@ -26,11 +25,6 @@ namespace GameEditor.UI
         public static void Init()
         {
             Target.Create(_viewW, _viewH);
-        }
-
-        public static void RequestUndock()
-        {
-            _requestUndock = true;
         }
 
         public static void FocusWindow()
@@ -56,12 +50,6 @@ namespace GameEditor.UI
         public static void Draw()
         {
             var currentMode = SceneManager.PlayMode;
-
-            if (_requestUndock)
-            {
-                igSetNextWindowDockID(0, ImGuiCond.Always);
-                _requestUndock = false;
-            }
 
             ImGuiWindowClass gameClass = default;
             gameClass.DockingAlwaysTabBar = 1;
