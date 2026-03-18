@@ -141,7 +141,6 @@ namespace GameEditor.UI
 
             if (world.TryGetComponent<ScriptCollectionComponent>(id, out var scc))
             {
-                Logger.Info($"[InspectorPanel] ScriptCollectionComponent found on entity {id} with {scc.Scripts?.Count ?? 0} scripts");
                 scc.Scripts ??= new System.Collections.Generic.List<ScriptComponent>();
                 bool listChanged = false;
                 int removeIndex = -1;
@@ -150,9 +149,7 @@ namespace GameEditor.UI
                 {
                     var item = scc.Scripts[i];
                     string originalTypeName = item.TypeName ?? "";  // Track original TypeName
-                    Logger.Info($"[InspectorPanel] Drawing additional script {i}: TypeName='{item.TypeName}'");
                     ComponentDrawers.DrawScriptComponent(id, ref item, $"Script {i + 2}", (i + 1).ToString());
-                    Logger.Info($"[InspectorPanel] After DrawScriptComponent, script {i}: TypeName='{item.TypeName}'");
                     scc.Scripts[i] = item;
                     
                     // Mark as changed if the script's TypeName or Properties changed

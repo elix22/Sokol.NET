@@ -534,6 +534,16 @@ namespace GameEditor
             }
         }
 
+        /// <summary>
+        /// Gets the name of the wrapped script type (e.g., "Rotator", "Mover").
+        /// </summary>
+        public string WrappedScriptTypeName => _wrappedType.Name;
+
+        /// <summary>
+        /// Gets the wrapped script instance.
+        /// </summary>
+        public object WrappedInstance => _wrapped;
+
         public override void OnStart()
         {
             // Propagate the EntityId from the proxy to the wrapped instance

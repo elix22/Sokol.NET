@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
@@ -143,6 +144,96 @@ namespace GameEditor.Framework.Scripting
         public static int Count        => _running.Count;
         public static bool IsRunning   => _started;
         public static bool HasFactory(string typeName) => _factories.ContainsKey(typeName);
+
+        // ── Live property updates ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Updates a property on a running script instance.
+        /// Used for live editing during play mode.
+        /// </summary>
+        public static void UpdateScriptProperty(int entityId, string typeName, string propertyName, string propertyValue)
+        {
+            // Find the running behaviour for this entity and type
+            // Note: In editor mode, scripts are wrapped in DynamicBehaviourProxy, so we need to match against the wrapped type
+            var match = _running.FirstOrDefault(b => 
+            {
+                if (b.EntityId != entityId) return false;
+                
+                // Check if this is a DynamicBehaviourProxy (editor mode)
+                var behaviourType = b.Behaviour.GetType();
+                if (behaviourType.Name == "DynamicBehaviourProxy")
+                {
+                    // Access the wrapped script type via reflection
+                    try
+                    {
+                        var wrappedTypeProp = behaviourType.GetProperty("WrappedScriptTypeName", 
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (wrappedTypeProp != null)
+                        {
+                            var wrappedTypeName = wrappedTypeProp.GetValue(b.Behaviour) as string;
+                            return wrappedTypeName == typeName;
+                        }
+                    }
+                    catch { }
+                    return false;
+                }
+                
+                // Direct type matching (deployed mode)
+                return b.Behaviour.GetType().Name == typeName;
+            });
+            
+            var behaviour = match.Behaviour;
+            if (behaviour == null)
+                return;
+
+            // Get the actual wrapped script instance if this is a proxy
+            object scriptInstance = behaviour;
+            if (behaviour.GetType().Name == "DynamicBehaviourProxy")
+            {
+                try
+                {
+                    var wrappedProp = behaviour.GetType().GetProperty("WrappedInstance",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    scriptInstance = wrappedProp?.GetValue(behaviour) ?? behaviour;
+                }
+                catch { }
+            }
+            
+            var field = scriptInstance.GetType().GetField(propertyName, 
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (field == null)
+                return;
+            
+            try
+            {
+                object? value = null;
+                if (field.FieldType == typeof(float) && float.TryParse(propertyValue, 
+                    System.Globalization.NumberStyles.Float, 
+                    System.Globalization.CultureInfo.InvariantCulture, out var fval))
+                {
+                    value = fval;
+                }
+                else if (field.FieldType == typeof(int) && int.TryParse(propertyValue, out var ival))
+                {
+                    value = ival;
+                }
+                else if (field.FieldType == typeof(bool))
+                {
+                    value = propertyValue is "true" or "True";
+                }
+                else
+                {
+                    value = propertyValue;
+                }
+
+                if (value != null)
+                    field.SetValue(scriptInstance, value);
+            }
+            catch (Exception ex) 
+            { 
+                Logger.Warning($"[ScriptSystem] Error updating property '{propertyName}': {ex.Message}"); 
+            }
+        }
 
         // ── Helpers ──────────────────────────────────────────────────────────
 

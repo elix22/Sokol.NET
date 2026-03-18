@@ -13,6 +13,7 @@ using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Renderer;
 using GameEditor.Framework.Scene;
+using GameEditor.Framework.Scripting;
 
 namespace GameEditor.UI
 {
@@ -402,7 +403,7 @@ namespace GameEditor.UI
         public static void DrawScriptComponent(int id, ref ScriptComponent sc, string headerLabel = "Script", string scopeKey = "0")
         {
             bool isPrimaryScript = scopeKey == "0";  // Track if this is the primary or additional script
-            Logger.Info($"[ComponentDrawers] DrawScriptComponent: id={id}, headerLabel={headerLabel}, scopeKey={scopeKey}, isPrimaryScript={isPrimaryScript}, typeName={sc.TypeName}");
+
             
             if (!igCollapsingHeader_TreeNodeFlags($"{headerLabel}##script_{id}_{scopeKey}", ImGuiTreeNodeFlags.DefaultOpen))
                 return;
@@ -419,11 +420,9 @@ namespace GameEditor.UI
                 {
                     buf = new byte[128];
                     _scriptNameBufs[inputKey] = buf;
-                    Logger.Info($"[ComponentDrawers] Created new buffer for {inputKey}");
                 }
                 else
                 {
-                    Logger.Info($"[ComponentDrawers] Using existing buffer for {inputKey}");
                 }
 
                 // If the assembly is loaded, offer a combo picker of known types
@@ -460,7 +459,6 @@ namespace GameEditor.UI
                     ImGuiInputTextFlags.None, null, null);
                 igSameLine(0, 4);
                 string inputName = ScBufToString(buf).Trim();
-                Logger.Info($"[ComponentDrawers] Buffer content for {inputKey}: '{inputName}'");
                 bool hasName = inputName.Length > 0;
                 // Check if an existing .cs file already exists for this name
                 bool fileExists = hasName && ConfigManager.HasProject &&
@@ -469,7 +467,6 @@ namespace GameEditor.UI
                 igBeginDisabled(!hasName);
                 if (igButton(btnLabel, new Vector2(-1, 0)))
                 {
-                    Logger.Info($"[ComponentDrawers] Assigning script '{inputName}' to entity {id}, scope {scopeKey}");
                     sc.TypeName = inputName;
                     if (ConfigManager.HasProject)
                         ScCreateAndBuild(ConfigManager.ProjectFolder!, inputName);
@@ -478,7 +475,6 @@ namespace GameEditor.UI
                         SceneManager.ActiveScene.IsDirty = true;
                     if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
                     // Clear this buffer since script is now assigned
-                    Logger.Info($"[ComponentDrawers] Clearing buffer for {inputKey}");
                     _scriptNameBufs.Remove(inputKey);
                 }
                 igEndDisabled();
@@ -654,6 +650,13 @@ namespace GameEditor.UI
                 if (SceneManager.ActiveScene != null)
                     SceneManager.ActiveScene.IsDirty = true;
                 if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                
+                // Live property update for playing scripts
+                if (SceneManager.PlayMode == PlayModeState.Playing && !string.IsNullOrEmpty(sc.TypeName) && sc.Properties != null)
+                {
+                    foreach (var kvp in sc.Properties)
+                        ScriptSystem.UpdateScriptProperty(id, sc.TypeName, kvp.Key, kvp.Value);
+                }
             }
         }
 
