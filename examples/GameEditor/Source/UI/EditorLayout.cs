@@ -28,7 +28,7 @@ namespace GameEditor.UI
 
         private static bool _layoutBuilt = false;
         private static bool _layoutResetRequested = false;
-        private static LayoutPreset _layoutPreset = LayoutPreset.SplitSceneGame;
+        private static LayoutPreset _layoutPreset = LayoutPreset.TabbedSceneGame;
         private static uint _sceneGameDockNodeId;
         private static uint _dockspaceId;
 

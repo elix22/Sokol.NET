@@ -57,14 +57,6 @@ namespace GameEditor.UI
         {
             var currentMode = SceneManager.PlayMode;
 
-            // In Unity-style tabbed layout, keep Game attached to the shared Scene/Game dock node.
-            if (EditorLayout.CurrentPreset == EditorLayout.LayoutPreset.TabbedSceneGame)
-            {
-                uint dockId = EditorLayout.SceneGameDockNodeId;
-                if (dockId != 0)
-                    igSetNextWindowDockID(dockId, ImGuiCond.Always);
-            }
-
             if (_requestUndock)
             {
                 igSetNextWindowDockID(0, ImGuiCond.Always);

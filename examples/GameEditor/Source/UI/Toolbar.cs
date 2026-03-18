@@ -92,42 +92,6 @@ namespace GameEditor.UI
                 igEndMenu();
             }
 
-            // Window menu
-            if (igBeginMenu("Window", true))
-            {
-                if (igBeginMenu("Layout", true))
-                {
-                    if (igMenuItem_Bool("Split Scene/Game", null, false, true))
-                        EditorLayout.RequestLayoutPreset(EditorLayout.LayoutPreset.SplitSceneGame);
-
-                    if (igMenuItem_Bool("Tabbed Scene+Game (Unity)", null, false, true))
-                        EditorLayout.RequestLayoutPreset(EditorLayout.LayoutPreset.TabbedSceneGame);
-
-                    igEndMenu();
-                }
-
-                igSeparator();
-
-                if (igMenuItem_Bool("Undock Scene", null, false, true))
-                    SceneWindow.RequestUndock();
-
-                if (igMenuItem_Bool("Undock Game", null, false, true))
-                    GameWindow.RequestUndock();
-
-                if (igMenuItem_Bool("Focus Scene", null, false, true))
-                    SceneWindow.FocusWindow();
-
-                if (igMenuItem_Bool("Focus Game", null, false, true))
-                    GameWindow.FocusWindow();
-
-                igSeparator();
-
-                if (igMenuItem_Bool("Reset Layout", null, false, true))
-                    EditorLayout.RequestResetLayout();
-
-                igEndMenu();
-            }
-
             // Play/Pause/Stop buttons centred
             var state = SceneManager.PlayMode;
             igSetCursorPosX((igGetWindowWidth() - 110f) * 0.5f);
