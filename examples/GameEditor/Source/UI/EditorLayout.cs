@@ -20,14 +20,30 @@ namespace GameEditor.UI
     /// </summary>
     public static unsafe class EditorLayout
     {
+        public enum LayoutPreset
+        {
+            SplitSceneGame,
+            TabbedSceneGame
+        }
+
         private static bool _layoutBuilt = false;
         private static bool _layoutResetRequested = false;
+        private static LayoutPreset _layoutPreset = LayoutPreset.SplitSceneGame;
+        private static uint _sceneGameDockNodeId;
         private static uint _dockspaceId;
 
         public static uint DockspaceId => _dockspaceId;
+        public static LayoutPreset CurrentPreset => _layoutPreset;
+        public static uint SceneGameDockNodeId => _sceneGameDockNodeId;
 
         public static void RequestResetLayout()
         {
+            _layoutResetRequested = true;
+        }
+
+        public static void RequestLayoutPreset(LayoutPreset preset)
+        {
+            _layoutPreset = preset;
             _layoutResetRequested = true;
         }
 
@@ -35,8 +51,13 @@ namespace GameEditor.UI
         {
             var viewport = igGetMainViewport();
 
-            igSetNextWindowPos(viewport->Pos, ImGuiCond.Always, Vector2.Zero);
-            igSetNextWindowSize(viewport->Size, ImGuiCond.Always);
+            // Reserve vertical space for the main menu bar so top dock tabs remain visible.
+            float menuBarH = igGetFrameHeight();
+            Vector2 dockPos = new Vector2(viewport->Pos.X, viewport->Pos.Y + menuBarH);
+            Vector2 dockSize = new Vector2(viewport->Size.X, MathF.Max(0f, viewport->Size.Y - menuBarH));
+
+            igSetNextWindowPos(dockPos, ImGuiCond.Always, Vector2.Zero);
+            igSetNextWindowSize(dockSize, ImGuiCond.Always);
 
             var windowFlags =
                 ImGuiWindowFlags.NoTitleBar |
@@ -66,7 +87,7 @@ namespace GameEditor.UI
             {
                 _layoutResetRequested = false;
                 _layoutBuilt = true;
-                BuildLayout(viewport->Size);
+                BuildLayout(dockSize);
             }
 
             igEnd();
@@ -99,16 +120,22 @@ namespace GameEditor.UI
                 dockCenter, ImGuiDir.Right, 0.22f,
                 &dockInspector, &dockMain);
 
-            // ── Step 4: split center into Scene (top) and Game (bottom) ────────────
-            uint dockGame, dockScene;
-            DockBuilder.igDockBuilderSplitNode(
-                dockMain, ImGuiDir.Down, 0.35f,
-                &dockGame, &dockScene);
+            uint dockGame = 0;
+            uint dockScene = dockMain;
+            if (_layoutPreset == LayoutPreset.SplitSceneGame)
+            {
+                // ── Step 4: split center into Scene (top) and Game (bottom) ────────────
+                DockBuilder.igDockBuilderSplitNode(
+                    dockMain, ImGuiDir.Down, 0.35f,
+                    &dockGame, &dockScene);
+            }
+
+                    _sceneGameDockNodeId = dockScene;
 
             // ── Assign windows to nodes ──────────────────────────────────────────
             DockBuilder.igDockBuilderDockWindow("Hierarchy", dockHierarchy);
             DockBuilder.igDockBuilderDockWindow("Scene",     dockScene);
-            DockBuilder.igDockBuilderDockWindow("Game",      dockGame);
+            DockBuilder.igDockBuilderDockWindow("Game",      _layoutPreset == LayoutPreset.SplitSceneGame ? dockGame : dockScene);
             DockBuilder.igDockBuilderDockWindow("Inspector", dockInspector);
             DockBuilder.igDockBuilderDockWindow("Console",      dockConsole);
             DockBuilder.igDockBuilderDockWindow("Build & Deploy", dockConsole);  // tab alongside Console

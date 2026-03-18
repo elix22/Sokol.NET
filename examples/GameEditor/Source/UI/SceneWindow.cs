@@ -63,8 +63,21 @@ namespace GameEditor.UI
             _requestUndock = true;
         }
 
+        public static void FocusWindow()
+        {
+            igSetWindowFocus_Str("Scene");
+        }
+
         public static void Draw()
         {
+            // Unity-style tabbed layout: keep Scene and Game in the same dock node.
+            if (EditorLayout.CurrentPreset == EditorLayout.LayoutPreset.TabbedSceneGame)
+            {
+                uint dockId = EditorLayout.SceneGameDockNodeId;
+                if (dockId != 0)
+                    igSetNextWindowDockID(dockId, ImGuiCond.Always);
+            }
+
             if (_requestUndock)
             {
                 igSetNextWindowDockID(0, ImGuiCond.Always);

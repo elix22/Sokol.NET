@@ -95,11 +95,30 @@ namespace GameEditor.UI
             // Window menu
             if (igBeginMenu("Window", true))
             {
+                if (igBeginMenu("Layout", true))
+                {
+                    if (igMenuItem_Bool("Split Scene/Game", null, false, true))
+                        EditorLayout.RequestLayoutPreset(EditorLayout.LayoutPreset.SplitSceneGame);
+
+                    if (igMenuItem_Bool("Tabbed Scene+Game (Unity)", null, false, true))
+                        EditorLayout.RequestLayoutPreset(EditorLayout.LayoutPreset.TabbedSceneGame);
+
+                    igEndMenu();
+                }
+
+                igSeparator();
+
                 if (igMenuItem_Bool("Undock Scene", null, false, true))
                     SceneWindow.RequestUndock();
 
                 if (igMenuItem_Bool("Undock Game", null, false, true))
                     GameWindow.RequestUndock();
+
+                if (igMenuItem_Bool("Focus Scene", null, false, true))
+                    SceneWindow.FocusWindow();
+
+                if (igMenuItem_Bool("Focus Game", null, false, true))
+                    GameWindow.FocusWindow();
 
                 igSeparator();
 
@@ -130,6 +149,7 @@ namespace GameEditor.UI
                     if (stopped && ConfigManager.HasProject)
                         GameAssemblyRunner.EnsureLoaded(ConfigManager.ProjectFolder!);
                     SceneManager.Play();
+                    GameWindow.FocusWindow();
                 }
                 if (playBlocked) igEndDisabled();
             }
@@ -155,6 +175,7 @@ namespace GameEditor.UI
                 {
                     SceneManager.Stop();
                     // Keep the assembly loaded (warm cache) — Unload() only on project close
+                    SceneWindow.FocusWindow();
                 }
             }
 

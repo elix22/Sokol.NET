@@ -33,6 +33,11 @@ namespace GameEditor.UI
             _requestUndock = true;
         }
 
+        public static void FocusWindow()
+        {
+            igSetWindowFocus_Str("Game");
+        }
+
         /// <summary>
         /// Must be called at the very start of Frame(), BEFORE any sokol render passes.
         /// Resizes the offscreen target to the size requested by the previous Draw() call.
@@ -51,6 +56,14 @@ namespace GameEditor.UI
         public static void Draw()
         {
             var currentMode = SceneManager.PlayMode;
+
+            // In Unity-style tabbed layout, keep Game attached to the shared Scene/Game dock node.
+            if (EditorLayout.CurrentPreset == EditorLayout.LayoutPreset.TabbedSceneGame)
+            {
+                uint dockId = EditorLayout.SceneGameDockNodeId;
+                if (dockId != 0)
+                    igSetNextWindowDockID(dockId, ImGuiCond.Always);
+            }
 
             if (_requestUndock)
             {
