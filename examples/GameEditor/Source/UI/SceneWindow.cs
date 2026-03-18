@@ -27,6 +27,7 @@ namespace GameEditor.UI
         private static int _viewW = 1280;
         private static int _viewH = 720;
         private static bool _viewportHovered;
+        private static bool _requestUndock;
 
         // Gizmo undo state ────────────────────────────────────────────────────
         private static int       _gizmoUndoId     = -1;
@@ -57,8 +58,23 @@ namespace GameEditor.UI
             CameraPreviewTarget.Create(PreviewW, PreviewH);
         }
 
+        public static void RequestUndock()
+        {
+            _requestUndock = true;
+        }
+
         public static void Draw()
         {
+            if (_requestUndock)
+            {
+                igSetNextWindowDockID(0, ImGuiCond.Always);
+                _requestUndock = false;
+            }
+
+            ImGuiWindowClass sceneClass = default;
+            sceneClass.DockingAlwaysTabBar = 1;
+            igSetNextWindowClass(&sceneClass);
+
             igPushStyleVar_Vec2(ImGuiStyleVar.WindowPadding, Vector2.Zero);
             byte open = 1;
             bool visible = igBegin("Scene", ref open, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);

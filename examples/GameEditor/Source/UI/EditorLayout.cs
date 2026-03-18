@@ -8,8 +8,11 @@ namespace GameEditor.UI
     /// Full-window dockspace with a Unity-style panel layout built via DockBuilder.
     ///
     ///  ┌──────────┬──────────────────┬───────────┐
-    ///  │ Hierarchy│     Scene        │ Inspector │
-    ///  │  ~200 px │   (remainder)    │  ~260 px  │
+    ///  │ Hierarchy│      Scene       │ Inspector │
+    ///  │  ~200 px │   (top center)   │  ~260 px  │
+    ///  ├──────────┼──────────────────┼───────────┤
+    ///  │          │       Game       │           │
+    ///  │          │  (bottom center) │           │
     ///  ├──────────┴──────────────────┴───────────┤
     ///  │                Console                  │
     ///  │               ~180 px tall              │
@@ -18,9 +21,15 @@ namespace GameEditor.UI
     public static unsafe class EditorLayout
     {
         private static bool _layoutBuilt = false;
+        private static bool _layoutResetRequested = false;
         private static uint _dockspaceId;
 
         public static uint DockspaceId => _dockspaceId;
+
+        public static void RequestResetLayout()
+        {
+            _layoutResetRequested = true;
+        }
 
         public static void BeginDockspace()
         {
@@ -46,13 +55,16 @@ namespace GameEditor.UI
             igPopStyleVar(3);
 
             _dockspaceId = igGetID_Str("MainDockspace");
-            igDockSpace(_dockspaceId, Vector2.Zero, ImGuiDockNodeFlags.PassthruCentralNode, null);
+            ImGuiWindowClass dockClass = default;
+            dockClass.DockingAlwaysTabBar = 1;
+            igDockSpace(_dockspaceId, Vector2.Zero, ImGuiDockNodeFlags.None, &dockClass);
 
             // Build default layout once per app launch.
             // DockBuilder always resets the node (even if igDockSpace just created it),
             // so windows get their Unity-style positions on the first frame.
-            if (!_layoutBuilt)
+            if (!_layoutBuilt || _layoutResetRequested)
             {
+                _layoutResetRequested = false;
                 _layoutBuilt = true;
                 BuildLayout(viewport->Size);
             }
@@ -82,15 +94,21 @@ namespace GameEditor.UI
                 &dockHierarchy, &dockCenter);
 
             // ── Step 3: split off Inspector on the right (~22 % of remaining) ──────
-            uint dockInspector, dockScene;
+            uint dockInspector, dockMain;
             DockBuilder.igDockBuilderSplitNode(
                 dockCenter, ImGuiDir.Right, 0.22f,
-                &dockInspector, &dockScene);
+                &dockInspector, &dockMain);
+
+            // ── Step 4: split center into Scene (top) and Game (bottom) ────────────
+            uint dockGame, dockScene;
+            DockBuilder.igDockBuilderSplitNode(
+                dockMain, ImGuiDir.Down, 0.35f,
+                &dockGame, &dockScene);
 
             // ── Assign windows to nodes ──────────────────────────────────────────
             DockBuilder.igDockBuilderDockWindow("Hierarchy", dockHierarchy);
             DockBuilder.igDockBuilderDockWindow("Scene",     dockScene);
-            DockBuilder.igDockBuilderDockWindow("Game",      dockScene);  // tab alongside Scene
+            DockBuilder.igDockBuilderDockWindow("Game",      dockGame);
             DockBuilder.igDockBuilderDockWindow("Inspector", dockInspector);
             DockBuilder.igDockBuilderDockWindow("Console",      dockConsole);
             DockBuilder.igDockBuilderDockWindow("Build & Deploy", dockConsole);  // tab alongside Console

@@ -92,6 +92,23 @@ namespace GameEditor.UI
                 igEndMenu();
             }
 
+            // Window menu
+            if (igBeginMenu("Window", true))
+            {
+                if (igMenuItem_Bool("Undock Scene", null, false, true))
+                    SceneWindow.RequestUndock();
+
+                if (igMenuItem_Bool("Undock Game", null, false, true))
+                    GameWindow.RequestUndock();
+
+                igSeparator();
+
+                if (igMenuItem_Bool("Reset Layout", null, false, true))
+                    EditorLayout.RequestResetLayout();
+
+                igEndMenu();
+            }
+
             // Play/Pause/Stop buttons centred
             var state = SceneManager.PlayMode;
             igSetCursorPosX((igGetWindowWidth() - 110f) * 0.5f);

@@ -17,8 +17,8 @@ namespace GameEditor.UI
         // Pending size is written by Draw() and applied by PrepareRenderTarget() next frame
         private static int          _pendingW = 1280;
         private static int          _pendingH = 720;
-        private static PlayModeState _lastPlayMode = PlayModeState.Stopped;
         private static bool         _hasCamera;   // set by PrepareRenderTarget, read by Draw
+        private static bool         _requestUndock;
 
         public static int ViewWidth  => _viewW;
         public static int ViewHeight => _viewH;
@@ -26,6 +26,11 @@ namespace GameEditor.UI
         public static void Init()
         {
             Target.Create(_viewW, _viewH);
+        }
+
+        public static void RequestUndock()
+        {
+            _requestUndock = true;
         }
 
         /// <summary>
@@ -47,15 +52,15 @@ namespace GameEditor.UI
         {
             var currentMode = SceneManager.PlayMode;
 
-            // Auto-focus the Game tab when Play starts
-            if (_lastPlayMode == PlayModeState.Stopped && currentMode == PlayModeState.Playing)
-                igSetWindowFocus_Str("Game");
+            if (_requestUndock)
+            {
+                igSetNextWindowDockID(0, ImGuiCond.Always);
+                _requestUndock = false;
+            }
 
-            // Auto-focus Scene when Play stops
-            if (_lastPlayMode != PlayModeState.Stopped && currentMode == PlayModeState.Stopped)
-                igSetWindowFocus_Str("Scene");
-
-            _lastPlayMode = currentMode;
+            ImGuiWindowClass gameClass = default;
+            gameClass.DockingAlwaysTabBar = 1;
+            igSetNextWindowClass(&gameClass);
 
             igPushStyleVar_Vec2(ImGuiStyleVar.WindowPadding, Vector2.Zero);
             byte open = 1;
