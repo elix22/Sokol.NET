@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "projectName": "MyGame",
+  "defaultScene": "Assets/Scenes/Main.scene.json",
+  "defaultCamera": "MainCamera",
+  "screenWidth": 1280,
+  "screenHeight": 720,
+  "physics": {
+    "engine3D": "jolt",
+    "engine2D": "box2d"
+  }
+}

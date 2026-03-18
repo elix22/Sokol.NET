@@ -39,7 +39,7 @@ namespace GameEditor.UI
 
         // ── Script inspector state ──────────────────────────────────────────
         private static byte[]  _scriptNameBuf = new byte[128];
-        private static int     _scriptInputId = -1;  // entity whose name-buf is initialized
+        private static string? _scriptInputKey;  // entity/scope whose name-buf is initialized
         private static DateTime _nextScriptResolveTryUtc = DateTime.MinValue;
         // Per-entity-per-field InputText staging buffers  (key = "entityId_fieldName")
         private static readonly Dictionary<string, byte[]> _fieldBufs = new();
@@ -399,9 +399,9 @@ namespace GameEditor.UI
         }
 
         // ── ScriptComponent ──────────────────────────────────────────────────
-        public static void DrawScriptComponent(int id, ref ScriptComponent sc)
+        public static void DrawScriptComponent(int id, ref ScriptComponent sc, string headerLabel = "Script", string scopeKey = "0")
         {
-            if (!igCollapsingHeader_TreeNodeFlags("Script", ImGuiTreeNodeFlags.DefaultOpen))
+            if (!igCollapsingHeader_TreeNodeFlags($"{headerLabel}##script_{id}_{scopeKey}", ImGuiTreeNodeFlags.DefaultOpen))
                 return;
 
             string typeName = sc.TypeName ?? "";
@@ -410,9 +410,10 @@ namespace GameEditor.UI
             // ── No type yet: picker + manual entry ────────────────────────────
             if (!hasType)
             {
-                if (_scriptInputId != id)
+                string inputKey = $"{id}_{scopeKey}";
+                if (_scriptInputKey != inputKey)
                 {
-                    _scriptInputId = id;
+                    _scriptInputKey = inputKey;
                     Array.Clear(_scriptNameBuf, 0, _scriptNameBuf.Length);
                 }
 
@@ -446,7 +447,7 @@ namespace GameEditor.UI
                 igText("Class name:");
                 igSameLine(0, 6);
                 igSetNextItemWidth(-96f);
-                igInputText("##scname", ref _scriptNameBuf[0], (uint)_scriptNameBuf.Length,
+                igInputText($"##scname_{scopeKey}", ref _scriptNameBuf[0], (uint)_scriptNameBuf.Length,
                     ImGuiInputTextFlags.None, null, null);
                 igSameLine(0, 4);
                 string inputName = ScBufToString(_scriptNameBuf).Trim();
@@ -454,7 +455,7 @@ namespace GameEditor.UI
                 // Check if an existing .cs file already exists for this name
                 bool fileExists = hasName && ConfigManager.HasProject &&
                     File.Exists(Path.Combine(ConfigManager.ProjectFolder!, "Source", $"{inputName}.cs"));
-                string btnLabel = fileExists ? "Assign##scc" : "Create##scc";
+                string btnLabel = fileExists ? $"Assign##scc_{scopeKey}" : $"Create##scc_{scopeKey}";
                 igBeginDisabled(!hasName);
                 if (igButton(btnLabel, new Vector2(-1, 0)))
                 {
@@ -486,7 +487,7 @@ namespace GameEditor.UI
                 igEndDragDropSource();
             }
             igSameLine(0, 8);
-            if (igSmallButton("Clear##scclr"))
+            if (igSmallButton($"Clear##scclr_{scopeKey}"))
             {
                 sc.TypeName   = "";
                 sc.Properties = null;
@@ -497,7 +498,7 @@ namespace GameEditor.UI
                 return;
             }
             igSameLine(0, 4);
-            if (igSmallButton("Recompile##scr") && ConfigManager.HasProject)
+            if (igSmallButton($"Recompile##scr_{scopeKey}") && ConfigManager.HasProject)
                 GameAssemblyRunner.TriggerBuild(ConfigManager.ProjectFolder!);
 
             // Build status
@@ -557,7 +558,7 @@ namespace GameEditor.UI
             foreach (var field in fields)
             {
                 string key   = field.Name;
-                string label = $"{key}##scp_{id}_{key}";
+                string label = $"{key}##scp_{id}_{scopeKey}_{key}";
                 sc.Properties.TryGetValue(key, out string? raw);
 
                 if (field.FieldType == typeof(float))
@@ -620,7 +621,7 @@ namespace GameEditor.UI
                 else
                 {
                     // Fallback: string / enum / other — show as text input
-                    string bufKey = $"{id}_{key}";
+                    string bufKey = $"{id}_{scopeKey}_{key}";
                     if (!_fieldBufs.TryGetValue(bufKey, out var buf))
                         _fieldBufs[bufKey] = buf = new byte[256];
                     string fallback = raw

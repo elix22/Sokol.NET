@@ -246,8 +246,7 @@ namespace GameEditor.UI
                         string droppedType = System.Text.Encoding.UTF8.GetString((byte*)sp->Data, sp->DataSize);
                         if (!string.IsNullOrEmpty(droppedType))
                         {
-                            world.TryGetComponent<ScriptComponent>(id, out var existing);
-                            world.AddComponent(id, new ScriptComponent { TypeName = droppedType, Properties = existing.Properties });
+                            AttachScriptToEntity(world, id, droppedType);
                             EditorState.SelectEntity(id);
                             scene.IsDirty = true;
                         }
@@ -261,8 +260,7 @@ namespace GameEditor.UI
                         string className   = System.IO.Path.GetFileNameWithoutExtension(droppedPath);
                         if (!string.IsNullOrEmpty(className))
                         {
-                            world.TryGetComponent<ScriptComponent>(id, out var existing);
-                            world.AddComponent(id, new ScriptComponent { TypeName = className, Properties = existing.Properties });
+                            AttachScriptToEntity(world, id, className);
                             EditorState.SelectEntity(id);
                             scene.IsDirty = true;
                         }
@@ -351,6 +349,20 @@ namespace GameEditor.UI
                     igTreePop();
                 }
             }
+        }
+
+        private static void AttachScriptToEntity(ECSWorld world, int entityId, string typeName)
+        {
+            if (!world.TryGetComponent<ScriptComponent>(entityId, out var primary) || string.IsNullOrEmpty(primary.TypeName))
+            {
+                world.AddComponent(entityId, new ScriptComponent { TypeName = typeName });
+                return;
+            }
+
+            world.TryGetComponent<ScriptCollectionComponent>(entityId, out var scc);
+            scc.Scripts ??= new System.Collections.Generic.List<ScriptComponent>();
+            scc.Scripts.Add(new ScriptComponent { TypeName = typeName });
+            world.AddComponent(entityId, scc);
         }
 
         private static void BeginRename(int id, string currentName)

@@ -63,29 +63,41 @@ namespace GameEditor.Framework.Scripting
             _running.Clear();
             foreach (int id in world.Entities)
             {
-                if (!world.TryGetComponent<ScriptComponent>(id, out var sc)) continue;
-                if (string.IsNullOrEmpty(sc.TypeName)) continue;
+                if (world.TryGetComponent<ScriptComponent>(id, out var sc))
+                    TryCreateBehaviour(id, sc);
 
-                if (!_factories.TryGetValue(sc.TypeName, out var factory))
+                if (world.TryGetComponent<ScriptCollectionComponent>(id, out var extra)
+                    && extra.Scripts != null)
                 {
-                    Logger.Warning($"[ScriptSystem] No factory for script type '{sc.TypeName}' on entity {id}.");
-                    continue;
-                }
-
-                try
-                {
-                    var behaviour = factory();
-                    behaviour.EntityId = id;
-                    if (sc.Properties != null && sc.Properties.Count > 0)
-                        behaviour.ApplySerializedProperties(sc.Properties);
-                    _running.Add((id, behaviour));
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error($"[ScriptSystem] Failed to create '{sc.TypeName}': {ex.Message}");
+                    foreach (var item in extra.Scripts)
+                        TryCreateBehaviour(id, item);
                 }
             }
             Logger.Info($"[ScriptSystem] Populated {_running.Count} behaviour(s) from scene.");
+        }
+
+        private static void TryCreateBehaviour(int id, ScriptComponent sc)
+        {
+            if (string.IsNullOrEmpty(sc.TypeName)) return;
+
+            if (!_factories.TryGetValue(sc.TypeName, out var factory))
+            {
+                Logger.Warning($"[ScriptSystem] No factory for script type '{sc.TypeName}' on entity {id}.");
+                return;
+            }
+
+            try
+            {
+                var behaviour = factory();
+                behaviour.EntityId = id;
+                if (sc.Properties != null && sc.Properties.Count > 0)
+                    behaviour.ApplySerializedProperties(sc.Properties);
+                _running.Add((id, behaviour));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"[ScriptSystem] Failed to create '{sc.TypeName}': {ex.Message}");
+            }
         }
 
         /// <summary>Manually register a pre-created behaviour for an entity.</summary>

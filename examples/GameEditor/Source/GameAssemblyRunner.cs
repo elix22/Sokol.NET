@@ -329,7 +329,30 @@ namespace GameEditor
             => ScheduleRebuild();
 
         private static void OnSourceRenamed(object sender, RenamedEventArgs e)
-            => ScheduleRebuild();
+        {
+            // If a .cs file is renamed externally, sync the class name inside the file.
+            if (e.OldFullPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                e.FullPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            {
+                string oldClassName = Path.GetFileNameWithoutExtension(e.OldFullPath);
+                string newClassName = Path.GetFileNameWithoutExtension(e.FullPath);
+                if (oldClassName != newClassName && File.Exists(e.FullPath))
+                {
+                    try
+                    {
+                        string content = File.ReadAllText(e.FullPath);
+                        string updated = content.Replace($"class {oldClassName}", $"class {newClassName}");
+                        if (updated != content)
+                            File.WriteAllText(e.FullPath, updated);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"[GameAssemblyRunner] Could not update class name after rename: {ex.Message}");
+                    }
+                }
+            }
+            ScheduleRebuild();
+        }
 
         private static void ScheduleRebuild()
         {

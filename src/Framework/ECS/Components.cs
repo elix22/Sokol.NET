@@ -90,4 +90,10 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>Serialized public field values, keyed by field name. Null = no overrides.</summary>
         public Dictionary<string, string>? Properties;
     }
+
+    public struct ScriptCollectionComponent
+    {
+        /// <summary>Additional scripts attached to the entity (beyond primary ScriptComponent).</summary>
+        public List<ScriptComponent>? Scripts;
+    }
 }

@@ -175,6 +175,8 @@ namespace GameEditor.UI
                     world.AddComponent(newId, rb);
                 if (world.TryGetComponent<ScriptComponent>(srcId, out var sc))
                     world.AddComponent(newId, sc);
+                if (world.TryGetComponent<ScriptCollectionComponent>(srcId, out var scc))
+                    world.AddComponent(newId, scc);
 
                 newIds.Add(newId);
             }

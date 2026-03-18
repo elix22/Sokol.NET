@@ -108,6 +108,34 @@ namespace GameEditor.Framework.Scene
                     sb.Append('}');
                 }
 
+                if (world.TryGetComponent<ScriptCollectionComponent>(id, out var scc)
+                    && scc.Scripts != null && scc.Scripts.Count > 0)
+                {
+                    Comma(sb, ref fc);
+                    sb.Append("\"Scripts\":[");
+                    bool firstScript = true;
+                    foreach (var sc2 in scc.Scripts)
+                    {
+                        if (!firstScript) sb.Append(',');
+                        firstScript = false;
+                        sb.Append("{\"Type\":\"").Append(Esc(sc2.TypeName ?? "")).Append('"');
+                        if (sc2.Properties != null && sc2.Properties.Count > 0)
+                        {
+                            sb.Append(",\"Props\":{");
+                            bool fp = true;
+                            foreach (var kvp in sc2.Properties)
+                            {
+                                if (!fp) sb.Append(',');
+                                fp = false;
+                                sb.Append('"').Append(Esc(kvp.Key)).Append("\":\"").Append(Esc(kvp.Value)).Append('"');
+                            }
+                            sb.Append('}');
+                        }
+                        sb.Append('}');
+                    }
+                    sb.Append(']');
+                }
+
                 sb.Append("}}"); // close components + entity
             }
 
@@ -211,6 +239,27 @@ namespace GameEditor.Framework.Scene
                             sc.Properties[p.Name] = p.Value.GetString() ?? "";
                     }
                     world.AddComponent(newId, sc);
+                }
+
+                if (c.TryGetProperty("Scripts", out var saEl) && saEl.ValueKind == JsonValueKind.Array)
+                {
+                    var list = new List<ScriptComponent>();
+                    foreach (var sxEl in saEl.EnumerateArray())
+                    {
+                        var sc = new ScriptComponent
+                        {
+                            TypeName = sxEl.TryGetProperty("Type", out var txEl) ? (txEl.GetString() ?? "") : ""
+                        };
+                        if (sxEl.TryGetProperty("Props", out var propsEl) && propsEl.ValueKind == JsonValueKind.Object)
+                        {
+                            sc.Properties = new Dictionary<string, string>();
+                            foreach (var p in propsEl.EnumerateObject())
+                                sc.Properties[p.Name] = p.Value.GetString() ?? "";
+                        }
+                        list.Add(sc);
+                    }
+                    if (list.Count > 0)
+                        world.AddComponent(newId, new ScriptCollectionComponent { Scripts = list });
                 }
             }
 

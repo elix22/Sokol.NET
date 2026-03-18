@@ -157,6 +157,11 @@ namespace GameEditor.UI
                 _cachedFolderPath = null;
             igSameLine(0, 8);
 
+            // Create script asset in the current folder (no entity attachment)
+            if (igSmallButton("+ Script"))
+                TryCreateScript(cur);
+            igSameLine(0, 8);
+
             // Search filter
             igPushItemWidth(180f);
             igInputText($"{IconSearch}##assets_search", ref _searchBuf[0],
@@ -341,6 +346,11 @@ namespace GameEditor.UI
                     TryCreateFolder(dirPath);
                     igCloseCurrentPopup();
                 }
+                if (igMenuItem_Bool("New Script", null, false, true))
+                {
+                    TryCreateScript(dirPath);
+                    igCloseCurrentPopup();
+                }
                 if (igMenuItem_Bool("Rename", null, false, true))
                 {
                     BeginRename(dirPath, isFolder: true);
@@ -512,6 +522,36 @@ namespace GameEditor.UI
             catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
         }
 
+        private static void TryCreateScript(string parentDir)
+        {
+            string stem = "NewScript";
+            string filePath = Path.Combine(parentDir, $"{stem}.cs");
+            int idx = 1;
+            while (File.Exists(filePath))
+                filePath = Path.Combine(parentDir, $"{stem}{idx++}.cs");
+
+            string className = Path.GetFileNameWithoutExtension(filePath);
+            string code =
+                "using GameEditor.Framework.Scripting;\n\n" +
+                $"public class {className} : GameBehaviour\n{{\n" +
+                "    public override void OnStart() { }\n\n" +
+                "    public override void OnUpdate(float dt)\n    {\n" +
+                "        base.OnUpdate(dt);\n" +
+                "    }\n}\n";
+
+            try
+            {
+                File.WriteAllText(filePath, code);
+                _cachedFolderPath = null;
+                _selectedFile = filePath;
+                BeginRename(filePath, isFolder: false);
+
+                if (ConfigManager.HasProject)
+                    GameAssemblyRunner.TriggerBuild(ConfigManager.ProjectFolder!);
+            }
+            catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
+        }
+
         private static void TryRenameFolder(string dirPath, string newName)
         {
             try
@@ -606,10 +646,36 @@ namespace GameEditor.UI
             {
                 string? dir = Path.GetDirectoryName(filePath);
                 if (dir == null) return;
-                File.Move(filePath, Path.Combine(dir, newName));
+
+                // When renaming a C# script, update the class name inside the file too.
+                if (filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                    newName.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    string oldClassName = Path.GetFileNameWithoutExtension(filePath);
+                    string newClassName = Path.GetFileNameWithoutExtension(newName);
+                    if (oldClassName != newClassName)
+                    {
+                        try
+                        {
+                            string content = File.ReadAllText(filePath);
+                            // Replace "class OldName" → "class NewName" (handles any trailing whitespace / braces)
+                            string updated = content.Replace($"class {oldClassName}", $"class {newClassName}");
+                            if (updated != content)
+                                File.WriteAllText(filePath, updated);
+                        }
+                        catch (Exception ex) { Logger.Warning($"[Assets] Could not update class name: {ex.Message}"); }
+                    }
+                }
+
+                string destPath = Path.Combine(dir, newName);
+                File.Move(filePath, destPath);
                 _cachedFolderPath = null;
                 if (_selectedFile == filePath)
-                    _selectedFile = Path.Combine(dir, newName);
+                    _selectedFile = destPath;
+
+                // Rebuild so the renamed class is picked up immediately.
+                if (filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) && ConfigManager.HasProject)
+                    GameAssemblyRunner.TriggerBuild(ConfigManager.ProjectFolder!);
             }
             catch (Exception ex) { Logger.Warning($"[Assets] {ex.Message}"); }
         }

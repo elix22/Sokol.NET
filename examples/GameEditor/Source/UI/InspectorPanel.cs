@@ -29,24 +29,14 @@ namespace GameEditor.UI
                         string droppedPath = System.Text.Encoding.UTF8.GetString((byte*)sfp->Data, sfp->DataSize);
                         string className   = System.IO.Path.GetFileNameWithoutExtension(droppedPath);
                         if (!string.IsNullOrEmpty(className))
-                        {
-                            var w = ECSWorld.Instance;
-                            w.TryGetComponent<ScriptComponent>(curId, out var existing);
-                            w.AddComponent(curId, new ScriptComponent { TypeName = className, Properties = existing.Properties });
-                            SceneManager.ActiveScene!.IsDirty = true;
-                        }
+                            AttachScriptToEntity(curId, className);
                     }
                     var stp = igAcceptDragDropPayload("SCRIPT_TYPE", ImGuiDragDropFlags.None);
                     if (stp != null && stp->DataSize > 0)
                     {
                         string droppedType = System.Text.Encoding.UTF8.GetString((byte*)stp->Data, stp->DataSize);
                         if (!string.IsNullOrEmpty(droppedType))
-                        {
-                            var w = ECSWorld.Instance;
-                            w.TryGetComponent<ScriptComponent>(curId, out var existing);
-                            w.AddComponent(curId, new ScriptComponent { TypeName = droppedType, Properties = existing.Properties });
-                            SceneManager.ActiveScene!.IsDirty = true;
-                        }
+                            AttachScriptToEntity(curId, droppedType);
                     }
                 }
                 igEndDragDropTarget();
@@ -144,8 +134,51 @@ namespace GameEditor.UI
             // ScriptComponent
             if (world.TryGetComponent<ScriptComponent>(id, out var sc))
             {
-                ComponentDrawers.DrawScriptComponent(id, ref sc);
-                DrawRemoveButton("ScriptComponent", id, sc);
+                ComponentDrawers.DrawScriptComponent(id, ref sc, "Script", "0");
+                world.AddComponent(id, sc);
+                DrawRemovePrimaryScriptButton(id, sc);
+            }
+
+            if (world.TryGetComponent<ScriptCollectionComponent>(id, out var scc))
+            {
+                scc.Scripts ??= new System.Collections.Generic.List<ScriptComponent>();
+                bool listChanged = false;
+                int removeIndex = -1;
+
+                for (int i = 0; i < scc.Scripts.Count; i++)
+                {
+                    var item = scc.Scripts[i];
+                    ComponentDrawers.DrawScriptComponent(id, ref item, $"Script {i + 2}", (i + 1).ToString());
+                    scc.Scripts[i] = item;
+
+                    igPushID_Str($"scr_extra_rm_{id}_{i}");
+                    if (igSmallButton("Remove This Script"))
+                        removeIndex = i;
+                    igPopID();
+                }
+
+                if (removeIndex >= 0)
+                {
+                    scc.Scripts.RemoveAt(removeIndex);
+                    listChanged = true;
+                }
+
+                if (igButton("+ Add Script", new Vector2(-1, 0)))
+                {
+                    scc.Scripts.Add(new ScriptComponent { TypeName = "" });
+                    listChanged = true;
+                }
+
+                if (listChanged)
+                {
+                    if (scc.Scripts.Count == 0)
+                        world.RemoveComponent<ScriptCollectionComponent>(id);
+                    else
+                        world.AddComponent(id, scc);
+                    if (SceneManager.ActiveScene != null)
+                        SceneManager.ActiveScene.IsDirty = true;
+                    EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                }
             }
 
             igSpacing();
@@ -195,12 +228,33 @@ namespace GameEditor.UI
                         () => world.RemoveComponent<RigidbodyComponent>(cid)));
                     igCloseCurrentPopup();
                 }
-                if (igMenuItem_Bool("Script", null, false, !world.HasComponent<ScriptComponent>(id)))
+                if (igMenuItem_Bool("Script", null, false, true))
                 {
-                    var snap = new ScriptComponent { TypeName = "" }; int cid = id;
-                    UndoStack.Record(new DelegateCommand("Add ScriptComponent",
-                        () => world.AddComponent(cid, snap),
-                        () => world.RemoveComponent<ScriptComponent>(cid)));
+                    int cid = id;
+                    if (!world.HasComponent<ScriptComponent>(cid))
+                    {
+                        var snap = new ScriptComponent { TypeName = "" };
+                        UndoStack.Record(new DelegateCommand("Add ScriptComponent",
+                            () => world.AddComponent(cid, snap),
+                            () => world.RemoveComponent<ScriptComponent>(cid)));
+                    }
+                    else
+                    {
+                        world.TryGetComponent<ScriptCollectionComponent>(cid, out var extraScripts);
+                        extraScripts.Scripts ??= new System.Collections.Generic.List<ScriptComponent>();
+                        var before = new System.Collections.Generic.List<ScriptComponent>(extraScripts.Scripts);
+                        extraScripts.Scripts.Add(new ScriptComponent { TypeName = "" });
+                        var after = new System.Collections.Generic.List<ScriptComponent>(extraScripts.Scripts);
+                        UndoStack.Record(new DelegateCommand("Add Additional Script",
+                            () => world.AddComponent(cid, new ScriptCollectionComponent { Scripts = new System.Collections.Generic.List<ScriptComponent>(after) }),
+                            () =>
+                            {
+                                if (before.Count == 0)
+                                    world.RemoveComponent<ScriptCollectionComponent>(cid);
+                                else
+                                    world.AddComponent(cid, new ScriptCollectionComponent { Scripts = new System.Collections.Generic.List<ScriptComponent>(before) });
+                            }));
+                    }
                     igCloseCurrentPopup();
                 }
                 igEndPopup();
@@ -227,6 +281,69 @@ namespace GameEditor.UI
                     {
                         ECSWorld.Instance.AddComponent(cid, before);
                         EventBus.RaiseComponentChanged(cid, componentName);
+                    }));
+            }
+            igPopID();
+        }
+
+        private static void AttachScriptToEntity(int entityId, string typeName)
+        {
+            var w = ECSWorld.Instance;
+            if (!w.TryGetComponent<ScriptComponent>(entityId, out var primary) || string.IsNullOrEmpty(primary.TypeName))
+            {
+                w.AddComponent(entityId, new ScriptComponent { TypeName = typeName });
+            }
+            else
+            {
+                w.TryGetComponent<ScriptCollectionComponent>(entityId, out var scc);
+                scc.Scripts ??= new System.Collections.Generic.List<ScriptComponent>();
+                scc.Scripts.Add(new ScriptComponent { TypeName = typeName });
+                w.AddComponent(entityId, scc);
+            }
+            if (SceneManager.ActiveScene != null)
+                SceneManager.ActiveScene.IsDirty = true;
+            EventBus.RaiseComponentChanged(entityId, nameof(ScriptComponent));
+        }
+
+        private static void DrawRemovePrimaryScriptButton(int id, ScriptComponent snapshot)
+        {
+            igPushID_Str($"##rm_primary_script_{id}");
+            igSameLine(igGetWindowWidth() - 28f, 0);
+            if (igSmallButton("X"))
+            {
+                var world = ECSWorld.Instance;
+                int cid = id;
+                ScriptComponent beforePrimary = snapshot;
+                world.TryGetComponent<ScriptCollectionComponent>(cid, out var beforeCollection);
+
+                UndoStack.Record(new DelegateCommand("Remove Primary Script",
+                    () =>
+                    {
+                        if (world.TryGetComponent<ScriptCollectionComponent>(cid, out var scc)
+                            && scc.Scripts != null && scc.Scripts.Count > 0)
+                        {
+                            var promoted = scc.Scripts[0];
+                            scc.Scripts.RemoveAt(0);
+                            world.AddComponent(cid, promoted);
+                            if (scc.Scripts.Count == 0)
+                                world.RemoveComponent<ScriptCollectionComponent>(cid);
+                            else
+                                world.AddComponent(cid, scc);
+                        }
+                        else
+                        {
+                            world.RemoveComponent<ScriptComponent>(cid);
+                        }
+                        EventBus.RaiseComponentChanged(cid, nameof(ScriptComponent));
+                    },
+                    () =>
+                    {
+                        world.AddComponent(cid, beforePrimary);
+                        if (beforeCollection.Scripts == null || beforeCollection.Scripts.Count == 0)
+                            world.RemoveComponent<ScriptCollectionComponent>(cid);
+                        else
+                            world.AddComponent(cid, beforeCollection);
+                        EventBus.RaiseComponentChanged(cid, nameof(ScriptComponent));
                     }));
             }
             igPopID();

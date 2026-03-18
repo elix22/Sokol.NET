@@ -1,0 +1,4 @@
+{"name":"Main","entities":[
+  {"id":1,"c":{"NameTag":{"Name":"Main Camera"},"ActiveFlag":{"Active":true},"Transform":{"P":[0,1,-5],"E":[0,0,0],"S":[1,1,1]},"Camera":{"Fov":60,"Near":0.1,"Far":1000,"Main":true,"Ortho":false,"OrthoSize":5}}},
+  {"id":2,"c":{"NameTag":{"Name":"Rotating Cube"},"ActiveFlag":{"Active":true},"Transform":{"P":[0,0,0],"E":[0,0,0],"S":[1,1,1]},"Script":{"Type":"RotateScript"}}}
+]}
