@@ -38,9 +38,9 @@ namespace GameEditor.UI
         private static RigidbodyComponent _rbUndoBefore;
 
         // ── Script inspector state ──────────────────────────────────────────
-        private static byte[]  _scriptNameBuf = new byte[128];
-        private static string? _scriptInputKey;  // entity/scope whose name-buf is initialized
         private static DateTime _nextScriptResolveTryUtc = DateTime.MinValue;
+        // Per-entity-per-scope script name buffers  (key = "entityId_scopeKey")
+        private static readonly Dictionary<string, byte[]> _scriptNameBufs = new();
         // Per-entity-per-field InputText staging buffers  (key = "entityId_fieldName")
         private static readonly Dictionary<string, byte[]> _fieldBufs = new();
 
@@ -401,6 +401,9 @@ namespace GameEditor.UI
         // ── ScriptComponent ──────────────────────────────────────────────────
         public static void DrawScriptComponent(int id, ref ScriptComponent sc, string headerLabel = "Script", string scopeKey = "0")
         {
+            bool isPrimaryScript = scopeKey == "0";  // Track if this is the primary or additional script
+            Logger.Info($"[ComponentDrawers] DrawScriptComponent: id={id}, headerLabel={headerLabel}, scopeKey={scopeKey}, isPrimaryScript={isPrimaryScript}, typeName={sc.TypeName}");
+            
             if (!igCollapsingHeader_TreeNodeFlags($"{headerLabel}##script_{id}_{scopeKey}", ImGuiTreeNodeFlags.DefaultOpen))
                 return;
 
@@ -411,10 +414,16 @@ namespace GameEditor.UI
             if (!hasType)
             {
                 string inputKey = $"{id}_{scopeKey}";
-                if (_scriptInputKey != inputKey)
+                // Get or create a buffer for this script editor
+                if (!_scriptNameBufs.TryGetValue(inputKey, out var buf))
                 {
-                    _scriptInputKey = inputKey;
-                    Array.Clear(_scriptNameBuf, 0, _scriptNameBuf.Length);
+                    buf = new byte[128];
+                    _scriptNameBufs[inputKey] = buf;
+                    Logger.Info($"[ComponentDrawers] Created new buffer for {inputKey}");
+                }
+                else
+                {
+                    Logger.Info($"[ComponentDrawers] Using existing buffer for {inputKey}");
                 }
 
                 // If the assembly is loaded, offer a combo picker of known types
@@ -427,10 +436,10 @@ namespace GameEditor.UI
                         if (igSelectable_Bool(kn, false, ImGuiSelectableFlags.None, new Vector2(0, 0)))
                         {
                             sc.TypeName = kn;
-                            ECSWorld.Instance.AddComponent(id, sc);
+                            if (isPrimaryScript) ECSWorld.Instance.AddComponent(id, sc);
                             if (SceneManager.ActiveScene != null)
                                 SceneManager.ActiveScene.IsDirty = true;
-                            EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                            if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
                         }
                         // Each known type is also a drag source
                         if (igBeginDragDropSource(ImGuiDragDropFlags.None))
@@ -447,10 +456,11 @@ namespace GameEditor.UI
                 igText("Class name:");
                 igSameLine(0, 6);
                 igSetNextItemWidth(-96f);
-                igInputText($"##scname_{scopeKey}", ref _scriptNameBuf[0], (uint)_scriptNameBuf.Length,
+                igInputText($"##scname_{scopeKey}", ref buf[0], (uint)buf.Length,
                     ImGuiInputTextFlags.None, null, null);
                 igSameLine(0, 4);
-                string inputName = ScBufToString(_scriptNameBuf).Trim();
+                string inputName = ScBufToString(buf).Trim();
+                Logger.Info($"[ComponentDrawers] Buffer content for {inputKey}: '{inputName}'");
                 bool hasName = inputName.Length > 0;
                 // Check if an existing .cs file already exists for this name
                 bool fileExists = hasName && ConfigManager.HasProject &&
@@ -459,13 +469,17 @@ namespace GameEditor.UI
                 igBeginDisabled(!hasName);
                 if (igButton(btnLabel, new Vector2(-1, 0)))
                 {
+                    Logger.Info($"[ComponentDrawers] Assigning script '{inputName}' to entity {id}, scope {scopeKey}");
                     sc.TypeName = inputName;
                     if (ConfigManager.HasProject)
                         ScCreateAndBuild(ConfigManager.ProjectFolder!, inputName);
-                    ECSWorld.Instance.AddComponent(id, sc);
+                    if (isPrimaryScript) ECSWorld.Instance.AddComponent(id, sc);
                     if (SceneManager.ActiveScene != null)
                         SceneManager.ActiveScene.IsDirty = true;
-                    EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                    if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                    // Clear this buffer since script is now assigned
+                    Logger.Info($"[ComponentDrawers] Clearing buffer for {inputKey}");
+                    _scriptNameBufs.Remove(inputKey);
                 }
                 igEndDisabled();
                 if (fileExists)
@@ -491,10 +505,10 @@ namespace GameEditor.UI
             {
                 sc.TypeName   = "";
                 sc.Properties = null;
-                ECSWorld.Instance.AddComponent(id, sc);
+                if (isPrimaryScript) ECSWorld.Instance.AddComponent(id, sc);
                 if (SceneManager.ActiveScene != null)
                     SceneManager.ActiveScene.IsDirty = true;
-                EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
                 return;
             }
             igSameLine(0, 4);
@@ -636,10 +650,10 @@ namespace GameEditor.UI
 
             if (changed)
             {
-                ECSWorld.Instance.AddComponent(id, sc);
+                if (isPrimaryScript) ECSWorld.Instance.AddComponent(id, sc);
                 if (SceneManager.ActiveScene != null)
                     SceneManager.ActiveScene.IsDirty = true;
-                EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
+                if (isPrimaryScript) EventBus.RaiseComponentChanged(id, nameof(ScriptComponent));
             }
         }
 
