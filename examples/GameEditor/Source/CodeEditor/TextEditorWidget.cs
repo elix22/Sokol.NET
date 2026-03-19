@@ -1857,11 +1857,16 @@ namespace GameEditor.CodeEditor
         }
 
         // ── Go to line dialog ─────────────────────────────────────────────────
+        private const string GotoLinePopupId = "##gotoLinePop";
+        private bool _gotoLineInputFocusSet;
+
         private unsafe void RenderGotoLine()
         {
             if (!_gotoLineVisible) return;
 
-            // Position the modal at the top of the parent window
+            // Position the popup centered horizontally near the top of the current
+            // (Script Editor) window. Must be called every frame before igBeginPopup
+            // with ImGuiCond.Always so the popup stays locked in place.
             Vector2 winPos = default;
             igGetWindowPos(ref winPos);
             Vector2 winSz = default;
@@ -1870,27 +1875,34 @@ namespace GameEditor.CodeEditor
                 ImGuiCond.Always, new Vector2(0.5f, 0f));
             igSetNextWindowSize(new Vector2(240f, 0f), ImGuiCond.Always);
 
-            byte open = 1;
-            if (!igBegin("Go to Line##gotoLineWnd",
-                    ref open,
+            // Open the popup on the first frame — must be called before igBeginPopup.
+            // igOpenPopup pushes it to the top of the window stack so it renders above
+            // all docked panels (unlike a plain igBegin window which can end up behind them).
+            if (_gotoLineJustOpened)
+            {
+                Console.Error.WriteLine($"[Editor] RenderGotoLine: opening popup winPos={winPos} winSz={winSz}");
+                igOpenPopup_Str(GotoLinePopupId, ImGuiPopupFlags.None);
+                _gotoLineJustOpened = false;
+                _gotoLineInputFocusSet = false;
+            }
+
+            if (!igBeginPopup(GotoLinePopupId,
                     ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize |
                     ImGuiWindowFlags.NoCollapse   | ImGuiWindowFlags.NoMove))
             {
-                Console.Error.WriteLine($"[Editor] RenderGotoLine: igBegin=false open={open} winPos={winPos} winSz={winSz}");
-                igEnd();
-                if (open == 0) _gotoLineVisible = false;
+                // Popup closed (e.g. clicked outside) — sync the visible flag
+                _gotoLineVisible = false;
                 return;
             }
-            if (open == 0) { _gotoLineVisible = false; igEnd(); return; }
 
             igText($"Line (1\u2013{_lines.Count}):");
             igSetNextItemWidth(-1f);
 
-            if (_gotoLineJustOpened)
+            // Focus the input on the first frame inside the popup only
+            if (!_gotoLineInputFocusSet)
             {
-                Console.Error.WriteLine($"[Editor] RenderGotoLine: dialog opened winPos={winPos} winSz={winSz}");
                 igSetKeyboardFocusHere(0);
-                _gotoLineJustOpened = false;
+                _gotoLineInputFocusSet = true;
             }
 
             bool submitted = igInputText("##gotoLineInput", ref _gotoLineBuf[0],
@@ -1898,25 +1910,26 @@ namespace GameEditor.CodeEditor
                 ImGuiInputTextFlags.CharsDecimal | ImGuiInputTextFlags.EnterReturnsTrue,
                 null, null);
 
-            if (submitted || (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Enter, false)))
+            if (submitted)
             {
                 int nullIdx = Array.IndexOf(_gotoLineBuf, (byte)0);
                 string raw = System.Text.Encoding.UTF8.GetString(
                     _gotoLineBuf, 0, nullIdx < 0 ? _gotoLineBuf.Length : nullIdx);
-                Console.Error.WriteLine($"[Editor] RenderGotoLine: submitted raw='{raw}' (submitted={submitted})");
+                Console.Error.WriteLine($"[Editor] RenderGotoLine: submitted raw='{raw}'");
                 if (int.TryParse(raw, out int targetLine))
                     JumpToLine(targetLine - 1);
-                _gotoLineVisible = false;
                 Array.Clear(_gotoLineBuf, 0, _gotoLineBuf.Length);
+                _gotoLineVisible = false;
+                igCloseCurrentPopup();
             }
-
-            if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
             {
-                _gotoLineVisible = false;
                 Array.Clear(_gotoLineBuf, 0, _gotoLineBuf.Length);
+                _gotoLineVisible = false;
+                igCloseCurrentPopup();
             }
 
-            igEnd();
+            igEndPopup();
         }
 
         // ── Symbol results popup (Find References / Go to Definition) ─────────

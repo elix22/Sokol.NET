@@ -65,6 +65,12 @@ namespace GameEditor.UI
         private static readonly ConcurrentQueue<(string File, int Line, int Col)>
             _pendingNavigations = new();
 
+        // Tab index to force-select on the next DrawTabBar() call (-1 = none).
+        // Set when navigation switches to an already-open tab so ImGui's own
+        // internal selection state (which still points at the previously active tab)
+        // doesn't overwrite the programmatic switch.
+        private static int _forceSelectTab = -1;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         public static bool IsVisible => _isVisible;
@@ -83,6 +89,7 @@ namespace GameEditor.UI
                 {
                     Logger.Info($"[ScriptEditor] Open: already open at tab {i}");
                     _activeTab = i;
+                    _forceSelectTab = i;  // tell DrawTabBar to force-select this tab
                     _isVisible = true;
                     return;
                 }
@@ -276,6 +283,11 @@ namespace GameEditor.UI
                 ImGuiTabItemFlags flags = ImGuiTabItemFlags.None;
                 if (tab.IsDirty)
                     flags |= ImGuiTabItemFlags.UnsavedDocument;
+                if (_forceSelectTab == i)
+                {
+                    flags |= ImGuiTabItemFlags.SetSelected;
+                    _forceSelectTab = -1;  // consume — only needed for one frame
+                }
 
                 byte tabOpen = 1;
                 bool selected = igBeginTabItem(label, ref tabOpen, flags);
@@ -483,7 +495,12 @@ namespace GameEditor.UI
 
         private static void CloseTab(int idx)
         {
-            RoslynHost.Instance.RemoveDocument(_tabs[idx].FilePath);
+            // Note: we intentionally do NOT call RoslynHost.Instance.RemoveDocument here.
+            // The Roslyn workspace acts as a project-wide symbol graph; removing a document
+            // when its UI tab is closed would break "Go to Definition" for any symbol defined
+            // in that file (it would fall back to the DLL metadata instead of source).
+            // Files accumulate in the workspace for the session lifetime, which is fine for
+            // an IDE. If the file is re-opened, UpdateDocument refreshes its content.
             _tabs.RemoveAt(idx);
             _closeTabIdx = -1;
             _activeTab   = Math.Min(_activeTab, _tabs.Count - 1);

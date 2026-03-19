@@ -430,30 +430,73 @@ namespace GameEditor.CodeEditor
             var files = new List<string>();
             CollectCsFiles(directory, files);
 
+            // Read source outside the lock to avoid long I/O inside a critical section
+            var toAdd = new List<(string filePath, string source)>();
             foreach (string filePath in files)
             {
-                bool alreadyKnown;
-                lock (_lock) alreadyKnown = _docIds.ContainsKey(filePath);
-                if (alreadyKnown) continue;
-
-                string sourceText;
-                try { sourceText = File.ReadAllText(filePath, System.Text.Encoding.UTF8); }
+                lock (_lock) { if (_docIds.ContainsKey(filePath)) continue; }
+                string source;
+                try { source = File.ReadAllText(filePath, System.Text.Encoding.UTF8); }
                 catch { continue; }
+                toAdd.Add((filePath, source));
+            }
 
-                lock (_lock)
+            if (toAdd.Count == 0) return;
+
+            // Apply all new documents in a single atomic TryApplyChanges to avoid
+            // the race where concurrent calls each read _workspace.CurrentSolution,
+            // both build a "n+1 doc" snapshot from the same "n doc" base, and the
+            // second TryApplyChanges is silently rejected by AdhocWorkspace because
+            // the solution version has already advanced past what it was built from.
+            lock (_lock)
+            {
+                // Build the list of truly-new docs (double-check inside lock)
+                var infos = new List<DocumentInfo>();
+                var newIds = new List<(string path, DocumentId id)>();
+                foreach (var (filePath, source) in toAdd)
                 {
-                    if (_docIds.ContainsKey(filePath)) continue;   // double-check inside lock
-
-                    DocumentId newId = DocumentId.CreateNewId(_projectId, filePath);
-                    _docIds[filePath] = newId;
+                    if (_docIds.ContainsKey(filePath)) continue;
+                    var id = DocumentId.CreateNewId(_projectId, filePath);
                     var info = DocumentInfo.Create(
-                        newId,
+                        id,
                         name:           Path.GetFileName(filePath),
                         filePath:       filePath,
                         sourceCodeKind: SourceCodeKind.Regular)
                         .WithTextLoader(TextLoader.From(
-                            TextAndVersion.Create(SourceText.From(sourceText), VersionStamp.Create())));
-                    _workspace.TryApplyChanges(_workspace.CurrentSolution.AddDocument(info));
+                            TextAndVersion.Create(SourceText.From(source), VersionStamp.Create())));
+                    infos.Add(info);
+                    newIds.Add((filePath, id));
+                }
+
+                if (infos.Count == 0) return;
+
+                // Build one solution snapshot that adds ALL new docs, then apply once.
+                // This also serializes with UpdateDocument/RemoveDocument which both hold _lock.
+                Solution solution = _workspace.CurrentSolution;
+                foreach (var info in infos)
+                    solution = solution.AddDocument(info);
+
+                if (_workspace.TryApplyChanges(solution))
+                {
+                    foreach (var (path, id) in newIds)
+                        _docIds[path] = id;
+                }
+                // If TryApplyChanges still fails (another holder of _lock beat us), retry
+                // one more time from the updated CurrentSolution.
+                else
+                {
+                    solution = _workspace.CurrentSolution;
+                    var stillMissing = newIds.Where(p => !_docIds.ContainsKey(p.path)).ToList();
+                    foreach (var (_, id) in stillMissing)
+                    {
+                        var info = infos.First(i => i.Id == id);
+                        solution = solution.AddDocument(info);
+                    }
+                    if (_workspace.TryApplyChanges(solution))
+                    {
+                        foreach (var (path, id) in stillMissing)
+                            _docIds[path] = id;
+                    }
                 }
             }
         }
