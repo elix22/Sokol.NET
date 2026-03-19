@@ -137,6 +137,16 @@ namespace GameEditor
                     Logger.Warning($"[EditorPersistence] Could not restore scene: {ex.Message}");
                 }
             }
+
+            // 3. Start file watcher + trigger initial background build so the assembly
+            //    is ready before the user presses Play.
+            if (ConfigManager.HasProject)
+            {
+                string proj = ConfigManager.ProjectFolder!;
+                GameAssemblyRunner.StartWatcher(proj);
+                GameAssemblyRunner.TriggerBuild(proj);
+                Logger.Info($"[EditorPersistence] Background build started for {proj}");
+            }
         }
 
         // ── Recent-projects list helpers ────────────────────────────────────

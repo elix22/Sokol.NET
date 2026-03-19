@@ -55,7 +55,7 @@ namespace GameEditor
         // ── Public state ─────────────────────────────────────────────────────
 
         public static bool IsLoaded             => _assembly != null;
-        public static bool LastBuildSucceeded    { get; private set; } = true;
+        public static bool LastBuildSucceeded    { get; private set; } = false; // false until first build
         public static bool IsBuilding            { get; private set; } = false;
 
         /// <summary>Diagnostics produced by the most recent build. Empty when build succeeded cleanly.</summary>
@@ -313,6 +313,22 @@ namespace GameEditor
                 {
                     IsBuilding = false;
                     BuildCompleted?.Invoke(LastBuildDiagnostics);
+
+                    // Log errors and warnings to the editor console so they surface
+                    // in the Console panel without having to check the script editor.
+                    if (!LastBuildSucceeded)
+                        Logger.Error("[Build] Build failed.");
+                    foreach (var diag in LastBuildDiagnostics)
+                    {
+                        string loc = string.IsNullOrEmpty(diag.FilePath)
+                            ? ""
+                            : $"{System.IO.Path.GetFileName(diag.FilePath)}({diag.Line},{diag.Column}): ";
+                        string msg = $"[Build] {loc}{diag.Code}: {diag.Message}";
+                        if (diag.IsError)   Logger.Error(msg);
+                        else                Logger.Warning(msg);
+                    }
+                    if (LastBuildSucceeded && LastBuildDiagnostics.Count == 0)
+                        Logger.Info("[Build] Build succeeded.");
                 }
             });
         }

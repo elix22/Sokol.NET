@@ -46,6 +46,9 @@ namespace GameEditor.UI
         private static          int               _activeTab  = 0;
         private static          bool              _isVisible  = false;
 
+        /// <summary>True if the Script Editor window had keyboard focus last frame.</summary>
+        public static bool IsWindowFocused { get; private set; }
+
         // Tab scheduled for close (confirmed or no unsaved changes)
         private static int    _closeTabIdx     = -1;
         private static bool   _showSaveModal   = false;
@@ -230,6 +233,7 @@ namespace GameEditor.UI
             bool visible = igBegin("Script Editor", ref open,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             _isVisible = visible;
+            IsWindowFocused = visible && igIsWindowFocused(ImGuiFocusedFlags.ChildWindows);
 
             if (!visible)
             {
@@ -460,6 +464,16 @@ namespace GameEditor.UI
         }
 
         // ── File operations ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Save every dirty tab. Called before entering Play so the build sees latest edits.
+        /// </summary>
+        public static void SaveAll()
+        {
+            foreach (var tab in _tabs)
+                if (tab.IsDirty) SaveTab(tab);
+        }
+
         private static void SaveTab(OpenFile tab)
         {
             try

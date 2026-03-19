@@ -14,6 +14,9 @@ namespace GameEditor.UI
     {
         private enum DialogMode { None, SaveAs, Open, NewProject, OpenProject, ProjectSettings }
         private static DialogMode _dialog = DialogMode.None;
+
+        // Which window was focused just before the user pressed Play
+        private static string _prePlayFocusWindow = "Scene";
         private static byte[] _dialogPathBuf    = new byte[512];
         private static byte[] _newProjectNameBuf = new byte[128];
 
@@ -108,6 +111,19 @@ namespace GameEditor.UI
                 if (playBlocked) igBeginDisabled(true);
                 if (igButton("\uF04B##play", new Vector2(32, 0)))
                 {
+                    // Record which window was focused so we can restore it on Stop
+                    if (stopped)
+                    {
+                        // Check visibility (active tab) rather than keyboard focus, because
+                        // clicking Play moves ImGui focus to the toolbar before this executes.
+                        if (ScriptEditorWindow.IsVisible)      _prePlayFocusWindow = "Script Editor";
+                        else if (SceneWindow.IsVisible)        _prePlayFocusWindow = "Scene";
+                        else                                   _prePlayFocusWindow = "Scene";
+                    }
+
+                    // Save all dirty script tabs so the build picks up latest changes
+                    if (stopped) ScriptEditorWindow.SaveAll();
+
                     // When transitioning from Stopped → Playing, build and load
                     // the game project's script assembly if a project is open.
                     if (stopped && ConfigManager.HasProject)
@@ -142,8 +158,11 @@ namespace GameEditor.UI
                 if (igButton("\uF04D##stop", new Vector2(32, 0)))
                 {
                     SceneManager.Stop();
-                    // Keep the assembly loaded (warm cache) — Unload() only on project close
-                    SceneWindow.FocusWindow();
+                    // Restore focus to whichever window was active before Play
+                    if (_prePlayFocusWindow == "Script Editor")
+                        igSetWindowFocus_Str("Script Editor");
+                    else
+                        SceneWindow.FocusWindow();
                 }
                 if (igIsItemHovered(ImGuiHoveredFlags.None))
                     igSetTooltip("Stop");

@@ -57,6 +57,11 @@ namespace GameEditor.UI
             CameraPreviewTarget.Create(PreviewW, PreviewH);
         }
 
+        /// <summary>True if the Scene window had keyboard focus last frame.</summary>
+        public static bool IsWindowFocused { get; private set; }
+        /// <summary>True if the Scene tab is the currently visible (active) tab in its dock.</summary>
+        public static bool IsVisible { get; private set; }
+
         public static void FocusWindow()
         {
             igSetWindowFocus_Str("Scene");
@@ -72,6 +77,8 @@ namespace GameEditor.UI
             byte open = 1;
             bool visible = igBegin("Scene", ref open, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             igPopStyleVar(1);
+            IsWindowFocused = visible && igIsWindowFocused(ImGuiFocusedFlags.ChildWindows);
+            IsVisible = visible;
 
             if (!visible)
             {
