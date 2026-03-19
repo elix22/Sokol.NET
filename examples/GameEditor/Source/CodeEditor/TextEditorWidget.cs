@@ -62,6 +62,25 @@ namespace GameEditor.CodeEditor
         public bool ReadOnly { get; set; } = false;
         public bool ShowLineNumbers { get; set; } = true;
 
+        // ── Find bar ──────────────────────────────────────────────────────────
+        private bool   _findBarVisible;
+        private bool   _findJustOpened;
+        private readonly byte[] _findBuf = new byte[256];
+        private string  _findQuery = "";
+        private int     _findMatchIdx = -1;
+        private readonly List<Coords> _findMatches = new();
+        private int     _findTextVersion = -2; // ensures first rebuild
+
+        // ── Go to line dialog ─────────────────────────────────────────────────
+        private bool   _gotoLineVisible;
+        private bool   _gotoLineJustOpened;
+        private readonly byte[] _gotoLineBuf = new byte[16];
+
+        // ── Symbol search results (references / definition) ───────────────────
+        private bool   _symResultsOpen;
+        private string  _symResultsTitle = "";
+        private readonly List<(int Line, int ColStart, int ColEnd)> _symResults = new();
+
         public Palette Palette
         {
             get => _palette;
@@ -122,7 +141,277 @@ namespace GameEditor.CodeEditor
         /// <summary>Returns the number of lines in the document.</summary>
         public int LineCount => _lines.Count;
 
-        // ── Public render entry point ─────────────────────────────────────────
+        private string GetLineText(int line)
+        {
+            if (line < 0 || line >= _lines.Count) return "";
+            var sb = new StringBuilder(_lines[line].Count);
+            foreach (var g in _lines[line]) sb.Append(g.Char);
+            return sb.ToString();
+        }
+
+        // ── Comment / uncomment ───────────────────────────────────────────────
+        private void ToggleLineComment()
+        {
+            int startLine = HasSelection() ? Math.Min(_selStart.Line, _selEnd.Line) : _cursor.Line;
+            int endLine   = HasSelection() ? Math.Max(_selStart.Line, _selEnd.Line) : _cursor.Line;
+
+            // VS Code style: if the selection ends at column 0, don't include that line
+            if (HasSelection() && (_selStart <= _selEnd ? _selEnd : _selStart).Column == 0 && endLine > startLine)
+                endLine--;
+
+            // All-commented → remove comment prefix; otherwise add it
+            bool allCommented = true;
+            for (int li = startLine; li <= endLine; li++)
+            {
+                string trimmed = GetLineText(li).TrimStart();
+                if (!trimmed.StartsWith("//")) { allCommented = false; break; }
+            }
+
+            for (int li = startLine; li <= endLine; li++)
+            {
+                var ln = _lines[li];
+                if (allCommented)
+                {
+                    // Find first "//" and remove it
+                    for (int ci = 0; ci < ln.Count - 1; ci++)
+                    {
+                        if (ln[ci].Char == '/' && ln[ci + 1].Char == '/')
+                        {
+                            ln.RemoveAt(ci + 1);
+                            ln.RemoveAt(ci);
+                            // Remove one space after // if present
+                            if (ci < ln.Count && ln[ci].Char == ' ')
+                                ln.RemoveAt(ci);
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // Find indent level, insert "// " there
+                    int indent = 0;
+                    while (indent < ln.Count && (ln[indent].Char == ' ' || ln[indent].Char == '\t'))
+                        indent++;
+                    ln.Insert(indent, new Glyph(' ', PaletteIndex.Default));
+                    ln.Insert(indent, new Glyph('/', PaletteIndex.Default));
+                    ln.Insert(indent, new Glyph('/', PaletteIndex.Default));
+                }
+            }
+
+            _textVersion++;
+        }
+
+        // ── Duplicate current line / selection ────────────────────────────────
+        private void DuplicateCurrentLine()
+        {
+            if (HasSelection())
+            {
+                // Duplicate selected text and place it after the selection
+                string selText = GetSelectedText();
+                var selMax = _selStart <= _selEnd ? _selEnd : _selStart;
+                _cursor = selMax;
+                InsertText(selText);
+            }
+            else
+            {
+                // Duplicate whole line below cursor
+                var ln = _lines[_cursor.Line];
+                var newLine = new List<Glyph>(ln);
+                _lines.Insert(_cursor.Line + 1, newLine);
+                _cursor = new Coords(_cursor.Line + 1, _cursor.Column);
+                _selStart = _selEnd = _cursor;
+                _textVersion++;
+            }
+        }
+
+        // ── Move line up ──────────────────────────────────────────────────────
+        private void MoveLineUp()
+        {
+            if (_cursor.Line == 0) return;
+            var tmp = _lines[_cursor.Line - 1];
+            _lines[_cursor.Line - 1] = _lines[_cursor.Line];
+            _lines[_cursor.Line]     = tmp;
+            _cursor.Line--;
+            _selStart = _selEnd = _cursor;
+            _textVersion++;
+        }
+
+        // ── Move line down ────────────────────────────────────────────────────
+        private void MoveLineDown()
+        {
+            if (_cursor.Line >= _lines.Count - 1) return;
+            var tmp = _lines[_cursor.Line + 1];
+            _lines[_cursor.Line + 1] = _lines[_cursor.Line];
+            _lines[_cursor.Line]     = tmp;
+            _cursor.Line++;
+            _selStart = _selEnd = _cursor;
+            _textVersion++;
+        }
+
+        // ── Find helpers ──────────────────────────────────────────────────────
+
+        /// Rebuild _findMatches for the current _findQuery.
+        private void RebuildFindMatches()
+        {
+            _findMatches.Clear();
+            _findMatchIdx = -1;
+            if (string.IsNullOrEmpty(_findQuery)) return;
+
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                string lineText = GetLineText(li);
+                int idx = 0;
+                while ((idx = lineText.IndexOf(_findQuery, idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+                {
+                    _findMatches.Add(new Coords(li, idx));
+                    idx += _findQuery.Length;
+                }
+            }
+
+            // Jump to the first match at or after cursor if possible
+            _findMatchIdx = -1;
+            for (int i = 0; i < _findMatches.Count; i++)
+            {
+                if (_findMatches[i].Line > _cursor.Line ||
+                    (_findMatches[i].Line == _cursor.Line && _findMatches[i].Column >= _cursor.Column))
+                {
+                    _findMatchIdx = i;
+                    break;
+                }
+            }
+            if (_findMatchIdx == -1 && _findMatches.Count > 0)
+                _findMatchIdx = 0;
+        }
+
+        private void NavigateToMatch(int delta)
+        {
+            if (_findMatches.Count == 0) return;
+            _findMatchIdx = ((_findMatchIdx + delta) % _findMatches.Count + _findMatches.Count) % _findMatches.Count;
+            var m = _findMatches[_findMatchIdx];
+            _cursor   = new Coords(m.Line, m.Column + _findQuery.Length);
+            _selStart = new Coords(m.Line, m.Column);
+            _selEnd   = _cursor;
+            // Scroll to match
+            float cursorPixelY = _cursor.Line * _charH;
+            if (cursorPixelY < _scrollY || cursorPixelY + _charH > _scrollY + 400f) // approx
+                _scrollY = MathF.Max(0f, cursorPixelY - 100f);
+        }
+
+        // ── Word under cursor ─────────────────────────────────────────────────
+        private string GetWordUnderCursor()
+        {
+            if (_cursor.Line < 0 || _cursor.Line >= _lines.Count) return "";
+            var ln = _lines[_cursor.Line];
+            if (ln.Count == 0) return "";
+
+            int col = Math.Clamp(_cursor.Column, 0, ln.Count - 1);
+            if (col < ln.Count && !IsWordChar(ln[col].Char) && col > 0) col--;
+            if (!IsWordChar(ln[col].Char)) return "";
+
+            int start = col;
+            while (start > 0 && IsWordChar(ln[start - 1].Char)) start--;
+            int end = col;
+            while (end < ln.Count && IsWordChar(ln[end].Char)) end++;
+
+            var sb = new StringBuilder(end - start);
+            for (int ci = start; ci < end; ci++) sb.Append(ln[ci].Char);
+            return sb.ToString();
+        }
+
+        // ── Find all references ───────────────────────────────────────────────
+        private void FindAllReferences()
+        {
+            string word = GetWordUnderCursor();
+            if (string.IsNullOrEmpty(word)) return;
+
+            _symResults.Clear();
+            _symResultsTitle = $"References to '{word}'";
+
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                string lineText = GetLineText(li);
+                int idx = 0;
+                while ((idx = lineText.IndexOf(word, idx, StringComparison.Ordinal)) >= 0)
+                {
+                    // Only match whole words
+                    bool beforeOk = idx == 0 || !IsWordChar(lineText[idx - 1]);
+                    bool afterOk  = (idx + word.Length >= lineText.Length) ||
+                                   !IsWordChar(lineText[idx + word.Length]);
+                    if (beforeOk && afterOk)
+                        _symResults.Add((li, idx, idx + word.Length));
+                    idx++;
+                }
+            }
+
+            _symResultsOpen = _symResults.Count > 0;
+        }
+
+        // ── Go to definition ──────────────────────────────────────────────────
+        // Text-based: looks for 'class/interface/struct/record/enum/void/etc. Word'
+        private static readonly string[] DefinitionKeywords =
+            { "class ", "interface ", "struct ", "record ", "enum ", "delegate ",
+              "void ", "bool ", "int ", "float ", "double ", "string ", "var ",
+              "public ", "private ", "protected ", "internal ", "static ",
+              "override ", "virtual ", "abstract ", "async " };
+
+        private void GotoDefinition()
+        {
+            string word = GetWordUnderCursor();
+            if (string.IsNullOrEmpty(word)) return;
+
+            _symResults.Clear();
+            _symResultsTitle = $"Definition of '{word}'";
+
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                string lineText = GetLineText(li);
+                // Check if this line has a declaration of 'word'
+                // Heuristic: the word appears and a definition keyword precedes it on the same line
+                int idx = lineText.IndexOf(word, StringComparison.Ordinal);
+                while (idx >= 0)
+                {
+                    bool beforeOk = idx == 0 || !IsWordChar(lineText[idx - 1]);
+                    bool afterOk  = (idx + word.Length >= lineText.Length) ||
+                                   !IsWordChar(lineText[idx + word.Length]);
+                    if (beforeOk && afterOk)
+                    {
+                        string before = lineText.Substring(0, idx);
+                        bool hasDefKw = false;
+                        foreach (var kw in DefinitionKeywords)
+                            if (before.Contains(kw)) { hasDefKw = true; break; }
+
+                        if (hasDefKw)
+                            _symResults.Add((li, idx, idx + word.Length));
+                    }
+                    idx = lineText.IndexOf(word, idx + 1, StringComparison.Ordinal);
+                }
+            }
+
+            if (_symResults.Count == 1)
+            {
+                // Jump directly if exactly one result
+                var r = _symResults[0];
+                _cursor   = new Coords(r.Line, r.ColEnd);
+                _selStart = new Coords(r.Line, r.ColStart);
+                _selEnd   = _cursor;
+                _scrollY  = MathF.Max(0f, r.Line * _charH - 100f);
+                _symResultsOpen = false;
+            }
+            else
+            {
+                _symResultsOpen = _symResults.Count > 0;
+            }
+        }
+
+        private void JumpToLine(int line)
+        {
+            line = Math.Clamp(line, 0, _lines.Count - 1);
+            _cursor = new Coords(line, Math.Min(_cursor.Column, _lines[line].Count));
+            _selStart = _selEnd = _cursor;
+            _scrollY = MathF.Max(0f, line * _charH - 100f);
+        }
+
+
         public unsafe void Render(string id, Vector2 size)
         {
             // Kick off a highlight pass if the text changed
@@ -142,8 +431,12 @@ namespace GameEditor.CodeEditor
             // Grab latest token data from the highlighter (may be null on first frame)
             _tokens = _highlighter.GetResult();
 
+            // Reserve space for the find bar strip when visible
+            const float findBarH = 28f;
+            float contentH = _findBarVisible ? MathF.Max(4f, size.Y - findBarH) : size.Y;
+
             var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
-            igBeginChild_Str(id, size, ImGuiChildFlags.None, windowFlags);
+            igBeginChild_Str(id, new Vector2(size.X, contentH), ImGuiChildFlags.None, windowFlags);
 
             // Push JetBrains Mono if available — must happen inside the child so
             // subsequent igCalcTextSize uses the correct font.
@@ -181,10 +474,27 @@ namespace GameEditor.CodeEditor
 
             HandleMouseInput();
 
+            // Capture editor screen-space origin before RenderContent overwrites the cursor
+            Vector2 editorScreenPos = default;
+            igGetWindowPos(ref editorScreenPos);
+
             RenderContent();
+
+            // Context menu (right-click within the child window)
+            RenderContextMenu();
 
             if (pushedFont) igPopFont();
             igEndChild();
+
+            // ── Find bar strip (placed immediately below the content child) ───
+            if (_findBarVisible)
+                RenderFindBar(new Vector2(size.X, findBarH));
+
+            // ── Go to line floating dialog ────────────────────────────────────
+            RenderGotoLine();
+
+            // ── Symbol results floating popup ─────────────────────────────────
+            RenderSymbolResults(editorScreenPos);
         }
 
         // ── Rendering ────────────────────────────────────────────────────────
@@ -265,6 +575,28 @@ namespace GameEditor.CodeEditor
                 // ── Selection background ──────────────────────────────────────
                 if (selMin != selMax)
                     DrawSelectionOnLine(drawList, li, lineY, contentLeft, winPos, winSize, selMin, selMax);
+
+                // ── Find match highlights ─────────────────────────────────────
+                if (_findMatches.Count > 0 && !string.IsNullOrEmpty(_findQuery))
+                {
+                    int matchLen = _findQuery.Length;
+                    for (int mi = 0; mi < _findMatches.Count; mi++)
+                    {
+                        var m = _findMatches[mi];
+                        if (m.Line != li) continue;
+                        float mx0 = contentLeft + ColToPixel(li, m.Column) - _scrollX;
+                        float mx1 = mx0 + matchLen * _charW;
+                        // Current match: bright highlight; others: subtle
+                        uint matchColor = (mi == _findMatchIdx)
+                            ? 0xAA00A0FF   // orange-ish for active match
+                            : 0x6600A0FF;  // dimmer yellow for other matches
+                        ImDrawList_AddRectFilled(drawList,
+                            new Vector2(mx0, lineY),
+                            new Vector2(mx1, lineY + _charH),
+                            matchColor,
+                            2f, ImDrawFlags.None);
+                    }
+                }
 
                 // ── Glyphs ────────────────────────────────────────────────────
                 var line   = _lines[li];
@@ -678,6 +1010,55 @@ namespace GameEditor.CodeEditor
                               (shift && igIsKeyPressed_Bool(ImGuiKey.Z, true))))
             {
                 DoRedo();
+            }
+            // ── Comment / uncomment ────────────────────────────────────────────
+            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Slash, false))
+            {
+                ToggleLineComment();
+            }
+            // ── Duplicate line ─────────────────────────────────────────────────
+            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.D, false))
+            {
+                DuplicateCurrentLine();
+            }
+            // ── Move line up / down ────────────────────────────────────────────
+            else if (alt && igIsKeyPressed_Bool(ImGuiKey.UpArrow, false))
+            {
+                MoveLineUp();
+            }
+            else if (alt && igIsKeyPressed_Bool(ImGuiKey.DownArrow, false))
+            {
+                MoveLineDown();
+            }
+            // ── Find bar ───────────────────────────────────────────────────────
+            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.F, false))
+            {
+                _findBarVisible   = true;
+                _findJustOpened   = true;
+            }
+            // ── Go to line ─────────────────────────────────────────────────────
+            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.G, false))
+            {
+                _gotoLineVisible   = true;
+                _gotoLineJustOpened = true;
+            }
+            // ── F3 next / prev find match ──────────────────────────────────────
+            else if (igIsKeyPressed_Bool(ImGuiKey.F3, false))
+            {
+                NavigateToMatch(shift ? -1 : 1);
+            }
+            // ── F12 go to definition / Shift+F12 find all references ──────────
+            else if (igIsKeyPressed_Bool(ImGuiKey.F12, false))
+            {
+                if (shift) FindAllReferences();
+                else       GotoDefinition();
+            }
+            // ── Escape: close overlays ─────────────────────────────────────────
+            else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            {
+                if (_findBarVisible)      { _findBarVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
+                else if (_gotoLineVisible) { _gotoLineVisible = false; }
+                else if (_symResultsOpen)  { _symResultsOpen = false; }
             }
 
             // ── Character input ───────────────────────────────────────────────
@@ -1096,7 +1477,241 @@ namespace GameEditor.CodeEditor
             _textVersion++;
         }
 
-        // ── Cursor info ───────────────────────────────────────────────────────
+        // ── Context menu ──────────────────────────────────────────────────────
+        private unsafe void RenderContextMenu()
+        {
+            // Use explicit open+begin instead of igBeginPopupContextWindow, which can
+            // assert or null-deref inside a child window that uses only ImDrawList rendering
+            // (no real ImGui items → unstable internal hover-item state).
+            if (igIsWindowHovered(ImGuiHoveredFlags.None) &&
+                igIsMouseClicked_Bool(ImGuiMouseButton.Right, false))
+                igOpenPopup_Str("##editorCtx", ImGuiPopupFlags.None);
+
+            if (!igBeginPopup("##editorCtx", ImGuiWindowFlags.None))
+                return;
+
+            bool hasSel = HasSelection();
+
+            if (igMenuItem_Bool("Cut",   "Ctrl+X", false, hasSel))  { CopyToClipboard(); DeleteSelection(); }
+            if (igMenuItem_Bool("Copy",  "Ctrl+C", false, hasSel))    CopyToClipboard();
+            if (igMenuItem_Bool("Paste", "Ctrl+V", false, !ReadOnly)) PasteFromClipboard();
+            if (igMenuItem_Bool("Select All", "Ctrl+A", false, true))
+            {
+                _selStart = Coords.Zero;
+                _selEnd   = new Coords(_lines.Count - 1, _lines[_lines.Count - 1].Count);
+                _cursor   = _selEnd;
+            }
+
+            igSeparator();
+
+            if (igMenuItem_Bool("Comment / Uncomment Lines", "Ctrl+/",  false, !ReadOnly))
+                ToggleLineComment();
+            if (igMenuItem_Bool("Duplicate Line",             "Ctrl+D",  false, !ReadOnly))
+                DuplicateCurrentLine();
+            if (igMenuItem_Bool("Move Line Up",               "Alt+\u2191", false, !ReadOnly))
+                MoveLineUp();
+            if (igMenuItem_Bool("Move Line Down",             "Alt+\u2193", false, !ReadOnly))
+                MoveLineDown();
+
+            igSeparator();
+
+            if (igMenuItem_Bool("Find",              "Ctrl+F",   false, true))
+            { _findBarVisible = true; _findJustOpened = true; }
+            if (igMenuItem_Bool("Go to Line\u2026",  "Ctrl+G",   false, true))
+            { _gotoLineVisible = true; _gotoLineJustOpened = true; }
+            if (igMenuItem_Bool("Next Match",        "F3",       false, _findMatches.Count > 0))
+                NavigateToMatch(1);
+            if (igMenuItem_Bool("Previous Match",    "Shift+F3", false, _findMatches.Count > 0))
+                NavigateToMatch(-1);
+
+            igSeparator();
+
+            if (igMenuItem_Bool("Go to Definition",    "F12",       false, true))
+                GotoDefinition();
+            if (igMenuItem_Bool("Find All References", "Shift+F12", false, true))
+                FindAllReferences();
+
+            igEndPopup();
+        }
+
+        // ── Find bar ──────────────────────────────────────────────────────────
+        private unsafe void RenderFindBar(Vector2 size)
+        {
+            igPushStyleVar_Vec2(ImGuiStyleVar.WindowPadding, new Vector2(6f, 4f));
+            igBeginChild_Str("##findbar", size, ImGuiChildFlags.Borders, ImGuiWindowFlags.None);
+            igPopStyleVar(1);
+
+            if (_findJustOpened)
+            {
+                igSetKeyboardFocusHere(0);
+                _findJustOpened = false;
+            }
+
+            // Search input – take most of the width
+            float btnW  = 60f;
+            float countW = 80f;
+            float inputW = size.X - btnW * 2f - countW - 20f;
+            igSetNextItemWidth(inputW);
+
+            bool changed = igInputText("##findInput", ref _findBuf[0], (uint)_findBuf.Length,
+                ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll,
+                null, null);
+
+            // Read null-terminated UTF-8 from buffer
+            int nullIdx = Array.IndexOf(_findBuf, (byte)0);
+            string newQuery = System.Text.Encoding.UTF8.GetString(_findBuf, 0, nullIdx < 0 ? _findBuf.Length : nullIdx);
+
+            if (newQuery != _findQuery || _findTextVersion != _textVersion)
+            {
+                _findQuery      = newQuery;
+                _findTextVersion = _textVersion;
+                RebuildFindMatches();
+            }
+
+            if (changed) NavigateToMatch(1);
+
+            // F3 / Enter inside find bar
+            if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.F3, false))
+            {
+                var io = igGetIO_Nil();
+                bool shift = (io->KeyMods & ImGuiKey.ImGuiMod_Shift) != 0;
+                NavigateToMatch(shift ? -1 : 1);
+            }
+            if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            {
+                _findBarVisible = false;
+                _findMatches.Clear();
+                _findMatchIdx = -1;
+            }
+
+            igSameLine(0, 4f);
+            if (igSmallButton("\uF060##prev")) NavigateToMatch(-1); // FA arrow-left
+            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Previous match (Shift+F3)");
+            igSameLine(0, 2f);
+            if (igSmallButton("\uF061##next")) NavigateToMatch(1);  // FA arrow-right
+            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Next match (F3)");
+
+            igSameLine(0, 8f);
+            string countText = _findMatches.Count == 0
+                ? (string.IsNullOrEmpty(_findQuery) ? "" : "No results")
+                : $"{(_findMatchIdx >= 0 ? _findMatchIdx + 1 : 0)}/{_findMatches.Count}";
+            igTextDisabled(countText);
+
+            igEndChild();
+        }
+
+        // ── Go to line dialog ─────────────────────────────────────────────────
+        private unsafe void RenderGotoLine()
+        {
+            if (!_gotoLineVisible) return;
+
+            // Position the modal at the top of the parent window
+            Vector2 winPos = default;
+            igGetWindowPos(ref winPos);
+            Vector2 winSz = default;
+            igGetWindowSize(ref winSz);
+            igSetNextWindowPos(new Vector2(winPos.X + winSz.X * 0.5f, winPos.Y + 40f),
+                ImGuiCond.Always, new Vector2(0.5f, 0f));
+            igSetNextWindowSize(new Vector2(240f, 0f), ImGuiCond.Always);
+
+            byte open = 1;
+            if (!igBegin("Go to Line##gotoLineWnd",
+                    ref open,
+                    ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoCollapse   | ImGuiWindowFlags.NoMove))
+            {
+                igEnd();
+                if (open == 0) _gotoLineVisible = false;
+                return;
+            }
+            if (open == 0) { _gotoLineVisible = false; igEnd(); return; }
+
+            igText($"Line (1\u2013{_lines.Count}):");
+            igSetNextItemWidth(-1f);
+
+            if (_gotoLineJustOpened)
+            {
+                igSetKeyboardFocusHere(0);
+                _gotoLineJustOpened = false;
+            }
+
+            bool submitted = igInputText("##gotoLineInput", ref _gotoLineBuf[0],
+                (uint)_gotoLineBuf.Length,
+                ImGuiInputTextFlags.CharsDecimal | ImGuiInputTextFlags.EnterReturnsTrue,
+                null, null);
+
+            if (submitted || (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Enter, false)))
+            {
+                int nullIdx = Array.IndexOf(_gotoLineBuf, (byte)0);
+                string raw = System.Text.Encoding.UTF8.GetString(
+                    _gotoLineBuf, 0, nullIdx < 0 ? _gotoLineBuf.Length : nullIdx);
+                if (int.TryParse(raw, out int targetLine))
+                    JumpToLine(targetLine - 1);
+                _gotoLineVisible = false;
+                Array.Clear(_gotoLineBuf, 0, _gotoLineBuf.Length);
+            }
+
+            if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            {
+                _gotoLineVisible = false;
+                Array.Clear(_gotoLineBuf, 0, _gotoLineBuf.Length);
+            }
+
+            igEnd();
+        }
+
+        // ── Symbol results popup (Find References / Go to Definition) ─────────
+        private unsafe void RenderSymbolResults(Vector2 editorScreenPos)
+        {
+            if (!_symResultsOpen || _symResults.Count == 0) return;
+
+            // Position below the cursor line
+            float popX = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
+            float popY = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 4f;
+            // Ensure it doesn't go off screen horizontally
+            popX = MathF.Max(editorScreenPos.X + _gutterW, popX);
+
+            igSetNextWindowPos(new Vector2(popX, popY), ImGuiCond.Always, Vector2.Zero);
+            igSetNextWindowSize(new Vector2(460f, Math.Min(_symResults.Count * _charH + 40f, 220f)), ImGuiCond.Always);
+
+            byte open = 1;
+            if (!igBegin("##symResults", ref open,
+                    ImGuiWindowFlags.NoScrollbar   | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoCollapse     | ImGuiWindowFlags.NoMove  |
+                    ImGuiWindowFlags.NoSavedSettings))
+            {
+                igEnd();
+                if (open == 0) _symResultsOpen = false;
+                return;
+            }
+            if (open == 0) { _symResultsOpen = false; igEnd(); return; }
+
+            igText(_symResultsTitle);
+            igSeparator();
+
+            for (int i = 0; i < _symResults.Count; i++)
+            {
+                var (rLine, rStart, rEnd) = _symResults[i];
+                string lineText = GetLineText(rLine).Trim();
+                string label    = $"  L{rLine + 1,4}:  {lineText}##sym{i}";
+                if (igSelectable_Bool(label, false, ImGuiSelectableFlags.None, Vector2.Zero))
+                {
+                    _cursor   = new Coords(rLine, rEnd);
+                    _selStart = new Coords(rLine, rStart);
+                    _selEnd   = _cursor;
+                    _scrollY  = MathF.Max(0f, rLine * _charH - 100f);
+                    _symResultsOpen = false;
+                }
+            }
+
+            // Close on Escape or click outside
+            if (igIsKeyPressed_Bool(ImGuiKey.Escape, false) ||
+                (!igIsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) &&
+                  igIsMouseClicked_Bool(ImGuiMouseButton.Left, false)))
+                _symResultsOpen = false;
+
+            igEnd();
+        }
         public (int Line, int Column) CursorPosition => (_cursor.Line + 1, _cursor.Column + 1);
     }
 }
