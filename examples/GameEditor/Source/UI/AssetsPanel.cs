@@ -328,6 +328,11 @@ namespace GameEditor.UI
                         SceneManager.LoadScene(file);
                         EditorPersistence.SetLastScene(file);
                     }
+                    else if (isScript)
+                    {
+                        ScriptEditorWindow.Open(file);
+                        igSetWindowFocus_Str("Script Editor");
+                    }
                     else
                         BeginRename(file, isFolder: false);
                 }

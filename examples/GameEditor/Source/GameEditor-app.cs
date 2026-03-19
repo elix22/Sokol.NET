@@ -207,6 +207,8 @@ public static unsafe class GameeditorApp
         ConsoleWindow.Draw();
         BuildDeployPanel.Draw();
         AssetsPanel.Draw();
+        ScriptEditorWindow.Draw();
+        ScriptEditorWindow.MarkDirtyIfChanged();
 
         simgui_render();
         sg_end_pass();

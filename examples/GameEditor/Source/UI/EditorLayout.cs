@@ -98,13 +98,14 @@ namespace GameEditor.UI
             uint dockScene = dockMain;
 
             // ── Assign windows to nodes ──────────────────────────────────────────
-            DockBuilder.igDockBuilderDockWindow("Hierarchy", dockHierarchy);
-            DockBuilder.igDockBuilderDockWindow("Scene",     dockScene);
-            DockBuilder.igDockBuilderDockWindow("Game",      dockScene);
-            DockBuilder.igDockBuilderDockWindow("Inspector", dockInspector);
-            DockBuilder.igDockBuilderDockWindow("Console",      dockConsole);
-            DockBuilder.igDockBuilderDockWindow("Build & Deploy", dockConsole);  // tab alongside Console
-            DockBuilder.igDockBuilderDockWindow("Assets",        dockConsole);  // tab alongside Console
+            DockBuilder.igDockBuilderDockWindow("Hierarchy",     dockHierarchy);
+            DockBuilder.igDockBuilderDockWindow("Scene",         dockScene);
+            DockBuilder.igDockBuilderDockWindow("Game",          dockScene);
+            DockBuilder.igDockBuilderDockWindow("Inspector",     dockInspector);
+            DockBuilder.igDockBuilderDockWindow("Console",       dockConsole);
+            DockBuilder.igDockBuilderDockWindow("Build & Deploy", dockConsole); // tab alongside Console
+            DockBuilder.igDockBuilderDockWindow("Assets",        dockConsole); // tab alongside Console
+            DockBuilder.igDockBuilderDockWindow("Script Editor", dockScene);   // tab alongside Scene & Game
 
             DockBuilder.igDockBuilderFinish(_dockspaceId);
         }
