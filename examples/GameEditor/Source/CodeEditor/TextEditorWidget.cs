@@ -317,6 +317,12 @@ namespace GameEditor.CodeEditor
                 if (!trimmed.StartsWith("//")) { allCommented = false; break; }
             }
 
+            // Snapshot the affected region before mutation so Ctrl+Z can restore it
+            var    beforeCursor = _cursor;
+            var    rangeStart   = new Coords(startLine, 0);
+            var    beforeEnd    = new Coords(endLine, _lines[endLine].Count);
+            string beforeText   = GetTextRange(rangeStart, beforeEnd);
+
             for (int li = startLine; li <= endLine; li++)
             {
                 var ln = _lines[li];
@@ -348,6 +354,14 @@ namespace GameEditor.CodeEditor
                 }
             }
 
+            // Snapshot after mutation and push a single undo record for the whole operation
+            var    afterEnd  = new Coords(endLine, _lines[endLine].Count);
+            string afterText = GetTextRange(rangeStart, afterEnd);
+            _undo.AddRecord(new UndoRecord(
+                afterText,  rangeStart, afterEnd,
+                beforeText, rangeStart, beforeEnd,
+                beforeCursor, _cursor));
+
             _textVersion++;
         }
 
@@ -365,11 +379,19 @@ namespace GameEditor.CodeEditor
             else
             {
                 // Duplicate whole line below cursor
-                var ln = _lines[_cursor.Line];
+                var    ln           = _lines[_cursor.Line];
+                string lineText     = GetLineText(_cursor.Line);
+                var    beforeCursor = _cursor;
+                var    addedStart   = new Coords(_cursor.Line, ln.Count);
                 var newLine = new List<Glyph>(ln);
                 _lines.Insert(_cursor.Line + 1, newLine);
                 _cursor = new Coords(_cursor.Line + 1, _cursor.Column);
                 _selStart = _selEnd = _cursor;
+                var addedEnd = new Coords(_cursor.Line, lineText.Length);
+                _undo.AddRecord(new UndoRecord(
+                    "\n" + lineText, addedStart, addedEnd,
+                    string.Empty,    addedStart, addedStart,
+                    beforeCursor, _cursor));
                 _textVersion++;
             }
         }
@@ -378,11 +400,23 @@ namespace GameEditor.CodeEditor
         private void MoveLineUp()
         {
             if (_cursor.Line == 0) return;
+            var    beforeCursor = _cursor;
+            var    rangeStart   = new Coords(_cursor.Line - 1, 0);
+            var    beforeEnd    = new Coords(_cursor.Line, _lines[_cursor.Line].Count);
+            string beforeText   = GetTextRange(rangeStart, beforeEnd);
+
             var tmp = _lines[_cursor.Line - 1];
             _lines[_cursor.Line - 1] = _lines[_cursor.Line];
             _lines[_cursor.Line]     = tmp;
             _cursor.Line--;
             _selStart = _selEnd = _cursor;
+
+            var    afterEnd  = new Coords(_cursor.Line + 1, _lines[_cursor.Line + 1].Count);
+            string afterText = GetTextRange(rangeStart, afterEnd);
+            _undo.AddRecord(new UndoRecord(
+                afterText,  rangeStart, afterEnd,
+                beforeText, rangeStart, beforeEnd,
+                beforeCursor, _cursor));
             _textVersion++;
         }
 
@@ -390,11 +424,23 @@ namespace GameEditor.CodeEditor
         private void MoveLineDown()
         {
             if (_cursor.Line >= _lines.Count - 1) return;
+            var    beforeCursor = _cursor;
+            var    rangeStart   = new Coords(_cursor.Line, 0);
+            var    beforeEnd    = new Coords(_cursor.Line + 1, _lines[_cursor.Line + 1].Count);
+            string beforeText   = GetTextRange(rangeStart, beforeEnd);
+
             var tmp = _lines[_cursor.Line + 1];
             _lines[_cursor.Line + 1] = _lines[_cursor.Line];
             _lines[_cursor.Line]     = tmp;
             _cursor.Line++;
             _selStart = _selEnd = _cursor;
+
+            var    afterEnd  = new Coords(_cursor.Line, _lines[_cursor.Line].Count);
+            string afterText = GetTextRange(rangeStart, afterEnd);
+            _undo.AddRecord(new UndoRecord(
+                afterText,  rangeStart, afterEnd,
+                beforeText, rangeStart, beforeEnd,
+                beforeCursor, _cursor));
             _textVersion++;
         }
 
