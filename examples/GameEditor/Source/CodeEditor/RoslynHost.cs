@@ -91,11 +91,34 @@ namespace GameEditor.CodeEditor
             _workspace  = new AdhocWorkspace(host);
             _projectId  = ProjectId.CreateNewId("GameProject");
 
-            // Load references: all loaded assemblies that have a physical file
-            var refs = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-                .Select(a => MetadataReference.CreateFromFile(a.Location))
-                .ToArray();
+            // Load references: scan the .NET runtime directory for ALL framework DLLs.
+            // Using AppDomain alone is insufficient — System.Runtime.dll is a type-forwarding
+            // facade in modern .NET, so Roslyn can't resolve types like MathF through it.
+            // Loading from the runtime directory includes System.Private.CoreLib.dll (where
+            // MathF, Math, etc. actually live) and all the standard library facades.
+            string runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+            var runtimeRefs = Directory
+                .GetFiles(runtimeDir, "*.dll", SearchOption.TopDirectoryOnly)
+                .Where(f =>
+                {
+                    string name = Path.GetFileName(f);
+                    return !name.StartsWith("api-ms-", StringComparison.OrdinalIgnoreCase)
+                        && !name.Contains(".resources.", StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(f => (MetadataReference)MetadataReference.CreateFromFile(f));
+
+            // Also add non-BCL assemblies already loaded in this AppDomain (game framework,
+            // Sokol bindings, etc.) that live outside the runtime directory.
+            var domainRefs = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a =>
+                {
+                    if (a.IsDynamic || string.IsNullOrEmpty(a.Location)) return false;
+                    string dir = Path.GetDirectoryName(a.Location) ?? "";
+                    return !string.Equals(dir, runtimeDir, StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location));
+
+            var refs = runtimeRefs.Concat(domainRefs).ToArray();
 
             var projectInfo = ProjectInfo.Create(
                 _projectId,
@@ -109,6 +132,32 @@ namespace GameEditor.CodeEditor
                 metadataReferences: refs);
 
             _workspace.AddProject(projectInfo);
+
+            // Inject a synthetic global-usings document that mirrors .NET's
+            // implicit usings (SDK-style project with ImplicitUsings=enable).
+            // Without this, types like MathF appear unresolved in the AdhocWorkspace
+            // even though the actual build succeeds — because the real compiler
+            // generates these global usings automatically from the SDK.
+            const string globalUsingsSource =
+                "global using System;\n" +
+                "global using System.Collections.Generic;\n" +
+                "global using System.IO;\n" +
+                "global using System.Linq;\n" +
+                "global using System.Net.Http;\n" +
+                "global using System.Numerics;\n" +
+                "global using System.Threading;\n" +
+                "global using System.Threading.Tasks;\n";
+
+            var globalUsingsId   = DocumentId.CreateNewId(_projectId, "GlobalUsings");
+            var globalUsingsInfo = DocumentInfo.Create(
+                globalUsingsId,
+                name:           "GlobalUsings.g.cs",
+                sourceCodeKind: SourceCodeKind.Regular)
+                .WithTextLoader(TextLoader.From(
+                    TextAndVersion.Create(SourceText.From(globalUsingsSource), VersionStamp.Create())));
+
+            _workspace.TryApplyChanges(
+                _workspace.CurrentSolution.AddDocument(globalUsingsInfo));
         }
 
         // ── Public API ───────────────────────────────────────────────────────
