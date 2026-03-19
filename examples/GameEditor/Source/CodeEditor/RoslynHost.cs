@@ -425,6 +425,38 @@ namespace GameEditor.CodeEditor
             catch (Exception)                  { return Array.Empty<SymbolLocation>(); }
         }
 
+        // ── Hover documentation ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns a hover string for the symbol at <paramref name="caretOffset"/>:
+        /// the fully-qualified signature followed (if present) by its XML doc summary.
+        /// Returns <c>null</c> if no symbol is found at the position.
+        /// </summary>
+        public async Task<string?> GetHoverAsync(
+            string filePath, int caretOffset, CancellationToken ct = default)
+        {
+            Document? doc = GetDocument(filePath);
+            if (doc == null) return null;
+            try
+            {
+                var symbol = await SymbolFinder
+                    .FindSymbolAtPositionAsync(doc, caretOffset, ct)
+                    .ConfigureAwait(false);
+                if (symbol == null) return null;
+
+                string signature = symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                string xmlDoc    = symbol.GetDocumentationCommentXml(
+                                       preferredCulture: null, expandIncludes: true,
+                                       cancellationToken: ct) ?? "";
+                string summary   = ExtractXmlTag(xmlDoc, "summary");
+                return string.IsNullOrEmpty(summary)
+                    ? signature
+                    : $"{signature}\n{summary}";
+            }
+            catch (OperationCanceledException) { return null; }
+            catch (Exception)                  { return null; }
+        }
+
         // ── Signature help ───────────────────────────────────────────────────
 
         /// <summary>

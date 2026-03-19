@@ -72,6 +72,11 @@ namespace GameEditor.CodeEditor
         private readonly List<Coords> _findMatches = new();
         private int     _findTextVersion = -2; // ensures first rebuild
 
+        // ── Replace bar (shown when Ctrl+H or the ↕ toggle is clicked) ────────
+        private bool   _replaceVisible;
+        private readonly byte[] _replaceBuf = new byte[256];
+        private string  _replaceQuery = "";
+
         // ── Go to line dialog ─────────────────────────────────────────────────
         private bool   _gotoLineVisible;
         private bool   _gotoLineJustOpened;
@@ -116,6 +121,15 @@ namespace GameEditor.CodeEditor
         private SignatureInfo?             _sigHelp;
         private int                       _sigParenDepth; // nesting depth of '(' since trigger (1=directly inside)
 
+        // ── Hover documentation ───────────────────────────────────────────────
+        private double   _hoverStillSince;          // igGetTime() when mouse last moved
+        private Vector2  _hoverMousePos;            // mouse position at last movement
+        private int      _hoverReqLine = -1;        // line for which hover was last requested
+        private int      _hoverReqCol  = -1;        // col  for which hover was last requested
+        private string?  _hoverDocText;             // non-null = cached tooltip text to display
+        private bool     _hoverPending;             // async Roslyn request in-flight
+        private CancellationTokenSource _hoverCts = new CancellationTokenSource();
+
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
         /// Argument is the current caret byte-offset into the source.
@@ -150,6 +164,15 @@ namespace GameEditor.CodeEditor
                     offset += _lines[i].Count + 1; // +1 for the '\n'
                 return offset + _cursor.Column;
             }
+        }
+
+        private int CoordsToOffset(Coords c)
+        {
+            int offset = 0;
+            int line = Math.Clamp(c.Line, 0, _lines.Count - 1);
+            for (int i = 0; i < line; i++)
+                offset += _lines[i].Count + 1;
+            return offset + Math.Min(c.Column, _lines[line].Count);
         }
 
         /// <summary>Show the autocomplete popup with the given entries.</summary>
@@ -447,6 +470,63 @@ namespace GameEditor.CodeEditor
         // ── Find helpers ──────────────────────────────────────────────────────
 
         /// Rebuild _findMatches for the current _findQuery.
+        // ── Replace helpers ───────────────────────────────────────────────────
+        private void ReplaceNext()
+        {
+            if (string.IsNullOrEmpty(_findQuery) || _findMatches.Count == 0) return;
+            // Navigate to current match first (so we operate on the right location)
+            if (_findMatchIdx < 0) NavigateToMatch(0);
+            var m = _findMatches[_findMatchIdx];
+            var from = m;
+            var to   = new Coords(m.Line, m.Column + _findQuery.Length);
+            string beforeText = GetTextRange(from, to);
+            string afterCaret = _replaceQuery;
+
+            // Snapshot for undo
+            var beforeCursor = _cursor;
+            DeleteRange(from, to);
+            _cursor = from;
+            InsertTextRaw(_replaceQuery);
+            _undo.AddRecord(new UndoRecord(_replaceQuery, from, _cursor, beforeText, from, to, beforeCursor, _cursor));
+
+            // Rebuild matches after the replacement (text changed)
+            RebuildFindMatches();
+            // Advance to next — wraps if at end
+            if (_findMatches.Count > 0) NavigateToMatch(1);
+        }
+
+        private void ReplaceAll()
+        {
+            if (string.IsNullOrEmpty(_findQuery) || _findMatches.Count == 0) return;
+
+            // Collect all match positions before replacing (indices shift as we replace)
+            var matches = new List<Coords>(_findMatches);
+
+            // Build before-text for a combined undo record
+            string textBefore = GetText();
+            var beforeCursor  = _cursor;
+
+            // Replace from the bottom up so earlier coords stay valid
+            for (int i = matches.Count - 1; i >= 0; i--)
+            {
+                var m    = matches[i];
+                var from = m;
+                var to   = new Coords(m.Line, m.Column + _findQuery.Length);
+                DeleteRange(from, to);
+                _cursor = from;
+                InsertTextRaw(_replaceQuery);
+            }
+
+            // Single combined undo record covering the entire file substitution
+            string textAfter = GetText();
+            _undo.AddRecord(new UndoRecord(
+                textAfter,  new Coords(0, 0), new Coords(_lines.Count - 1, _lines[^1].Count),
+                textBefore, new Coords(0, 0), new Coords(_lines.Count - 1, _lines[^1].Count),
+                beforeCursor, _cursor));
+
+            RebuildFindMatches();
+        }
+
         private void RebuildFindMatches()
         {
             _findMatches.Clear();
@@ -698,7 +778,9 @@ namespace GameEditor.CodeEditor
             _tokens = _highlighter.GetResult();
 
             // Reserve space for the find bar strip when visible
-            const float findBarH = 28f;
+            float findBarH = _findBarVisible
+                ? (_replaceVisible ? 58f : 30f)
+                : 0f;
             float contentH = _findBarVisible ? MathF.Max(4f, size.Y - findBarH) : size.Y;
 
             var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
@@ -912,20 +994,78 @@ namespace GameEditor.CodeEditor
                     _palette[PaletteIndex.Cursor], 1.5f);
             }
 
-            // ── Error tooltip on hover ───────────────────────────────────────
+            // ── Error / warning tooltip and hover documentation ──────────────
             if (igIsWindowHovered(ImGuiHoveredFlags.None))
             {
                 Vector2 mp = default;
                 igGetMousePos(ref mp);
                 int hoverLine = (int)((mp.Y - winPos.Y + _scrollY) / _charH);
+
+                bool showedErrorTooltip = false;
                 if (hoverLine >= 0 && hoverLine < _lines.Count)
                 {
                     var hoverErrors   = _highlighter.ErrorMarkers;
                     var hoverWarnings = _highlighter.WarningMarkers;
                     if (hoverErrors.TryGetValue(hoverLine, out string? errMsg))
-                        igSetTooltip($"\uF057 {errMsg}");   // FA circle-times icon
+                    { igSetTooltip($"\uF057 {errMsg}"); showedErrorTooltip = true; }
                     else if (hoverWarnings.TryGetValue(hoverLine, out string? warnMsg))
-                        igSetTooltip($"\uF071 {warnMsg}");  // FA warning icon
+                    { igSetTooltip($"\uF071 {warnMsg}"); showedErrorTooltip = true; }
+                }
+
+                if (!showedErrorTooltip)
+                {
+                    // Track mouse stillness to debounce the hover doc request (500ms).
+                    float mdx = mp.X - _hoverMousePos.X, mdy = mp.Y - _hoverMousePos.Y;
+                    if (mdx * mdx + mdy * mdy > 4f)
+                    {
+                        _hoverMousePos   = mp;
+                        _hoverStillSince = igGetTime();
+                        _hoverDocText    = null;
+                        _hoverPending    = false;
+                        _hoverReqLine    = -1;
+                        _hoverReqCol     = -1;
+                        _hoverCts.Cancel();
+                        _hoverCts = new System.Threading.CancellationTokenSource();
+                    }
+
+                    if (hoverLine >= 0 && hoverLine < _lines.Count && FilePath != null)
+                    {
+                        // Compute column from mouse X using window-local coordinates.
+                        Vector2 hoverWinPos = default;
+                        igGetWindowPos(ref hoverWinPos);
+                        int hoverCol = ScreenToCoords(mp, hoverWinPos, hoverWinPos.X + _gutterW).Column;
+                        bool overWord = hoverCol < _lines[hoverLine].Count
+                                     && IsWordChar(_lines[hoverLine][hoverCol].Char);
+
+                        if (!overWord)
+                        {
+                            // Mouse is not over an identifier — clear any cached tooltip.
+                            if (_hoverReqLine != -1) { _hoverDocText = null; _hoverReqLine = -1; _hoverReqCol = -1; }
+                        }
+                        else if (!_hoverPending && _hoverDocText == null
+                              && (igGetTime() - _hoverStillSince) > 0.5)
+                        {
+                            if (hoverLine != _hoverReqLine || hoverCol != _hoverReqCol)
+                            {
+                                _hoverReqLine = hoverLine;
+                                _hoverReqCol  = hoverCol;
+                                _hoverPending = true;
+                                string fp      = FilePath;
+                                int    offset  = CoordsToOffset(new Coords(hoverLine, hoverCol));
+                                var    cts     = _hoverCts;
+                                _ = RoslynHost.Instance.GetHoverAsync(fp, offset, cts.Token)
+                                    .ContinueWith(t =>
+                                    {
+                                        _hoverPending = false;
+                                        if (!t.IsFaulted && t.Result != null)
+                                            _hoverDocText = t.Result;
+                                    }, System.Threading.Tasks.TaskScheduler.Default);
+                            }
+                        }
+
+                        if (_hoverDocText != null)
+                            igSetTooltip(_hoverDocText);
+                    }
                 }
             }
 
@@ -1199,7 +1339,7 @@ namespace GameEditor.CodeEditor
             }
 
             // ── Ctrl+Space: request completions ───────────────────────────────
-            if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Space, false))
+            if (KeyBindings.IsPressed(KeyBindings.TriggerCompletion))
             {
                 _completionTriggerLine = _cursor.Line;
                 _completionTriggerCol  = _cursor.Column;
@@ -1339,32 +1479,40 @@ namespace GameEditor.CodeEditor
                 DoRedo();
             }
             // ── Comment / uncomment ────────────────────────────────────────────
-            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Slash, false))
+            else if (KeyBindings.IsPressed(KeyBindings.ToggleComment))
             {
                 ToggleLineComment();
             }
             // ── Duplicate line ─────────────────────────────────────────────────
-            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.D, false))
+            else if (KeyBindings.IsPressed(KeyBindings.DuplicateLine))
             {
                 DuplicateCurrentLine();
             }
             // ── Move line up / down ────────────────────────────────────────────
-            else if (alt && igIsKeyPressed_Bool(ImGuiKey.UpArrow, false))
+            else if (KeyBindings.IsPressed(KeyBindings.MoveLineUp))
             {
                 MoveLineUp();
             }
-            else if (alt && igIsKeyPressed_Bool(ImGuiKey.DownArrow, false))
+            else if (KeyBindings.IsPressed(KeyBindings.MoveLineDown))
             {
                 MoveLineDown();
             }
             // ── Find bar ───────────────────────────────────────────────────────
-            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.F, false))
+            else if (KeyBindings.IsPressed(KeyBindings.Find))
             {
                 _findBarVisible   = true;
+                _replaceVisible   = false;
+                _findJustOpened   = true;
+            }
+            // ── Find & Replace ─────────────────────────────────────────────────
+            else if (KeyBindings.IsPressed(KeyBindings.Replace))
+            {
+                _findBarVisible   = true;
+                _replaceVisible   = true;
                 _findJustOpened   = true;
             }
             // ── Go to line ─────────────────────────────────────────────────────
-            else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.G, false))
+            else if (KeyBindings.IsPressed(KeyBindings.GotoLine))
             {
                 Console.Error.WriteLine("[Editor] Ctrl+G: opening go-to-line");
                 _gotoLineVisible   = true;
@@ -1376,16 +1524,22 @@ namespace GameEditor.CodeEditor
                 NavigateToMatch(shift ? -1 : 1);
             }
             // ── F12 go to definition / Shift+F12 find all references / Ctrl+F12 go to implementation ──
-            else if (igIsKeyPressed_Bool(ImGuiKey.F12, false))
+            else if (KeyBindings.IsPressed(KeyBindings.GotoImpl))
             {
-                if (ctrl)  GotoImplementation();
-                else if (shift) FindAllReferences();
-                else       GotoDefinition();
+                GotoImplementation();
+            }
+            else if (KeyBindings.IsPressed(KeyBindings.FindAllRef))
+            {
+                FindAllReferences();
+            }
+            else if (KeyBindings.IsPressed(KeyBindings.GotoDef))
+            {
+                GotoDefinition();
             }
             // ── Escape: close overlays ─────────────────────────────────────────
             else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
             {
-                if (_findBarVisible)       { _findBarVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
+                if (_findBarVisible)       { _findBarVisible = false; _replaceVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
                 else if (_gotoLineVisible)  { _gotoLineVisible = false; }
                 else if (_symResultsOpen)   { _symResultsOpen = false; }
                 else if (_sigHelp != null)  { _sigHelp = null; _sigParenDepth = 0; }
@@ -1983,10 +2137,19 @@ namespace GameEditor.CodeEditor
                 _findJustOpened = false;
             }
 
-            // Search input – take most of the width
-            float btnW  = 60f;
+            // ── Row 1 : Find ──────────────────────────────────────────────────
+            // Toggle button: ▶ (find only) / ▼ (find + replace)
+            string toggleIcon = _replaceVisible ? "\uF0D7" : "\uF0DA"; // FA caret-down / caret-right
+            if (igSmallButton($"{toggleIcon}##toggleReplace"))
+                _replaceVisible = !_replaceVisible;
+            if (igIsItemHovered(ImGuiHoveredFlags.None))
+                igSetTooltip(_replaceVisible ? "Hide Replace" : "Show Replace (Ctrl+H)");
+            igSameLine(0, 4f);
+
+            float btnW   = 56f;
             float countW = 80f;
-            float inputW = size.X - btnW * 2f - countW - 20f;
+            float toggleW = 20f;
+            float inputW = size.X - toggleW - btnW * 2f - countW - 30f;
             igSetNextItemWidth(inputW);
 
             bool changed = igInputText("##findInput", ref _findBuf[0], (uint)_findBuf.Length,
@@ -1999,14 +2162,14 @@ namespace GameEditor.CodeEditor
 
             if (newQuery != _findQuery || _findTextVersion != _textVersion)
             {
-                _findQuery      = newQuery;
+                _findQuery       = newQuery;
                 _findTextVersion = _textVersion;
                 RebuildFindMatches();
             }
 
             if (changed) NavigateToMatch(1);
 
-            // F3 / Enter inside find bar
+            // F3 / Enter navigates; Escape closes
             if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.F3, false))
             {
                 var io = igGetIO_Nil();
@@ -2015,16 +2178,15 @@ namespace GameEditor.CodeEditor
             }
             if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Escape, false))
             {
-                _findBarVisible = false;
-                _findMatches.Clear();
-                _findMatchIdx = -1;
+                _findBarVisible = false; _replaceVisible = false;
+                _findMatches.Clear(); _findMatchIdx = -1;
             }
 
             igSameLine(0, 4f);
-            if (igSmallButton("\uF060##prev")) NavigateToMatch(-1); // FA arrow-left
+            if (igSmallButton("\uF060##prev")) NavigateToMatch(-1);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Previous match (Shift+F3)");
             igSameLine(0, 2f);
-            if (igSmallButton("\uF061##next")) NavigateToMatch(1);  // FA arrow-right
+            if (igSmallButton("\uF061##next")) NavigateToMatch(1);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Next match (F3)");
 
             igSameLine(0, 8f);
@@ -2032,6 +2194,42 @@ namespace GameEditor.CodeEditor
                 ? (string.IsNullOrEmpty(_findQuery) ? "" : "No results")
                 : $"{(_findMatchIdx >= 0 ? _findMatchIdx + 1 : 0)}/{_findMatches.Count}";
             igTextDisabled(countText);
+
+            // ── Row 2 : Replace (only when _replaceVisible) ───────────────────
+            if (_replaceVisible)
+            {
+                igSpacing();
+
+                // Indent to align with the find input (past the toggle button)
+                igDummy(new Vector2(toggleW + 4f, 0f));
+                igSameLine(0, 0f);
+
+                igSetNextItemWidth(inputW);
+                bool replaceChanged = igInputText("##replaceInput", ref _replaceBuf[0],
+                    (uint)_replaceBuf.Length,
+                    ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll,
+                    null, null);
+
+                int rNull = Array.IndexOf(_replaceBuf, (byte)0);
+                _replaceQuery = System.Text.Encoding.UTF8.GetString(
+                    _replaceBuf, 0, rNull < 0 ? _replaceBuf.Length : rNull);
+
+                // Enter in the replace field → replace next
+                if (replaceChanged) ReplaceNext();
+
+                if (igIsItemFocused() && igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+                {
+                    _findBarVisible = false; _replaceVisible = false;
+                    _findMatches.Clear(); _findMatchIdx = -1;
+                }
+
+                igSameLine(0, 4f);
+                if (igSmallButton("1##replaceOne")) ReplaceNext();
+                if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Replace next (Enter)");
+                igSameLine(0, 2f);
+                if (igSmallButton("All##replaceAll")) ReplaceAll();
+                if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Replace all");
+            }
 
             igEndChild();
         }

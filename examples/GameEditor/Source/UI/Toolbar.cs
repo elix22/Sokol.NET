@@ -7,12 +7,13 @@ using static Imgui.ImguiNative;
 using GameEditor.Framework.Scene;
 using GameEditor.Framework.Core;
 using GameEditor;
+using GameEditor.CodeEditor;
 
 namespace GameEditor.UI
 {
     public static unsafe class Toolbar
     {
-        private enum DialogMode { None, SaveAs, Open, NewProject, OpenProject, ProjectSettings }
+        private enum DialogMode { None, SaveAs, Open, NewProject, OpenProject, ProjectSettings, KeyboardShortcuts }
         private static DialogMode _dialog = DialogMode.None;
 
         // Which window was focused just before the user pressed Play
@@ -28,6 +29,9 @@ namespace GameEditor.UI
         private static int    _cfgHeight    = 720;
         private static byte[] _cfgPhys3DBuf = new byte[32];
         private static byte[] _cfgPhys2DBuf = new byte[32];
+
+        // Keyboard-shortcuts dialog recording state
+        private static string?  _recordingAction = null;
 
         // New-project background process
         private static Process? _createProcess = null;
@@ -92,6 +96,9 @@ namespace GameEditor.UI
                     int id = SceneManager.ActiveScene!.CreateEntity("Entity");
                     EditorState.SelectEntity(id);
                 }
+                igSeparator();
+                if (igMenuItem_Bool("Keyboard Shortcuts...", null, false, true))
+                    _dialog = DialogMode.KeyboardShortcuts;
                 igEndMenu();
             }
 
@@ -422,6 +429,102 @@ namespace GameEditor.UI
                 return;
             }
 
+            // ── Keyboard Shortcuts dialog ─────────────────────────────────────
+            if (_dialog == DialogMode.KeyboardShortcuts)
+            {
+                var kvp = igGetMainViewport();
+                var kCenter = new Vector2(kvp->Pos.X + kvp->Size.X * 0.5f,
+                                         kvp->Pos.Y + kvp->Size.Y * 0.5f);
+                igSetNextWindowPos(kCenter, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+                igSetNextWindowSize(new Vector2(500, 0), ImGuiCond.Always);
+                byte kbOpen = 1;
+                bool kbShowing = igBegin("Keyboard Shortcuts##kbs_dlg", ref kbOpen,
+                    ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize |
+                    ImGuiWindowFlags.NoDocking  | ImGuiWindowFlags.NoSavedSettings);
+
+                if (kbOpen == 0)
+                {
+                    KeyBindings.SaveToFile();
+                    _recordingAction = null;
+                    _dialog = DialogMode.None;
+                    igEnd();
+                    return;
+                }
+
+                if (kbShowing)
+                {
+                    if (igBeginTable("##kbt", 3,
+                        ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
+                        ImGuiTableFlags.SizingStretchProp,
+                        Vector2.Zero, 0))
+                    {
+                        igTableSetupColumn("Action",   ImGuiTableColumnFlags.WidthStretch, 0.45f, 0);
+                        igTableSetupColumn("Shortcut", ImGuiTableColumnFlags.WidthStretch, 0.40f, 0);
+                        igTableSetupColumn("Reset",    ImGuiTableColumnFlags.WidthFixed,   56f,   0);
+                        igTableHeadersRow();
+
+                        foreach (var action in KeyBindings.Actions)
+                        {
+                            igTableNextRow(ImGuiTableRowFlags.None, 0);
+                            igTableSetColumnIndex(0);
+                            igText(action);
+
+                            igTableSetColumnIndex(1);
+                            bool isRec = _recordingAction == action;
+                            if (isRec)
+                            {
+                                igTextColored(new Vector4(1f, 0.85f, 0.2f, 1f), "Press key... (Esc=cancel)");
+                                igSetNextFrameWantCaptureKeyboard(true);
+                                ImGuiKey hit = ScanForPressedKey();
+                                if (hit == ImGuiKey.Escape)
+                                {
+                                    _recordingAction = null;
+                                }
+                                else if (hit != ImGuiKey.None)
+                                {
+                                    unsafe
+                                    {
+                                        var io = igGetIO_Nil();
+                                        bool c = (io->KeyMods & ImGuiKey.ImGuiMod_Ctrl)  != 0;
+                                        bool s = (io->KeyMods & ImGuiKey.ImGuiMod_Shift) != 0;
+                                        bool a = (io->KeyMods & ImGuiKey.ImGuiMod_Alt)   != 0;
+                                        KeyBindings.Set(action, new KeyChord { Key = hit, Ctrl = c, Shift = s, Alt = a });
+                                    }
+                                    _recordingAction = null;
+                                }
+                            }
+                            else
+                            {
+                                string chordStr = KeyBindings.Get(action).ToString();
+                                if (igSelectable_Bool(chordStr + "##kbs_" + action, false,
+                                    ImGuiSelectableFlags.None, Vector2.Zero))
+                                    _recordingAction = action;
+                                if (igIsItemHovered(ImGuiHoveredFlags.None))
+                                    igSetTooltip("Click to rebind");
+                            }
+
+                            igTableSetColumnIndex(2);
+                            if (igSmallButton("Reset##r_" + action))
+                                KeyBindings.Reset(action);
+                        }
+                        igEndTable();
+                    }
+
+                    igSpacing();
+                    if (igButton("Reset All##kbsAll", new Vector2(90, 0)))
+                        KeyBindings.ResetAll();
+                    igSameLine(0, 10);
+                    if (igButton("Close##kbsClose", new Vector2(80, 0)))
+                    {
+                        KeyBindings.SaveToFile();
+                        _recordingAction = null;
+                        _dialog = DialogMode.None;
+                    }
+                }
+                igEnd();
+                return;
+            }
+
             // ── Window-based dialogs (NewProject, ProjectSettings) ────────────
             var vp = igGetMainViewport();
             var center = new Vector2(vp->Pos.X + vp->Size.X * 0.5f,
@@ -596,6 +699,35 @@ namespace GameEditor.UI
             };
             _createProcess.BeginOutputReadLine();
             _createProcess.BeginErrorReadLine();
+        }
+
+        private static ImGuiKey ScanForPressedKey()
+        {
+            // Scan the keys that are valid as primary bindings (not modifiers)
+            ReadOnlySpan<ImGuiKey> keys = [
+                ImGuiKey.A,  ImGuiKey.B,  ImGuiKey.C,  ImGuiKey.D,  ImGuiKey.E,
+                ImGuiKey.F,  ImGuiKey.G,  ImGuiKey.H,  ImGuiKey.I,  ImGuiKey.J,
+                ImGuiKey.K,  ImGuiKey.L,  ImGuiKey.M,  ImGuiKey.N,  ImGuiKey.O,
+                ImGuiKey.P,  ImGuiKey.Q,  ImGuiKey.R,  ImGuiKey.S,  ImGuiKey.T,
+                ImGuiKey.U,  ImGuiKey.V,  ImGuiKey.W,  ImGuiKey.X,  ImGuiKey.Y, ImGuiKey.Z,
+                ImGuiKey._0, ImGuiKey._1, ImGuiKey._2, ImGuiKey._3, ImGuiKey._4,
+                ImGuiKey._5, ImGuiKey._6, ImGuiKey._7, ImGuiKey._8, ImGuiKey._9,
+                ImGuiKey.F1,  ImGuiKey.F2,  ImGuiKey.F3,  ImGuiKey.F4,
+                ImGuiKey.F5,  ImGuiKey.F6,  ImGuiKey.F7,  ImGuiKey.F8,
+                ImGuiKey.F9,  ImGuiKey.F10, ImGuiKey.F11, ImGuiKey.F12,
+                ImGuiKey.Space, ImGuiKey.Enter, ImGuiKey.Escape,
+                ImGuiKey.Tab, ImGuiKey.Backspace, ImGuiKey.Delete,
+                ImGuiKey.UpArrow, ImGuiKey.DownArrow,
+                ImGuiKey.LeftArrow, ImGuiKey.RightArrow,
+                ImGuiKey.Home, ImGuiKey.End, ImGuiKey.PageUp, ImGuiKey.PageDown,
+                ImGuiKey.Slash, ImGuiKey.Period, ImGuiKey.Comma, ImGuiKey.Semicolon,
+                ImGuiKey.Equal, ImGuiKey.Minus, ImGuiKey.Apostrophe,
+                ImGuiKey.LeftBracket, ImGuiKey.RightBracket,
+                ImGuiKey.Backslash, ImGuiKey.GraveAccent,
+            ];
+            foreach (var k in keys)
+                if (igIsKeyPressed_Bool(k, false)) return k;
+            return ImGuiKey.None;
         }
 
         private static string GetStringFromBuffer(byte[] buf)

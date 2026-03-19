@@ -18,6 +18,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Scene;
+using GameEditor.CodeEditor;
 
 namespace GameEditor
 {
@@ -74,6 +75,8 @@ namespace GameEditor
             {
                 Logger.Warning($"[EditorPersistence] Could not load state: {ex.Message}");
             }
+
+            KeyBindings.LoadFromFile();
         }
 
         // ── Save ────────────────────────────────────────────────────────────
@@ -95,6 +98,8 @@ namespace GameEditor
                     _state,
                     EditorPersistenceJsonContext.Default.EditorState_Persisted);
                 File.WriteAllText(_stateFile, json);
+
+                KeyBindings.SaveToFile();
             }
             catch (Exception ex)
             {
