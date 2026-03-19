@@ -2177,10 +2177,17 @@ namespace GameEditor.CodeEditor
             if (sig == null) return;
 
             var @params = sig.Parameters;
-            float lineH   = _charH > 0 ? _charH : 18f;
-            float popupW  = 440f;
-            // Signature row + overload hint + separator + summary (2 lines) + param label + param doc (2 lines) + padding
-            float popupH  = lineH * 1.5f + 4f + lineH * 5f + 24f;
+            float lineH  = _charH > 0 ? _charH : 18f;
+            float popupW = 440f;
+
+            // Estimate height for above/below placement: signature row + optional desc section.
+            bool hasSummaryEst  = !string.IsNullOrWhiteSpace(sig.Summary);
+            bool hasParamDocEst = !string.IsNullOrWhiteSpace(sig.ActiveParamDoc)
+                                  && sig.ActiveParamDoc != sig.Summary;
+            int  descLines = (hasSummaryEst ? 2 : 0) + (hasParamDocEst ? 2 : 0);
+            float popupH   = lineH * 1.5f                                   // signature row
+                           + (descLines > 0 ? 4f + lineH * descLines : 0f)  // separator + desc
+                           + 20f;                                            // window padding
 
             float cx = editorScreenPos.X + _gutterW
                        + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
@@ -2190,7 +2197,7 @@ namespace GameEditor.CodeEditor
             cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
 
             igSetNextWindowPos(new Vector2(cx, cy), ImGuiCond.Always, Vector2.Zero);
-            igSetNextWindowSize(new Vector2(popupW, popupH), ImGuiCond.Always);
+            igSetNextWindowSizeConstraints(new Vector2(popupW, 0), new Vector2(popupW, 400f), null, null);
             igSetNextWindowBgAlpha(0.92f);
 
             byte open = 1;
@@ -2198,7 +2205,8 @@ namespace GameEditor.CodeEditor
                     ImGuiWindowFlags.NoTitleBar      | ImGuiWindowFlags.NoResize |
                     ImGuiWindowFlags.NoMove          | ImGuiWindowFlags.NoScrollbar |
                     ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoNav |
-                    ImGuiWindowFlags.NoFocusOnAppearing))
+                    ImGuiWindowFlags.NoFocusOnAppearing |
+                    ImGuiWindowFlags.AlwaysAutoResize))
             {
                 igEnd();
                 return;
