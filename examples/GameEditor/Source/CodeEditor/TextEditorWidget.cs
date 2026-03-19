@@ -104,6 +104,17 @@ namespace GameEditor.CodeEditor
         // Using line/col directly avoids byte-offset arithmetic bugs at line boundaries.
         private int                       _completionTriggerLine;
         private int                       _completionTriggerCol;
+        // Guard against multiple parallel Roslyn requests racing each other:
+        // set true at trigger-fire time, cleared when ShowCompletions/HideCompletions runs.
+        private volatile bool             _completionPending;
+        // The character that triggered the current completion ('.', letter, or '\0' for Ctrl+Space).
+        // Exposed so the ScriptEditorWindow handler can pass it to Roslyn's CreateInsertionTrigger.
+        public char CompletionTriggerChar { get; private set; }
+
+        // ── Signature help ────────────────────────────────────────────────────
+        public event Action<int>?         SignatureHelpRequested;
+        private SignatureInfo?             _sigHelp;
+        private int                       _sigParenDepth; // nesting depth of '(' since trigger (1=directly inside)
 
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
@@ -146,23 +157,30 @@ namespace GameEditor.CodeEditor
         /// <param name="triggerCol">Caret column captured on the render thread when completion was requested.</param>
         public void ShowCompletions(IReadOnlyList<CompletionEntry> entries, int triggerLine, int triggerCol)
         {
-            Console.Error.WriteLine($"[Editor] ShowCompletions: {entries.Count} items trigger=L{triggerLine}:{triggerCol}");
+            Console.Error.WriteLine($"[Completion] ShowCompletions: {entries.Count} items trig=L{triggerLine}:{triggerCol}  cursor=L{_cursor.Line}:{_cursor.Column}");
+            _completionPending = false;
             if (entries.Count == 0) { _completionVisible = false; return; }
             _completions             = new List<CompletionEntry>(entries);
             _completionTriggerLine   = triggerLine;
             _completionTriggerCol    = triggerCol;
             _completionIdx           = 0;
+            _filteredCompletions     = null; // UpdateCompletionFilter on next frame applies prefix
             _completionVisible       = true;
-            _filteredCompletions     = _completions; // initially no filter
         }
 
         /// <summary>Dismiss the autocomplete popup.</summary>
         public void HideCompletions()
         {
+            _completionPending    = false;
             _completionVisible    = false;
             _completions          = null;
             _filteredCompletions  = null;
         }
+
+        /// <summary>Show or update the signature help tooltip (pass null to hide).</summary>
+        public void ShowSignatureHelp(SignatureInfo? info) => _sigHelp = info;
+        /// <summary>Dismiss the signature help tooltip.</summary>
+        public void HideSignatureHelp() { _sigHelp = null; _sigParenDepth = 0; }
 
         /// <summary>
         /// Called each frame while the completion popup is visible.
@@ -172,19 +190,21 @@ namespace GameEditor.CodeEditor
         {
             if (_completions == null) return;
 
-            // The trigger line/col were stored at the moment the dot was typed (render thread),
-            // so no byte-offset arithmetic needed — they are always authoritative.
             int triggerLine = _completionTriggerLine;
             int triggerCol  = _completionTriggerCol;
+
+            Console.Error.WriteLine($"[Completion] Filter: trig=L{triggerLine}:{triggerCol}  cursor=L{_cursor.Line}:{_cursor.Column}");
 
             // Dismiss if the caret has moved to a different line or left of the trigger column
             if (_cursor.Line != triggerLine || _cursor.Column < triggerCol)
             {
+                Console.Error.WriteLine($"[Completion] Filter: DISMISS (cursor left trigger)");
                 HideCompletions();
                 return;
             }
 
             string prefix = GetSpanText(triggerLine, triggerCol, _cursor.Column);
+            Console.Error.WriteLine($"[Completion] Filter: prefix='{prefix}'");
 
             if (string.IsNullOrEmpty(prefix))
             {
@@ -192,10 +212,6 @@ namespace GameEditor.CodeEditor
             }
             else
             {
-                // VS Code-style matching:
-                //   1. Items whose label starts with the prefix (highest relevance, listed first)
-                //   2. Items whose label contains the prefix anywhere (e.g. "AndNot" for "No")
-                // Deduplicated and order-preserving.
                 var startsWith = _completions
                     .Where(e => e.Label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     .ToList();
@@ -207,7 +223,8 @@ namespace GameEditor.CodeEditor
                 _filteredCompletions = startsWith;
             }
 
-            // Reset selection index when list shrinks
+            Console.Error.WriteLine($"[Completion] Filter: result {_filteredCompletions.Count} items, first='{(_filteredCompletions.Count > 0 ? _filteredCompletions[0].Label : "(none)")}'" );
+
             if (_completionIdx >= _filteredCompletions.Count)
                 _completionIdx = 0;
 
@@ -673,7 +690,7 @@ namespace GameEditor.CodeEditor
             // igIsWindowFocused returns false when a floating child window (like the
             // completion popup) is active. Keep processing keyboard input as long as
             // completions are visible so Up/Down/Tab/Enter/Escape still work.
-            bool focused = igIsWindowFocused(ImGuiFocusedFlags.None) || _completionVisible;
+            bool focused = igIsWindowFocused(ImGuiFocusedFlags.None) || _completionVisible || _sigHelp != null;
 
             if (focused && !ReadOnly)
                 HandleKeyboardInput();
@@ -709,6 +726,10 @@ namespace GameEditor.CodeEditor
                 if (_completionVisible)
                     RenderCompletionPopup(editorScreenPos);
             }
+
+            // ── Signature help tooltip ─────────────────────────────────────────
+            if (_sigHelp != null)
+                RenderSignatureHelp(editorScreenPos);
         }
 
         // ── Rendering ────────────────────────────────────────────────────────
@@ -1128,7 +1149,8 @@ namespace GameEditor.CodeEditor
             {
                 _completionTriggerLine = _cursor.Line;
                 _completionTriggerCol  = _cursor.Column;
-                Console.Error.WriteLine($"[Editor] Ctrl+Space: requesting completions at offset {CaretOffset} L{_cursor.Line}:{_cursor.Column}");
+                _completionPending     = true;
+                CompletionTriggerChar  = '\0'; // explicit invoke — no insertion char
                 CompletionRequested?.Invoke(CaretOffset);
                 return;
             }
@@ -1309,9 +1331,10 @@ namespace GameEditor.CodeEditor
             // ── Escape: close overlays ─────────────────────────────────────────
             else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
             {
-                if (_findBarVisible)      { _findBarVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
-                else if (_gotoLineVisible) { _gotoLineVisible = false; }
-                else if (_symResultsOpen)  { _symResultsOpen = false; }
+                if (_findBarVisible)       { _findBarVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
+                else if (_gotoLineVisible)  { _gotoLineVisible = false; }
+                else if (_symResultsOpen)   { _symResultsOpen = false; }
+                else if (_sigHelp != null)  { _sigHelp = null; _sigParenDepth = 0; }
             }
 
             // ── Character input ───────────────────────────────────────────────
@@ -1326,15 +1349,45 @@ namespace GameEditor.CodeEditor
 
                     InsertChar(ch);
 
-                    // Trigger completion after dot — member-access.
-                    // Capture line+col NOW on the render thread so UpdateCompletionFilter
-                    // can use them directly without byte-offset arithmetic.
+                    // ── Completion triggers ────────────────────────────────────────────
                     if (ch == '.')
                     {
                         _completionTriggerLine = _cursor.Line;
                         _completionTriggerCol  = _cursor.Column;
-                        Console.Error.WriteLine($"[Editor] '.' typed: requesting completions at offset {CaretOffset} L{_cursor.Line}:{_cursor.Column}");
+                        _completionPending     = true;
+                        CompletionTriggerChar  = '.';
+                        Console.Error.WriteLine($"[Completion] Trigger '.': L{_completionTriggerLine}:{_completionTriggerCol}");
                         CompletionRequested?.Invoke(CaretOffset);
+                    }
+                    else if ((char.IsLetter(ch) || ch == '_') && !_completionVisible && !_completionPending)
+                    {
+                        var ln = _lines[_cursor.Line];
+                        int ws = _cursor.Column - 1;
+                        while (ws > 0 && (char.IsLetterOrDigit(ln[ws - 1].Char) || ln[ws - 1].Char == '_'))
+                            ws--;
+                        _completionTriggerLine = _cursor.Line;
+                        _completionTriggerCol  = ws;
+                        _completionPending     = true;
+                        CompletionTriggerChar  = ch;
+                        Console.Error.WriteLine($"[Completion] Trigger '{ch}': ws={ws} triggerCol={_completionTriggerCol} cursorAfter=L{_cursor.Line}:{_cursor.Column}");
+                        CompletionRequested?.Invoke(CaretOffset);
+                    }
+
+                    // ── Signature help triggers ────────────────────────────────────────
+                    if (ch == '(')
+                    {
+                        _sigParenDepth++;
+                        if (_sigParenDepth == 1)
+                            SignatureHelpRequested?.Invoke(CaretOffset);
+                    }
+                    else if (ch == ')' && _sigParenDepth > 0)
+                    {
+                        _sigParenDepth--;
+                        if (_sigParenDepth == 0) _sigHelp = null;
+                    }
+                    else if (ch == ',' && _sigParenDepth > 0)
+                    {
+                        SignatureHelpRequested?.Invoke(CaretOffset);
                     }
                 }
             }
@@ -2042,6 +2095,7 @@ namespace GameEditor.CodeEditor
         private unsafe void RenderCompletionPopup(Vector2 editorScreenPos)
         {
             var items = _filteredCompletions ?? _completions;
+            Console.Error.WriteLine($"[Completion] Render: filteredNull={_filteredCompletions == null} showing {items?.Count ?? 0} items, first='{(items?.Count > 0 ? items[0].Label : "(none)")}'" );
             if (!_completionVisible || items == null || items.Count == 0) return;
 
             const int maxVisible = 8;
@@ -2112,6 +2166,102 @@ namespace GameEditor.CodeEditor
             if (!igIsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) &&
                  igIsMouseClicked_Bool(ImGuiMouseButton.Left, false))
                 HideCompletions();
+
+            igEnd();
+        }
+
+        // ── Signature help popup ─────────────────────────────────────────────
+        private unsafe void RenderSignatureHelp(Vector2 editorScreenPos)
+        {
+            var sig = _sigHelp;
+            if (sig == null) return;
+
+            var @params = sig.Parameters;
+            float lineH   = _charH > 0 ? _charH : 18f;
+            float popupW  = 440f;
+            // Rough height: signature row + separator + wrapped description (up to 3 lines)
+            float popupH  = lineH * 1.5f + 4f + lineH * 3f + 16f;
+
+            float cx = editorScreenPos.X + _gutterW
+                       + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
+            float cyAbove = editorScreenPos.Y + _cursor.Line * lineH - _scrollY - popupH - 4f;
+            float cyBelow = editorScreenPos.Y + (_cursor.Line + 1) * lineH - _scrollY + 2f;
+            float cy      = cyAbove >= editorScreenPos.Y ? cyAbove : cyBelow;
+            cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
+
+            igSetNextWindowPos(new Vector2(cx, cy), ImGuiCond.Always, Vector2.Zero);
+            igSetNextWindowSize(new Vector2(popupW, popupH), ImGuiCond.Always);
+            igSetNextWindowBgAlpha(0.92f);
+
+            byte open = 1;
+            if (!igBegin("##sighelp", ref open,
+                    ImGuiWindowFlags.NoTitleBar      | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoMove          | ImGuiWindowFlags.NoScrollbar |
+                    ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoNav |
+                    ImGuiWindowFlags.NoFocusOnAppearing))
+            {
+                igEnd();
+                return;
+            }
+            if (open == 0) { HideSignatureHelp(); igEnd(); return; }
+
+            var dimCol    = new Vector4(0.60f, 0.60f, 0.60f, 1f); // grey for other params / type
+            var nameCol   = new Vector4(0.85f, 0.85f, 0.85f, 1f); // slightly brighter for names
+            var activeCol = new Vector4(1.00f, 0.85f, 0.35f, 1f); // yellow for active param
+            var retCol    = new Vector4(0.55f, 0.85f, 1.00f, 1f); // cyan for return type
+
+            // ── Return type + method name + "(" ──────────────────────────────
+            igPushStyleColor_Vec4(ImGuiCol.Text, retCol);
+            igText($"{sig.ReturnType} ");
+            igPopStyleColor(1);
+            igSameLine(0, 0);
+            igPushStyleColor_Vec4(ImGuiCol.Text, nameCol);
+            igText($"{sig.MethodName}(");
+            igPopStyleColor(1);
+
+            // ── Parameters ───────────────────────────────────────────────────
+            for (int i = 0; i < @params.Count; i++)
+            {
+                var (pType, pName) = @params[i];
+                bool isActive = i == sig.ActiveParam;
+
+                if (i > 0)
+                {
+                    igSameLine(0, 0);
+                    igPushStyleColor_Vec4(ImGuiCol.Text, dimCol);
+                    igText(", ");
+                    igPopStyleColor(1);
+                }
+                igSameLine(0, 0);
+                igPushStyleColor_Vec4(ImGuiCol.Text, isActive ? activeCol : dimCol);
+                igText($"{pType} {pName}");
+                igPopStyleColor(1);
+            }
+            igSameLine(0, 0);
+            igPushStyleColor_Vec4(ImGuiCol.Text, dimCol);
+            igText(")");
+            igPopStyleColor(1);
+
+            // Overload count hint
+            if (sig.OverloadCount > 1)
+            {
+                igSameLine(0, 6f);
+                igPushStyleColor_Vec4(ImGuiCol.Text, dimCol);
+                igText($"(+{sig.OverloadCount - 1} overload{(sig.OverloadCount > 2 ? "s" : "")})");
+                igPopStyleColor(1);
+            }
+
+            // ── Description ──────────────────────────────────────────────────
+            string desc = !string.IsNullOrWhiteSpace(sig.ActiveParamDoc)
+                ? sig.ActiveParamDoc
+                : sig.Summary;
+            if (!string.IsNullOrWhiteSpace(desc))
+            {
+                igSeparator();
+                igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.90f, 0.90f, 0.90f, 1f));
+                igTextWrapped(desc);
+                igPopStyleColor(1);
+            }
 
             igEnd();
         }

@@ -56,6 +56,22 @@ namespace GameEditor.CodeEditor
         public CompletionItemKind Kind        { get; init; }
     }
 
+    // ── Signature help model ─────────────────────────────────────────────────
+
+    public class SignatureInfo
+    {
+        public string ReturnType     { get; init; } = "";
+        public string MethodName     { get; init; } = "";
+        /// <summary>(Type, Name) pairs for all parameters of the best-matching overload.</summary>
+        public IReadOnlyList<(string Type, string Name)> Parameters { get; init; }
+            = Array.Empty<(string, string)>();
+        public string Summary        { get; init; } = ""; // method XML doc summary
+        /// <summary>Documentation for the currently active parameter (falls back to Summary).</summary>
+        public string ActiveParamDoc { get; init; } = "";
+        public int    ActiveParam    { get; init; }        // 0-based index of highlighted param
+        public int    OverloadCount  { get; init; } = 1;  // total overloads found
+    }
+
     // ── RoslynHost ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -251,7 +267,7 @@ namespace GameEditor.CodeEditor
         /// The <paramref name="caretOffset"/> must be a byte offset into the source text.
         /// </summary>
         public async Task<IReadOnlyList<CompletionEntry>> GetCompletionsAsync(
-            string filePath, int caretOffset, CancellationToken ct = default)
+            string filePath, int caretOffset, char triggerChar = '\0', CancellationToken ct = default)
         {
             Document? doc = GetDocument(filePath);
             if (doc == null)
@@ -269,7 +285,14 @@ namespace GameEditor.CodeEditor
                     return Array.Empty<CompletionEntry>();
                 }
 
-                CompletionList list = await svc.GetCompletionsAsync(doc, caretOffset, cancellationToken: ct)
+                // Use CreateInsertionTrigger when the user typed a real character so Roslyn
+                // returns relevance-ranked results for that char rather than the full A→Z list.
+                // Fall back to Invoke (Ctrl+Space) for explicit invocation.
+                var trigger = triggerChar != '\0'
+                    ? CompletionTrigger.CreateInsertionTrigger(triggerChar)
+                    : CompletionTrigger.Invoke;
+
+                CompletionList list = await svc.GetCompletionsAsync(doc, caretOffset, trigger, cancellationToken: ct)
                                                .ConfigureAwait(false);
                 if (list == null || list.ItemsList.Count == 0)
                 {
@@ -277,8 +300,9 @@ namespace GameEditor.CodeEditor
                     return Array.Empty<CompletionEntry>();
                 }
 
+                // No Take() cap — the popup renders 8 rows at a time and UpdateCompletionFilter
+                // handles prefix filtering, so list size doesn't impact render performance.
                 var completionResults = list.ItemsList
-                    .Take(256)  // cap — filter in UpdateCompletionFilter, not here
                     .Select(item => new CompletionEntry
                     {
                         Label      = item.DisplayText,
@@ -394,6 +418,177 @@ namespace GameEditor.CodeEditor
             }
             catch (OperationCanceledException) { return Array.Empty<SymbolLocation>(); }
             catch (Exception)                  { return Array.Empty<SymbolLocation>(); }
+        }
+
+        // ── Signature help ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns signature help for the method call enclosing <paramref name="caretOffset"/>,
+        /// or <c>null</c> if the caret is not inside a method argument list.
+        /// </summary>
+        public async Task<SignatureInfo?> GetSignatureHelpAsync(
+            string filePath, int caretOffset, CancellationToken ct = default)
+        {
+            Document? doc = GetDocument(filePath);
+            if (doc == null) return null;
+            try
+            {
+                var sourceText = await doc.GetTextAsync(ct).ConfigureAwait(false);
+                string src = sourceText.ToString();
+
+                // Walk backwards to find the unclosed '(' for the current argument list.
+                int depth = 0, openParen = -1, activeParam = 0;
+                for (int i = caretOffset - 1; i >= 0; i--)
+                {
+                    char c = src[i];
+                    if (c == ')' || c == ']') { depth++; continue; }
+                    if (c == '(' || c == '[')
+                    {
+                        if (depth > 0) { depth--; continue; }
+                        if (c == '(') { openParen = i; break; }
+                        return null;
+                    }
+                    if (depth == 0 && c == ',') activeParam++;
+                    if (c == ';' || c == '{' || c == '}') return null;
+                }
+                if (openParen < 0) return null;
+
+                int nameEnd = openParen - 1;
+                while (nameEnd >= 0 && (src[nameEnd] == ' ' || src[nameEnd] == '\t')) nameEnd--;
+                if (nameEnd < 0) return null;
+
+                Console.Error.WriteLine($"[Roslyn] sighelp: caretOffset={caretOffset} openParen={openParen} nameEnd={nameEnd} char='{src[nameEnd]}' activeParam={activeParam}");
+
+                // Use SemanticModel + FindToken — more reliable than SymbolFinder at call sites.
+                // SymbolFinder.FindSymbolAtPositionAsync navigates to declarations and can return
+                // null for method references in invocation expressions.
+                var semanticModel = await doc.GetSemanticModelAsync(ct).ConfigureAwait(false);
+                var root          = await doc.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+                if (semanticModel == null || root == null)
+                {
+                    Console.Error.WriteLine("[Roslyn] sighelp: null semanticModel or root");
+                    return null;
+                }
+
+                var token = root.FindToken(nameEnd);
+                Console.Error.WriteLine($"[Roslyn] sighelp: token='{token.Text}' parentType={token.Parent?.GetType().Name}");
+
+                IMethodSymbol? methodSym  = null;
+                List<IMethodSymbol>? overloadList = null;
+
+                // Walk up the syntax tree up to 6 levels trying three resolution strategies:
+                //  1. GetSymbolInfo  → exact resolved symbol (works when invocation is complete)
+                //  2. CandidateSymbols → partial resolution (ambiguous overloads)
+                //  3. GetMemberGroup  → all overloads (works even on incomplete invocations)
+                var node = token.Parent;
+                for (int attempt = 0; attempt < 6 && node != null; attempt++)
+                {
+                    var info = semanticModel.GetSymbolInfo(node, ct);
+                    if (info.Symbol is IMethodSymbol ms)
+                    {
+                        methodSym = ms;
+                        break;
+                    }
+                    var cands = info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
+                    if (cands.Count > 0)
+                    {
+                        methodSym    = cands[0];
+                        overloadList = cands;
+                        break;
+                    }
+                    var grp = semanticModel.GetMemberGroup(node, ct).OfType<IMethodSymbol>().ToList();
+                    if (grp.Count > 0)
+                    {
+                        methodSym    = grp[0];
+                        overloadList = grp;
+                        break;
+                    }
+                    node = node.Parent;
+                }
+
+                Console.Error.WriteLine($"[Roslyn] sighelp: symbol='{methodSym?.Name ?? "null"}' overloads={overloadList?.Count ?? (methodSym != null ? 1 : 0)}");
+                if (methodSym == null) return null;
+
+                // Collect all overloads from the containing type
+                var allOverloads = overloadList != null
+                    ? overloadList
+                    : (methodSym.ContainingType
+                          ?.GetMembers(methodSym.Name).OfType<IMethodSymbol>().ToList()
+                       ?? new List<IMethodSymbol> { methodSym });
+
+                IMethodSymbol best = allOverloads
+                    .Where(m => m.Parameters.Length > activeParam)
+                    .OrderBy(m => m.Parameters.Length)
+                    .FirstOrDefault()
+                    ?? allOverloads.OrderByDescending(m => m.Parameters.Length).FirstOrDefault()
+                    ?? methodSym;
+
+                string xmlDoc          = best.GetDocumentationCommentXml() ?? "";
+                string summary         = ExtractXmlTag(xmlDoc, "summary");
+                int    activeIdx       = Math.Min(activeParam, best.Parameters.Length - 1);
+                string activeParamName = activeIdx >= 0 && activeIdx < best.Parameters.Length
+                                         ? best.Parameters[activeIdx].Name : "";
+                string activeParamDoc  = ExtractXmlParamDoc(xmlDoc, activeParamName);
+
+                return new SignatureInfo
+                {
+                    ReturnType     = best.ReturnsVoid ? "void"
+                                     : best.ReturnType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    MethodName     = (best.ContainingType?.Name ?? "") + "." + best.Name,
+                    Parameters     = best.Parameters
+                        .Select(p => (p.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat), p.Name))
+                        .ToArray(),
+                    Summary        = summary,
+                    ActiveParamDoc = !string.IsNullOrEmpty(activeParamDoc) ? activeParamDoc : summary,
+                    ActiveParam    = Math.Max(0, activeIdx),
+                    OverloadCount  = allOverloads.Count
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Roslyn] GetSignatureHelpAsync ex: {ex.GetType().Name}: {ex.Message}");
+                return null;
+            }
+        }
+
+        // Extracts the text content of the first XML tag <tag>…</tag> from a doc-comment string.
+        private static string ExtractXmlTag(string xml, string tag)
+        {
+            if (string.IsNullOrEmpty(xml)) return "";
+            int start = xml.IndexOf($"<{tag}", StringComparison.Ordinal);
+            if (start < 0) return "";
+            int end = xml.IndexOf($"</{tag}>", start, StringComparison.Ordinal);
+            if (end < 0) return "";
+            int cs = xml.IndexOf('>', start) + 1;
+            if (cs <= 0 || cs >= end) return "";
+            return StripXmlTags(xml[cs..end]);
+        }
+
+        // Extracts the text content of <param name="paramName">…</param>.
+        private static string ExtractXmlParamDoc(string xml, string paramName)
+        {
+            if (string.IsNullOrEmpty(xml) || string.IsNullOrEmpty(paramName)) return "";
+            string open = $"<param name=\"{paramName}\">";
+            int start = xml.IndexOf(open, StringComparison.Ordinal);
+            if (start < 0) return "";
+            int end = xml.IndexOf("</param>", start, StringComparison.Ordinal);
+            if (end < 0) return "";
+            return xml[(start + open.Length)..end].Trim();
+        }
+
+        // Strips XML tags from a string (for displaying doc-comment text).
+        private static string StripXmlTags(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new System.Text.StringBuilder(s.Length);
+            bool inTag = false;
+            foreach (char c in s)
+            {
+                if      (c == '<') { inTag = true;  continue; }
+                else if (c == '>') { inTag = false; continue; }
+                if (!inTag) sb.Append(c);
+            }
+            return sb.ToString().Trim();
         }
 
         // ── Remove document ──────────────────────────────────────────────────

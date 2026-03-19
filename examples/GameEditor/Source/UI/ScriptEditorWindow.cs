@@ -146,20 +146,30 @@ namespace GameEditor.UI
                 tab.Editor.CompletionRequested += caretOffset =>
                 {
                     Logger.Info($"[ScriptEditor] CompletionRequested: {System.IO.Path.GetFileName(fp)} offset={caretOffset}");
-                    // Flush the current editor text into Roslyn NOW (debounce=0) so the
-                    // workspace reflects the exact source at this caret position.
                     string currentText = tab.Editor.GetText();
                     RoslynHost.Instance.UpdateDocument(fp, currentText, debounceMs: 0);
-                    // Capture trigger position NOW on the render thread — by the time the
-                    // ContinueWith runs the cursor may have moved.
-                    int tLine = tab.Editor.CompletionTriggerLine;
-                    int tCol  = tab.Editor.CompletionTriggerCol;
-                    _ = RoslynHost.Instance.GetCompletionsAsync(fp, caretOffset)
+                    int  tLine  = tab.Editor.CompletionTriggerLine;
+                    int  tCol   = tab.Editor.CompletionTriggerCol;
+                    char tChar  = tab.Editor.CompletionTriggerChar;
+                    _ = RoslynHost.Instance.GetCompletionsAsync(fp, caretOffset, tChar)
                         .ContinueWith(t =>
                         {
                             Console.Error.WriteLine($"[ScriptEditor] GetCompletions result: {(t.IsFaulted ? "FAULTED " + t.Exception?.InnerException?.Message : t.Result.Count + " items")}");
                             if (!t.IsFaulted && t.Result.Count > 0)
                                 tab.Editor.ShowCompletions(t.Result, tLine, tCol);
+                        }, System.Threading.Tasks.TaskScheduler.Default);
+                };
+
+                // Wire signature help — fires on '(' and ',' (render thread).
+                tab.Editor.SignatureHelpRequested += caretOffset =>
+                {
+                    string currentText = tab.Editor.GetText();
+                    RoslynHost.Instance.UpdateDocument(fp, currentText, debounceMs: 0);
+                    _ = RoslynHost.Instance.GetSignatureHelpAsync(fp, caretOffset)
+                        .ContinueWith(t =>
+                        {
+                            if (!t.IsFaulted)
+                                tab.Editor.ShowSignatureHelp(t.Result); // null = hide
                         }, System.Threading.Tasks.TaskScheduler.Default);
                 };
 
