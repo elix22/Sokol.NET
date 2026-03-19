@@ -140,16 +140,26 @@ namespace GameEditor.UI
                     _pendingRoslynDiags.Enqueue((path, diags));
                 };
 
-                // Wire completion trigger — fires on '.' or Ctrl+Space
+                // Wire completion trigger — fires on '.' or Ctrl+Space (render thread).
+                // The event also carries the trigger line+col captured at fire time so
+                // ShowCompletions can store them without byte-offset arithmetic.
                 tab.Editor.CompletionRequested += caretOffset =>
                 {
                     Logger.Info($"[ScriptEditor] CompletionRequested: {System.IO.Path.GetFileName(fp)} offset={caretOffset}");
+                    // Flush the current editor text into Roslyn NOW (debounce=0) so the
+                    // workspace reflects the exact source at this caret position.
+                    string currentText = tab.Editor.GetText();
+                    RoslynHost.Instance.UpdateDocument(fp, currentText, debounceMs: 0);
+                    // Capture trigger position NOW on the render thread — by the time the
+                    // ContinueWith runs the cursor may have moved.
+                    int tLine = tab.Editor.CompletionTriggerLine;
+                    int tCol  = tab.Editor.CompletionTriggerCol;
                     _ = RoslynHost.Instance.GetCompletionsAsync(fp, caretOffset)
                         .ContinueWith(t =>
                         {
                             Console.Error.WriteLine($"[ScriptEditor] GetCompletions result: {(t.IsFaulted ? "FAULTED " + t.Exception?.InnerException?.Message : t.Result.Count + " items")}");
                             if (!t.IsFaulted && t.Result.Count > 0)
-                                tab.Editor.ShowCompletions(t.Result, caretOffset);
+                                tab.Editor.ShowCompletions(t.Result, tLine, tCol);
                         }, System.Threading.Tasks.TaskScheduler.Default);
                 };
 

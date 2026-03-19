@@ -100,7 +100,10 @@ namespace GameEditor.CodeEditor
         private List<CompletionEntry>?   _completions;      // full unfiltered list from Roslyn
         private List<CompletionEntry>?   _filteredCompletions; // filtered by typed prefix
         private int                       _completionIdx;
-        private int                       _completionTriggerOffset; // caret offset where trigger fired
+        // Trigger position stored as line+col (captured on the render thread at fire time).
+        // Using line/col directly avoids byte-offset arithmetic bugs at line boundaries.
+        private int                       _completionTriggerLine;
+        private int                       _completionTriggerCol;
 
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
@@ -108,6 +111,11 @@ namespace GameEditor.CodeEditor
         /// The external handler should call <see cref="ShowCompletions"/> when results arrive.
         /// </summary>
         public event Action<int>? CompletionRequested;
+
+        /// <summary>The line stored at the last completion trigger (render-thread-safe read).</summary>
+        public int CompletionTriggerLine => _completionTriggerLine;
+        /// <summary>The column stored at the last completion trigger (render-thread-safe read).</summary>
+        public int CompletionTriggerCol  => _completionTriggerCol;
 
         public Palette Palette
         {
@@ -134,13 +142,15 @@ namespace GameEditor.CodeEditor
         }
 
         /// <summary>Show the autocomplete popup with the given entries.</summary>
-        /// <param name="triggerOffset">Caret byte-offset captured on the render thread when completion was requested.</param>
-        public void ShowCompletions(IReadOnlyList<CompletionEntry> entries, int triggerOffset)
+        /// <param name="triggerLine">Caret line captured on the render thread when completion was requested.</param>
+        /// <param name="triggerCol">Caret column captured on the render thread when completion was requested.</param>
+        public void ShowCompletions(IReadOnlyList<CompletionEntry> entries, int triggerLine, int triggerCol)
         {
-            Console.Error.WriteLine($"[Editor] ShowCompletions: {entries.Count} items triggerOffset={triggerOffset}");
+            Console.Error.WriteLine($"[Editor] ShowCompletions: {entries.Count} items trigger=L{triggerLine}:{triggerCol}");
             if (entries.Count == 0) { _completionVisible = false; return; }
             _completions             = new List<CompletionEntry>(entries);
-            _completionTriggerOffset = triggerOffset;
+            _completionTriggerLine   = triggerLine;
+            _completionTriggerCol    = triggerCol;
             _completionIdx           = 0;
             _completionVisible       = true;
             _filteredCompletions     = _completions; // initially no filter
@@ -162,25 +172,14 @@ namespace GameEditor.CodeEditor
         {
             if (_completions == null) return;
 
-            // Extract the prefix typed after the trigger position
-            int triggerLine  = 0, triggerCol = 0;
-            int accumulated  = 0;
-            for (int li = 0; li < _lines.Count; li++)
-            {
-                int lineLen = _lines[li].Count + 1; // +1 for '\n'
-                if (accumulated + lineLen > _completionTriggerOffset)
-                {
-                    triggerLine = li;
-                    triggerCol  = _completionTriggerOffset - accumulated;
-                    break;
-                }
-                accumulated += lineLen;
-            }
+            // The trigger line/col were stored at the moment the dot was typed (render thread),
+            // so no byte-offset arithmetic needed — they are always authoritative.
+            int triggerLine = _completionTriggerLine;
+            int triggerCol  = _completionTriggerCol;
 
-            // Only filter when caret is on the same line and hasn't moved left of trigger
+            // Dismiss if the caret has moved to a different line or left of the trigger column
             if (_cursor.Line != triggerLine || _cursor.Column < triggerCol)
             {
-                Console.Error.WriteLine($"[Editor] Completions hidden: cursor(L{_cursor.Line}:{_cursor.Column}) left trigger(L{triggerLine}:{triggerCol})");
                 HideCompletions();
                 return;
             }
@@ -193,20 +192,27 @@ namespace GameEditor.CodeEditor
             }
             else
             {
-                _filteredCompletions = _completions
+                // VS Code-style matching:
+                //   1. Items whose label starts with the prefix (highest relevance, listed first)
+                //   2. Items whose label contains the prefix anywhere (e.g. "AndNot" for "No")
+                // Deduplicated and order-preserving.
+                var startsWith = _completions
                     .Where(e => e.Label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     .ToList();
+                var contains = _completions
+                    .Where(e => !e.Label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                             && e.Label.IndexOf(prefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+                startsWith.AddRange(contains);
+                _filteredCompletions = startsWith;
             }
 
-            // Reset selection index if it's now out of range
+            // Reset selection index when list shrinks
             if (_completionIdx >= _filteredCompletions.Count)
                 _completionIdx = 0;
 
             if (_filteredCompletions.Count == 0)
-            {
-                Console.Error.WriteLine($"[Editor] Completions hidden: no match for prefix '{prefix}'");
                 HideCompletions();
-            }
         }
 
         // ── Construction ─────────────────────────────────────────────────────
@@ -664,7 +670,10 @@ namespace GameEditor.CodeEditor
                 _gutterW = 4f;
             }
 
-            bool focused = igIsWindowFocused(ImGuiFocusedFlags.None);
+            // igIsWindowFocused returns false when a floating child window (like the
+            // completion popup) is active. Keep processing keyboard input as long as
+            // completions are visible so Up/Down/Tab/Enter/Escape still work.
+            bool focused = igIsWindowFocused(ImGuiFocusedFlags.None) || _completionVisible;
 
             if (focused && !ReadOnly)
                 HandleKeyboardInput();
@@ -1090,6 +1099,7 @@ namespace GameEditor.CodeEditor
             // ── Completion popup intercept ────────────────────────────────────
             if (_completionVisible && _completions != null && _completions.Count > 0)
             {
+                var navList = _filteredCompletions ?? _completions;
                 if (igIsKeyPressed_Bool(ImGuiKey.UpArrow, true))
                 {
                     _completionIdx = Math.Max(0, _completionIdx - 1);
@@ -1097,7 +1107,7 @@ namespace GameEditor.CodeEditor
                 }
                 if (igIsKeyPressed_Bool(ImGuiKey.DownArrow, true))
                 {
-                    _completionIdx = Math.Min(_completions.Count - 1, _completionIdx + 1);
+                    _completionIdx = Math.Min(navList.Count - 1, _completionIdx + 1);
                     return;
                 }
                 if (igIsKeyPressed_Bool(ImGuiKey.Enter, false) ||
@@ -1116,7 +1126,9 @@ namespace GameEditor.CodeEditor
             // ── Ctrl+Space: request completions ───────────────────────────────
             if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Space, false))
             {
-                Console.Error.WriteLine($"[Editor] Ctrl+Space: requesting completions at offset {CaretOffset}");
+                _completionTriggerLine = _cursor.Line;
+                _completionTriggerCol  = _cursor.Column;
+                Console.Error.WriteLine($"[Editor] Ctrl+Space: requesting completions at offset {CaretOffset} L{_cursor.Line}:{_cursor.Column}");
                 CompletionRequested?.Invoke(CaretOffset);
                 return;
             }
@@ -1314,10 +1326,14 @@ namespace GameEditor.CodeEditor
 
                     InsertChar(ch);
 
-                    // Trigger completion after dot — member-access
+                    // Trigger completion after dot — member-access.
+                    // Capture line+col NOW on the render thread so UpdateCompletionFilter
+                    // can use them directly without byte-offset arithmetic.
                     if (ch == '.')
                     {
-                        Console.Error.WriteLine($"[Editor] '.' typed: requesting completions at offset {CaretOffset}");
+                        _completionTriggerLine = _cursor.Line;
+                        _completionTriggerCol  = _cursor.Column;
+                        Console.Error.WriteLine($"[Editor] '.' typed: requesting completions at offset {CaretOffset} L{_cursor.Line}:{_cursor.Column}");
                         CompletionRequested?.Invoke(CaretOffset);
                     }
                 }
@@ -2044,9 +2060,10 @@ namespace GameEditor.CodeEditor
 
             byte open = 1;
             if (!igBegin("##completion", ref open,
-                    ImGuiWindowFlags.NoTitleBar    | ImGuiWindowFlags.NoResize |
-                    ImGuiWindowFlags.NoMove        | ImGuiWindowFlags.NoScrollbar |
-                    ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoNav))
+                    ImGuiWindowFlags.NoTitleBar      | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoMove          | ImGuiWindowFlags.NoScrollbar |
+                    ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoNav |
+                    ImGuiWindowFlags.NoFocusOnAppearing))  // must NOT steal focus from the editor
             {
                 igEnd();
                 if (open == 0) HideCompletions();

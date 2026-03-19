@@ -278,7 +278,7 @@ namespace GameEditor.CodeEditor
                 }
 
                 var completionResults = list.ItemsList
-                    .Take(64)   // cap at 64 for the popup
+                    .Take(256)  // cap — filter in UpdateCompletionFilter, not here
                     .Select(item => new CompletionEntry
                     {
                         Label      = item.DisplayText,
