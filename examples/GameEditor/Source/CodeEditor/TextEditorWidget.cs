@@ -84,6 +84,8 @@ namespace GameEditor.CodeEditor
 
         // ── Symbol search results (references / definition) ───────────────────
         private bool   _symResultsOpen;
+        private bool   _symResultsJustOpened;
+        private const  string SymResultsPopupId = "##symResultsPop";
         private string  _symResultsTitle = "";
         private readonly List<(string FilePath, int Line, int ColStart, int ColEnd)> _symResults = new();
 
@@ -636,7 +638,8 @@ namespace GameEditor.CodeEditor
                         _symResults.Clear();
                         foreach (var loc in t.Result)
                             _symResults.Add((loc.FilePath, loc.Line - 1, loc.Column - 1, loc.Column - 1 + word.Length));
-                        _symResultsOpen = _symResults.Count > 0;
+                        _symResultsOpen       = _symResults.Count > 0;
+                        _symResultsJustOpened = _symResultsOpen;
                     }, System.Threading.Tasks.TaskScheduler.Default);
             }
             else
@@ -656,7 +659,8 @@ namespace GameEditor.CodeEditor
                         idx++;
                     }
                 }
-                _symResultsOpen = _symResults.Count > 0;
+                _symResultsOpen       = _symResults.Count > 0;
+                _symResultsJustOpened = _symResultsOpen;
             }
         }
 
@@ -707,7 +711,8 @@ namespace GameEditor.CodeEditor
                         }
                         else
                         {
-                            _symResultsOpen = _symResults.Count > 0;
+                            _symResultsOpen       = _symResults.Count > 0;
+                            _symResultsJustOpened = _symResultsOpen;
                         }
                     }, System.Threading.Tasks.TaskScheduler.Default);
             }
@@ -752,7 +757,8 @@ namespace GameEditor.CodeEditor
                     }
                     else
                     {
-                        _symResultsOpen = _symResults.Count > 0;
+                        _symResultsOpen       = _symResults.Count > 0;
+                        _symResultsJustOpened = _symResultsOpen;
                     }
                 }, System.Threading.Tasks.TaskScheduler.Default);
         }
@@ -2557,26 +2563,32 @@ namespace GameEditor.CodeEditor
         {
             if (!_symResultsOpen || _symResults.Count == 0) return;
 
-            // Position below the cursor line
+            // Position below the cursor line (must be set every frame before igBeginPopup)
             float popX = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
             int   cvr19b = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
             float popY = editorScreenPos.Y + (cvr19b + 1) * _charH - _scrollY + 4f;
             popX = MathF.Max(editorScreenPos.X + _gutterW, popX);
-
             igSetNextWindowPos(new Vector2(popX, popY), ImGuiCond.Always, Vector2.Zero);
             igSetNextWindowSize(new Vector2(520f, Math.Min(_symResults.Count * _charH + 40f, 240f)), ImGuiCond.Always);
 
-            byte open = 1;
-            if (!igBegin("##symResults", ref open,
-                    ImGuiWindowFlags.NoScrollbar   | ImGuiWindowFlags.NoResize |
-                    ImGuiWindowFlags.NoCollapse     | ImGuiWindowFlags.NoMove  |
+            // Open the popup the first frame it appears — must be before igBeginPopup.
+            // Using igOpenPopup ensures the window is on the popup layer so it receives
+            // mouse input correctly even when overlapping other docked panels.
+            if (_symResultsJustOpened)
+            {
+                igOpenPopup_Str(SymResultsPopupId, ImGuiPopupFlags.None);
+                _symResultsJustOpened = false;
+            }
+
+            if (!igBeginPopup(SymResultsPopupId,
+                    ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoCollapse   | ImGuiWindowFlags.NoMove  |
                     ImGuiWindowFlags.NoSavedSettings))
             {
-                igEnd();
-                if (open == 0) _symResultsOpen = false;
+                // Popup was closed by ImGui (e.g. click outside) — sync visible flag
+                _symResultsOpen = false;
                 return;
             }
-            if (open == 0) { _symResultsOpen = false; igEnd(); return; }
 
             igText(_symResultsTitle);
             igSeparator();
@@ -2603,16 +2615,17 @@ namespace GameEditor.CodeEditor
                         NavigationRequested?.Invoke(rFile, rLine + 1, rStart + 1);
                     }
                     _symResultsOpen = false;
+                    igCloseCurrentPopup();
                 }
             }
 
-            // Close on Escape or click outside
-            if (igIsKeyPressed_Bool(ImGuiKey.Escape, false) ||
-                (!igIsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) &&
-                  igIsMouseClicked_Bool(ImGuiMouseButton.Left, false)))
+            if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            {
                 _symResultsOpen = false;
+                igCloseCurrentPopup();
+            }
 
-            igEnd();
+            igEndPopup();
         }
         public (int Line, int Column) CursorPosition => (_cursor.Line + 1, _cursor.Column + 1);
 
