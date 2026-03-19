@@ -1576,6 +1576,23 @@ namespace GameEditor.CodeEditor
             _textVersion++;
         }
 
+        private void InsertTextRaw(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            foreach (char c in text)
+            {
+                if (c == '\r') continue;
+                if (c == '\n')
+                    InsertNewlineAt(_cursor);
+                else
+                {
+                    _lines[_cursor.Line].Insert(_cursor.Column, new Glyph(c, PaletteIndex.Default));
+                    _cursor.Column++;
+                }
+            }
+            _selStart = _selEnd = _cursor;
+        }
+
         private void InsertNewline()
         {
             if (HasSelection()) DeleteSelection();
@@ -1757,19 +1774,37 @@ namespace GameEditor.CodeEditor
         private void DeleteRange(Coords from, Coords to)
         {
             if (from == to) return;
+
+            if (to < from)
+                (from, to) = (to, from);
+
+            from.Line = Math.Clamp(from.Line, 0, _lines.Count - 1);
+            to.Line   = Math.Clamp(to.Line,   0, _lines.Count - 1);
+            from.Column = Math.Clamp(from.Column, 0, _lines[from.Line].Count);
+            to.Column   = Math.Clamp(to.Column,   0, _lines[to.Line].Count);
+
+            if (from == to) return;
+
             if (from.Line == to.Line)
             {
-                _lines[from.Line].RemoveRange(from.Column, to.Column - from.Column);
+                int count = to.Column - from.Column;
+                if (count > 0)
+                    _lines[from.Line].RemoveRange(from.Column, count);
             }
             else
             {
                 // Keep chars before from on from.Line; append chars after to on to.Line
                 var firstLn = _lines[from.Line];
                 var lastLn  = _lines[to.Line];
-                firstLn.RemoveRange(from.Column, firstLn.Count - from.Column);
-                for (int ci = to.Column; ci < lastLn.Count; ci++)
+                int suffixStart = Math.Min(to.Column, lastLn.Count);
+                int trimCount   = firstLn.Count - from.Column;
+                if (trimCount > 0)
+                    firstLn.RemoveRange(from.Column, trimCount);
+                for (int ci = suffixStart; ci < lastLn.Count; ci++)
                     firstLn.Add(lastLn[ci]);
-                _lines.RemoveRange(from.Line + 1, to.Line - from.Line);
+                int removeCount = to.Line - from.Line;
+                if (removeCount > 0)
+                    _lines.RemoveRange(from.Line + 1, removeCount);
             }
             _textVersion++;
         }
@@ -2107,9 +2142,6 @@ namespace GameEditor.CodeEditor
 
             string insertText = items[_completionIdx].InsertText;
 
-            // Replace the full typed span, not just the missing suffix.
-            // This preserves Roslyn's canonical casing, e.g. typing "no" and committing
-            // "Normalize" should yield "Normalize", not "normalize".
             Coords replaceFrom;
             Coords replaceTo = _cursor;
 
@@ -2119,7 +2151,6 @@ namespace GameEditor.CodeEditor
             }
             else
             {
-                // Fallback for any stale trigger position: replace the current word prefix.
                 var line = _lines[_cursor.Line];
                 int wordStart = _cursor.Column;
                 while (wordStart > 0 && IsWordChar(line[wordStart - 1].Char))
@@ -2127,13 +2158,22 @@ namespace GameEditor.CodeEditor
                 replaceFrom = new Coords(_cursor.Line, wordStart);
             }
 
+            Coords beforeCursor = _cursor;
+            Coords spanStart    = replaceFrom <= replaceTo ? replaceFrom : replaceTo;
+            Coords spanEnd      = replaceFrom <= replaceTo ? replaceTo   : replaceFrom;
+            string removedText  = GetTextRange(spanStart, spanEnd);
             HideCompletions();
 
-            if (replaceFrom != replaceTo)
-                DeleteRange(replaceFrom, replaceTo);
-            _cursor = replaceFrom;
+            DeleteRange(spanStart, spanEnd);
+            _cursor = spanStart;
             _selStart = _selEnd = _cursor;
-            InsertText(insertText);
+            InsertTextRaw(insertText);
+
+            Coords afterCursor = _cursor;
+            _undo.AddRecord(new UndoRecord(
+                insertText, spanStart, afterCursor,
+                removedText, spanStart, spanEnd,
+                beforeCursor, afterCursor));
         }
 
         private unsafe void RenderCompletionPopup(Vector2 editorScreenPos)
