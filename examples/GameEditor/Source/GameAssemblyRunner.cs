@@ -34,6 +34,7 @@ using System.Diagnostics;
 using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
+using GameEditor.CodeEditor;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Scripting;
 using GameEditor.Framework.ECS;
@@ -56,6 +57,16 @@ namespace GameEditor
         public static bool IsLoaded             => _assembly != null;
         public static bool LastBuildSucceeded    { get; private set; } = true;
         public static bool IsBuilding            { get; private set; } = false;
+
+        /// <summary>Diagnostics produced by the most recent build. Empty when build succeeded cleanly.</summary>
+        public static IReadOnlyList<BuildDiagnostic> LastBuildDiagnostics { get; private set; }
+            = Array.Empty<BuildDiagnostic>();
+
+        /// <summary>
+        /// Raised on the thread-pool thread when an async build triggered by
+        /// <see cref="TriggerBuild"/> finishes. The argument is the list of diagnostics.
+        /// </summary>
+        public static event Action<IReadOnlyList<BuildDiagnostic>>? BuildCompleted;
 
         private static FileSystemWatcher? _watcher;
         private static Timer?             _debounceTimer;
@@ -162,6 +173,7 @@ namespace GameEditor
             if (csproj == null)
             {
                 Logger.Error("[GameAssemblyRunner] No .csproj found in project folder.");
+                LastBuildDiagnostics = Array.Empty<BuildDiagnostic>();
                 return false;
             }
 
@@ -181,10 +193,11 @@ namespace GameEditor
             if (proc == null)
             {
                 Logger.Error("[GameAssemblyRunner] Failed to start build process.");
+                LastBuildDiagnostics = Array.Empty<BuildDiagnostic>();
                 return false;
             }
 
-            // Forward build output to the in-editor logger
+            // Capture output and forward to the in-editor logger
             string stdout = proc.StandardOutput.ReadToEnd();
             string stderr = proc.StandardError.ReadToEnd();
             proc.WaitForExit();
@@ -193,6 +206,10 @@ namespace GameEditor
                 Logger.Info(line.TrimEnd());
             foreach (string line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                 Logger.Warning(line.TrimEnd());
+
+            // Parse structured diagnostics from combined output
+            string combined = stdout + "\n" + stderr;
+            LastBuildDiagnostics = BuildErrorParser.Parse(combined);
 
             if (proc.ExitCode != 0)
             {
@@ -287,8 +304,16 @@ namespace GameEditor
             Task.Run(() =>
             {
                 try   { LastBuildSucceeded = Build(projectFolder); }
-                catch { LastBuildSucceeded = false; }
-                finally { IsBuilding = false; }
+                catch
+                {
+                    LastBuildSucceeded    = false;
+                    LastBuildDiagnostics = Array.Empty<BuildDiagnostic>();
+                }
+                finally
+                {
+                    IsBuilding = false;
+                    BuildCompleted?.Invoke(LastBuildDiagnostics);
+                }
             });
         }
 

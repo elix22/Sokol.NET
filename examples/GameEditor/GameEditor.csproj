@@ -66,6 +66,14 @@
       <Compile Remove="bin/**/*" />
     </ItemGroup>
 
+  <!-- Roslyn — C# diagnostics + code intelligence for the script editor -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.*" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.*" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Features" Version="4.*" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="4.*" />
+  </ItemGroup>
+
   <!-- Exclude shaders from other platform folders -->
   <ItemGroup>
     <Compile Remove="shaders/compiled/web/**/*.cs" />

@@ -81,6 +81,18 @@ namespace GameEditor.CodeEditor
         private string  _symResultsTitle = "";
         private readonly List<(int Line, int ColStart, int ColEnd)> _symResults = new();
 
+        // ── Autocomplete popup ────────────────────────────────────────────────
+        private bool                     _completionVisible;
+        private List<CompletionEntry>?   _completions;
+        private int                       _completionIdx;
+
+        /// <summary>
+        /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
+        /// Argument is the current caret byte-offset into the source.
+        /// The external handler should call <see cref="ShowCompletions"/> when results arrive.
+        /// </summary>
+        public event Action<int>? CompletionRequested;
+
         public Palette Palette
         {
             get => _palette;
@@ -92,6 +104,34 @@ namespace GameEditor.CodeEditor
             => _highlighter.SetErrorMarkers(markers);
         public void SetWarningMarkers(Dictionary<int, string> markers)
             => _highlighter.SetWarningMarkers(markers);
+
+        /// <summary>Returns the 0-based character offset of the caret into the source text.</summary>
+        public int CaretOffset
+        {
+            get
+            {
+                int offset = 0;
+                for (int i = 0; i < _cursor.Line; i++)
+                    offset += _lines[i].Count + 1; // +1 for the '\n'
+                return offset + _cursor.Column;
+            }
+        }
+
+        /// <summary>Show the autocomplete popup with the given entries.</summary>
+        public void ShowCompletions(IReadOnlyList<CompletionEntry> entries)
+        {
+            if (entries.Count == 0) { _completionVisible = false; return; }
+            _completions = new List<CompletionEntry>(entries);
+            _completionIdx = 0;
+            _completionVisible = true;
+        }
+
+        /// <summary>Dismiss the autocomplete popup.</summary>
+        public void HideCompletions()
+        {
+            _completionVisible = false;
+            _completions = null;
+        }
 
         // ── Construction ─────────────────────────────────────────────────────
         public TextEditorWidget()
@@ -495,6 +535,10 @@ namespace GameEditor.CodeEditor
 
             // ── Symbol results floating popup ─────────────────────────────────
             RenderSymbolResults(editorScreenPos);
+
+            // ── Autocomplete popup ─────────────────────────────────────────────
+            if (_completionVisible)
+                RenderCompletionPopup(editorScreenPos);
         }
 
         // ── Rendering ────────────────────────────────────────────────────────
@@ -882,6 +926,39 @@ namespace GameEditor.CodeEditor
             bool shift = (io->KeyMods & ImGuiKey.ImGuiMod_Shift) != 0;
             bool alt   = (io->KeyMods & ImGuiKey.ImGuiMod_Alt)   != 0;
 
+            // ── Completion popup intercept ────────────────────────────────────
+            if (_completionVisible && _completions != null && _completions.Count > 0)
+            {
+                if (igIsKeyPressed_Bool(ImGuiKey.UpArrow, true))
+                {
+                    _completionIdx = Math.Max(0, _completionIdx - 1);
+                    return;
+                }
+                if (igIsKeyPressed_Bool(ImGuiKey.DownArrow, true))
+                {
+                    _completionIdx = Math.Min(_completions.Count - 1, _completionIdx + 1);
+                    return;
+                }
+                if (igIsKeyPressed_Bool(ImGuiKey.Enter, false) ||
+                    igIsKeyPressed_Bool(ImGuiKey.Tab,   false))
+                {
+                    CommitCompletion();
+                    return;
+                }
+                if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+                {
+                    HideCompletions();
+                    return;
+                }
+            }
+
+            // ── Ctrl+Space: request completions ───────────────────────────────
+            if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Space, false))
+            {
+                CompletionRequested?.Invoke(CaretOffset);
+                return;
+            }
+
             // ── Navigation ─────────────────────────────────────────────────────
             if (igIsKeyPressed_Bool(ImGuiKey.UpArrow, true))
             {
@@ -1066,7 +1143,17 @@ namespace GameEditor.CodeEditor
             {
                 char ch = (char)io->InputQueueCharacters.Ref<ushort>(qi);
                 if (ch >= 0x20 && ch != 127) // printable non-DEL
+                {
+                    // Dismiss completion on characters that break the word context
+                    if (_completionVisible && ch != '_' && !char.IsLetterOrDigit(ch))
+                        HideCompletions();
+
                     InsertChar(ch);
+
+                    // Trigger completion after dot — member-access
+                    if (ch == '.')
+                        CompletionRequested?.Invoke(CaretOffset);
+                }
             }
 
             // Scroll so cursor remains visible
@@ -1713,5 +1800,114 @@ namespace GameEditor.CodeEditor
             igEnd();
         }
         public (int Line, int Column) CursorPosition => (_cursor.Line + 1, _cursor.Column + 1);
+
+        // ── Autocomplete helpers ──────────────────────────────────────────────
+
+        private void CommitCompletion()
+        {
+            if (_completions == null || _completionIdx < 0 || _completionIdx >= _completions.Count)
+            {
+                HideCompletions();
+                return;
+            }
+
+            string insertText = _completions[_completionIdx].InsertText;
+            HideCompletions();
+
+            // Find word start before cursor so we replace only the typed prefix
+            var line = _lines[_cursor.Line];
+            int wordStart = _cursor.Column;
+            while (wordStart > 0 && IsWordChar(line[wordStart - 1].Char))
+                wordStart--;
+
+            int alreadyTyped = _cursor.Column - wordStart;
+            string suffix = insertText.Length > alreadyTyped
+                ? insertText.Substring(alreadyTyped)
+                : "";
+
+            if (suffix.Length > 0)
+                InsertText(suffix);
+        }
+
+        private unsafe void RenderCompletionPopup(Vector2 editorScreenPos)
+        {
+            if (!_completionVisible || _completions == null || _completions.Count == 0) return;
+
+            const int maxVisible = 8;
+            float itemH  = _charH > 0 ? _charH : 16f;
+            float popupW = 300f;
+            float popupH = Math.Min(_completions.Count, maxVisible) * itemH + 8f;
+
+            // Position the popup below the cursor
+            float cx = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
+            float cy = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 2f;
+
+            // Keep inside window horizontally
+            Vector2 displaySz = default;
+            igGetIO_Nil(); // ensure io is accessible — not needed here
+            // Clamp popup X so it doesn't overflow the right side
+            cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
+
+            igSetNextWindowPos(new Vector2(cx, cy), ImGuiCond.Always, Vector2.Zero);
+            igSetNextWindowSize(new Vector2(popupW, popupH), ImGuiCond.Always);
+            igSetNextWindowBgAlpha(0.95f);
+
+            byte open = 1;
+            if (!igBegin("##completion", ref open,
+                    ImGuiWindowFlags.NoTitleBar    | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoMove        | ImGuiWindowFlags.NoScrollbar |
+                    ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoNav))
+            {
+                igEnd();
+                if (open == 0) HideCompletions();
+                return;
+            }
+            if (open == 0) { HideCompletions(); igEnd(); return; }
+
+            // Ensure selected item stays visible
+            int scrollOffset = Math.Max(0, _completionIdx - maxVisible + 1);
+
+            for (int i = 0; i < _completions.Count; i++)
+            {
+                if (i < scrollOffset || i >= scrollOffset + maxVisible) continue;
+                bool selected = i == _completionIdx;
+                var  entry    = _completions[i];
+
+                // Kind icon using Font Awesome glyph codes
+                string kindIcon = entry.Kind switch
+                {
+                    CompletionItemKind.Method or
+                    CompletionItemKind.Function or
+                    CompletionItemKind.Constructor  => "\uf013", // cog
+                    CompletionItemKind.Class        => "\uf1c0",
+                    CompletionItemKind.Interface    => "\uf0e8",
+                    CompletionItemKind.Field or
+                    CompletionItemKind.Variable      => "\uf069",
+                    CompletionItemKind.Property      => "\uf044",
+                    CompletionItemKind.Keyword       => "\uf0a9",
+                    CompletionItemKind.Namespace     => "\uf07b",
+                    CompletionItemKind.Enum or
+                    CompletionItemKind.EnumMember    => "\uf0ca",
+                    _                               => "\uf111"
+                };
+
+                string label = string.IsNullOrEmpty(entry.Detail)
+                    ? $"{kindIcon} {entry.Label}##comp{i}"
+                    : $"{kindIcon} {entry.Label}  \u00b7\u00b7\u00b7 {entry.Detail}##comp{i}";
+
+                if (igSelectable_Bool(label, selected, ImGuiSelectableFlags.None, Vector2.Zero))
+                {
+                    _completionIdx = i;
+                    CommitCompletion();
+                }
+            }
+
+            // Dismiss if click outside
+            if (!igIsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) &&
+                 igIsMouseClicked_Bool(ImGuiMouseButton.Left, false))
+                HideCompletions();
+
+            igEnd();
+        }
     }
 }

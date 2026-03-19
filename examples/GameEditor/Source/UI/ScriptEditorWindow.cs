@@ -1,16 +1,21 @@
 // ScriptEditorWindow.cs — Dockable multi-tab C# script editor panel.
 //
 // Double-clicking a .cs file in AssetsPanel calls Open(path).
-// Ctrl+S saves the current tab.
+// Ctrl+S saves the current tab and triggers a background build.
 // A dirty indicator (•) appears on the tab when unsaved changes exist.
+// Roslyn provides real-time diagnostics and autocomplete.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using Imgui;
 using static Imgui.ImguiNative;
+using GameEditor;
+using GameEditor.CodeEditor;
 using GameEditor.Framework.Core;
 
 namespace GameEditor.UI
@@ -45,6 +50,17 @@ namespace GameEditor.UI
         private static int    _closeTabIdx     = -1;
         private static bool   _showSaveModal   = false;
 
+        // ── Build / diagnostics state ─────────────────────────────────────────
+        private static bool   _eventsSubscribed;
+
+        // Build diagnostics arriving from the thread-pool — applied next Draw()
+        private static IReadOnlyList<BuildDiagnostic>? _pendingBuildDiags;
+        private static readonly object                  _pendingBuildLock = new();
+
+        // Roslyn real-time diagnostics arriving from the thread-pool
+        private static readonly ConcurrentQueue<(string FilePath, IReadOnlyList<BuildDiagnostic> Diags)>
+            _pendingRoslynDiags = new();
+
         // ── Public API ────────────────────────────────────────────────────────
 
         public static bool IsVisible => _isVisible;
@@ -73,6 +89,28 @@ namespace GameEditor.UI
                 _tabs.Add(tab);
                 _activeTab = _tabs.Count - 1;
                 _isVisible = true;
+
+                // Register with Roslyn for real-time diagnostics (no debounce on open)
+                string fp = tab.FilePath;
+                RoslynHost.Instance.UpdateDocument(fp, text, debounceMs: 0);
+
+                // Subscribe to Roslyn diagnostics for this editor
+                RoslynHost.Instance.DiagnosticsChanged += (path, diags) =>
+                {
+                    if (!string.Equals(path, fp, StringComparison.OrdinalIgnoreCase)) return;
+                    _pendingRoslynDiags.Enqueue((path, diags));
+                };
+
+                // Wire completion trigger — fires on '.' or Ctrl+Space
+                tab.Editor.CompletionRequested += caretOffset =>
+                {
+                    _ = RoslynHost.Instance.GetCompletionsAsync(fp, caretOffset)
+                        .ContinueWith(t =>
+                        {
+                            if (!t.IsFaulted && t.Result.Count > 0)
+                                tab.Editor.ShowCompletions(t.Result);
+                        }, System.Threading.Tasks.TaskScheduler.Default);
+                };
             }
             catch (Exception ex)
             {
@@ -83,6 +121,20 @@ namespace GameEditor.UI
         /// <summary>Called each frame from EditorLayout.</summary>
         public static void Draw()
         {
+            EnsureEventsSubscribed();
+
+            // ── Drain pending background diagnostics (thread-safe) ────────────
+            IReadOnlyList<BuildDiagnostic>? buildDiags;
+            lock (_pendingBuildLock)
+            {
+                buildDiags       = _pendingBuildDiags;
+                _pendingBuildDiags = null;
+            }
+            if (buildDiags != null)
+                ApplyBuildDiagnostics(buildDiags);
+
+            while (_pendingRoslynDiags.TryDequeue(out var ritem))
+                ApplyRoslynDiagnostics(ritem.FilePath, ritem.Diags);
             ImGuiWindowClass cls = default;
             cls.DockingAlwaysTabBar = 1;
             igSetNextWindowClass(&cls);
@@ -260,9 +312,6 @@ namespace GameEditor.UI
         // ── Status bar ────────────────────────────────────────────────────────
         private static void DrawStatusBar()
         {
-            Vector2 avail = default;
-            igGetContentRegionAvail(ref avail);
-
             igSeparator();
             if (_activeTab >= 0 && _activeTab < _tabs.Count)
             {
@@ -287,6 +336,35 @@ namespace GameEditor.UI
             {
                 igText("C# Script Editor");
             }
+
+            // ── Build status indicator ────────────────────────────────────────
+            igSameLine(0, 24);
+            if (GameAssemblyRunner.IsBuilding)
+            {
+                // Animate a rotating spinner using ⣾⣽⣻⢿⡿⣟⣯⣷ braille dots
+                string[] spinnerFrames = { "\u28fe", "\u28fd", "\u28fb", "\u28bf",
+                                           "\u287f", "\u28df", "\u28ef", "\u28f7" };
+                int frame = (int)(igGetTime() * 8.0) & 7;
+                igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.6f, 0.8f, 1f, 1f));
+                igText($"{spinnerFrames[frame]}  Building\u2026");
+                igPopStyleColor(1);
+            }
+            else if (ConfigManager.HasProject)
+            {
+                int errorCount = GameAssemblyRunner.LastBuildDiagnostics.Count(d => d.IsError);
+                if (GameAssemblyRunner.LastBuildSucceeded)
+                {
+                    igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.4f, 0.9f, 0.4f, 1f));
+                    igText("\uf058  Build OK");        // FA check-circle
+                    igPopStyleColor(1);
+                }
+                else
+                {
+                    igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(1f, 0.4f, 0.4f, 1f));
+                    igText($"\uf057  Build FAILED \u2014 {errorCount} error{(errorCount != 1 ? "s" : "")}");
+                    igPopStyleColor(1);
+                }
+            }
         }
 
         // ── File operations ───────────────────────────────────────────────────
@@ -294,11 +372,19 @@ namespace GameEditor.UI
         {
             try
             {
-                File.WriteAllText(tab.FilePath, tab.Editor.GetText(), Encoding.UTF8);
+                string text = tab.Editor.GetText();
+                File.WriteAllText(tab.FilePath, text, Encoding.UTF8);
                 tab.IsDirty            = false;
                 tab.LastDiskWriteUtc   = File.GetLastWriteTimeUtc(tab.FilePath);
                 tab.ReloadBannerVisible = false;
                 Logger.Info($"[ScriptEditor] Saved {tab.FileName}");
+
+                // Update Roslyn immediately so completion/diagnostics reflect latest save
+                RoslynHost.Instance.UpdateDocument(tab.FilePath, text, debounceMs: 0);
+
+                // Trigger background rebuild if a project is open
+                if (ConfigManager.HasProject)
+                    GameAssemblyRunner.TriggerBuild(ConfigManager.ProjectFolder!);
             }
             catch (Exception ex)
             {
@@ -337,6 +423,7 @@ namespace GameEditor.UI
 
         private static void CloseTab(int idx)
         {
+            RoslynHost.Instance.RemoveDocument(_tabs[idx].FilePath);
             _tabs.RemoveAt(idx);
             _closeTabIdx = -1;
             _activeTab   = Math.Min(_activeTab, _tabs.Count - 1);
@@ -401,8 +488,67 @@ namespace GameEditor.UI
                 {
                     _lastTextHash[i] = current;
                     if (prev != null) // null on first setup — don't mark dirty on load
+                    {
                         tab.IsDirty = true;
+                        // Notify Roslyn about the change (debounced)
+                        RoslynHost.Instance.UpdateDocument(tab.FilePath, current);
+                    }
                 }
+            }
+        }
+
+        // ── Event subscription ────────────────────────────────────────────────
+
+        private static void EnsureEventsSubscribed()
+        {
+            if (_eventsSubscribed) return;
+            _eventsSubscribed = true;
+            GameAssemblyRunner.BuildCompleted += OnBuildCompleted;
+        }
+
+        private static void OnBuildCompleted(IReadOnlyList<BuildDiagnostic> diags)
+        {
+            lock (_pendingBuildLock)
+                _pendingBuildDiags = diags;
+        }
+
+        // ── Diagnostics application ───────────────────────────────────────────
+
+        private static void ApplyBuildDiagnostics(IReadOnlyList<BuildDiagnostic> diags)
+        {
+            var (errsByFile, warnsByFile) = BuildErrorParser.GroupByFile(diags);
+
+            // Apply to all open tabs, including clearing stale markers when no diags
+            foreach (var tab in _tabs)
+            {
+                errsByFile.TryGetValue(tab.FilePath, out var errs);
+                warnsByFile.TryGetValue(tab.FilePath, out var warns);
+                tab.Editor.SetErrorMarkers(errs   ?? new Dictionary<int, string>());
+                tab.Editor.SetWarningMarkers(warns ?? new Dictionary<int, string>());
+            }
+        }
+
+        private static void ApplyRoslynDiagnostics(string filePath, IReadOnlyList<BuildDiagnostic> diags)
+        {
+            foreach (var tab in _tabs)
+            {
+                if (!string.Equals(tab.FilePath, filePath, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var errs = new Dictionary<int, string>();
+                var warns = new Dictionary<int, string>();
+                foreach (var d in diags)
+                {
+                    string msg = $"{d.Code}: {d.Message}";
+                    var target = d.IsError ? errs : warns;
+                    if (target.TryGetValue(d.Line, out string? existing))
+                        target[d.Line] = existing + "\n" + msg;
+                    else
+                        target[d.Line] = msg;
+                }
+
+                tab.Editor.SetErrorMarkers(errs);
+                tab.Editor.SetWarningMarkers(warns);
+                break;
             }
         }
     }
