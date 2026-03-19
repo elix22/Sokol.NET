@@ -85,6 +85,17 @@ public static unsafe class GameeditorApp
                 ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconFontPath, fontSize, &cfg, ref *iconRange);
             }
         }
+
+        // Load JetBrains Mono as the code editor font (separate font slot, not merged).
+        string codeFontPath = System.IO.Path.Combine(
+            System.AppContext.BaseDirectory, "fonts", "JetBrainsMono-Regular.ttf");
+        if (System.IO.File.Exists(codeFontPath))
+        {
+            ushort rangeEnd = 0;
+            EditorFonts.CodeFont = ImFontAtlas_AddFontFromFileTTF(
+                io->Fonts, codeFontPath, 14.0f, null, ref rangeEnd);
+        }
+
         io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         // Keep a visible tab even for single-window dock nodes so panels remain draggable.
         io->ConfigDockingAlwaysTabBar = 1;

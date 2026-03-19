@@ -142,7 +142,20 @@ namespace GameEditor.CodeEditor
             // Grab latest token data from the highlighter (may be null on first frame)
             _tokens = _highlighter.GetResult();
 
-            // Measure one character
+            var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
+            igBeginChild_Str(id, size, ImGuiChildFlags.None, windowFlags);
+
+            // Push JetBrains Mono if available — must happen inside the child so
+            // subsequent igCalcTextSize uses the correct font.
+            bool pushedFont = false;
+            var cf = GameEditor.EditorFonts.CodeFont;
+            if (cf != null)
+            {
+                igPushFont(cf, 0f); // 0f = use font's built-in size
+                pushedFont = true;
+            }
+
+            // Measure one character (uses whichever font is now active)
             Vector2 charSz = default;
             igCalcTextSize(ref charSz, "X", null, false, 0f);
             _charW = charSz.X;
@@ -161,9 +174,6 @@ namespace GameEditor.CodeEditor
                 _gutterW = 4f;
             }
 
-            var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
-            igBeginChild_Str(id, size, ImGuiChildFlags.None, windowFlags);
-
             bool focused = igIsWindowFocused(ImGuiFocusedFlags.None);
 
             if (focused && !ReadOnly)
@@ -173,6 +183,7 @@ namespace GameEditor.CodeEditor
 
             RenderContent();
 
+            if (pushedFont) igPopFont();
             igEndChild();
         }
 
