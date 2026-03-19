@@ -183,6 +183,7 @@ namespace GameEditor.CodeEditor
         public const string MoveLineUp    = "MoveLineUp";
         public const string MoveLineDown  = "MoveLineDown";
         public const string TriggerCompletion = "TriggerCompletion";
+        public const string RenameSymbol  = "RenameSymbol";
 
         // ── Defaults ─────────────────────────────────────────────────────────
 
@@ -200,6 +201,7 @@ namespace GameEditor.CodeEditor
             [MoveLineUp]        = new KeyChord { Key = ImGuiKey.UpArrow,    Alt  = true  },
             [MoveLineDown]      = new KeyChord { Key = ImGuiKey.DownArrow,  Alt  = true  },
             [TriggerCompletion] = new KeyChord { Key = ImGuiKey.Space,      Ctrl = true  },
+            [RenameSymbol]      = new KeyChord { Key = ImGuiKey.F2                       },
         };
 
         private static Dictionary<string, KeyChord> _bindings = new(_defaults);

@@ -68,6 +68,10 @@ namespace GameEditor.UI
         private static readonly ConcurrentQueue<(string File, int Line, int Col)>
             _pendingNavigations = new();
 
+        // Rename results arriving from the thread-pool — applied next Draw()
+        private static readonly ConcurrentQueue<Dictionary<string, string>>
+            _pendingRenames = new();
+
         // Tab index to force-select on the next DrawTabBar() call (-1 = none).
         // Set when navigation switches to an already-open tab so ImGui's own
         // internal selection state (which still points at the previously active tab)
@@ -184,6 +188,17 @@ namespace GameEditor.UI
                 // enqueue the request and drain it on the render thread in Draw().
                 tab.Editor.NavigationRequested += (targetFile, line, col) =>
                     _pendingNavigations.Enqueue((targetFile, line, col));
+
+                // Rename symbol — run Roslyn on background thread, apply results on render thread.
+                tab.Editor.RenameRequested += (filePath2, caretOffset, newName) =>
+                {
+                    RoslynHost.Instance.RenameSymbolAsync(filePath2, caretOffset, newName)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted || t.Result.Count == 0) return;
+                            _pendingRenames.Enqueue(t.Result);
+                        }, System.Threading.Tasks.TaskScheduler.Default);
+                };
             }
             catch (Exception ex)
             {
@@ -224,6 +239,10 @@ namespace GameEditor.UI
                     }
                 }
             }
+
+            // Drain rename results from the thread-pool — apply to open tabs and disk
+            while (_pendingRenames.TryDequeue(out var renameMap))
+                ApplyRename(renameMap);
 
             ImGuiWindowClass cls = default;
             cls.DockingAlwaysTabBar = 1;
@@ -496,6 +515,51 @@ namespace GameEditor.UI
             {
                 Logger.Error($"[ScriptEditor] Failed to save {tab.FilePath}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Applies the file-path → new-text map produced by a Roslyn rename.
+        /// Open tabs are updated in-place and marked dirty.
+        /// Files not currently open are written directly to disk.
+        /// </summary>
+        private static void ApplyRename(Dictionary<string, string> changes)
+        {
+            foreach (var (changedPath, newText) in changes)
+            {
+                // Check if this file is open in a tab
+                bool foundTab = false;
+                foreach (var tab in _tabs)
+                {
+                    if (string.Equals(tab.FilePath, changedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        tab.Editor.SetText(newText);
+                        tab.IsDirty = true;
+                        RoslynHost.Instance.UpdateDocument(changedPath, newText, debounceMs: 0);
+                        Logger.Info($"[ScriptEditor] Rename applied (open tab): {tab.FileName}");
+                        foundTab = true;
+                        break;
+                    }
+                }
+
+                if (!foundTab)
+                {
+                    // File not open — write to disk directly
+                    try
+                    {
+                        File.WriteAllText(changedPath, newText, Encoding.UTF8);
+                        RoslynHost.Instance.UpdateDocument(changedPath, newText, debounceMs: 0);
+                        Logger.Info($"[ScriptEditor] Rename applied (disk): {Path.GetFileName(changedPath)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"[ScriptEditor] Rename write failed for {changedPath}: {ex.Message}");
+                    }
+                }
+            }
+
+            // Trigger a rebuild so the assembly reflects the renamed symbols
+            if (changes.Count > 0 && ConfigManager.HasProject)
+                GameAssemblyRunner.TriggerBuild(ConfigManager.ProjectFolder!);
         }
 
         private static void ReloadFromDisk(OpenFile tab)

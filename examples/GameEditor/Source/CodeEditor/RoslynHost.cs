@@ -22,6 +22,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Text;
 
 using GameEditor.CodeEditor;
@@ -699,6 +700,67 @@ namespace GameEditor.CodeEditor
                 if (!inTag) sb.Append(c);
             }
             return sb.ToString().Trim();
+        }
+
+        // ── Rename symbol ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Renames the symbol at <paramref name="caretOffset"/> in <paramref name="filePath"/>
+        /// to <paramref name="newName"/> across the entire solution.
+        /// Returns a mapping of absolute file path → full new source text for every
+        /// file that was changed.  Returns an empty dictionary when the symbol could
+        /// not be resolved.
+        /// </summary>
+        public async Task<Dictionary<string, string>> RenameSymbolAsync(
+            string filePath, int caretOffset, string newName, CancellationToken ct = default)
+        {
+            Document? doc = GetDocument(filePath);
+            if (doc == null) return new Dictionary<string, string>();
+
+            try
+            {
+                var symbol = await SymbolFinder
+                    .FindSymbolAtPositionAsync(doc, caretOffset, ct)
+                    .ConfigureAwait(false);
+                if (symbol == null) return new Dictionary<string, string>();
+
+                // Skip symbols that cannot be renamed (operators, constructors, etc.)
+                if (symbol.Kind == SymbolKind.Namespace) return new Dictionary<string, string>();
+
+                var options  = new SymbolRenameOptions();
+                var newSolution = await Renamer
+                    .RenameSymbolAsync(_workspace.CurrentSolution, symbol, options, newName, ct)
+                    .ConfigureAwait(false);
+
+                var result  = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var projectChange in newSolution.GetChanges(_workspace.CurrentSolution).GetProjectChanges())
+                foreach (var docId in projectChange.GetChangedDocuments())
+                {
+                    var changedDoc = newSolution.GetDocument(docId);
+                    if (changedDoc == null) continue;
+                    string? path = changedDoc.FilePath;
+                    if (string.IsNullOrEmpty(path)) continue;
+                    var srcText = await changedDoc.GetTextAsync(ct).ConfigureAwait(false);
+                    result[path] = srcText.ToString();
+                }
+
+                // Apply the new solution so subsequent Roslyn queries use the renamed text.
+                if (result.Count > 0)
+                {
+                    lock (_lock)
+                    {
+                        _workspace.TryApplyChanges(newSolution);
+                    }
+                }
+
+                return result;
+            }
+            catch (OperationCanceledException) { return new Dictionary<string, string>(); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Roslyn] RenameSymbolAsync ex: {ex.GetType().Name}: {ex.Message}");
+                return new Dictionary<string, string>();
+            }
         }
 
         // ── Remove document ──────────────────────────────────────────────────

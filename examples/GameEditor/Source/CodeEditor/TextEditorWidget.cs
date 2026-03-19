@@ -137,6 +137,21 @@ namespace GameEditor.CodeEditor
         private int[]                          _logicalToVisual = Array.Empty<int>();
         private int                            _foldVersion     = -1;
 
+        // ── Rename symbol ─────────────────────────────────────────────────────
+        private bool   _renameVisible;
+        private bool   _renameJustOpened;
+        private bool   _renameInputFocusSet;
+        private readonly byte[] _renameBuf = new byte[256];
+        private string  _renameOriginalWord = "";
+        private const string RenamePopupId = "##renamePop";
+
+        /// <summary>
+        /// Fired when the user commits a rename.
+        /// Arguments: (absoluteFilePath, caretOffset, newName)
+        /// The external handler should call RoslynHost.RenameSymbolAsync and apply results.
+        /// </summary>
+        public event Action<string, int, string>? RenameRequested;
+
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
         /// Argument is the current caret byte-offset into the source.
@@ -742,6 +757,24 @@ namespace GameEditor.CodeEditor
                 }, System.Threading.Tasks.TaskScheduler.Default);
         }
 
+        // ── Rename symbol ─────────────────────────────────────────────────────
+        private void StartRename()
+        {
+            if (FilePath == null) return;
+            string word = GetWordUnderCursor();
+            if (string.IsNullOrEmpty(word)) return;
+
+            _renameOriginalWord = word;
+            // Pre-fill the input buffer with the current name
+            Array.Clear(_renameBuf, 0, _renameBuf.Length);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(word);
+            Array.Copy(bytes, _renameBuf, Math.Min(bytes.Length, _renameBuf.Length - 1));
+
+            _renameVisible       = true;
+            _renameJustOpened    = true;
+            _renameInputFocusSet = false;
+        }
+
         private void JumpToLine(int line)
         {
             line = Math.Clamp(line, 0, _lines.Count - 1);
@@ -850,6 +883,9 @@ namespace GameEditor.CodeEditor
 
             // ── Go to line floating dialog ────────────────────────────────────
             RenderGotoLine();
+
+            // ── Rename symbol floating dialog ─────────────────────────────────
+            RenderRename();
 
             // ── Symbol results floating popup ─────────────────────────────────
             RenderSymbolResults(editorScreenPos);
@@ -1653,11 +1689,17 @@ namespace GameEditor.CodeEditor
             {
                 GotoDefinition();
             }
+            // ── F2 rename symbol ───────────────────────────────────────────────
+            else if (KeyBindings.IsPressed(KeyBindings.RenameSymbol))
+            {
+                StartRename();
+            }
             // ── Escape: close overlays ─────────────────────────────────────────
             else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
             {
                 if (_findBarVisible)       { _findBarVisible = false; _replaceVisible = false; _findMatches.Clear(); _findMatchIdx = -1; }
                 else if (_gotoLineVisible)  { _gotoLineVisible = false; }
+                else if (_renameVisible)    { _renameVisible = false; }
                 else if (_symResultsOpen)   { _symResultsOpen = false; }
                 else if (_sigHelp != null)  { _sigHelp = null; _sigParenDepth = 0; }
             }
@@ -2251,6 +2293,8 @@ namespace GameEditor.CodeEditor
                 FindAllReferences();
             if (igMenuItem_Bool("Go to Implementation",  "Ctrl+F12",  false, true))
                 GotoImplementation();
+            if (igMenuItem_Bool("Rename Symbol\u2026",   "F2",        false, !ReadOnly))
+                StartRename();
 
             igEndPopup();
         }
@@ -2435,6 +2479,73 @@ namespace GameEditor.CodeEditor
             {
                 Array.Clear(_gotoLineBuf, 0, _gotoLineBuf.Length);
                 _gotoLineVisible = false;
+                igCloseCurrentPopup();
+            }
+
+            igEndPopup();
+        }
+
+        // ── Rename symbol popup ───────────────────────────────────────────────
+        private unsafe void RenderRename()
+        {
+            if (!_renameVisible) return;
+
+            Vector2 winPos = default;
+            igGetWindowPos(ref winPos);
+            Vector2 winSz = default;
+            igGetWindowSize(ref winSz);
+            igSetNextWindowPos(new Vector2(winPos.X + winSz.X * 0.5f, winPos.Y + 40f),
+                ImGuiCond.Always, new Vector2(0.5f, 0f));
+            igSetNextWindowSize(new Vector2(300f, 0f), ImGuiCond.Always);
+
+            if (_renameJustOpened)
+            {
+                igOpenPopup_Str(RenamePopupId, ImGuiPopupFlags.None);
+                _renameJustOpened    = false;
+                _renameInputFocusSet = false;
+            }
+
+            if (!igBeginPopup(RenamePopupId,
+                    ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize |
+                    ImGuiWindowFlags.NoCollapse   | ImGuiWindowFlags.NoMove))
+            {
+                _renameVisible = false;
+                return;
+            }
+
+            igText($"Rename '{_renameOriginalWord}' to:");
+            igSetNextItemWidth(-1f);
+
+            if (!_renameInputFocusSet)
+            {
+                igSetKeyboardFocusHere(0);
+                _renameInputFocusSet = true;
+            }
+
+            bool submitted = igInputText("##renameInput", ref _renameBuf[0],
+                (uint)_renameBuf.Length,
+                ImGuiInputTextFlags.EnterReturnsTrue,
+                null, null);
+
+            if (submitted)
+            {
+                int nullIdx = Array.IndexOf(_renameBuf, (byte)0);
+                string newName = System.Text.Encoding.UTF8.GetString(
+                    _renameBuf, 0, nullIdx < 0 ? _renameBuf.Length : nullIdx).Trim();
+
+                if (!string.IsNullOrEmpty(newName) && newName != _renameOriginalWord
+                    && FilePath != null)
+                {
+                    RenameRequested?.Invoke(FilePath, CaretOffset, newName);
+                }
+                Array.Clear(_renameBuf, 0, _renameBuf.Length);
+                _renameVisible = false;
+                igCloseCurrentPopup();
+            }
+            else if (igIsKeyPressed_Bool(ImGuiKey.Escape, false))
+            {
+                Array.Clear(_renameBuf, 0, _renameBuf.Length);
+                _renameVisible = false;
                 igCloseCurrentPopup();
             }
 
