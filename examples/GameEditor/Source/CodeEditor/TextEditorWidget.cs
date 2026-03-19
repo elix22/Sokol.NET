@@ -130,6 +130,13 @@ namespace GameEditor.CodeEditor
         private bool     _hoverPending;             // async Roslyn request in-flight
         private CancellationTokenSource _hoverCts = new CancellationTokenSource();
 
+        // ── Code folding ──────────────────────────────────────────────────────────────────
+        private readonly Dictionary<int, int> _foldStartToEnd  = new();
+        private readonly HashSet<int>          _foldedLines     = new();
+        private int[]                          _visualRows      = Array.Empty<int>();
+        private int[]                          _logicalToVisual = Array.Empty<int>();
+        private int                            _foldVersion     = -1;
+
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
         /// Argument is the current caret byte-offset into the source.
@@ -568,7 +575,7 @@ namespace GameEditor.CodeEditor
             _selStart = new Coords(m.Line, m.Column);
             _selEnd   = _cursor;
             // Scroll to match
-            float cursorPixelY = _cursor.Line * _charH;
+            float cursorPixelY = LineToVisualY(_cursor.Line);
             if (cursorPixelY < _scrollY || cursorPixelY + _charH > _scrollY + 400f) // approx
                 _scrollY = MathF.Max(0f, cursorPixelY - 100f);
         }
@@ -675,7 +682,7 @@ namespace GameEditor.CodeEditor
                                 _cursor   = new Coords(line, col + word.Length);
                                 _selStart = new Coords(line, col);
                                 _selEnd   = _cursor;
-                                _scrollY  = MathF.Max(0f, line * _charH - 100f);
+                                _scrollY  = MathF.Max(0f, LineToVisualY(line) - 100f);
                             }
                             else
                             {
@@ -721,7 +728,7 @@ namespace GameEditor.CodeEditor
                             _cursor   = new Coords(line, col + word.Length);
                             _selStart = new Coords(line, col);
                             _selEnd   = _cursor;
-                            _scrollY  = MathF.Max(0f, line * _charH - 100f);
+                            _scrollY  = MathF.Max(0f, LineToVisualY(line) - 100f);
                         }
                         else
                         {
@@ -740,7 +747,7 @@ namespace GameEditor.CodeEditor
             line = Math.Clamp(line, 0, _lines.Count - 1);
             _cursor = new Coords(line, Math.Min(_cursor.Column, _lines[line].Count));
             _selStart = _selEnd = _cursor;
-            _scrollY = MathF.Max(0f, line * _charH - 100f);
+            _scrollY = MathF.Max(0f, LineToVisualY(line) - 100f);
         }
 
         /// <summary>
@@ -754,7 +761,7 @@ namespace GameEditor.CodeEditor
             _cursor   = new Coords(line, col);
             _selStart = _cursor;
             _selEnd   = _cursor;
-            _scrollY  = MathF.Max(0f, line * _charH - 100f);
+            _scrollY  = MathF.Max(0f, LineToVisualY(line) - 100f);
         }
 
 
@@ -868,6 +875,87 @@ namespace GameEditor.CodeEditor
             }
         }
 
+        // ── Code folding helpers ──────────────────────────────────────────────────────────
+
+        private float LineToVisualY(int li)
+        {
+            if (li >= 0 && li < _logicalToVisual.Length)
+            {
+                int vr = _logicalToVisual[li];
+                return (vr >= 0 ? vr : li) * _charH;
+            }
+            return li * _charH;
+        }
+
+        private void ComputeFoldRegions()
+        {
+            _foldStartToEnd.Clear();
+            var braceStack  = new Stack<int>();
+            var regionStack = new Stack<int>();
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                var    line    = _lines[li];
+                string trimmed = GetLineText(li).TrimStart();
+                if (trimmed.StartsWith("#region", StringComparison.OrdinalIgnoreCase))
+                { regionStack.Push(li); continue; }
+                if (trimmed.StartsWith("#endregion", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (regionStack.Count > 0) { int sl = regionStack.Pop(); if (li > sl) _foldStartToEnd[sl] = li; }
+                    continue;
+                }
+                bool inLC = false, inStr = false;
+                for (int ci = 0; ci < line.Count; ci++)
+                {
+                    char c = line[ci].Char;
+                    if (inLC) break;
+                    if (!inStr && ci + 1 < line.Count && c == '/' && line[ci + 1].Char == '/') { inLC = true; break; }
+                    if (c == '"' && (ci == 0 || line[ci - 1].Char != '\\')) inStr = !inStr;
+                    if (inStr) continue;
+                    if (c == '{') braceStack.Push(li);
+                    else if (c == '}' && braceStack.Count > 0) { int sl = braceStack.Pop(); if (li > sl) _foldStartToEnd[sl] = li; }
+                }
+            }
+        }
+
+        private void RebuildVisualRows()
+        {
+            if (_foldVersion != _textVersion)
+            {
+                ComputeFoldRegions();
+                _foldedLines.RemoveWhere(li => !_foldStartToEnd.ContainsKey(li));
+                _foldVersion = _textVersion;
+            }
+            var hidden = new HashSet<int>();
+            foreach (int li in _foldedLines)
+                if (_foldStartToEnd.TryGetValue(li, out int end))
+                    for (int h = li + 1; h <= end; h++) hidden.Add(h);
+            int visCount = _lines.Count - hidden.Count;
+            var visual   = new int[visCount];
+            var lToV     = new int[_lines.Count];
+            int vr = 0;
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                if (hidden.Contains(li)) lToV[li] = -1;
+                else { lToV[li] = vr; visual[vr++] = li; }
+            }
+            _visualRows      = visual;
+            _logicalToVisual = lToV;
+        }
+
+        private void ToggleFold(int li)
+        {
+            if (!_foldStartToEnd.ContainsKey(li)) return;
+            int end = _foldStartToEnd[li];
+            if (_foldedLines.Contains(li)) _foldedLines.Remove(li);
+            else
+            {
+                _foldedLines.Add(li);
+                if (_cursor.Line > li && _cursor.Line <= end)
+                    _cursor = new Coords(li, _lines[li].Count);
+            }
+            RebuildVisualRows();
+        }
+
         // ── Rendering ────────────────────────────────────────────────────────
         private unsafe void RenderContent()
         {
@@ -889,18 +977,21 @@ namespace GameEditor.CodeEditor
 
             float contentLeft = winPos.X + _gutterW;
 
-            // Determine visible line range
-            int firstLine = (int)MathF.Floor(_scrollY / _charH);
-            int lastLine  = (int)MathF.Ceiling((_scrollY + winSize.Y) / _charH);
-            firstLine = Math.Clamp(firstLine, 0, _lines.Count - 1);
-            lastLine  = Math.Clamp(lastLine,  0, _lines.Count - 1);
+            // Ensure fold/visual-row state is current
+            if (_logicalToVisual.Length != _lines.Count || _foldVersion != _textVersion)
+                RebuildVisualRows();
+
+            int vrCount = _visualRows.Length;
+            int firstVR = vrCount > 0 ? Math.Clamp((int)MathF.Floor(_scrollY / _charH), 0, vrCount - 1) : 0;
+            int lastVR  = vrCount > 0 ? Math.Clamp((int)MathF.Ceiling((_scrollY + winSize.Y) / _charH), 0, vrCount - 1) : 0;
 
             Coords selMin = _selStart <= _selEnd ? _selStart : _selEnd;
             Coords selMax = _selStart <= _selEnd ? _selEnd   : _selStart;
 
-            for (int li = firstLine; li <= lastLine; li++)
+            for (int vr = firstVR; vr <= lastVR; vr++)
             {
-                float lineY = winPos.Y + li * _charH - _scrollY;
+                int li = vrCount > 0 ? _visualRows[vr] : vr;
+                float lineY = winPos.Y + vr * _charH - _scrollY;
 
                 // ── Current-line highlight ───────────────────────────────────
                 if (li == _cursor.Line)
@@ -941,6 +1032,16 @@ namespace GameEditor.CodeEditor
                         new Vector2(numX, lineY),
                         _palette[PaletteIndex.LineNumber],
                         lineNum, null);
+
+                    // Fold arrow for fold-region start lines
+                    if (_foldStartToEnd.TryGetValue(li, out _))
+                    {
+                        bool folded = _foldedLines.Contains(li);
+                        ImDrawList_AddText_Vec2(drawList,
+                            new Vector2(winPos.X + 2f, lineY),
+                            0xFF909090U,
+                            folded ? "\u25b6" : "\u25bc", null);
+                    }
                 }
 
                 // ── Selection background ──────────────────────────────────────
@@ -974,6 +1075,14 @@ namespace GameEditor.CodeEditor
                 var tokRow = (_tokens != null && li < _tokens.Length) ? _tokens[li] : null;
                 DrawGlyphs(drawList, line, tokRow, li, lineY, contentLeft);
 
+                // Fold placeholder
+                if (_foldedLines.Contains(li))
+                {
+                    float px = contentLeft + ColToPixel(li, _lines[li].Count) - _scrollX + 2f;
+                    ImDrawList_AddText_Vec2(drawList, new Vector2(px, lineY),
+                        _palette[PaletteIndex.Comment], " { \u2026 }", null);
+                }
+
                 // ── Error squiggle ────────────────────────────────────────────
                 if (errors.ContainsKey(li))
                     DrawSquiggle(drawList, li, lineY, contentLeft, 0xFF2020FF);
@@ -984,10 +1093,11 @@ namespace GameEditor.CodeEditor
             // ── Cursor ───────────────────────────────────────────────────────
             bool cursorVisible = igIsWindowFocused(ImGuiFocusedFlags.None) &&
                                  (igGetTime() % 1.0) < 0.5;
-            if (cursorVisible)
+            int cursorVR2 = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
+            if (cursorVisible && cursorVR2 >= 0)
             {
                 float cx = contentLeft + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
-                float cy = winPos.Y + _cursor.Line * _charH - _scrollY;
+                float cy = winPos.Y + cursorVR2 * _charH - _scrollY;
                 ImDrawList_AddLine(drawList,
                     new Vector2(cx, cy),
                     new Vector2(cx, cy + _charH),
@@ -999,7 +1109,9 @@ namespace GameEditor.CodeEditor
             {
                 Vector2 mp = default;
                 igGetMousePos(ref mp);
-                int hoverLine = (int)((mp.Y - winPos.Y + _scrollY) / _charH);
+                int hoverVR   = (int)((mp.Y - winPos.Y + _scrollY) / _charH);
+                int hoverLine = (hoverVR >= 0 && hoverVR < _visualRows.Length)
+                              ? _visualRows[hoverVR] : hoverVR;
 
                 bool showedErrorTooltip = false;
                 if (hoverLine >= 0 && hoverLine < _lines.Count)
@@ -1072,7 +1184,7 @@ namespace GameEditor.CodeEditor
             igPopClipRect();
 
             // Invisible dummy for proper scrollbar support: tell ImGui the total content size
-            float totalH = _lines.Count * _charH;
+            float totalH = (_visualRows.Length > 0 ? _visualRows.Length : _lines.Count) * _charH;
             igSetCursorScreenPos(new Vector2(winPos.X, winPos.Y + totalH));
             igDummy(Vector2.Zero);
         }
@@ -1210,8 +1322,12 @@ namespace GameEditor.CodeEditor
             float relY = screenPos.Y - winPos.Y + _scrollY;
             float relX = screenPos.X - contentLeft + _scrollX;
 
-            int line = (int)(relY / _charH);
-            line = Math.Clamp(line, 0, _lines.Count - 1);
+            int rowIdx = (int)(relY / _charH);
+            int line;
+            if (_visualRows.Length > 0)
+            { rowIdx = Math.Clamp(rowIdx, 0, _visualRows.Length - 1); line = _visualRows[rowIdx]; }
+            else
+            { line = Math.Clamp(rowIdx, 0, _lines.Count - 1); }
 
             var ln = _lines[line];
             float x = 0f;
@@ -1282,7 +1398,8 @@ namespace GameEditor.CodeEditor
         // ── Scroll management ─────────────────────────────────────────────────
         private void ScrollToCursor(Vector2 winSize)
         {
-            float cursorPixelY = _cursor.Line * _charH;
+            int   cursorVR     = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
+            float cursorPixelY = (cursorVR >= 0 ? cursorVR : _cursor.Line) * _charH;
             float cursorPixelX = ColToPixel(_cursor.Line, _cursor.Column);
 
             // Vertical
@@ -1635,26 +1752,40 @@ namespace GameEditor.CodeEditor
 
             if (igIsMouseClicked_Bool(ImGuiMouseButton.Left, false))
             {
-                Coords clicked = ScreenToCoords(mp, actualWinPos, contentLeft);
-                if (igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
+                // ── Fold arrow click (gutter) ─────────────────────────────────
+                bool foldHandled = false;
+                if (mp.X >= actualWinPos.X && mp.X < contentLeft && _foldStartToEnd.Count > 0)
                 {
-                    // Select word
-                    _selStart = WordStartBefore(new Coords(clicked.Line, Math.Min(clicked.Column + 1, _lines[clicked.Line].Count)));
-                    _selEnd   = WordEndAfter(clicked);
-                    _cursor   = _selEnd;
+                    int vrG = (int)((mp.Y - actualWinPos.Y + _scrollY) / _charH);
+                    if (_visualRows.Length > 0 && vrG >= 0 && vrG < _visualRows.Length)
+                    {
+                        int foldLi = _visualRows[vrG];
+                        if (_foldStartToEnd.ContainsKey(foldLi)) { ToggleFold(foldLi); foldHandled = true; }
+                    }
                 }
-                else
+                if (!foldHandled)
                 {
-                    bool shift = (io->KeyMods & ImGuiKey.ImGuiMod_Shift) != 0;
-                    if (shift)
-                        ExtendSelection(clicked);
+                    Coords clicked = ScreenToCoords(mp, actualWinPos, contentLeft);
+                    if (igIsMouseDoubleClicked_Nil(ImGuiMouseButton.Left))
+                    {
+                        // Select word
+                        _selStart = WordStartBefore(new Coords(clicked.Line, Math.Min(clicked.Column + 1, _lines[clicked.Line].Count)));
+                        _selEnd   = WordEndAfter(clicked);
+                        _cursor   = _selEnd;
+                    }
                     else
                     {
-                        _cursor   = clicked;
-                        _selStart = clicked;
-                        _selEnd   = clicked;
+                        bool shift = (io->KeyMods & ImGuiKey.ImGuiMod_Shift) != 0;
+                        if (shift)
+                            ExtendSelection(clicked);
+                        else
+                        {
+                            _cursor   = clicked;
+                            _selStart = clicked;
+                            _selEnd   = clicked;
+                        }
+                        _selecting = true;
                     }
-                    _selecting = true;
                 }
             }
 
@@ -2317,7 +2448,8 @@ namespace GameEditor.CodeEditor
 
             // Position below the cursor line
             float popX = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
-            float popY = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 4f;
+            int   cvr19b = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
+            float popY = editorScreenPos.Y + (cvr19b + 1) * _charH - _scrollY + 4f;
             popX = MathF.Max(editorScreenPos.X + _gutterW, popX);
 
             igSetNextWindowPos(new Vector2(popX, popY), ImGuiCond.Always, Vector2.Zero);
@@ -2353,7 +2485,7 @@ namespace GameEditor.CodeEditor
                         _cursor   = new Coords(rLine, rEnd);
                         _selStart = new Coords(rLine, rStart);
                         _selEnd   = _cursor;
-                        _scrollY  = MathF.Max(0f, rLine * _charH - 100f);
+                        _scrollY  = MathF.Max(0f, LineToVisualY(rLine) - 100f);
                     }
                     else
                     {
@@ -2433,7 +2565,8 @@ namespace GameEditor.CodeEditor
 
             // Position the popup below the cursor
             float cx = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
-            float cy = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 2f;
+            int   cvr19a = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
+            float cy = editorScreenPos.Y + (cvr19a + 1) * _charH - _scrollY + 2f;
             cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
 
             igSetNextWindowPos(new Vector2(cx, cy), ImGuiCond.Always, Vector2.Zero);
@@ -2517,10 +2650,11 @@ namespace GameEditor.CodeEditor
                            + (descLines > 0 ? 4f + lineH * descLines : 0f)  // separator + desc
                            + 20f;                                            // window padding
 
+            int   cvr19c  = (_cursor.Line < _logicalToVisual.Length) ? _logicalToVisual[_cursor.Line] : _cursor.Line;
             float cx = editorScreenPos.X + _gutterW
                        + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
-            float cyAbove = editorScreenPos.Y + _cursor.Line * lineH - _scrollY - popupH - 4f;
-            float cyBelow = editorScreenPos.Y + (_cursor.Line + 1) * lineH - _scrollY + 2f;
+            float cyAbove = editorScreenPos.Y + cvr19c * lineH - _scrollY - popupH - 4f;
+            float cyBelow = editorScreenPos.Y + (cvr19c + 1) * lineH - _scrollY + 2f;
             float cy      = cyAbove >= editorScreenPos.Y ? cyAbove : cyBelow;
             cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
 
@@ -2622,5 +2756,6 @@ namespace GameEditor.CodeEditor
 
             igEnd();
         }
+
     }
 }
