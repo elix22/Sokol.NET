@@ -728,8 +728,16 @@ namespace GameEditor.CodeEditor
             }
 
             // ── Signature help tooltip ─────────────────────────────────────────
+            // Validate every frame: scan backward from the cursor to confirm we are
+            // still inside an unclosed '('.  This handles ALL edit paths (backspace,
+            // delete, cut, paste, select+type, undo, etc.) without needing per-operation
+            // intercepts.
             if (_sigHelp != null)
-                RenderSignatureHelp(editorScreenPos);
+            {
+                CheckSigHelpStillValid();
+                if (_sigHelp != null)
+                    RenderSignatureHelp(editorScreenPos);
+            }
         }
 
         // ── Rendering ────────────────────────────────────────────────────────
@@ -1383,7 +1391,7 @@ namespace GameEditor.CodeEditor
                     else if (ch == ')' && _sigParenDepth > 0)
                     {
                         _sigParenDepth--;
-                        if (_sigParenDepth == 0) _sigHelp = null;
+                        // Don't null _sigHelp here — CheckSigHelpStillValid on next frame handles it
                     }
                     else if (ch == ',' && _sigParenDepth > 0)
                     {
@@ -1643,6 +1651,28 @@ namespace GameEditor.CodeEditor
                 for (int si = 0; si < spacesToInsert; si++)
                     InsertChar(' ');
             }
+        }
+
+        // Dismisses signature help if the cursor is no longer inside an unclosed '('.
+        // Called after any deletion so pasting/backspacing the '(' hides the popup.
+        private void CheckSigHelpStillValid()
+        {
+            int caretOff = CaretOffset;
+            string src   = GetText();
+            int depth = 0;
+            for (int i = caretOff - 1; i >= 0; i--)
+            {
+                char c = src[i];
+                if (c == ')') { depth++; continue; }
+                if (c == '(')
+                {
+                    if (depth > 0) { depth--; continue; }
+                    return; // still inside an open paren — keep showing
+                }
+                if (c == ';' || c == '{' || c == '}') break;
+            }
+            // No unclosed '(' found before the cursor.
+            HideSignatureHelp();
         }
 
         private void DeleteCharBefore()
@@ -2068,28 +2098,42 @@ namespace GameEditor.CodeEditor
 
         private void CommitCompletion()
         {
-            if (_completions == null || _completionIdx < 0 || _completionIdx >= _completions.Count)
+            var items = _filteredCompletions ?? _completions;
+            if (items == null || _completionIdx < 0 || _completionIdx >= items.Count)
             {
                 HideCompletions();
                 return;
             }
 
-            string insertText = (_filteredCompletions ?? _completions)[_completionIdx].InsertText;
+            string insertText = items[_completionIdx].InsertText;
+
+            // Replace the full typed span, not just the missing suffix.
+            // This preserves Roslyn's canonical casing, e.g. typing "no" and committing
+            // "Normalize" should yield "Normalize", not "normalize".
+            Coords replaceFrom;
+            Coords replaceTo = _cursor;
+
+            if (_cursor.Line == _completionTriggerLine && _cursor.Column >= _completionTriggerCol)
+            {
+                replaceFrom = new Coords(_completionTriggerLine, _completionTriggerCol);
+            }
+            else
+            {
+                // Fallback for any stale trigger position: replace the current word prefix.
+                var line = _lines[_cursor.Line];
+                int wordStart = _cursor.Column;
+                while (wordStart > 0 && IsWordChar(line[wordStart - 1].Char))
+                    wordStart--;
+                replaceFrom = new Coords(_cursor.Line, wordStart);
+            }
+
             HideCompletions();
 
-            // Find word start before cursor so we replace only the typed prefix
-            var line = _lines[_cursor.Line];
-            int wordStart = _cursor.Column;
-            while (wordStart > 0 && IsWordChar(line[wordStart - 1].Char))
-                wordStart--;
-
-            int alreadyTyped = _cursor.Column - wordStart;
-            string suffix = insertText.Length > alreadyTyped
-                ? insertText.Substring(alreadyTyped)
-                : "";
-
-            if (suffix.Length > 0)
-                InsertText(suffix);
+            if (replaceFrom != replaceTo)
+                DeleteRange(replaceFrom, replaceTo);
+            _cursor = replaceFrom;
+            _selStart = _selEnd = _cursor;
+            InsertText(insertText);
         }
 
         private unsafe void RenderCompletionPopup(Vector2 editorScreenPos)
