@@ -2179,8 +2179,8 @@ namespace GameEditor.CodeEditor
             var @params = sig.Parameters;
             float lineH   = _charH > 0 ? _charH : 18f;
             float popupW  = 440f;
-            // Rough height: signature row + separator + wrapped description (up to 3 lines)
-            float popupH  = lineH * 1.5f + 4f + lineH * 3f + 16f;
+            // Signature row + overload hint + separator + summary (2 lines) + param label + param doc (2 lines) + padding
+            float popupH  = lineH * 1.5f + 4f + lineH * 5f + 24f;
 
             float cx = editorScreenPos.X + _gutterW
                        + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
@@ -2252,15 +2252,36 @@ namespace GameEditor.CodeEditor
             }
 
             // ── Description ──────────────────────────────────────────────────
-            string desc = !string.IsNullOrWhiteSpace(sig.ActiveParamDoc)
-                ? sig.ActiveParamDoc
-                : sig.Summary;
-            if (!string.IsNullOrWhiteSpace(desc))
+            // Show method summary first (like VS Code), then the active param description below.
+            bool hasSummary  = !string.IsNullOrWhiteSpace(sig.Summary);
+            bool hasParamDoc = !string.IsNullOrWhiteSpace(sig.ActiveParamDoc)
+                               && sig.ActiveParamDoc != sig.Summary;
+
+            if (hasSummary || hasParamDoc)
             {
                 igSeparator();
-                igPushStyleColor_Vec4(ImGuiCol.Text, new Vector4(0.90f, 0.90f, 0.90f, 1f));
-                igTextWrapped(desc);
-                igPopStyleColor(1);
+                var descCol  = new Vector4(0.90f, 0.90f, 0.90f, 1f);
+                var labelCol = new Vector4(0.60f, 0.60f, 0.60f, 1f);
+
+                if (hasSummary)
+                {
+                    igPushStyleColor_Vec4(ImGuiCol.Text, descCol);
+                    igTextWrapped(sig.Summary);
+                    igPopStyleColor(1);
+                }
+
+                if (hasParamDoc && sig.ActiveParam >= 0 && sig.ActiveParam < sig.Parameters.Count)
+                {
+                    string paramName = sig.Parameters[sig.ActiveParam].Name;
+                    if (hasSummary) igSpacing();
+                    igPushStyleColor_Vec4(ImGuiCol.Text, activeCol);
+                    igText($"@{paramName}");
+                    igPopStyleColor(1);
+                    igSameLine(0, 6f);
+                    igPushStyleColor_Vec4(ImGuiCol.Text, descCol);
+                    igTextWrapped(sig.ActiveParamDoc);
+                    igPopStyleColor(1);
+                }
             }
 
             igEnd();

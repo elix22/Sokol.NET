@@ -18,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -134,21 +135,23 @@ namespace GameEditor.CodeEditor
             _workspace  = new AdhocWorkspace(host);
             _projectId  = ProjectId.CreateNewId("GameProject");
 
-            // Load references: scan the .NET runtime directory for ALL framework DLLs.
-            // Using AppDomain alone is insufficient — System.Runtime.dll is a type-forwarding
-            // facade in modern .NET, so Roslyn can't resolve types like MathF through it.
-            // Loading from the runtime directory includes System.Private.CoreLib.dll (where
-            // MathF, Math, etc. actually live) and all the standard library facades.
+            // Load references: prefer the SDK reference pack directory over the shared runtime.
+            // Reference packs (packs/Microsoft.NETCore.App.Ref/{ver}/ref/net{major}.{minor}/)
+            // contain reference-only assemblies AND sibling XML documentation files, which the
+            // shared runtime directory does NOT have. This is what enables xmlDoc descriptions.
             string runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+            string refDir     = FindNetRefPackDirectory(runtimeDir) ?? runtimeDir;
+            Console.Error.WriteLine($"[Roslyn] BCL ref dir: {refDir}");
             var runtimeRefs = Directory
-                .GetFiles(runtimeDir, "*.dll", SearchOption.TopDirectoryOnly)
+                .GetFiles(refDir, "*.dll", SearchOption.TopDirectoryOnly)
                 .Where(f =>
                 {
                     string name = Path.GetFileName(f);
                     return !name.StartsWith("api-ms-", StringComparison.OrdinalIgnoreCase)
                         && !name.Contains(".resources.", StringComparison.OrdinalIgnoreCase);
                 })
-                .Select(f => (MetadataReference)MetadataReference.CreateFromFile(f));
+                .Select(f => (MetadataReference)MetadataReference.CreateFromFile(f,
+                    documentation: XmlDocFromSiblingFile(f)));
 
             // Also add non-BCL assemblies already loaded in this AppDomain (game framework,
             // Sokol bindings, etc.) that live outside the runtime directory.
@@ -157,9 +160,11 @@ namespace GameEditor.CodeEditor
                 {
                     if (a.IsDynamic || string.IsNullOrEmpty(a.Location)) return false;
                     string dir = Path.GetDirectoryName(a.Location) ?? "";
-                    return !string.Equals(dir, runtimeDir, StringComparison.OrdinalIgnoreCase);
+                    return !string.Equals(dir, runtimeDir, StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(dir, refDir,     StringComparison.OrdinalIgnoreCase);
                 })
-                .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location));
+                .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location,
+                    documentation: XmlDocFromSiblingFile(a.Location)));
 
             var refs = runtimeRefs.Concat(domainRefs).ToArray();
 
@@ -459,9 +464,6 @@ namespace GameEditor.CodeEditor
 
                 Console.Error.WriteLine($"[Roslyn] sighelp: caretOffset={caretOffset} openParen={openParen} nameEnd={nameEnd} char='{src[nameEnd]}' activeParam={activeParam}");
 
-                // Use SemanticModel + FindToken — more reliable than SymbolFinder at call sites.
-                // SymbolFinder.FindSymbolAtPositionAsync navigates to declarations and can return
-                // null for method references in invocation expressions.
                 var semanticModel = await doc.GetSemanticModelAsync(ct).ConfigureAwait(false);
                 var root          = await doc.GetSyntaxRootAsync(ct).ConfigureAwait(false);
                 if (semanticModel == null || root == null)
@@ -470,40 +472,75 @@ namespace GameEditor.CodeEditor
                     return null;
                 }
 
-                var token = root.FindToken(nameEnd);
-                Console.Error.WriteLine($"[Roslyn] sighelp: token='{token.Text}' parentType={token.Parent?.GetType().Name}");
-
                 IMethodSymbol? methodSym  = null;
                 List<IMethodSymbol>? overloadList = null;
 
-                // Walk up the syntax tree up to 6 levels trying three resolution strategies:
-                //  1. GetSymbolInfo  → exact resolved symbol (works when invocation is complete)
-                //  2. CandidateSymbols → partial resolution (ambiguous overloads)
-                //  3. GetMemberGroup  → all overloads (works even on incomplete invocations)
-                var node = token.Parent;
-                for (int attempt = 0; attempt < 6 && node != null; attempt++)
+                // Strategy 1: find InvocationExpressionSyntax via the '(' token.
+                // This is the most reliable approach — works even for incomplete/error code
+                // because Roslyn's error recovery still builds the full invocation node.
+                var openParenToken = root.FindToken(openParen);
+                var invocation     = openParenToken.Parent?
+                    .AncestorsAndSelf()
+                    .OfType<InvocationExpressionSyntax>()
+                    .FirstOrDefault();
+
+                if (invocation != null)
                 {
-                    var info = semanticModel.GetSymbolInfo(node, ct);
-                    if (info.Symbol is IMethodSymbol ms)
+                    var expr = invocation.Expression;
+                    Console.Error.WriteLine($"[Roslyn] sighelp: invocation expr={expr.GetType().Name} text='{expr}'");
+
+                    // Try GetMemberGroup on the full expression (most reliable for overloads).
+                    var grp = semanticModel.GetMemberGroup(expr, ct).OfType<IMethodSymbol>().ToList();
+                    if (grp.Count > 0) { methodSym = grp[0]; overloadList = grp; }
+
+                    // Try exact symbol + candidate symbols.
+                    if (methodSym == null)
                     {
-                        methodSym = ms;
-                        break;
+                        var si = semanticModel.GetSymbolInfo(expr, ct);
+                        if (si.Symbol is IMethodSymbol ms) { methodSym = ms; }
+                        else
+                        {
+                            var cands = si.CandidateSymbols.OfType<IMethodSymbol>().ToList();
+                            if (cands.Count > 0) { methodSym = cands[0]; overloadList = cands; }
+                        }
                     }
-                    var cands = info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
-                    if (cands.Count > 0)
+
+                    // Case-insensitive fallback: resolve receiver type → look up method by name.
+                    // Handles the common case where the user is still typing (wrong casing, etc.).
+                    if (methodSym == null && expr is MemberAccessExpressionSyntax memberAccess)
                     {
-                        methodSym    = cands[0];
-                        overloadList = cands;
-                        break;
+                        string methodName  = memberAccess.Name.Identifier.Text;
+                        var    receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, ct).Type
+                                             as INamedTypeSymbol;
+                        Console.Error.WriteLine($"[Roslyn] sighelp: fallback name='{methodName}' receiver='{receiverType?.Name}'");
+                        if (receiverType != null)
+                        {
+                            var methods = receiverType.GetMembers()
+                                .OfType<IMethodSymbol>()
+                                .Where(m => string.Equals(m.Name, methodName, StringComparison.OrdinalIgnoreCase)
+                                         && m.MethodKind == MethodKind.Ordinary)
+                                .ToList();
+                            if (methods.Count > 0) { methodSym = methods[0]; overloadList = methods; }
+                        }
                     }
-                    var grp = semanticModel.GetMemberGroup(node, ct).OfType<IMethodSymbol>().ToList();
-                    if (grp.Count > 0)
+                }
+
+                // Strategy 2: token walk from nameEnd (fallback for constructors / simple calls).
+                if (methodSym == null)
+                {
+                    var token = root.FindToken(nameEnd);
+                    Console.Error.WriteLine($"[Roslyn] sighelp: token fallback token='{token.Text}' parentType={token.Parent?.GetType().Name}");
+                    var node = token.Parent;
+                    for (int attempt = 0; attempt < 6 && node != null; attempt++)
                     {
-                        methodSym    = grp[0];
-                        overloadList = grp;
-                        break;
+                        var info = semanticModel.GetSymbolInfo(node, ct);
+                        if (info.Symbol is IMethodSymbol ms) { methodSym = ms; break; }
+                        var cands = info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
+                        if (cands.Count > 0) { methodSym = cands[0]; overloadList = cands; break; }
+                        var grp = semanticModel.GetMemberGroup(node, ct).OfType<IMethodSymbol>().ToList();
+                        if (grp.Count > 0) { methodSym = grp[0]; overloadList = grp; break; }
+                        node = node.Parent;
                     }
-                    node = node.Parent;
                 }
 
                 Console.Error.WriteLine($"[Roslyn] sighelp: symbol='{methodSym?.Name ?? "null"}' overloads={overloadList?.Count ?? (methodSym != null ? 1 : 0)}");
@@ -523,8 +560,9 @@ namespace GameEditor.CodeEditor
                     ?? allOverloads.OrderByDescending(m => m.Parameters.Length).FirstOrDefault()
                     ?? methodSym;
 
-                string xmlDoc          = best.GetDocumentationCommentXml() ?? "";
+                string xmlDoc          = best.GetDocumentationCommentXml(preferredCulture: null, expandIncludes: true, cancellationToken: ct) ?? "";
                 string summary         = ExtractXmlTag(xmlDoc, "summary");
+                Console.Error.WriteLine($"[Roslyn] sighelp: xmlDoc len={xmlDoc.Length} summary='{summary.Replace('\n',' ').Substring(0, Math.Min(80, summary.Length))}'");
                 int    activeIdx       = Math.Min(activeParam, best.Parameters.Length - 1);
                 string activeParamName = activeIdx >= 0 && activeIdx < best.Parameters.Length
                                          ? best.Parameters[activeIdx].Name : "";
@@ -549,6 +587,46 @@ namespace GameEditor.CodeEditor
                 Console.Error.WriteLine($"[Roslyn] GetSignatureHelpAsync ex: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
+        }
+
+        // Returns an XmlDocumentationProvider for the XML file next to a DLL, or null.
+        private static DocumentationProvider XmlDocFromSiblingFile(string dllPath)
+        {
+            string xmlPath = Path.ChangeExtension(dllPath, ".xml");
+            return File.Exists(xmlPath)
+                ? XmlDocumentationProvider.CreateFromFile(xmlPath)
+                : DocumentationProvider.Default;
+        }
+
+        // Locates the SDK reference pack directory for the current runtime, which contains
+        // both reference-only DLLs and their sibling XML documentation files.
+        // e.g. /usr/local/share/dotnet/packs/Microsoft.NETCore.App.Ref/10.0.0/ref/net10.0/
+        private static string? FindNetRefPackDirectory(string runtimeDir)
+        {
+            // runtimeDir: …/shared/Microsoft.NETCore.App/10.0.0  → go up 3 = dotnet root
+            string? dotnetRoot = runtimeDir;
+            for (int i = 0; i < 3 && dotnetRoot != null; i++)
+                dotnetRoot = Path.GetDirectoryName(dotnetRoot);
+            if (dotnetRoot == null) return null;
+
+            string packsDir = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+            if (!Directory.Exists(packsDir)) return null;
+
+            string netTfm        = $"net{Environment.Version.Major}.{Environment.Version.Minor}";
+            string runtimeVersion = Path.GetFileName(runtimeDir); // "10.0.0"
+
+            // Exact version match first.
+            string exactDir = Path.Combine(packsDir, runtimeVersion, "ref", netTfm);
+            if (Directory.Exists(exactDir)) return exactDir;
+
+            // Any pack with matching major.minor, take the highest.
+            string prefix = $"{Environment.Version.Major}.{Environment.Version.Minor}";
+            return Directory.GetDirectories(packsDir)
+                .Where(d => Path.GetFileName(d).StartsWith(prefix))
+                .Select(d => Path.Combine(d, "ref", netTfm))
+                .Where(Directory.Exists)
+                .OrderByDescending(d => d)
+                .FirstOrDefault();
         }
 
         // Extracts the text content of the first XML tag <tag>…</tag> from a doc-comment string.
