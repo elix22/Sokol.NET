@@ -61,6 +61,10 @@ namespace GameEditor.UI
         private static readonly ConcurrentQueue<(string FilePath, IReadOnlyList<BuildDiagnostic> Diags)>
             _pendingRoslynDiags = new();
 
+        // Cross-file navigations arriving from the thread-pool — applied next Draw()
+        private static readonly ConcurrentQueue<(string File, int Line, int Col)>
+            _pendingNavigations = new();
+
         // ── Public API ────────────────────────────────────────────────────────
 
         public static bool IsVisible => _isVisible;
@@ -71,11 +75,13 @@ namespace GameEditor.UI
         /// </summary>
         public static void Open(string filePath)
         {
+            Logger.Info($"[ScriptEditor] Open: {System.IO.Path.GetFileName(filePath)}");
             // Switch to existing tab if already open
             for (int i = 0; i < _tabs.Count; i++)
             {
                 if (string.Equals(_tabs[i].FilePath, filePath, StringComparison.OrdinalIgnoreCase))
                 {
+                    Logger.Info($"[ScriptEditor] Open: already open at tab {i}");
                     _activeTab = i;
                     _isVisible = true;
                     return;
@@ -94,6 +100,32 @@ namespace GameEditor.UI
                 string fp = tab.FilePath;
                 RoslynHost.Instance.UpdateDocument(fp, text, debounceMs: 0);
 
+                // Scan the whole project directory so all .cs files are in the workspace.
+                // This enables cross-file Go-to-Definition and Find-References.
+                string? projectDir = FindProjectDirectory(fp);
+                string? sokolNetHome = FindSokolNetHome();
+                if (projectDir != null || sokolNetHome != null)
+                    Task.Run(() =>
+                    {
+                        if (projectDir != null)
+                        {
+                            Logger.Info($"[ScriptEditor] Scanning project dir: {projectDir}");
+                            RoslynHost.Instance.ScanProjectDirectory(projectDir);
+                        }
+                        // Also scan the Sokol.NET framework source so symbols like
+                        // GameBehaviour.Transform resolve to their .cs source file
+                        // (they are compiled as source via <Compile Include> in Directory.Build.props)
+                        if (sokolNetHome != null)
+                        {
+                            string fwRoot = System.IO.Path.Combine(sokolNetHome, "src", "Framework");
+                            if (Directory.Exists(fwRoot))
+                            {
+                                Logger.Info($"[ScriptEditor] Scanning framework: {fwRoot}");
+                                RoslynHost.Instance.ScanProjectDirectory(fwRoot);
+                            }
+                        }
+                    });
+
                 // Subscribe to Roslyn diagnostics for this editor
                 RoslynHost.Instance.DiagnosticsChanged += (path, diags) =>
                 {
@@ -104,13 +136,24 @@ namespace GameEditor.UI
                 // Wire completion trigger — fires on '.' or Ctrl+Space
                 tab.Editor.CompletionRequested += caretOffset =>
                 {
+                    Logger.Info($"[ScriptEditor] CompletionRequested: {System.IO.Path.GetFileName(fp)} offset={caretOffset}");
                     _ = RoslynHost.Instance.GetCompletionsAsync(fp, caretOffset)
                         .ContinueWith(t =>
                         {
+                            Console.Error.WriteLine($"[ScriptEditor] GetCompletions result: {(t.IsFaulted ? "FAULTED " + t.Exception?.InnerException?.Message : t.Result.Count + " items")}");
                             if (!t.IsFaulted && t.Result.Count > 0)
-                                tab.Editor.ShowCompletions(t.Result);
+                                tab.Editor.ShowCompletions(t.Result, caretOffset);
                         }, System.Threading.Tasks.TaskScheduler.Default);
                 };
+
+                // Set editor file path for Roslyn navigation
+                tab.Editor.FilePath = fp;
+
+                // Cross-file navigation (Go to Definition / Find References result in another file).
+                // The event may fire from a thread-pool thread (Roslyn ContinueWith), so we
+                // enqueue the request and drain it on the render thread in Draw().
+                tab.Editor.NavigationRequested += (targetFile, line, col) =>
+                    _pendingNavigations.Enqueue((targetFile, line, col));
             }
             catch (Exception ex)
             {
@@ -135,6 +178,23 @@ namespace GameEditor.UI
 
             while (_pendingRoslynDiags.TryDequeue(out var ritem))
                 ApplyRoslynDiagnostics(ritem.FilePath, ritem.Diags);
+
+            // Drain cross-file navigation requests queued by the thread-pool
+            while (_pendingNavigations.TryDequeue(out var nav))
+            {
+                Logger.Info($"[ScriptEditor] Navigation dequeued → {System.IO.Path.GetFileName(nav.File)} L{nav.Line}:{nav.Col}");
+                Open(nav.File);
+                for (int ti = 0; ti < _tabs.Count; ti++)
+                {
+                    if (string.Equals(_tabs[ti].FilePath, nav.File, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Info($"[ScriptEditor] ScrollToLine: tab {ti} → L{nav.Line - 1}");
+                        _tabs[ti].Editor.ScrollToLine(nav.Line - 1, nav.Col - 1);
+                        break;
+                    }
+                }
+            }
+
             ImGuiWindowClass cls = default;
             cls.DockingAlwaysTabBar = 1;
             igSetNextWindowClass(&cls);
@@ -466,6 +526,46 @@ namespace GameEditor.UI
                         $"\"{System.IO.Path.GetDirectoryName(path)}\"");
             }
             catch { }
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Walk up from <paramref name="filePath"/> until a directory containing a
+        /// .csproj file is found. Returns that directory, or the file's own directory
+        /// as a fallback.
+        /// </summary>
+        private static string? FindProjectDirectory(string filePath)
+        {
+            string? dir = Path.GetDirectoryName(filePath);
+            while (dir != null)
+            {
+                if (Directory.GetFiles(dir, "*.csproj", SearchOption.TopDirectoryOnly).Length > 0)
+                    return dir;
+                dir = Path.GetDirectoryName(dir);
+            }
+            return Path.GetDirectoryName(filePath);
+        }
+
+        /// <summary>
+        /// Returns the Sokol.NET root dir by reading ~/.sokolnet_config/sokolnet_home,
+        /// which is how the MSBuild SokolNetHome property is resolved at build time.
+        /// </summary>
+        private static string? FindSokolNetHome()
+        {
+            try
+            {
+                string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string configFile = System.IO.Path.Combine(homeDir, ".sokolnet_config", "sokolnet_home");
+                if (File.Exists(configFile))
+                {
+                    string home = File.ReadAllText(configFile, Encoding.UTF8).Trim();
+                    if (Directory.Exists(home))
+                        return home;
+                }
+            }
+            catch { }
+            return null;
         }
 
         // ── Mark dirty when the editor text changes ───────────────────────────

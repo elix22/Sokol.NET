@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using Imgui;
@@ -79,12 +80,27 @@ namespace GameEditor.CodeEditor
         // ── Symbol search results (references / definition) ───────────────────
         private bool   _symResultsOpen;
         private string  _symResultsTitle = "";
-        private readonly List<(int Line, int ColStart, int ColEnd)> _symResults = new();
+        private readonly List<(string FilePath, int Line, int ColStart, int ColEnd)> _symResults = new();
+
+        // ── Roslyn navigation support ─────────────────────────────────────────
+        /// <summary>
+        /// Absolute path of the file this editor is editing.
+        /// Must be set by <see cref="ScriptEditorWindow"/> after calling <see cref="RoslynHost.UpdateDocument"/>.
+        /// </summary>
+        public string? FilePath { get; set; }
+
+        /// <summary>
+        /// Fired when a Roslyn-resolved navigation target is in a different file.
+        /// Arguments: (absoluteFilePath, 1-based line, 1-based column)
+        /// </summary>
+        public event Action<string, int, int>? NavigationRequested;
 
         // ── Autocomplete popup ────────────────────────────────────────────────
         private bool                     _completionVisible;
-        private List<CompletionEntry>?   _completions;
+        private List<CompletionEntry>?   _completions;      // full unfiltered list from Roslyn
+        private List<CompletionEntry>?   _filteredCompletions; // filtered by typed prefix
         private int                       _completionIdx;
+        private int                       _completionTriggerOffset; // caret offset where trigger fired
 
         /// <summary>
         /// Fired when the user triggers completion (`.` typed or Ctrl+Space).
@@ -118,19 +134,79 @@ namespace GameEditor.CodeEditor
         }
 
         /// <summary>Show the autocomplete popup with the given entries.</summary>
-        public void ShowCompletions(IReadOnlyList<CompletionEntry> entries)
+        /// <param name="triggerOffset">Caret byte-offset captured on the render thread when completion was requested.</param>
+        public void ShowCompletions(IReadOnlyList<CompletionEntry> entries, int triggerOffset)
         {
+            Console.Error.WriteLine($"[Editor] ShowCompletions: {entries.Count} items triggerOffset={triggerOffset}");
             if (entries.Count == 0) { _completionVisible = false; return; }
-            _completions = new List<CompletionEntry>(entries);
-            _completionIdx = 0;
-            _completionVisible = true;
+            _completions             = new List<CompletionEntry>(entries);
+            _completionTriggerOffset = triggerOffset;
+            _completionIdx           = 0;
+            _completionVisible       = true;
+            _filteredCompletions     = _completions; // initially no filter
         }
 
         /// <summary>Dismiss the autocomplete popup.</summary>
         public void HideCompletions()
         {
-            _completionVisible = false;
-            _completions = null;
+            _completionVisible    = false;
+            _completions          = null;
+            _filteredCompletions  = null;
+        }
+
+        /// <summary>
+        /// Called each frame while the completion popup is visible.
+        /// Re-filters the completion list by what the user has typed since the trigger.
+        /// </summary>
+        private void UpdateCompletionFilter()
+        {
+            if (_completions == null) return;
+
+            // Extract the prefix typed after the trigger position
+            int triggerLine  = 0, triggerCol = 0;
+            int accumulated  = 0;
+            for (int li = 0; li < _lines.Count; li++)
+            {
+                int lineLen = _lines[li].Count + 1; // +1 for '\n'
+                if (accumulated + lineLen > _completionTriggerOffset)
+                {
+                    triggerLine = li;
+                    triggerCol  = _completionTriggerOffset - accumulated;
+                    break;
+                }
+                accumulated += lineLen;
+            }
+
+            // Only filter when caret is on the same line and hasn't moved left of trigger
+            if (_cursor.Line != triggerLine || _cursor.Column < triggerCol)
+            {
+                Console.Error.WriteLine($"[Editor] Completions hidden: cursor(L{_cursor.Line}:{_cursor.Column}) left trigger(L{triggerLine}:{triggerCol})");
+                HideCompletions();
+                return;
+            }
+
+            string prefix = GetSpanText(triggerLine, triggerCol, _cursor.Column);
+
+            if (string.IsNullOrEmpty(prefix))
+            {
+                _filteredCompletions = _completions;
+            }
+            else
+            {
+                _filteredCompletions = _completions
+                    .Where(e => e.Label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            // Reset selection index if it's now out of range
+            if (_completionIdx >= _filteredCompletions.Count)
+                _completionIdx = 0;
+
+            if (_filteredCompletions.Count == 0)
+            {
+                Console.Error.WriteLine($"[Editor] Completions hidden: no match for prefix '{prefix}'");
+                HideCompletions();
+            }
         }
 
         // ── Construction ─────────────────────────────────────────────────────
@@ -186,6 +262,17 @@ namespace GameEditor.CodeEditor
             if (line < 0 || line >= _lines.Count) return "";
             var sb = new StringBuilder(_lines[line].Count);
             foreach (var g in _lines[line]) sb.Append(g.Char);
+            return sb.ToString();
+        }
+
+        private string GetSpanText(int line, int colStart, int colEnd)
+        {
+            if (line < 0 || line >= _lines.Count) return "";
+            var ln = _lines[line];
+            int start = Math.Clamp(colStart, 0, ln.Count);
+            int end   = Math.Clamp(colEnd,   start, ln.Count);
+            var sb    = new StringBuilder(end - start);
+            for (int ci = start; ci < end; ci++) sb.Append(ln[ci].Char);
             return sb.ToString();
         }
 
@@ -365,35 +452,44 @@ namespace GameEditor.CodeEditor
             if (string.IsNullOrEmpty(word)) return;
 
             _symResults.Clear();
-            _symResultsTitle = $"References to '{word}'";
+            _symResultsTitle  = $"References to '{word}'";
+            _symResultsOpen   = false;
 
-            for (int li = 0; li < _lines.Count; li++)
+            if (FilePath != null)
             {
-                string lineText = GetLineText(li);
-                int idx = 0;
-                while ((idx = lineText.IndexOf(word, idx, StringComparison.Ordinal)) >= 0)
-                {
-                    // Only match whole words
-                    bool beforeOk = idx == 0 || !IsWordChar(lineText[idx - 1]);
-                    bool afterOk  = (idx + word.Length >= lineText.Length) ||
-                                   !IsWordChar(lineText[idx + word.Length]);
-                    if (beforeOk && afterOk)
-                        _symResults.Add((li, idx, idx + word.Length));
-                    idx++;
-                }
+                int offset = CaretOffset;
+                _ = RoslynHost.Instance.GetReferencesAsync(FilePath, offset)
+                    .ContinueWith(t =>
+                    {
+                        if (t.Exception != null || t.Result.Count == 0) return;
+                        _symResults.Clear();
+                        foreach (var loc in t.Result)
+                            _symResults.Add((loc.FilePath, loc.Line - 1, loc.Column - 1, loc.Column - 1 + word.Length));
+                        _symResultsOpen = _symResults.Count > 0;
+                    }, System.Threading.Tasks.TaskScheduler.Default);
             }
-
-            _symResultsOpen = _symResults.Count > 0;
+            else
+            {
+                // Fallback: text search in this file only
+                for (int li = 0; li < _lines.Count; li++)
+                {
+                    string lineText = GetLineText(li);
+                    int idx = 0;
+                    while ((idx = lineText.IndexOf(word, idx, StringComparison.Ordinal)) >= 0)
+                    {
+                        bool beforeOk = idx == 0 || !IsWordChar(lineText[idx - 1]);
+                        bool afterOk  = (idx + word.Length >= lineText.Length) ||
+                                       !IsWordChar(lineText[idx + word.Length]);
+                        if (beforeOk && afterOk)
+                            _symResults.Add((FilePath ?? "", li, idx, idx + word.Length));
+                        idx++;
+                    }
+                }
+                _symResultsOpen = _symResults.Count > 0;
+            }
         }
 
         // ── Go to definition ──────────────────────────────────────────────────
-        // Text-based: looks for 'class/interface/struct/record/enum/void/etc. Word'
-        private static readonly string[] DefinitionKeywords =
-            { "class ", "interface ", "struct ", "record ", "enum ", "delegate ",
-              "void ", "bool ", "int ", "float ", "double ", "string ", "var ",
-              "public ", "private ", "protected ", "internal ", "static ",
-              "override ", "virtual ", "abstract ", "async " };
-
         private void GotoDefinition()
         {
             string word = GetWordUnderCursor();
@@ -401,46 +497,93 @@ namespace GameEditor.CodeEditor
 
             _symResults.Clear();
             _symResultsTitle = $"Definition of '{word}'";
+            _symResultsOpen  = false;
 
-            for (int li = 0; li < _lines.Count; li++)
+            if (FilePath != null)
             {
-                string lineText = GetLineText(li);
-                // Check if this line has a declaration of 'word'
-                // Heuristic: the word appears and a definition keyword precedes it on the same line
-                int idx = lineText.IndexOf(word, StringComparison.Ordinal);
-                while (idx >= 0)
-                {
-                    bool beforeOk = idx == 0 || !IsWordChar(lineText[idx - 1]);
-                    bool afterOk  = (idx + word.Length >= lineText.Length) ||
-                                   !IsWordChar(lineText[idx + word.Length]);
-                    if (beforeOk && afterOk)
+                int offset = CaretOffset;
+                _ = RoslynHost.Instance.GetDefinitionAsync(FilePath, offset)
+                    .ContinueWith(t =>
                     {
-                        string before = lineText.Substring(0, idx);
-                        bool hasDefKw = false;
-                        foreach (var kw in DefinitionKeywords)
-                            if (before.Contains(kw)) { hasDefKw = true; break; }
+                        Console.Error.WriteLine($"[Editor] GotoDefinition: faulted={t.IsFaulted} count={(!t.IsFaulted ? t.Result.Count.ToString() : "N/A")} word='{word}'");
+                        if (t.Exception != null || t.Result.Count == 0) return;
+                        var results = t.Result;
+                        _symResults.Clear();
+                        foreach (var loc in results)
+                        {
+                            Console.Error.WriteLine($"[Editor] GotoDefinition loc: {loc.FilePath} L{loc.Line}");
+                            _symResults.Add((loc.FilePath, loc.Line - 1, loc.Column - 1, loc.Column - 1 + word.Length));
+                        }
 
-                        if (hasDefKw)
-                            _symResults.Add((li, idx, idx + word.Length));
+                        if (results.Count == 1)
+                        {
+                            var loc = results[0];
+                            if (string.Equals(loc.FilePath, FilePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Same file — jump directly
+                                int line = loc.Line - 1;
+                                int col  = loc.Column - 1;
+                                _cursor   = new Coords(line, col + word.Length);
+                                _selStart = new Coords(line, col);
+                                _selEnd   = _cursor;
+                                _scrollY  = MathF.Max(0f, line * _charH - 100f);
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine($"[Editor] GotoDefinition cross-file → {loc.FilePath} L{loc.Line}");
+                                NavigationRequested?.Invoke(loc.FilePath, loc.Line, loc.Column);
+                            }
+                        }
+                        else
+                        {
+                            _symResultsOpen = _symResults.Count > 0;
+                        }
+                    }, System.Threading.Tasks.TaskScheduler.Default);
+            }
+        }
+
+        // ── Go to implementation ──────────────────────────────────────────────
+        private void GotoImplementation()
+        {
+            string word = GetWordUnderCursor();
+            if (string.IsNullOrEmpty(word) || FilePath == null) return;
+
+            _symResults.Clear();
+            _symResultsTitle = $"Implementations of '{word}'";
+            _symResultsOpen  = false;
+
+            int offset = CaretOffset;
+            _ = RoslynHost.Instance.GetDefinitionAsync(FilePath, offset)
+                .ContinueWith(t =>
+                {
+                    if (t.Exception != null || t.Result.Count == 0) return;
+                    var results = t.Result;
+                    _symResults.Clear();
+                    foreach (var loc in results)
+                        _symResults.Add((loc.FilePath, loc.Line - 1, loc.Column - 1, loc.Column - 1 + word.Length));
+
+                    if (results.Count == 1)
+                    {
+                        var loc = results[0];
+                        if (loc.FilePath == FilePath)
+                        {
+                            int line = loc.Line - 1;
+                            int col  = loc.Column - 1;
+                            _cursor   = new Coords(line, col + word.Length);
+                            _selStart = new Coords(line, col);
+                            _selEnd   = _cursor;
+                            _scrollY  = MathF.Max(0f, line * _charH - 100f);
+                        }
+                        else
+                        {
+                            NavigationRequested?.Invoke(loc.FilePath, loc.Line, loc.Column);
+                        }
                     }
-                    idx = lineText.IndexOf(word, idx + 1, StringComparison.Ordinal);
-                }
-            }
-
-            if (_symResults.Count == 1)
-            {
-                // Jump directly if exactly one result
-                var r = _symResults[0];
-                _cursor   = new Coords(r.Line, r.ColEnd);
-                _selStart = new Coords(r.Line, r.ColStart);
-                _selEnd   = _cursor;
-                _scrollY  = MathF.Max(0f, r.Line * _charH - 100f);
-                _symResultsOpen = false;
-            }
-            else
-            {
-                _symResultsOpen = _symResults.Count > 0;
-            }
+                    else
+                    {
+                        _symResultsOpen = _symResults.Count > 0;
+                    }
+                }, System.Threading.Tasks.TaskScheduler.Default);
         }
 
         private void JumpToLine(int line)
@@ -449,6 +592,20 @@ namespace GameEditor.CodeEditor
             _cursor = new Coords(line, Math.Min(_cursor.Column, _lines[line].Count));
             _selStart = _selEnd = _cursor;
             _scrollY = MathF.Max(0f, line * _charH - 100f);
+        }
+
+        /// <summary>
+        /// Scroll to and select the given 0-based line and column.
+        /// Called from <see cref="ScriptEditorWindow"/> after cross-file navigation.
+        /// </summary>
+        public void ScrollToLine(int line, int col = 0)
+        {
+            line = Math.Clamp(line, 0, _lines.Count - 1);
+            col  = Math.Clamp(col,  0, _lines[line].Count);
+            _cursor   = new Coords(line, col);
+            _selStart = _cursor;
+            _selEnd   = _cursor;
+            _scrollY  = MathF.Max(0f, line * _charH - 100f);
         }
 
 
@@ -538,7 +695,11 @@ namespace GameEditor.CodeEditor
 
             // ── Autocomplete popup ─────────────────────────────────────────────
             if (_completionVisible)
-                RenderCompletionPopup(editorScreenPos);
+            {
+                UpdateCompletionFilter();
+                if (_completionVisible)
+                    RenderCompletionPopup(editorScreenPos);
+            }
         }
 
         // ── Rendering ────────────────────────────────────────────────────────
@@ -955,6 +1116,7 @@ namespace GameEditor.CodeEditor
             // ── Ctrl+Space: request completions ───────────────────────────────
             if (ctrl && igIsKeyPressed_Bool(ImGuiKey.Space, false))
             {
+                Console.Error.WriteLine($"[Editor] Ctrl+Space: requesting completions at offset {CaretOffset}");
                 CompletionRequested?.Invoke(CaretOffset);
                 return;
             }
@@ -1116,6 +1278,7 @@ namespace GameEditor.CodeEditor
             // ── Go to line ─────────────────────────────────────────────────────
             else if (ctrl && igIsKeyPressed_Bool(ImGuiKey.G, false))
             {
+                Console.Error.WriteLine("[Editor] Ctrl+G: opening go-to-line");
                 _gotoLineVisible   = true;
                 _gotoLineJustOpened = true;
             }
@@ -1124,10 +1287,11 @@ namespace GameEditor.CodeEditor
             {
                 NavigateToMatch(shift ? -1 : 1);
             }
-            // ── F12 go to definition / Shift+F12 find all references ──────────
+            // ── F12 go to definition / Shift+F12 find all references / Ctrl+F12 go to implementation ──
             else if (igIsKeyPressed_Bool(ImGuiKey.F12, false))
             {
-                if (shift) FindAllReferences();
+                if (ctrl)  GotoImplementation();
+                else if (shift) FindAllReferences();
                 else       GotoDefinition();
             }
             // ── Escape: close overlays ─────────────────────────────────────────
@@ -1152,7 +1316,10 @@ namespace GameEditor.CodeEditor
 
                     // Trigger completion after dot — member-access
                     if (ch == '.')
+                    {
+                        Console.Error.WriteLine($"[Editor] '.' typed: requesting completions at offset {CaretOffset}");
                         CompletionRequested?.Invoke(CaretOffset);
+                    }
                 }
             }
 
@@ -1613,10 +1780,12 @@ namespace GameEditor.CodeEditor
 
             igSeparator();
 
-            if (igMenuItem_Bool("Go to Definition",    "F12",       false, true))
+            if (igMenuItem_Bool("Go to Definition",       "F12",       false, true))
                 GotoDefinition();
-            if (igMenuItem_Bool("Find All References", "Shift+F12", false, true))
+            if (igMenuItem_Bool("Find All References",    "Shift+F12", false, true))
                 FindAllReferences();
+            if (igMenuItem_Bool("Go to Implementation",  "Ctrl+F12",  false, true))
+                GotoImplementation();
 
             igEndPopup();
         }
@@ -1707,6 +1876,7 @@ namespace GameEditor.CodeEditor
                     ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize |
                     ImGuiWindowFlags.NoCollapse   | ImGuiWindowFlags.NoMove))
             {
+                Console.Error.WriteLine($"[Editor] RenderGotoLine: igBegin=false open={open} winPos={winPos} winSz={winSz}");
                 igEnd();
                 if (open == 0) _gotoLineVisible = false;
                 return;
@@ -1718,6 +1888,7 @@ namespace GameEditor.CodeEditor
 
             if (_gotoLineJustOpened)
             {
+                Console.Error.WriteLine($"[Editor] RenderGotoLine: dialog opened winPos={winPos} winSz={winSz}");
                 igSetKeyboardFocusHere(0);
                 _gotoLineJustOpened = false;
             }
@@ -1732,6 +1903,7 @@ namespace GameEditor.CodeEditor
                 int nullIdx = Array.IndexOf(_gotoLineBuf, (byte)0);
                 string raw = System.Text.Encoding.UTF8.GetString(
                     _gotoLineBuf, 0, nullIdx < 0 ? _gotoLineBuf.Length : nullIdx);
+                Console.Error.WriteLine($"[Editor] RenderGotoLine: submitted raw='{raw}' (submitted={submitted})");
                 if (int.TryParse(raw, out int targetLine))
                     JumpToLine(targetLine - 1);
                 _gotoLineVisible = false;
@@ -1755,11 +1927,10 @@ namespace GameEditor.CodeEditor
             // Position below the cursor line
             float popX = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
             float popY = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 4f;
-            // Ensure it doesn't go off screen horizontally
             popX = MathF.Max(editorScreenPos.X + _gutterW, popX);
 
             igSetNextWindowPos(new Vector2(popX, popY), ImGuiCond.Always, Vector2.Zero);
-            igSetNextWindowSize(new Vector2(460f, Math.Min(_symResults.Count * _charH + 40f, 220f)), ImGuiCond.Always);
+            igSetNextWindowSize(new Vector2(520f, Math.Min(_symResults.Count * _charH + 40f, 240f)), ImGuiCond.Always);
 
             byte open = 1;
             if (!igBegin("##symResults", ref open,
@@ -1778,15 +1949,25 @@ namespace GameEditor.CodeEditor
 
             for (int i = 0; i < _symResults.Count; i++)
             {
-                var (rLine, rStart, rEnd) = _symResults[i];
-                string lineText = GetLineText(rLine).Trim();
-                string label    = $"  L{rLine + 1,4}:  {lineText}##sym{i}";
+                var (rFile, rLine, rStart, rEnd) = _symResults[i];
+                bool isSameFile = string.IsNullOrEmpty(rFile) || rFile == FilePath;
+                string lineText = isSameFile ? GetLineText(rLine).Trim() : "";
+                string fileTag  = isSameFile ? "" : $"[{System.IO.Path.GetFileName(rFile)}]  ";
+                string label    = $"  {fileTag}L{rLine + 1,4}:  {lineText}##sym{i}";
+
                 if (igSelectable_Bool(label, false, ImGuiSelectableFlags.None, Vector2.Zero))
                 {
-                    _cursor   = new Coords(rLine, rEnd);
-                    _selStart = new Coords(rLine, rStart);
-                    _selEnd   = _cursor;
-                    _scrollY  = MathF.Max(0f, rLine * _charH - 100f);
+                    if (isSameFile)
+                    {
+                        _cursor   = new Coords(rLine, rEnd);
+                        _selStart = new Coords(rLine, rStart);
+                        _selEnd   = _cursor;
+                        _scrollY  = MathF.Max(0f, rLine * _charH - 100f);
+                    }
+                    else
+                    {
+                        NavigationRequested?.Invoke(rFile, rLine + 1, rStart + 1);
+                    }
                     _symResultsOpen = false;
                 }
             }
@@ -1811,7 +1992,7 @@ namespace GameEditor.CodeEditor
                 return;
             }
 
-            string insertText = _completions[_completionIdx].InsertText;
+            string insertText = (_filteredCompletions ?? _completions)[_completionIdx].InsertText;
             HideCompletions();
 
             // Find word start before cursor so we replace only the typed prefix
@@ -1831,21 +2012,17 @@ namespace GameEditor.CodeEditor
 
         private unsafe void RenderCompletionPopup(Vector2 editorScreenPos)
         {
-            if (!_completionVisible || _completions == null || _completions.Count == 0) return;
+            var items = _filteredCompletions ?? _completions;
+            if (!_completionVisible || items == null || items.Count == 0) return;
 
             const int maxVisible = 8;
             float itemH  = _charH > 0 ? _charH : 16f;
-            float popupW = 300f;
-            float popupH = Math.Min(_completions.Count, maxVisible) * itemH + 8f;
+            float popupW = 340f;
+            float popupH = Math.Min(items.Count, maxVisible) * itemH + 8f;
 
             // Position the popup below the cursor
             float cx = editorScreenPos.X + _gutterW + ColToPixel(_cursor.Line, _cursor.Column) - _scrollX;
             float cy = editorScreenPos.Y + (_cursor.Line + 1) * _charH - _scrollY + 2f;
-
-            // Keep inside window horizontally
-            Vector2 displaySz = default;
-            igGetIO_Nil(); // ensure io is accessible — not needed here
-            // Clamp popup X so it doesn't overflow the right side
             cx = MathF.Max(editorScreenPos.X + _gutterW, cx);
 
             igSetNextWindowPos(new Vector2(cx, cy), ImGuiCond.Always, Vector2.Zero);
@@ -1867,18 +2044,17 @@ namespace GameEditor.CodeEditor
             // Ensure selected item stays visible
             int scrollOffset = Math.Max(0, _completionIdx - maxVisible + 1);
 
-            for (int i = 0; i < _completions.Count; i++)
+            for (int i = 0; i < items.Count; i++)
             {
                 if (i < scrollOffset || i >= scrollOffset + maxVisible) continue;
                 bool selected = i == _completionIdx;
-                var  entry    = _completions[i];
+                var  entry    = items[i];
 
-                // Kind icon using Font Awesome glyph codes
                 string kindIcon = entry.Kind switch
                 {
                     CompletionItemKind.Method or
                     CompletionItemKind.Function or
-                    CompletionItemKind.Constructor  => "\uf013", // cog
+                    CompletionItemKind.Constructor  => "\uf013",
                     CompletionItemKind.Class        => "\uf1c0",
                     CompletionItemKind.Interface    => "\uf0e8",
                     CompletionItemKind.Field or
