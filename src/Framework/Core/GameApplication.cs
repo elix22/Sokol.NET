@@ -129,6 +129,11 @@ namespace GameEditor.Framework.Core
             SceneManager.Play();
         }
 
+        public static void Pause()
+        {
+            SceneManager.Pause();
+        }
+
         // ── Frame ─────────────────────────────────────────────────────────────
 
         /// <summary>

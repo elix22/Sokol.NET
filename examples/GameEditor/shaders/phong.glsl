@@ -42,7 +42,7 @@ void main() {
 @fs phong_fs
 layout(binding=1) uniform phong_fs_params {
     vec4 ambient_and_count;  // xyz = ambient colour,  w = float(light_count)
-    vec4 lights_data[1024];  // 256 lights × 4 vec4s each
+    vec4 lights_data[64];  // 16 lights × 4 vec4s each
 };
 
 in vec3 world_normal;

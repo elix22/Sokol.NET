@@ -83,8 +83,8 @@ namespace GameEditor.Framework.Renderer
 
             sg_apply_pipeline(_pip);
 
-            // Gather up to 256 active lights from ECS (directional / point / spot).
-            const int MaxLights = 256;
+            // Gather up to 16 active lights from ECS (directional / point / spot).
+            const int MaxLights = 16;
             var fsParams = new phong_fs_params_t();
             int lightCount = 0;
 

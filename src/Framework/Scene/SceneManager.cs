@@ -90,6 +90,12 @@ namespace GameEditor.Framework.Scene
         {
             if (PlayMode == PlayModeState.Playing) return;
 
+            if (ActiveScene == null)
+            {
+                Logger.Warning("[SceneManager] No active scene to play.");
+                return;
+            }
+
             if (PlayMode == PlayModeState.Stopped)
             {
                 // Snapshot the scene so we can restore it on Stop()

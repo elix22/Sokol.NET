@@ -625,51 +625,106 @@ namespace GameEditor.UI
         }
 
         /// <summary>
-        /// Draws the world X/Y/Z axis arrows onto an ImDrawList already obtained from the
-        /// scene window, using projected screen-space coordinates.
+        /// Draws the world X/Y/Z axis arrows as a fixed orientation gizmo in the
+        /// top-right corner of the viewport (same region as the orientation cube).
+        /// Perspective foreshortening (axes toward the viewer look longer) and
+        /// negative-end stub circles give an unambiguous 3-D appearance.
         /// </summary>
         private static void DrawWorldAxes(ImDrawList* dl, Vector2 rectMin, Vector2 rectSize)
         {
             if (dl == null) return;
 
-            var vp = Camera.ViewProj;
+            const float CubeSize     = 128f;
+            const float AxisLen      = 38f;    // base length at perpendicular angle
+            const float ArrowSz      = 5f;
+            const float LabelOff     = 8f;
+            const float PerspFactor  = 0.30f;  // >0 → perspective foreshortening strength
+            const float NegStubLen   = 0.45f;  // negative-end stub as fraction of AxisLen
 
-            // Axis endpoints in world space.  Length = 1 world-unit.
-            var origin = Vector3.Zero;
-            (Vector3 dir, uint col, string label)[] axes =
+            var pivot = new Vector2(
+                rectMin.X + rectSize.X - CubeSize * 0.5f,
+                rectMin.Y + CubeSize * 0.5f);
+
+            var view = Camera.View;
+
+            (Vector3 worldDir, uint col, string label)[] axes =
             {
-                (Vector3.UnitX,  0xFF4444FF, "X"),   // red   (ABGR)
-                (Vector3.UnitY,  0xFF44FF44, "Y"),   // green
-                (Vector3.UnitZ,  0xFFFF4444, "Z"),   // blue
+                (Vector3.UnitX, 0xFF4444FF, "X"),   // red   (ABGR)
+                (Vector3.UnitY, 0xFF44FF44, "Y"),   // green
+                (Vector3.UnitZ, 0xFFFF4444, "Z"),   // blue
             };
 
-            const float LineThick  = 2.5f;
-            const float ArrowSize  = 7f;   // half-width of arrowhead base
-            const float LabelOff   = 10f;  // pixels past tip for the label
+            // 6 items: positive arrow tip + negative stub per axis
+            var items = new (Vector2 tip, uint col, string label, float depth, bool isPos)[6];
+            int n = 0;
 
-            var o2d = WorldToScreen(origin, vp, rectMin, rectSize, out bool oFront);
-            if (!oFront) return;   // camera is inside origin — nothing sensible to draw
-
-            foreach (var (dir, col, label) in axes)
+            foreach (var (worldDir, col, label) in axes)
             {
-                var tip2d = WorldToScreen(dir, vp, rectMin, rectSize, out bool tipFront);
-                if (!tipFront) continue;
+                var d = Vector3.TransformNormal(worldDir, view);
+                // d.Z > 0  ⟹ axis points toward the viewer  (camera looks along -Z in camera space)
+                // d.Z < 0  ⟹ axis points away from the viewer
+
+                // Perspective scale: longer when pointing toward viewer, shorter when away
+                float scalePos = MathF.Max(1f + d.Z * PerspFactor, 0.25f);
+                float scaleNeg = MathF.Max(1f - d.Z * PerspFactor, 0.25f);
+
+                // Positive tip (arrow)
+                var posTip  = pivot + new Vector2(d.X, -d.Y) * (AxisLen * scalePos);
+                byte alpha  = d.Z > -0.1f ? (byte)0xFF : (byte)0x88;
+                uint posCol = (col & 0x00FFFFFFu) | ((uint)alpha << 24);
+
+                items[n++] = (posTip, posCol, label, d.Z, true);
+
+                // Negative stub (small circle in the opposite direction)
+                var negTip  = pivot + new Vector2(-d.X, d.Y) * (AxisLen * NegStubLen * scaleNeg);
+                uint negCol = (col & 0x00FFFFFFu) | 0x66000000u;
+
+                items[n++] = (negTip, negCol, "", -d.Z, false);
+            }
+
+            // Insertion sort: ascending depth → back items draw first (back-to-front)
+            for (int i = 1; i < n; i++)
+            {
+                var cur = items[i];
+                int j = i - 1;
+                while (j >= 0 && items[j].depth > cur.depth)
+                { items[j + 1] = items[j]; j--; }
+                items[j + 1] = cur;
+            }
+
+            // Center dot
+            ImDrawList_AddCircleFilled(dl, pivot, 3.5f, 0xFFFFFFFF, 8);
+
+            for (int i = 0; i < n; i++)
+            {
+                var (tip, col, label, _, isPos) = items[i];
+
+                if (!isPos)
+                {
+                    // Negative stub: small filled circle
+                    ImDrawList_AddCircleFilled(dl, tip, 3.5f, col, 8);
+                    continue;
+                }
+
+                var shaft = tip - pivot;
+                float len = shaft.Length();
+                if (len < 1e-4f) continue;
+                shaft /= len;
 
                 // Shaft
-                ImDrawList_AddLine(dl, o2d, tip2d, col, LineThick);
+                ImDrawList_AddLine(dl, pivot, tip, col, 2f);
 
-                // Arrowhead: filled triangle at the tip
-                Vector2 shaft = Vector2.Normalize(tip2d - o2d);
-                Vector2 perp  = new Vector2(-shaft.Y, shaft.X) * ArrowSize;
+                // Arrowhead
+                var perp = new Vector2(-shaft.Y, shaft.X) * ArrowSz;
                 ImDrawList_AddTriangleFilled(dl,
-                    tip2d + shaft * ArrowSize * 1.5f,     // apex
-                    tip2d - perp,                          // base-left
-                    tip2d + perp,                          // base-right
+                    tip + shaft * (ArrowSz * 1.5f),
+                    tip - perp,
+                    tip + perp,
                     col);
 
-                // Label
-                var labelPos = tip2d + shaft * (ArrowSize * 1.5f + LabelOff) - new Vector2(4f, 7f);
-                ImDrawList_AddText_Vec2(dl, labelPos + Vector2.One, 0xFF000000, label, null); // shadow
+                // Label (with drop shadow)
+                var labelPos = tip + shaft * (ArrowSz * 1.5f + LabelOff) - new Vector2(4f, 7f);
+                ImDrawList_AddText_Vec2(dl, labelPos + Vector2.One, 0xFF000000, label, null);
                 ImDrawList_AddText_Vec2(dl, labelPos,               col,         label, null);
             }
         }
