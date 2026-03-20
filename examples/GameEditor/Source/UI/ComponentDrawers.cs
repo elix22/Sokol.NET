@@ -29,6 +29,9 @@ namespace GameEditor.UI
         private static int       _transformUndoId     = -1;
         private static Transform _transformUndoBefore;
 
+        // ── Transform clipboard (copy/paste between entities) ───────────────
+        private static Transform? _transformClipboard = null;
+
         private static int             _cameraUndoId     = -1;
         private static CameraComponent _cameraUndoBefore;
 
@@ -56,7 +59,116 @@ namespace GameEditor.UI
         // ── Transform ───────────────────────────────────────────────────────
         public static void DrawTransform(int id, ref Transform t)
         {
-            if (!igCollapsingHeader_TreeNodeFlags("Transform", ImGuiTreeNodeFlags.DefaultOpen))
+            igCollapsingHeader_TreeNodeFlags("Transform", ImGuiTreeNodeFlags.DefaultOpen);
+            bool headerVisible = igIsItemVisible();
+
+            // Right-click context menu on the Transform header
+            if (igBeginPopupContextItem("##tr_ctx", ImGuiPopupFlags.MouseButtonRight))
+            {
+                if (igMenuItem_Bool("Reset Position", null, false, true))
+                {
+                    var before = t; int cid = id;
+                    t.Position = Vector3.Zero;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Reset Position",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Reset Rotation", null, false, true))
+                {
+                    var before = t; int cid = id;
+                    t.EulerAngles = Vector3.Zero;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Reset Rotation",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Reset Scale", null, false, true))
+                {
+                    var before = t; int cid = id;
+                    t.Scale = Vector3.One;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Reset Scale",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Reset All", null, false, true))
+                {
+                    var before = t; int cid = id;
+                    t.Position = Vector3.Zero; t.EulerAngles = Vector3.Zero; t.Scale = Vector3.One;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Reset Transform",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                igSeparator();
+                if (igMenuItem_Bool("Copy Transform", null, false, true))
+                    _transformClipboard = t;
+                if (igMenuItem_Bool("Paste Transform", null, false, _transformClipboard.HasValue))
+                {
+                    var before = t; int cid = id;
+                    var clip = _transformClipboard!.Value;
+                    t.Position = clip.Position; t.EulerAngles = clip.EulerAngles; t.Scale = clip.Scale;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Paste Transform",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Paste Position", null, false, _transformClipboard.HasValue))
+                {
+                    var before = t; int cid = id;
+                    t.Position = _transformClipboard!.Value.Position;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Paste Position",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Paste Rotation", null, false, _transformClipboard.HasValue))
+                {
+                    var before = t; int cid = id;
+                    t.EulerAngles = _transformClipboard!.Value.EulerAngles;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Paste Rotation",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                if (igMenuItem_Bool("Paste Scale", null, false, _transformClipboard.HasValue))
+                {
+                    var before = t; int cid = id;
+                    t.Scale = _transformClipboard!.Value.Scale;
+                    ECSWorld.Instance.AddComponent(id, t);
+                    EventBus.RaiseComponentChanged(id, nameof(Transform));
+                    var after = t;
+                    UndoStack.RecordAlreadyExecuted(new DelegateCommand("Paste Scale",
+                        () => { ECSWorld.Instance.AddComponent(cid, after);  EventBus.RaiseComponentChanged(cid, nameof(Transform)); },
+                        () => { ECSWorld.Instance.AddComponent(cid, before); EventBus.RaiseComponentChanged(cid, nameof(Transform)); }));
+                    _transformUndoBefore = t;
+                }
+                igEndPopup();
+            }
+
+            if (!headerVisible)
                 return;
 
             // Reset snapshot when switching entity
