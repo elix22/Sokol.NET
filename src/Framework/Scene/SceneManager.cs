@@ -1,5 +1,8 @@
 using System.IO;
+using System.Numerics;
 using GameEditor.Framework.Core;
+using GameEditor.Framework.ECS;
+using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Scripting;
 
 namespace GameEditor.Framework.Scene
@@ -47,6 +50,30 @@ namespace GameEditor.Framework.Scene
             EventBus.RaiseSceneLoaded();
             UndoStack.Clear();
             Logger.Info($"Scene loaded from {path}");
+        }
+
+        public static void LoadSceneFromAssetsAsync(string assetPath)
+        {
+            GameFileSystem.Instance.LoadFile(assetPath, (path, buffer, status) =>
+            {
+                if (status == FileLoadStatus.Success)
+                {
+                    string json = System.Text.Encoding.UTF8.GetString(buffer);
+                    EventBus.RaiseSceneUnloaded();
+                    ActiveScene ??= new Scene("Untitled");
+                    SceneSerializer.Deserialize(json, ActiveScene);
+                    ActiveScene.FilePath = null; // Loaded from assets, not a file path
+                    ActiveScene.IsDirty = false;
+                    EventBus.RaiseSceneLoaded();
+                    UndoStack.Clear();
+                    Logger.Info($"Scene loaded from assets: {assetPath}");
+                }
+                else
+                {
+                    Logger.Warning($"Failed to load scene from assets: {assetPath}");
+                }
+            });
+
         }
 
         public static void SetPlayMode(PlayModeState state)
@@ -120,6 +147,48 @@ namespace GameEditor.Framework.Scene
             }
 
             UndoStack.Clear();
+        }
+
+        public static bool GetMainCameraMatrices(int width, int height,out Matrix4x4 viewProj, out Vector3 eyePos)
+        {
+            viewProj = Matrix4x4.Identity;
+            eyePos = Vector3.Zero;
+            if (width <= 0 || height <= 0) return false;
+
+            var world = ECSWorld.Instance;
+            foreach (int id in world.Entities)
+            {
+                if (!world.TryGetComponent<CameraComponent>(id, out var cam) || !cam.IsMain) continue;
+                if (cam.NearZ <= 0f || cam.FarZ <= cam.NearZ) continue; // skip degenerate projection
+                if (!world.TryGetComponent<Transform>(id, out var tr)) continue;
+
+                Matrix4x4 rotMat = Matrix4x4.CreateFromYawPitchRoll(
+                    tr.EulerAngles.Y * MathF.PI / 180f,
+                    tr.EulerAngles.X * MathF.PI / 180f,
+                    tr.EulerAngles.Z * MathF.PI / 180f);
+
+                // Use the rotation matrix's +Z column as forward (matches gizmo convention)
+                Vector3 forward = new Vector3(rotMat.M31, rotMat.M32, rotMat.M33);
+                Vector3 up = new Vector3(rotMat.M21, rotMat.M22, rotMat.M23);
+
+                eyePos = tr.Position;
+                Matrix4x4 view = Matrix4x4.CreateLookAt(eyePos, eyePos + forward, up);
+                Matrix4x4 proj;
+                if (cam.IsOrthographic)
+                {
+                    float orthoH = MathF.Max(0.01f, cam.OrthoSize > 0f ? cam.OrthoSize : 5f);
+                    float orthoW = orthoH * ((float)width / height);
+                    proj = Matrix4x4.CreateOrthographicOffCenter(-orthoW, orthoW, -orthoH, orthoH, cam.NearZ, cam.FarZ);
+                }
+                else
+                {
+                    float fov = MathF.Max(1f, cam.Fov) * MathF.PI / 180f;
+                    proj = Matrix4x4.CreatePerspectiveFieldOfView(fov, (float)width / height, cam.NearZ, cam.FarZ);
+                }
+                viewProj = view * proj;
+                return true;
+            }
+            return false;
         }
     }
 }

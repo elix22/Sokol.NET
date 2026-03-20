@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using static Sokol.SFetch;
 using static Sokol.SLog;
-
+using static Sokol.Utils;
 namespace GameEditor.Framework.Core
 {
     /// <summary>
@@ -25,17 +25,17 @@ namespace GameEditor.Framework.Core
         public static GameFileSystem Instance => _instance ??= new GameFileSystem();
 
         // ── Configuration ────────────────────────────────────────────────────
-        private const int MaxRequests   = 64;
-        private const int NumChannels   = 2;
-        private const int NumLanes      = 4;
-        private const int DefaultBufSz  = 4 * 1024 * 1024; // 4 MB
+        private const int MaxRequests = 64;
+        private const int NumChannels = 2;
+        private const int NumLanes = 4;
+        private const int DefaultBufSz = 4 * 1024 * 1024; // 4 MB
 
         // ── State ────────────────────────────────────────────────────────────
         private bool _initialized;
 
         // Active requests indexed by sfetch handle id
         private readonly Dictionary<uint, PendingLoad> _active = new();
-        private readonly Queue<PendingLoad>             _queue  = new();
+        private readonly Queue<PendingLoad> _queue = new();
 
         private GameFileSystem() { }
 
@@ -51,8 +51,8 @@ namespace GameEditor.Framework.Core
             {
                 max_requests = MaxRequests,
                 num_channels = NumChannels,
-                num_lanes    = NumLanes,
-                logger       = { func = &slog_func }
+                num_lanes = NumLanes,
+                logger = { func = &slog_func }
             });
             _initialized = true;
             Logger.Info("[GameFileSystem] Initialized.");
@@ -94,8 +94,8 @@ namespace GameEditor.Framework.Core
 
             _queue.Enqueue(new PendingLoad
             {
-                FilePath   = filePath,
-                Callback   = callback,
+                FilePath = filePath,
+                Callback = callback,
                 BufferSize = bufferSize
             });
             FlushQueue();
@@ -114,13 +114,14 @@ namespace GameEditor.Framework.Core
 
         private void StartLoad(PendingLoad load)
         {
-            var buf  = Sokol.SharedBuffer.Create((uint)load.BufferSize);
+            var buf = Sokol.SharedBuffer.Create((uint)load.BufferSize);
             var bufPtr = (void*)buf.GetBufferPointer();
+            string platformPath = util_get_file_path(load.FilePath);
             var handle = sfetch_send(new sfetch_request_t
             {
-                path     = load.FilePath,
+                path = platformPath,
                 callback = &FetchCallback,
-                buffer   = new sfetch_range_t { ptr = bufPtr, size = (nuint)load.BufferSize },
+                buffer = new sfetch_range_t { ptr = bufPtr, size = (nuint)load.BufferSize },
             });
 
             // Store PendingLoad keyed by handle id

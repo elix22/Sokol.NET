@@ -14,8 +14,8 @@ namespace GameEditor.Framework.Core
     {
         public const string ConfigFileName = "config.json";
 
-        public static string?        ProjectFolder { get; private set; }
-        public static ProjectConfig? Config        { get; private set; }
+        public static string? ProjectFolder { get; private set; }
+        public static ProjectConfig? Config { get; private set; }
 
         public static bool HasProject => ProjectFolder != null && Config != null;
 
@@ -40,12 +40,12 @@ namespace GameEditor.Framework.Core
                 var root = doc.RootElement;
 
                 var cfg = new ProjectConfig();
-                if (root.TryGetProperty("version",       out var v))  cfg.Version       = v.GetString()  ?? cfg.Version;
-                if (root.TryGetProperty("projectName",   out var pn)) cfg.ProjectName   = pn.GetString() ?? cfg.ProjectName;
-                if (root.TryGetProperty("defaultScene",  out var ds)) cfg.DefaultScene  = ds.GetString() ?? cfg.DefaultScene;
+                if (root.TryGetProperty("version", out var v)) cfg.Version = v.GetString() ?? cfg.Version;
+                if (root.TryGetProperty("projectName", out var pn)) cfg.ProjectName = pn.GetString() ?? cfg.ProjectName;
+                if (root.TryGetProperty("defaultScene", out var ds)) cfg.DefaultScene = ds.GetString() ?? cfg.DefaultScene;
                 if (root.TryGetProperty("defaultCamera", out var dc)) cfg.DefaultCamera = dc.GetString() ?? cfg.DefaultCamera;
-                if (root.TryGetProperty("screenWidth",   out var sw)) cfg.ScreenWidth   = sw.GetInt32();
-                if (root.TryGetProperty("screenHeight",  out var sh)) cfg.ScreenHeight  = sh.GetInt32();
+                if (root.TryGetProperty("screenWidth", out var sw)) cfg.ScreenWidth = sw.GetInt32();
+                if (root.TryGetProperty("screenHeight", out var sh)) cfg.ScreenHeight = sh.GetInt32();
                 if (root.TryGetProperty("physics", out var phys))
                 {
                     if (phys.TryGetProperty("engine3D", out var e3)) cfg.Physics3D = e3.GetString() ?? cfg.Physics3D;
@@ -53,13 +53,46 @@ namespace GameEditor.Framework.Core
                 }
 
                 ProjectFolder = projectFolder;
-                Config        = cfg;
+                Config = cfg;
                 Logger.Info($"Project loaded: {cfg.ProjectName}  ({projectFolder})");
                 return cfg;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Failed to parse config.json: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static ProjectConfig? LoadFromMemory(byte[]? data)
+        {
+            if (data == null) return null;
+            try
+            {
+                string json = Encoding.UTF8.GetString(data);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var cfg = new ProjectConfig();
+                if (root.TryGetProperty("version", out var v)) cfg.Version = v.GetString() ?? cfg.Version;
+                if (root.TryGetProperty("projectName", out var pn)) cfg.ProjectName = pn.GetString() ?? cfg.ProjectName;
+                if (root.TryGetProperty("defaultScene", out var ds)) cfg.DefaultScene = ds.GetString() ?? cfg.DefaultScene;
+                if (root.TryGetProperty("defaultCamera", out var dc)) cfg.DefaultCamera = dc.GetString() ?? cfg.DefaultCamera;
+                if (root.TryGetProperty("screenWidth", out var sw)) cfg.ScreenWidth = sw.GetInt32();
+                if (root.TryGetProperty("screenHeight", out var sh)) cfg.ScreenHeight = sh.GetInt32();
+                if (root.TryGetProperty("physics", out var phys))
+                {
+                    if (phys.TryGetProperty("engine3D", out var e3)) cfg.Physics3D = e3.GetString() ?? cfg.Physics3D;
+                    if (phys.TryGetProperty("engine2D", out var e2)) cfg.Physics2D = e2.GetString() ?? cfg.Physics2D;
+                }
+
+                Config = cfg;
+                Logger.Info($"Project config loaded from buffer.");
+                return cfg;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to parse config buffer: {ex.Message}");
                 return null;
             }
         }

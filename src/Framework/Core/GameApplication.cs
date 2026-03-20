@@ -55,7 +55,7 @@ namespace GameEditor.Framework.Core
         /// Reads config.json, loads the default scene and wires the Logger to stdout.
         /// Call from your Sokol Init() callback after <see cref="GameFileSystem.Instance.Initialize"/>.
         /// </summary>
-        public static void Init()
+        public static void Init(ProjectConfig? projectConfig = null,bool LoadFromassets = false)
         {
             // Wire logger to stdout so the user sees messages in the console
             Logger.OnLog -= ConsoleLog;
@@ -63,7 +63,7 @@ namespace GameEditor.Framework.Core
 
             string folder = ProjectFolder ?? AppContext.BaseDirectory;
 
-            var cfg = ConfigManager.Load(folder);
+            var cfg = projectConfig ?? ConfigManager.Load(folder);
             if (cfg == null)
             {
                 Logger.Warning("[GameApplication] config.json not found — using defaults.");
@@ -76,6 +76,11 @@ namespace GameEditor.Framework.Core
             // Load default scene
             if (!string.IsNullOrEmpty(cfg.DefaultScene))
             {
+                if(LoadFromassets)
+                {
+                    SceneManager.LoadSceneFromAssetsAsync(cfg.DefaultScene);
+                    return;
+                }
                 string scenePath = Path.IsPathRooted(cfg.DefaultScene)
                     ? cfg.DefaultScene
                     : Path.Combine(folder, cfg.DefaultScene);
