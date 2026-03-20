@@ -597,6 +597,30 @@ namespace GameEditor.UI
 
             if (prefShowing)
             {
+                // ── Appearance ──────────────────────────────────────────────
+                igText("Appearance");
+                igSeparator();
+                igSpacing();
+
+                int themeIdx = System.Array.IndexOf(EditorTheme.Names, EditorTheme.Current);
+                if (themeIdx < 0) themeIdx = 0;
+                igSetNextItemWidth(160f);
+                if (igBeginCombo("GUI Theme##pref_theme", EditorTheme.Names[themeIdx], ImGuiComboFlags.None))
+                {
+                    for (int i = 0; i < EditorTheme.Names.Length; i++)
+                    {
+                        bool sel = i == themeIdx;
+                        if (igSelectable_Bool(EditorTheme.Names[i] + "##th" + i, sel,
+                                ImGuiSelectableFlags.None, Vector2.Zero))
+                            EditorTheme.Apply(EditorTheme.Names[i]);
+                        if (sel) igSetItemDefaultFocus();
+                    }
+                    igEndCombo();
+                }
+
+                igSpacing();
+
+                // ── Font Sizes ───────────────────────────────────────────────
                 igText("Font Sizes");
                 igSeparator();
                 igSpacing();

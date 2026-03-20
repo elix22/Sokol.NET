@@ -56,7 +56,7 @@ public static unsafe class GameeditorApp
         io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         // Keep a visible tab even for single-window dock nodes so panels remain draggable.
         io->ConfigDockingAlwaysTabBar = 1;
-        igStyleColorsDark(null);
+        EditorTheme.Apply(EditorTheme.Current); // default Dark; overridden by RestoreSession
 
         // Swapchain pass: don't clear (passthru dockspace covers it)
         state.swapchain_pass_action = default;

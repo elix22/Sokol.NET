@@ -39,6 +39,9 @@ namespace GameEditor
         // Font sizes
         public float?  UiFontSize      { get; set; }   // Editor UI font size in px; null = 14
         public float?  CodeFontSize    { get; set; }   // Script editor font size in px; null = 14
+
+        // GUI style theme ("Dark", "Light", "Classic")
+        public string? GuiTheme        { get; set; }   // null = "Dark"
     }
 
     // ── AOT-safe JSON context ───────────────────────────────────────────────
@@ -112,6 +115,9 @@ namespace GameEditor
                 _state.UiFontSize   = EditorFonts.UiFontSize;
                 _state.CodeFontSize = EditorFonts.CodeFontSize;
 
+                // Snapshot GUI theme
+                _state.GuiTheme = EditorTheme.Current;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_stateFile)!);
                 string json = JsonSerializer.Serialize(
                     _state,
@@ -143,6 +149,10 @@ namespace GameEditor
                 EditorFonts.UiFontSize = _state.UiFontSize.Value;
             if (_state.CodeFontSize.HasValue && _state.CodeFontSize.Value >= 8f)
                 EditorFonts.CodeFontSize = _state.CodeFontSize.Value;
+
+            // Restore GUI theme
+            if (!string.IsNullOrEmpty(_state.GuiTheme))
+                EditorTheme.Apply(_state.GuiTheme);
 
             // 1. Restore last project
             if (!string.IsNullOrEmpty(_state.LastProjectFolder) &&
