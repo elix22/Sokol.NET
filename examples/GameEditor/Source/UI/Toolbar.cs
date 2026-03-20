@@ -13,7 +13,7 @@ namespace GameEditor.UI
 {
     public static unsafe class Toolbar
     {
-        private enum DialogMode { None, SaveAs, Open, NewProject, OpenProject, ProjectSettings, KeyboardShortcuts }
+        private enum DialogMode { None, SaveAs, Open, NewProject, OpenProject, ProjectSettings, KeyboardShortcuts, Preferences }
         private static DialogMode _dialog = DialogMode.None;
 
         // Which window was focused just before the user pressed Play
@@ -109,6 +109,8 @@ namespace GameEditor.UI
                 igSeparator();
                 if (igMenuItem_Bool("Keyboard Shortcuts...", null, false, true))
                     _dialog = DialogMode.KeyboardShortcuts;
+                if (igMenuItem_Bool("Preferences...", null, false, true))
+                    _dialog = DialogMode.Preferences;
                 igEndMenu();
             }
 
@@ -578,34 +580,92 @@ namespace GameEditor.UI
                 return;
             }
 
-            // ── Window-based dialogs (NewProject, ProjectSettings) ────────────
-            var vp = igGetMainViewport();
-            var center = new Vector2(vp->Pos.X + vp->Size.X * 0.5f,
-                                     vp->Pos.Y + vp->Size.Y * 0.5f);
+        // ── Preferences dialog ──────────────────────────────────────────
+        if (_dialog == DialogMode.Preferences)
+        {
+            var pvp = igGetMainViewport();
+            var pCenter = new Vector2(pvp->Pos.X + pvp->Size.X * 0.5f,
+                                      pvp->Pos.Y + pvp->Size.Y * 0.5f);
+            igSetNextWindowPos(pCenter, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+            igSetNextWindowSize(new Vector2(340, 0), ImGuiCond.Always);
+            byte prefOpen = 1;
+            bool prefShowing = igBegin("Preferences##pref_dlg", ref prefOpen,
+                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize |
+                ImGuiWindowFlags.NoDocking  | ImGuiWindowFlags.NoSavedSettings);
 
-            igSetNextWindowPos(center, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
-            igSetNextWindowSize(Vector2.Zero, ImGuiCond.Always);
+            if (prefOpen == 0) { _dialog = DialogMode.None; igEnd(); return; }
 
-            string title = _dialog switch
+            if (prefShowing)
             {
-                DialogMode.NewProject      => "New Project",
-                DialogMode.ProjectSettings => "Project Settings",
-                _                          => "Dialog"
-            };
+                igText("Font Sizes");
+                igSeparator();
+                igSpacing();
 
-            byte dlgOpen = 1;
-            bool showing = igBegin(title + "##Editor_dlg", ref dlgOpen,
-                ImGuiWindowFlags.NoCollapse       |
-                ImGuiWindowFlags.AlwaysAutoResize |
-                ImGuiWindowFlags.NoDocking        |
-                ImGuiWindowFlags.NoSavedSettings);
+                float uiSize   = EditorFonts.UiFontSize;
+                float codeSize = EditorFonts.CodeFontSize;
 
-            if (dlgOpen == 0) { _dialog = DialogMode.None; igEnd(); return; }
-
-            if (showing)
-            {
-                switch (_dialog)
+                igSetNextItemWidth(160f);
+                if (igSliderFloat("UI Font Size##pref_ui", ref uiSize, 8f, 32f, "%.0f px", ImGuiSliderFlags.None))
                 {
+                    EditorFonts.UiFontSize   = uiSize;
+                    EditorFonts.RebuildRequested = true;
+                }
+                if (igIsItemHovered(ImGuiHoveredFlags.None))
+                    igSetTooltip("Also: Ctrl + / Ctrl -  in the viewport");
+
+                igSetNextItemWidth(160f);
+                if (igSliderFloat("Code Font Size##pref_code", ref codeSize, 8f, 32f, "%.0f px", ImGuiSliderFlags.None))
+                {
+                    EditorFonts.CodeFontSize = codeSize;
+                    EditorFonts.RebuildRequested = true;
+                }
+
+                igSpacing();
+                if (igButton("Reset##pref_rst", new Vector2(80, 0)))
+                {
+                    EditorFonts.UiFontSize   = 14f;
+                    EditorFonts.CodeFontSize = 14f;
+                    EditorFonts.RebuildRequested = true;
+                }
+                igSameLine(0, 10);
+                if (igButton("Close##pref_close", new Vector2(80, 0)))
+                {
+                    EditorPersistence.Save();
+                    _dialog = DialogMode.None;
+                }
+            }
+            igEnd();
+            return;
+        }
+
+        // ── Window-based dialogs (NewProject, ProjectSettings) ──────────────
+        var vp = igGetMainViewport();
+        var center = new Vector2(vp->Pos.X + vp->Size.X * 0.5f,
+                                 vp->Pos.Y + vp->Size.Y * 0.5f);
+
+        igSetNextWindowPos(center, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+        igSetNextWindowSize(Vector2.Zero, ImGuiCond.Always);
+
+        string title = _dialog switch
+        {
+            DialogMode.NewProject      => "New Project",
+            DialogMode.ProjectSettings => "Project Settings",
+            _                          => "Dialog"
+        };
+
+        byte dlgOpen = 1;
+        bool showing = igBegin(title + "##Editor_dlg", ref dlgOpen,
+            ImGuiWindowFlags.NoCollapse       |
+            ImGuiWindowFlags.AlwaysAutoResize |
+            ImGuiWindowFlags.NoDocking        |
+            ImGuiWindowFlags.NoSavedSettings);
+
+        if (dlgOpen == 0) { _dialog = DialogMode.None; igEnd(); return; }
+
+        if (showing)
+        {
+            switch (_dialog)
+            {
                     case DialogMode.NewProject:
                     {
                         igText("Name:");

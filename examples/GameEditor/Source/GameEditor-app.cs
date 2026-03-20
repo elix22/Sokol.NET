@@ -45,57 +45,13 @@ public static unsafe class GameeditorApp
             logger = { func = &slog_func }
         });
 
+        // Restore font size preferences before building the atlas.
+        EditorPersistence.Load();
+
         // Load Roboto Regular (Apache 2.0 — free for commercial use) as the UI font.
         // Must be done after simgui_setup() and before the first simgui_new_frame().
         var io = igGetIO_Nil();
-        string fontPath = System.IO.Path.Combine(
-            System.AppContext.BaseDirectory, "fonts", "Roboto-Regular.ttf");
-        if (System.IO.File.Exists(fontPath))
-        {
-            ushort rangeEnd = 0;  // null-terminator — use default glyph range (Latin + common symbols)
-            ImFontAtlas_AddFontFromFileTTF(io->Fonts, fontPath, 14.0f, null, ref rangeEnd);
-
-            // Merge Font Awesome icons onto Roboto (same font size, merge mode)
-            string iconFontPath = System.IO.Path.Combine(
-                System.AppContext.BaseDirectory, "fonts", "fa-solid-900.ttf");
-            if (System.IO.File.Exists(iconFontPath))
-            {
-                const float fontSize = 14.0f; // must match Roboto size so icons are same height as text
-                const float iconAdvance = fontSize + 2f; // 2px wider than text = right buffer prevents right-bleed
-                var cfg = new Imgui.ImFontConfig
-                {
-                    MergeMode          = 1,           // merge into previous font
-                    PixelSnapH         = 1,
-                    OversampleH        = 3,           // must be non-zero
-                    OversampleV        = 1,           // must be non-zero
-                    RasterizerMultiply = 1.0f,        // C# zero-init → 0.0f = invisible; must be 1.0f
-                    RasterizerDensity  = 1.0f,        // must be > 0
-                    GlyphMinAdvanceX   = iconAdvance, // monospace: min advance
-                    GlyphMaxAdvanceX   = iconAdvance, // monospace: max advance (strictly 16px)
-                    GlyphOffset        = new System.Numerics.Vector2(1f, 0f), // 1px left-pad prevents left-bearing bleed into preceding char
-                };
-                // Pin the FA glyph range (U+F000–U+F8FF) in a SharedBuffer so the
-                // pointer stays valid until ImGui builds the atlas on the first frame.
-                _iconGlyphRange = SharedBuffer.Create(6u); // 3 × ushort
-                var rgBuf = _iconGlyphRange.Buffer;
-                rgBuf[0] = 0x00; rgBuf[1] = 0xF0; // 0xF000 little-endian
-                rgBuf[2] = 0xFF; rgBuf[3] = 0xF8; // 0xF8FF little-endian
-                rgBuf[4] = 0x00; rgBuf[5] = 0x00; // null terminator
-                ushort* iconRange = (ushort*)_iconGlyphRange.GetBufferPointer();
-                cfg.GlyphRanges = iconRange;
-                ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconFontPath, fontSize, &cfg, ref *iconRange);
-            }
-        }
-
-        // Load JetBrains Mono as the code editor font (separate font slot, not merged).
-        string codeFontPath = System.IO.Path.Combine(
-            System.AppContext.BaseDirectory, "fonts", "JetBrainsMono-Regular.ttf");
-        if (System.IO.File.Exists(codeFontPath))
-        {
-            ushort rangeEnd = 0;
-            EditorFonts.CodeFont = ImFontAtlas_AddFontFromFileTTF(
-                io->Fonts, codeFontPath, 14.0f, null, ref rangeEnd);
-        }
+        LoadFonts(io, EditorFonts.UiFontSize, EditorFonts.CodeFontSize);
 
         io->ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         // Keep a visible tab even for single-window dock nodes so panels remain draggable.
@@ -116,11 +72,69 @@ public static unsafe class GameeditorApp
 
         _ = EditorState.SelectedEntity; // trigger static ctor
 
-        // Restore last project + scene from previous session
-        EditorPersistence.Load();
+        // Restore last project + scene from previous session (EditorPersistence.Load already called above)
         EditorPersistence.RestoreSession();
 
         Logger.Info("GameEditor initialized.");
+    }
+
+    /// <summary>
+    /// Clears the ImGui font atlas and re-adds Roboto+FA (UI) and JetBrains Mono (code)
+    /// at the requested pixel sizes. Keeps _iconGlyphRange pinned so the pointer survives
+    /// until simgui_new_frame rebuilds the atlas texture.
+    /// </summary>
+    private static void LoadFonts(Imgui.ImGuiIO* io, float uiSize, float codeSize)
+    {
+        // Clamp to sensible range
+        uiSize   = Math.Clamp(uiSize,   8f, 48f);
+        codeSize = Math.Clamp(codeSize, 8f, 48f);
+
+        string fontsDir = System.IO.Path.Combine(System.AppContext.BaseDirectory, "fonts");
+        string roboPath = System.IO.Path.Combine(fontsDir, "Roboto-Regular.ttf");
+        if (System.IO.File.Exists(roboPath))
+        {
+            ushort rangeEnd = 0;
+            ImFontAtlas_AddFontFromFileTTF(io->Fonts, roboPath, uiSize, null, ref rangeEnd);
+
+            string iconPath = System.IO.Path.Combine(fontsDir, "fa-solid-900.ttf");
+            if (System.IO.File.Exists(iconPath))
+            {
+                float iconAdv = uiSize + 2f;
+                var cfg = new Imgui.ImFontConfig
+                {
+                    MergeMode          = 1,
+                    PixelSnapH         = 1,
+                    OversampleH        = 3,
+                    OversampleV        = 1,
+                    RasterizerMultiply = 1.0f,
+                    RasterizerDensity  = 1.0f,
+                    GlyphMinAdvanceX   = iconAdv,
+                    GlyphMaxAdvanceX   = iconAdv,
+                    GlyphOffset        = new Vector2(1f, 0f),
+                };
+                // Re-pin glyph range buffer — must stay alive until atlas is built.
+                _iconGlyphRange?.Dispose();
+                _iconGlyphRange = SharedBuffer.Create(6u);
+                var rgBuf = _iconGlyphRange.Buffer;
+                rgBuf[0] = 0x00; rgBuf[1] = 0xF0;
+                rgBuf[2] = 0xFF; rgBuf[3] = 0xF8;
+                rgBuf[4] = 0x00; rgBuf[5] = 0x00;
+                ushort* iconRange = (ushort*)_iconGlyphRange.GetBufferPointer();
+                cfg.GlyphRanges = iconRange;
+                ImFontAtlas_AddFontFromFileTTF(io->Fonts, iconPath, uiSize, &cfg, ref *iconRange);
+            }
+        }
+
+        string codeFontPath = System.IO.Path.Combine(fontsDir, "JetBrainsMono-Regular.ttf");
+        if (System.IO.File.Exists(codeFontPath))
+        {
+            ushort rangeEnd = 0;
+            EditorFonts.CodeFont = ImFontAtlas_AddFontFromFileTTF(
+                io->Fonts, codeFontPath, codeSize, null, ref rangeEnd);
+        }
+
+        EditorFonts.UiFontSize   = uiSize;
+        EditorFonts.CodeFontSize = codeSize;
     }
 
     [UnmanagedCallersOnly]
@@ -188,6 +202,9 @@ public static unsafe class GameeditorApp
             sg_end_pass();
         }
 
+        // --- Apply UI font size (ImGui 1.92: dynamic atlas — no rebuild needed, just set FontSizeBase) ---
+        igGetStyle()->FontSizeBase = EditorFonts.UiFontSize;
+
         // --- ImGui frame on swapchain ---
         sg_begin_pass(new sg_pass
         {
@@ -209,7 +226,8 @@ public static unsafe class GameeditorApp
         // Gizmo operation shortcuts — checked via ImGui key state (supports user rebinding)
         unsafe
         {
-            if (igGetIO_Nil()->WantTextInput == 0 && SceneManager.PlayMode != PlayModeState.Playing)
+            var kio = igGetIO_Nil();
+            if (kio->WantTextInput == 0 && SceneManager.PlayMode != PlayModeState.Playing)
             {
                 if      (KeyBindings.IsPressed(KeyBindings.GizmoTranslate))
                     EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Translate;
@@ -217,6 +235,34 @@ public static unsafe class GameeditorApp
                     EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Rotate;
                 else if (KeyBindings.IsPressed(KeyBindings.GizmoScale))
                     EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Scale;
+
+                // Ctrl+= (same physical key as +) and Ctrl+- — resize UI font
+                if (kio->KeyCtrl != 0)
+                {
+                    bool plusPressed  = igIsKeyPressed_Bool(ImGuiKey.Equal, false) ||
+                                       igIsKeyPressed_Bool(ImGuiKey.KeypadAdd, false);
+                    bool minusPressed = igIsKeyPressed_Bool(ImGuiKey.Minus, false) ||
+                                       igIsKeyPressed_Bool(ImGuiKey.KeypadSubtract, false);
+                    if (plusPressed || minusPressed)
+                    {
+                        float newSize = EditorFonts.UiFontSize + (plusPressed ? 1f : -1f);
+                        newSize = Math.Clamp(newSize, 8f, 48f);
+                        if (newSize != EditorFonts.UiFontSize)
+                        {
+                            EditorFonts.UiFontSize   = newSize;
+                            EditorFonts.RebuildRequested = true;
+                            EditorPersistence.Save();
+                        }
+                    }
+                }
+
+                // F — frame / focus selected entity in scene window
+                if (SceneWindow.IsWindowFocused &&
+                    igIsKeyPressed_Bool(ImGuiKey.F, false) &&
+                    EditorState.SelectionCount > 0)
+                {
+                    SceneWindow.FrameSelection();
+                }
             }
         }
 

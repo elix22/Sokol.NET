@@ -67,6 +67,39 @@ namespace GameEditor.UI
             igSetWindowFocus_Str("Scene");
         }
 
+        /// <summary>
+        /// Moves the viewport camera to frame all currently selected entities
+        /// (like F in Unity/Godot). The camera orbits around the selection centroid
+        /// at a distance proportional to the largest entity extent.
+        /// </summary>
+        public static void FrameSelection()
+        {
+            var world = ECSWorld.Instance;
+            Vector3 center = Vector3.Zero;
+            float   maxExt = 0f;
+            int     count  = 0;
+
+            foreach (int id in EditorState.SelectedEntities)
+            {
+                if (!world.TryGetComponent<Transform>(id, out var tr)) continue;
+                center += tr.Position;
+                // Use the largest scale component as a rough extent proxy
+                float ext = MathF.Max(MathF.Max(MathF.Abs(tr.Scale.X),
+                                                MathF.Abs(tr.Scale.Y)),
+                                      MathF.Abs(tr.Scale.Z));
+                maxExt = MathF.Max(maxExt, ext);
+                count++;
+            }
+
+            if (count == 0) return;
+
+            center /= count;
+            float dist = MathF.Max(2f, maxExt * 3f);
+
+            Camera.Center   = center;
+            Camera.Distance = dist;
+        }
+
         public static void Draw()
         {
             ImGuiWindowClass sceneClass = default;

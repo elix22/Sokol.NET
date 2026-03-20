@@ -35,6 +35,10 @@ namespace GameEditor
         public int?    OverlayFlags    { get; set; }   // GizmoOverlayFlags bitmask; null = use default
         public int?    GizmoOperation  { get; set; }   // ImGuizmo.Operation; null = use default (Translate)
         public int?    GizmoMode       { get; set; }   // ImGuizmo.Mode;      null = use default (World)
+
+        // Font sizes
+        public float?  UiFontSize      { get; set; }   // Editor UI font size in px; null = 14
+        public float?  CodeFontSize    { get; set; }   // Script editor font size in px; null = 14
     }
 
     // ── AOT-safe JSON context ───────────────────────────────────────────────
@@ -104,6 +108,10 @@ namespace GameEditor
                 _state.GizmoOperation = (int)EditorState.CurrentGizmoOp;
                 _state.GizmoMode      = (int)EditorState.CurrentGizmoMode;
 
+                // Snapshot font sizes
+                _state.UiFontSize   = EditorFonts.UiFontSize;
+                _state.CodeFontSize = EditorFonts.CodeFontSize;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_stateFile)!);
                 string json = JsonSerializer.Serialize(
                     _state,
@@ -129,6 +137,12 @@ namespace GameEditor
                 EditorState.CurrentGizmoOp = (Imgui.ImGuizmo.Operation)_state.GizmoOperation.Value;
             if (_state.GizmoMode.HasValue)
                 EditorState.CurrentGizmoMode = (Imgui.ImGuizmo.Mode)_state.GizmoMode.Value;
+
+            // Restore font sizes (actual atlas rebuild happens in Frame() / LoadFonts)
+            if (_state.UiFontSize.HasValue && _state.UiFontSize.Value >= 8f)
+                EditorFonts.UiFontSize = _state.UiFontSize.Value;
+            if (_state.CodeFontSize.HasValue && _state.CodeFontSize.Value >= 8f)
+                EditorFonts.CodeFontSize = _state.CodeFontSize.Value;
 
             // 1. Restore last project
             if (!string.IsNullOrEmpty(_state.LastProjectFolder) &&

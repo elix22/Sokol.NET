@@ -838,7 +838,7 @@ namespace GameEditor.CodeEditor
             var cf = GameEditor.EditorFonts.CodeFont;
             if (cf != null)
             {
-                igPushFont(cf, 0f); // 0f = use font's built-in size
+                igPushFont(cf, GameEditor.EditorFonts.CodeFontSize);
                 pushedFont = true;
             }
 
