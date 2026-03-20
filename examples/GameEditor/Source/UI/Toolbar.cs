@@ -23,12 +23,18 @@ namespace GameEditor.UI
 
         // Project Settings edit buffers
         private static byte[] _cfgNameBuf   = new byte[128];
-        private static byte[] _cfgSceneBuf  = new byte[256];
-        private static byte[] _cfgCamBuf    = new byte[128];
         private static int    _cfgWidth     = 1280;
         private static int    _cfgHeight    = 720;
-        private static byte[] _cfgPhys3DBuf = new byte[32];
-        private static byte[] _cfgPhys2DBuf = new byte[32];
+
+        // Project Settings dropdown state
+        private static string[]  _psSceneFiles    = System.Array.Empty<string>();
+        private static int       _psSceneIdx      = 0;
+        private static string[]  _psCameraNames   = System.Array.Empty<string>();
+        private static int       _psCameraIdx     = 0;
+        private static int       _psPhys3DIdx     = 0;
+        private static int       _psPhys2DIdx     = 0;
+        private static readonly string[] _psPhys3DOptions = { "none", "jolt" };
+        private static readonly string[] _psPhys2DOptions = { "none", "box2d" };
 
         // Keyboard-shortcuts dialog recording state
         private static string?  _recordingAction = null;
@@ -315,13 +321,30 @@ namespace GameEditor.UI
                 var cfg = ConfigManager.Config;
                 if (cfg != null)
                 {
-                    FillBuffer(ref _cfgNameBuf,   cfg.ProjectName);
-                    FillBuffer(ref _cfgSceneBuf,  cfg.DefaultScene);
-                    FillBuffer(ref _cfgCamBuf,    cfg.DefaultCamera);
+                    FillBuffer(ref _cfgNameBuf, cfg.ProjectName);
                     _cfgWidth  = cfg.ScreenWidth;
                     _cfgHeight = cfg.ScreenHeight;
-                    FillBuffer(ref _cfgPhys3DBuf, cfg.Physics3D);
-                    FillBuffer(ref _cfgPhys2DBuf, cfg.Physics2D);
+
+                    // Discover scene files and match current value
+                    _psSceneFiles = DiscoverSceneFiles();
+                    _psSceneIdx   = 0;
+                    for (int i = 0; i < _psSceneFiles.Length; i++)
+                        if (string.Equals(_psSceneFiles[i], cfg.DefaultScene, StringComparison.OrdinalIgnoreCase))
+                        { _psSceneIdx = i; break; }
+
+                    // Discover cameras in the selected scene
+                    string? sel = _psSceneFiles.Length > 0 ? _psSceneFiles[_psSceneIdx] : null;
+                    _psCameraNames = DiscoverCameraNames(sel);
+                    _psCameraIdx   = 0;
+                    for (int i = 0; i < _psCameraNames.Length; i++)
+                        if (string.Equals(_psCameraNames[i], cfg.DefaultCamera, StringComparison.OrdinalIgnoreCase))
+                        { _psCameraIdx = i; break; }
+
+                    // Match physics engine options
+                    _psPhys3DIdx = System.Array.IndexOf(_psPhys3DOptions, cfg.Physics3D);
+                    if (_psPhys3DIdx < 0) _psPhys3DIdx = 0;
+                    _psPhys2DIdx = System.Array.IndexOf(_psPhys2DOptions, cfg.Physics2D);
+                    if (_psPhys2DIdx < 0) _psPhys2DIdx = 0;
                 }
             }
         }
@@ -607,16 +630,50 @@ namespace GameEditor.UI
                         igSetNextItemWidth(260f);
                         igInputText("##psName", ref _cfgNameBuf[0], (uint)_cfgNameBuf.Length,
                             ImGuiInputTextFlags.None, null, null);
+
+                        // Default Scene dropdown
                         igText("Default Scene:");
                         igSameLine(0, 6);
                         igSetNextItemWidth(260f);
-                        igInputText("##psScene", ref _cfgSceneBuf[0], (uint)_cfgSceneBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
+                        string scenePreview = _psSceneFiles.Length > 0 ? _psSceneFiles[_psSceneIdx] : "(no scenes found)";
+                        if (igBeginCombo("##psScene", scenePreview, ImGuiComboFlags.None))
+                        {
+                            for (int i = 0; i < _psSceneFiles.Length; i++)
+                            {
+                                bool scSel = i == _psSceneIdx;
+                                if (igSelectable_Bool(_psSceneFiles[i] + "##sc" + i, scSel,
+                                        ImGuiSelectableFlags.None, Vector2.Zero))
+                                {
+                                    if (_psSceneIdx != i)
+                                    {
+                                        _psSceneIdx    = i;
+                                        _psCameraNames = DiscoverCameraNames(_psSceneFiles[_psSceneIdx]);
+                                        _psCameraIdx   = 0;
+                                    }
+                                }
+                                if (scSel) igSetItemDefaultFocus();
+                            }
+                            igEndCombo();
+                        }
+
+                        // Default Camera dropdown
                         igText("Default Camera:");
                         igSameLine(0, 6);
                         igSetNextItemWidth(260f);
-                        igInputText("##psCam", ref _cfgCamBuf[0], (uint)_cfgCamBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
+                        string camPreview = _psCameraNames.Length > 0 ? _psCameraNames[_psCameraIdx] : "(no cameras found)";
+                        if (igBeginCombo("##psCam", camPreview, ImGuiComboFlags.None))
+                        {
+                            for (int i = 0; i < _psCameraNames.Length; i++)
+                            {
+                                bool camSel = i == _psCameraIdx;
+                                if (igSelectable_Bool(_psCameraNames[i] + "##cam" + i, camSel,
+                                        ImGuiSelectableFlags.None, Vector2.Zero))
+                                    _psCameraIdx = i;
+                                if (camSel) igSetItemDefaultFocus();
+                            }
+                            igEndCombo();
+                        }
+
                         igText("Screen Width:");
                         igSameLine(0, 6);
                         igSetNextItemWidth(100f);
@@ -625,16 +682,41 @@ namespace GameEditor.UI
                         igSameLine(0, 6);
                         igSetNextItemWidth(100f);
                         igInputInt("##psH", ref _cfgHeight, 1, 10, ImGuiInputTextFlags.None);
+
+                        // Physics 3D dropdown
                         igText("Physics 3D:");
                         igSameLine(0, 6);
                         igSetNextItemWidth(100f);
-                        igInputText("##psP3", ref _cfgPhys3DBuf[0], (uint)_cfgPhys3DBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
+                        if (igBeginCombo("##psP3", _psPhys3DOptions[_psPhys3DIdx], ImGuiComboFlags.None))
+                        {
+                            for (int i = 0; i < _psPhys3DOptions.Length; i++)
+                            {
+                                bool p3Sel = i == _psPhys3DIdx;
+                                if (igSelectable_Bool(_psPhys3DOptions[i] + "##p3" + i, p3Sel,
+                                        ImGuiSelectableFlags.None, Vector2.Zero))
+                                    _psPhys3DIdx = i;
+                                if (p3Sel) igSetItemDefaultFocus();
+                            }
+                            igEndCombo();
+                        }
+
+                        // Physics 2D dropdown
                         igText("Physics 2D:");
                         igSameLine(0, 6);
                         igSetNextItemWidth(100f);
-                        igInputText("##psP2", ref _cfgPhys2DBuf[0], (uint)_cfgPhys2DBuf.Length,
-                            ImGuiInputTextFlags.None, null, null);
+                        if (igBeginCombo("##psP2", _psPhys2DOptions[_psPhys2DIdx], ImGuiComboFlags.None))
+                        {
+                            for (int i = 0; i < _psPhys2DOptions.Length; i++)
+                            {
+                                bool p2Sel = i == _psPhys2DIdx;
+                                if (igSelectable_Bool(_psPhys2DOptions[i] + "##p2" + i, p2Sel,
+                                        ImGuiSelectableFlags.None, Vector2.Zero))
+                                    _psPhys2DIdx = i;
+                                if (p2Sel) igSetItemDefaultFocus();
+                            }
+                            igEndCombo();
+                        }
+
                         igSpacing();
                         if (igButton("Save##psSave", new Vector2(80, 0)))
                         {
@@ -642,12 +724,12 @@ namespace GameEditor.UI
                             if (cfg != null)
                             {
                                 cfg.ProjectName   = GetStringFromBuffer(_cfgNameBuf);
-                                cfg.DefaultScene  = GetStringFromBuffer(_cfgSceneBuf);
-                                cfg.DefaultCamera = GetStringFromBuffer(_cfgCamBuf);
+                                cfg.DefaultScene  = _psSceneFiles.Length  > 0 ? _psSceneFiles[_psSceneIdx]   : "";
+                                cfg.DefaultCamera = _psCameraNames.Length > 0 ? _psCameraNames[_psCameraIdx] : "";
                                 cfg.ScreenWidth   = _cfgWidth;
                                 cfg.ScreenHeight  = _cfgHeight;
-                                cfg.Physics3D     = GetStringFromBuffer(_cfgPhys3DBuf);
-                                cfg.Physics2D     = GetStringFromBuffer(_cfgPhys2DBuf);
+                                cfg.Physics3D     = _psPhys3DOptions[_psPhys3DIdx];
+                                cfg.Physics2D     = _psPhys2DOptions[_psPhys2DIdx];
                                 ConfigManager.Save();
                             }
                             _dialog = DialogMode.None;
@@ -734,6 +816,58 @@ namespace GameEditor.UI
         {
             int len = System.Array.IndexOf(buf, (byte)0);
             return len > 0 ? System.Text.Encoding.UTF8.GetString(buf, 0, len) : string.Empty;
+        }
+
+        /// <summary>Discovers all *.scene.json files relative to the project folder.</summary>
+        private static string[] DiscoverSceneFiles()
+        {
+            string? folder = ConfigManager.ProjectFolder;
+            if (folder == null) return System.Array.Empty<string>();
+            try
+            {
+                string assetsDir = System.IO.Path.Combine(folder, "Assets");
+                string searchDir = System.IO.Directory.Exists(assetsDir) ? assetsDir : folder;
+                var files = System.IO.Directory.GetFiles(searchDir, "*.scene.json",
+                    System.IO.SearchOption.AllDirectories);
+                var result = new string[files.Length];
+                for (int i = 0; i < files.Length; i++)
+                    result[i] = System.IO.Path.GetRelativePath(folder, files[i]).Replace('\\', '/');
+                System.Array.Sort(result);
+                return result;
+            }
+            catch { return System.Array.Empty<string>(); }
+        }
+
+        /// <summary>Parses a scene JSON file and returns the names of entities with a Camera component.</summary>
+        private static string[] DiscoverCameraNames(string? relativeScenePath)
+        {
+            string? folder = ConfigManager.ProjectFolder;
+            if (folder == null || string.IsNullOrEmpty(relativeScenePath))
+                return System.Array.Empty<string>();
+            string fullPath = System.IO.Path.IsPathRooted(relativeScenePath)
+                ? relativeScenePath
+                : System.IO.Path.Combine(folder, relativeScenePath);
+            if (!System.IO.File.Exists(fullPath)) return System.Array.Empty<string>();
+            try
+            {
+                string json = System.IO.File.ReadAllText(fullPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("entities", out var entities))
+                    return System.Array.Empty<string>();
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var entity in entities.EnumerateArray())
+                {
+                    if (!entity.TryGetProperty("c", out var c)) continue;
+                    if (!c.TryGetProperty("Camera", out _)) continue;
+                    string name = "Camera";
+                    if (c.TryGetProperty("NameTag", out var nt) && nt.TryGetProperty("Name", out var nm))
+                        name = nm.GetString() ?? "Camera";
+                    names.Add(name);
+                }
+                return names.ToArray();
+            }
+            catch { return System.Array.Empty<string>(); }
         }
 
         /// <summary>
