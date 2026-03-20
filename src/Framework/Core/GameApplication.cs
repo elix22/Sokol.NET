@@ -52,7 +52,7 @@ namespace GameEditor.Framework.Core
 
         static void RegisterAvailableGameBehaviours()
         {
-            var gameBehaviours = typeof(GameBehaviour).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(GameBehaviour)) && t != typeof(GameBehaviour)).ToArray();
+            var gameBehaviours = typeof(GameBehaviour).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(GameBehaviour)) && t != typeof(GameBehaviour));
             foreach (var gameBehaviour in gameBehaviours)
             {
                 ScriptSystem.RegisterType(gameBehaviour.ToString());
