@@ -182,7 +182,6 @@ public static unsafe class GameeditorApp
             sg_begin_pass(gamePass);
             if (hasCamera)
             {
-                GridRenderer.Draw(gameVP, gameEyePos, 0.1f, 1000f);
                 SceneRenderer.DrawScene(gameVP);
             }
             sg_end_pass();
