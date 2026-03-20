@@ -49,6 +49,15 @@ namespace GameEditor.Framework.Core
         /// </summary>
         public static string? ProjectFolder { get; set; }
 
+
+        static void RegisterAvailableGameBehaviours()
+        {
+            var gameBehaviours = typeof(GameBehaviour).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(GameBehaviour)) && t != typeof(GameBehaviour)).ToArray();
+            foreach (var gameBehaviour in gameBehaviours)
+            {
+                ScriptSystem.RegisterType(gameBehaviour.ToString());
+            }
+        }
         // ── Init ─────────────────────────────────────────────────────────────
 
         /// <summary>
@@ -57,6 +66,11 @@ namespace GameEditor.Framework.Core
         /// </summary>
         public static void Init(ProjectConfig? projectConfig = null,bool LoadFromassets = false)
         {
+
+#if !GAME_EDITOR
+            RegisterAvailableGameBehaviours();
+#endif
+
             // Wire logger to stdout so the user sees messages in the console
             Logger.OnLog -= ConsoleLog;
             Logger.OnLog += ConsoleLog;

@@ -45,8 +45,13 @@ namespace GameEditor.Framework.Scripting
         public static void RegisterType<T>(string? typeName = null) where T : GameBehaviour, new()
         {
             string key = typeName ?? typeof(T).Name;
-            _factories[key] = static () => new T();
+            _factories[key] = static () => new T(); 
             Logger.Info($"[ScriptSystem] Registered type: {key}");
+        }
+
+        public static void RegisterType(string typeName)
+        {
+            _factories[typeName] = () => Activator.CreateInstance(Type.GetType(typeName)!) as GameBehaviour;
         }
 
         /// <summary>Remove all registered factories (called by GameAssemblyRunner on unload).</summary>
