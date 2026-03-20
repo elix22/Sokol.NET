@@ -19,6 +19,7 @@ using System.Text.Json.Serialization;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Scene;
 using GameEditor.CodeEditor;
+using GameEditor.UI;
 
 namespace GameEditor
 {
@@ -29,6 +30,11 @@ namespace GameEditor
         public string? LastProjectFolder { get; set; }
         public string? LastScenePath     { get; set; }
         public List<string> RecentProjects { get; set; } = new();
+
+        // Editor UI state (overlays, gizmo)
+        public int?    OverlayFlags    { get; set; }   // GizmoOverlayFlags bitmask; null = use default
+        public int?    GizmoOperation  { get; set; }   // ImGuizmo.Operation; null = use default (Translate)
+        public int?    GizmoMode       { get; set; }   // ImGuizmo.Mode;      null = use default (World)
     }
 
     // ── AOT-safe JSON context ───────────────────────────────────────────────
@@ -93,6 +99,11 @@ namespace GameEditor
                 if (scene?.FilePath != null)
                     _state.LastScenePath = scene.FilePath;
 
+                // Snapshot overlay + gizmo state before serialising
+                _state.OverlayFlags   = (int)EditorState.Overlays;
+                _state.GizmoOperation = (int)EditorState.CurrentGizmoOp;
+                _state.GizmoMode      = (int)EditorState.CurrentGizmoMode;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_stateFile)!);
                 string json = JsonSerializer.Serialize(
                     _state,
@@ -111,6 +122,14 @@ namespace GameEditor
 
         public static void RestoreSession()
         {
+            // 0. Restore overlay + gizmo state (fast — no I/O, just field sets)
+            if (_state.OverlayFlags.HasValue)
+                EditorState.Overlays = (GizmoOverlayFlags)_state.OverlayFlags.Value;
+            if (_state.GizmoOperation.HasValue)
+                EditorState.CurrentGizmoOp = (Imgui.ImGuizmo.Operation)_state.GizmoOperation.Value;
+            if (_state.GizmoMode.HasValue)
+                EditorState.CurrentGizmoMode = (Imgui.ImGuizmo.Mode)_state.GizmoMode.Value;
+
             // 1. Restore last project
             if (!string.IsNullOrEmpty(_state.LastProjectFolder) &&
                 Directory.Exists(_state.LastProjectFolder))

@@ -319,7 +319,20 @@ public static unsafe class GameeditorApp
         {
             bool ctrl = (e->modifiers & SAPP_MODIFIER_CTRL) != 0;
             bool shift = (e->modifiers & SAPP_MODIFIER_SHIFT) != 0;
-            if (ctrl && e->key_code == sapp_keycode.SAPP_KEYCODE_Z)
+            bool super = (e->modifiers & SAPP_MODIFIER_SUPER) != 0;
+            if ((ctrl || super) && e->key_code == sapp_keycode.SAPP_KEYCODE_S)
+            {
+                // Ctrl/Cmd+S — save the active scene (mirrors the File menu item)
+                var activeScene = SceneManager.ActiveScene;
+                if (activeScene != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(activeScene.FilePath))
+                        SceneManager.SaveScene(activeScene.FilePath!);
+                    else
+                        GameEditor.UI.Toolbar.TriggerSaveAs();
+                }
+            }
+            else if (ctrl && e->key_code == sapp_keycode.SAPP_KEYCODE_Z)
             {
                 if (shift) GameEditor.Framework.Core.UndoStack.Redo();
                 else       GameEditor.Framework.Core.UndoStack.Undo();

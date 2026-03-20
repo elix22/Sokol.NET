@@ -13,11 +13,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Imgui;
 using static Imgui.ImguiNative;
 
 namespace GameEditor.CodeEditor
 {
+    // AOT-safe source-generated context for keybindings JSON
+    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSerializable(typeof(Dictionary<string, string>))]
+    internal partial class KeyBindingsJsonContext : JsonSerializerContext { }
+
     // ── KeyChord ──────────────────────────────────────────────────────────────
 
     /// <summary>One keyboard shortcut: a base key plus optional Ctrl/Shift/Alt modifiers.</summary>
@@ -250,7 +256,8 @@ namespace GameEditor.CodeEditor
             {
                 if (!File.Exists(_bindingsFile)) return;
                 string json = File.ReadAllText(_bindingsFile);
-                var data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                var data = JsonSerializer.Deserialize(
+                    json, KeyBindingsJsonContext.Default.DictionaryStringString);
                 if (data == null) return;
                 foreach (var (action, chordStr) in data)
                 {
@@ -274,8 +281,9 @@ namespace GameEditor.CodeEditor
                     data[action] = chord.ToString();
                 }
                 Directory.CreateDirectory(Path.GetDirectoryName(_bindingsFile)!);
-                File.WriteAllText(_bindingsFile, JsonSerializer.Serialize(data,
-                    new JsonSerializerOptions { WriteIndented = true }));
+                string json = JsonSerializer.Serialize(
+                    data, KeyBindingsJsonContext.Default.DictionaryStringString);
+                File.WriteAllText(_bindingsFile, json);
             }
             catch { /* ignore write errors */ }
         }

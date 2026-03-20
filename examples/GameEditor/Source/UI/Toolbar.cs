@@ -46,6 +46,10 @@ namespace GameEditor.UI
         private static string   _createProjectName  = "";
         private static readonly ConcurrentQueue<(bool isErr, string msg)> _createOutput = new();
 
+        /// <summary>Opens the Save As dialog — callable from the global keyboard handler.</summary>
+        public static void TriggerSaveAs()
+            => OpenDialog(DialogMode.SaveAs, SceneManager.ActiveScene?.Name ?? "Untitled");
+
         public static void Draw()
         {
             if (!igBeginMainMenuBar())
@@ -137,6 +141,19 @@ namespace GameEditor.UI
                     // Save all dirty script tabs so the build picks up latest changes
                     if (stopped) ScriptEditorWindow.SaveAll();
 
+                    // Auto-save modified scene before entering Play so the on-disk
+                    // copy is up to date and the pre-play snapshot is correct.
+                    if (stopped)
+                    {
+                        var activeScene = SceneManager.ActiveScene;
+                        if (activeScene != null && activeScene.IsDirty
+                            && !string.IsNullOrWhiteSpace(activeScene.FilePath))
+                        {
+                            SceneManager.SaveScene(activeScene.FilePath!);
+                            Logger.Info($"[AutoSave] Scene saved before Play: {activeScene.FilePath}");
+                        }
+                    }
+
                     // When transitioning from Stopped → Playing, build and load
                     // the game project's script assembly if a project is open.
                     if (stopped && ConfigManager.HasProject)
@@ -203,19 +220,19 @@ namespace GameEditor.UI
             var activeCol = new Vector4(0.26f, 0.70f, 0.98f, 1f);
 
             if (isT) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
-            if (igButton("T##gT", new Vector2(26, 0))) EditorState.CurrentGizmoOp = ImGuizmo.Operation.Translate;
+            if (igButton("T##gT", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Translate; EditorPersistence.Save(); }
             if (isT) igPopStyleColor(1);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Translate (W)");
 
             igSameLine(0, 2);
             if (isR) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
-            if (igButton("R##gR", new Vector2(26, 0))) EditorState.CurrentGizmoOp = ImGuizmo.Operation.Rotate;
+            if (igButton("R##gR", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Rotate; EditorPersistence.Save(); }
             if (isR) igPopStyleColor(1);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Rotate (E)");
 
             igSameLine(0, 2);
             if (isSc) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
-            if (igButton("S##gS", new Vector2(26, 0))) EditorState.CurrentGizmoOp = ImGuizmo.Operation.Scale;
+            if (igButton("S##gS", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Scale; EditorPersistence.Save(); }
             if (isSc) igPopStyleColor(1);
             if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Scale (R)");
 
@@ -223,7 +240,10 @@ namespace GameEditor.UI
             bool isLocal = EditorState.CurrentGizmoMode == ImGuizmo.Mode.Local;
             if (isLocal) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
             if (igButton(isLocal ? "Local" : "World", new Vector2(50, 0)))
+            {
                 EditorState.CurrentGizmoMode = isLocal ? ImGuizmo.Mode.World : ImGuizmo.Mode.Local;
+                EditorPersistence.Save();
+            }
             if (isLocal) igPopStyleColor(1);
 
             // ── Overlays dropdown (like Unity's "Gizmos" button) ─────────────
@@ -245,6 +265,7 @@ namespace GameEditor.UI
             if (igBeginPopup("##overlays_popup", ImGuiWindowFlags.None))
             {
                 var ov = EditorState.Overlays;
+                var prevOv = ov;
                 DrawOverlayToggle(ref ov, GizmoOverlayFlags.Grid,            "Grid");
                 DrawOverlayToggle(ref ov, GizmoOverlayFlags.WorldAxes,       "World Axes");
                 DrawOverlayToggle(ref ov, GizmoOverlayFlags.OrientationCube, "Orientation Cube");
@@ -252,6 +273,8 @@ namespace GameEditor.UI
                 DrawOverlayToggle(ref ov, GizmoOverlayFlags.CameraGizmos,    "Camera Gizmos");
                 DrawOverlayToggle(ref ov, GizmoOverlayFlags.LightGizmos,     "Light Gizmos");
                 EditorState.Overlays = ov;
+                if (ov != prevOv)
+                    EditorPersistence.Save();
                 igEndPopup();
             }
 
@@ -514,6 +537,7 @@ namespace GameEditor.UI
                                         KeyBindings.Set(action, new KeyChord { Key = hit, Ctrl = c, Shift = s, Alt = a });
                                     }
                                     _recordingAction = null;
+                                    KeyBindings.SaveToFile();
                                 }
                             }
                             else
@@ -528,14 +552,20 @@ namespace GameEditor.UI
 
                             igTableSetColumnIndex(2);
                             if (igSmallButton("Reset##r_" + action))
+                            {
                                 KeyBindings.Reset(action);
+                                KeyBindings.SaveToFile();
+                            }
                         }
                         igEndTable();
                     }
 
                     igSpacing();
                     if (igButton("Reset All##kbsAll", new Vector2(90, 0)))
+                    {
                         KeyBindings.ResetAll();
+                        KeyBindings.SaveToFile();
+                    }
                     igSameLine(0, 10);
                     if (igButton("Close##kbsClose", new Vector2(80, 0)))
                     {
