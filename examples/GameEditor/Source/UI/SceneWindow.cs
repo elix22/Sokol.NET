@@ -364,14 +364,34 @@ namespace GameEditor.UI
 
             if (changed)
             {
-                float* newPos   = stackalloc float[3];
-                float* newRot   = stackalloc float[3];
-                float* newScale = stackalloc float[3];
-                ImGuizmo.DecomposeMatrix((float*)&matM, newPos, newRot, newScale);
+                // Use Matrix4x4.Decompose + quaternion extraction instead of
+                // ImGuizmo.DecomposeMatrix, which uses XYZ-intrinsic Euler order that
+                // mismatches Transform.LocalMatrix (CreateFromYawPitchRoll = Ry(-y)*Rx(x)*Rz(z)).
+                if (!Matrix4x4.Decompose(matM, out var newScaleV, out var newQuat, out var newPosV))
+                    goto skipGizmoApply;
 
-                var newPosV   = new Vector3(newPos[0],   newPos[1],   newPos[2]);
-                var newRotV   = new Vector3(newRot[0],   newRot[1],   newRot[2]);
-                var newScaleV = new Vector3(newScale[0], newScale[1], newScale[2]);
+                // Reconstruct rotation matrix from quaternion and extract angles in the
+                // CreateFromYawPitchRoll(Y, X, Z) convention where M = Rz(roll)*Rx(pitch)*Ry(yaw):
+                //   M32 = -sin(pitch)                             → pitch = asin(-M32)
+                //   M31 = sin(yaw)*cos(pitch), M33 = cos(yaw)*cos(pitch) → yaw = atan2(M31, M33)
+                //   M12 = sin(roll)*cos(pitch), M22 = cos(roll)*cos(pitch) → roll = atan2(M12, M22)
+                //   Gimbal lock (pitch=±90°): M11=cos(yaw∓roll), M13=-sin(yaw∓roll) → yaw=atan2(-M13,M11)
+                var rotM  = Matrix4x4.CreateFromQuaternion(newQuat);
+                float pit = MathF.Asin(Math.Clamp(-rotM.M32, -1f, 1f));
+                float yaw, rol;
+                if (MathF.Abs(MathF.Cos(pit)) > 1e-6f)
+                {
+                    yaw = MathF.Atan2(rotM.M31, rotM.M33);
+                    rol = MathF.Atan2(rotM.M12, rotM.M22);
+                }
+                else
+                {
+                    // Gimbal lock (pitch = ±90°): yaw±roll collapses; set roll=0
+                    yaw = MathF.Atan2(-rotM.M13, rotM.M11);
+                    rol = 0f;
+                }
+                const float R2D = 180f / MathF.PI;
+                var newRotV = new Vector3(pit * R2D, yaw * R2D, rol * R2D);
 
                 if (!multiSelect)
                 {
@@ -430,6 +450,7 @@ namespace GameEditor.UI
                         world.AddComponent(otherId, otherTr);
                     }
                 }
+                skipGizmoApply:;
             }
 
             // Record compound undo when drag ends (covers all selected entities)

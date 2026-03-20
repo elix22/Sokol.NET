@@ -222,19 +222,19 @@ namespace GameEditor.UI
             if (isT) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
             if (igButton("T##gT", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Translate; EditorPersistence.Save(); }
             if (isT) igPopStyleColor(1);
-            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Translate (W)");
+            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip($"Translate ({GameEditor.CodeEditor.KeyBindings.Get(GameEditor.CodeEditor.KeyBindings.GizmoTranslate)})");
 
             igSameLine(0, 2);
             if (isR) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
             if (igButton("R##gR", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Rotate; EditorPersistence.Save(); }
             if (isR) igPopStyleColor(1);
-            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Rotate (E)");
+            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip($"Rotate ({GameEditor.CodeEditor.KeyBindings.Get(GameEditor.CodeEditor.KeyBindings.GizmoRotate)})");
 
             igSameLine(0, 2);
             if (isSc) igPushStyleColor_Vec4(ImGuiCol.Button, activeCol);
             if (igButton("S##gS", new Vector2(26, 0))) { EditorState.CurrentGizmoOp = ImGuizmo.Operation.Scale; EditorPersistence.Save(); }
             if (isSc) igPopStyleColor(1);
-            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip("Scale (R)");
+            if (igIsItemHovered(ImGuiHoveredFlags.None)) igSetTooltip($"Scale ({GameEditor.CodeEditor.KeyBindings.Get(GameEditor.CodeEditor.KeyBindings.GizmoScale)})");
 
             igSameLine(0, 8);
             bool isLocal = EditorState.CurrentGizmoMode == ImGuizmo.Mode.Local;

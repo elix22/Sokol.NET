@@ -191,6 +191,11 @@ namespace GameEditor.CodeEditor
         public const string TriggerCompletion = "TriggerCompletion";
         public const string RenameSymbol  = "RenameSymbol";
 
+        // Gizmo operation shortcuts (scene viewport)
+        public const string GizmoTranslate = "GizmoTranslate";
+        public const string GizmoRotate    = "GizmoRotate";
+        public const string GizmoScale     = "GizmoScale";
+
         // ── Defaults ─────────────────────────────────────────────────────────
 
         private static readonly Dictionary<string, KeyChord> _defaults = new()
@@ -208,6 +213,11 @@ namespace GameEditor.CodeEditor
             [MoveLineDown]      = new KeyChord { Key = ImGuiKey.DownArrow,  Alt  = true  },
             [TriggerCompletion] = new KeyChord { Key = ImGuiKey.Space,      Ctrl = true  },
             [RenameSymbol]      = new KeyChord { Key = ImGuiKey.F2                       },
+
+            // Gizmo operations
+            [GizmoTranslate]    = new KeyChord { Key = ImGuiKey.W },
+            [GizmoRotate]       = new KeyChord { Key = ImGuiKey.E },
+            [GizmoScale]        = new KeyChord { Key = ImGuiKey.R },
         };
 
         private static Dictionary<string, KeyChord> _bindings = new(_defaults);

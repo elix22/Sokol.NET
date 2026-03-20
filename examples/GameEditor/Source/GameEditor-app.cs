@@ -17,6 +17,7 @@ using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
 using GameEditor.UI;
 using GameEditor;
+using GameEditor.CodeEditor;
 using System.Diagnostics;
 
 public static unsafe class GameeditorApp
@@ -205,6 +206,20 @@ public static unsafe class GameeditorApp
         // ImGuizmo must be reset once per frame right after simgui_new_frame
         Imgui.ImGuizmo.BeginFrame();
 
+        // Gizmo operation shortcuts — checked via ImGui key state (supports user rebinding)
+        unsafe
+        {
+            if (igGetIO_Nil()->WantTextInput == 0 && SceneManager.PlayMode != PlayModeState.Playing)
+            {
+                if      (KeyBindings.IsPressed(KeyBindings.GizmoTranslate))
+                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Translate;
+                else if (KeyBindings.IsPressed(KeyBindings.GizmoRotate))
+                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Rotate;
+                else if (KeyBindings.IsPressed(KeyBindings.GizmoScale))
+                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Scale;
+            }
+        }
+
         // Draw full-window dockspace
         EditorLayout.BeginDockspace();
 
@@ -349,13 +364,7 @@ public static unsafe class GameeditorApp
             // Gizmo operation shortcuts (no modifier) — skip when typing in any text field
             else if (!ctrl && !shift && igGetIO_Nil()->WantTextInput == 0)
             {
-                if      (e->key_code == sapp_keycode.SAPP_KEYCODE_W)
-                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Translate;
-                else if (e->key_code == sapp_keycode.SAPP_KEYCODE_E)
-                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Rotate;
-                else if (e->key_code == sapp_keycode.SAPP_KEYCODE_R)
-                    EditorState.CurrentGizmoOp = Imgui.ImGuizmo.Operation.Scale;
-                else if (e->key_code == sapp_keycode.SAPP_KEYCODE_DELETE
+                if (e->key_code == sapp_keycode.SAPP_KEYCODE_DELETE
                          && EditorState.SelectionCount > 0
                          && SceneManager.ActiveScene != null)
                 {
