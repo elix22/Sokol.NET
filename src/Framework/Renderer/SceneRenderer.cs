@@ -54,6 +54,7 @@ namespace GameEditor.Framework.Renderer
                 },
                 index_type = sg_index_type.SG_INDEXTYPE_UINT16,
                 cull_mode = sg_cull_mode.SG_CULLMODE_BACK,
+#if GAME_EDITOR
                 sample_count = 1,
                 depth = new sg_depth_state
                 {
@@ -62,6 +63,7 @@ namespace GameEditor.Framework.Renderer
                     write_enabled = true
                 },
                 colors = { [0] = new sg_color_target_state { pixel_format = SG_PIXELFORMAT_RGBA8 } },
+#endif
                 label = "scene-pipeline"
             });
 

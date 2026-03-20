@@ -27,6 +27,7 @@
     <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
     <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
     <SokolNetHome Condition="'$(SokolNetHome)' == ''">../../</SokolNetHome>
+    <DefineConstants>GAME_EDITOR</DefineConstants>
   </PropertyGroup>
 
   <Import Project="$(SokolNetHome)/Directory.Build.props" />
