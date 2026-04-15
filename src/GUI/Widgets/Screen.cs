@@ -36,6 +36,8 @@ public sealed class Screen : Widget
     /// </summary>
     private static Widget? _activePopup;
 
+    private NotificationHost _notificationHost = new();
+
     public static void SetActivePopup(Widget? popup)
     {
         _activePopup = popup;
@@ -106,6 +108,9 @@ public sealed class Screen : Widget
             _activePopup.DrawPopupOverlay(Renderer);
             Renderer.Restore();
         }
+        // Draw notification toasts on top of everything.
+        _notificationHost.Bounds = new Rect(0, 0, width, height);
+        _notificationHost.Draw(Renderer);
         Renderer.EndFrame();
     }
 
@@ -137,6 +142,20 @@ public sealed class Screen : Widget
     /// Check the active popup widget first (it may draw outside its parent's bounds),
     /// then fall back to the normal tree walk.
     /// </summary>
+    // ─── Popup support ───────────────────────────────────────────────────────
+    /// <summary>
+    /// Dismiss the active popup if the click target is outside it.
+    /// Called only on mouse-down so hover/move never close the popup prematurely.
+    /// </summary>
+    internal static void DismissActivePopupIfNeeded(Widget? clickTarget)
+    {
+        if (_activePopup != null && clickTarget != _activePopup)
+        {
+            _activePopup.OnPopupDismiss();
+            _activePopup = null;
+        }
+    }
+
     public override Widget? HitTestDeep(Vector2 screenPoint)
     {
         if (_activePopup != null)
@@ -148,9 +167,9 @@ public sealed class Screen : Widget
                 Sokol.SLog.Info($"HitTest: popup {_activePopup.GetType().Name} captured screenPoint={screenPoint} local={local}", "Sokol.GUI");
                 return _activePopup;
             }
-            // Click was outside the popup — close it.
-            _activePopup.OnPopupDismiss();
-            _activePopup = null;
+            // Mouse is outside the popup — do NOT dismiss here (dismissal
+            // happens only on click via DismissActivePopupIfNeeded).
+            // Fall through to normal tree walk so other widgets can be hovered.
         }
         return base.HitTestDeep(screenPoint);
     }

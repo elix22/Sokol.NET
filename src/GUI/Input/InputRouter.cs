@@ -57,6 +57,9 @@ public sealed class InputRouter
                 var me = new MouseEvent { Position = pos, Button = btn, Clicks = _clickCount, Modifiers = Mods(ev) };
                 var target = _screen.HitTestDeep(pos);
                 Sokol.SLog.Info($"GUI: MouseDown ({pos.X:F0},{pos.Y:F0}) btn={btn} → {target?.GetType().Name ?? "none"}[{target?.Id ?? "-"}]", "Sokol.GUI");
+                // Dismiss any open popup (ComboBox dropdown, ColorPicker, etc.) if
+                // the click landed outside it.
+                Screen.DismissActivePopupIfNeeded(target);
                 if (target != null)
                 {
                     _captured = target;
