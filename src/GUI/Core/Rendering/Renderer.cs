@@ -228,17 +228,23 @@ public sealed class Renderer
     /// <summary>Measure rendered advance width of a string at current font/size settings.</summary>
     public float MeasureText(string text)
     {
-        float bounds0 = 0f, bounds1 = 0f, bounds2 = 0f, bounds3 = 0f;
-        return nvgTextBounds(_vg, 0f, 0f, text, null, ref bounds0);
+        // nvgTextBounds writes 4 floats into the bounds array even though we only
+        // care about the return value.  Using a single ref float is not safe in
+        // NativeAOT Release builds where unused locals are eliminated — the C
+        // function then writes out-of-bounds and corrupts the stack (SIGSEGV on
+        // iOS/Android).  Always provide a proper 4-element buffer.
+        if (string.IsNullOrEmpty(text)) return 0f;
+        unsafe
+        {
+            float* bounds = stackalloc float[4];
+            return nvgTextBounds(_vg, 0f, 0f, text, null, ref bounds[0]);
+        }
     }
 
     /// <summary>Measure the bounding rect of a string at current font/size settings.</summary>
     public Rect MeasureTextBounds(string text)
     {
-        float b0 = 0f, b1 = 0f, b2 = 0f, b3 = 0f;
-        nvgTextBounds(_vg, 0f, 0f, text, null, ref b0);
-        // NanoVG fills bounds as [xmin,ymin,xmax,ymax] in the float array;
-        // the ref overload writes into b0 (xmin).  Use the full-bounds overload:
+        if (string.IsNullOrEmpty(text)) return default;
         unsafe
         {
             float* bounds = stackalloc float[4];
