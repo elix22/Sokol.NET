@@ -78,5 +78,11 @@ public readonly record struct UIColor(float R, float G, float B, float A)
     /// <summary>Multiply alpha by a factor (darken transparency).</summary>
     public UIColor MultiplyAlpha(float factor) => this with { A = MathF.Max(0f, MathF.Min(1f, A * factor)) };
 
+    /// <summary>Blend toward white by <paramref name="amount"/> (0=unchanged, 1=white).</summary>
+    public UIColor Lighten(float amount) => Lerp(this, White with { A = A }, amount);
+
+    /// <summary>Blend toward black by <paramref name="amount"/> (0=unchanged, 1=black).</summary>
+    public UIColor Darken(float amount)  => Lerp(this, Black with { A = A }, amount);
+
     public override string ToString() => $"#{(int)(R*255):X2}{(int)(G*255):X2}{(int)(B*255):X2}{(int)(A*255):X2}";
 }

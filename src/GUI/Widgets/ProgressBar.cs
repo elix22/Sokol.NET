@@ -39,7 +39,11 @@ public class ProgressBar : Widget
         var bg    = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cr  = theme.ProgressBarCornerRadius;
 
-        renderer.FillRoundedRect(bg, cr, theme.ProgressBarTrackColor);
+        // Track: inset gradient (darker top = sunken look)
+        var trackGrad = renderer.LinearGradient(
+            new Vector2(bg.X, bg.Y), new Vector2(bg.X, bg.Bottom),
+            theme.ProgressBarTrackColor.Darken(0.15f), theme.ProgressBarTrackColor.Lighten(0.05f));
+        renderer.FillRoundedRectWithPaint(bg, cr, trackGrad);
 
         if (_value > 0f)
         {
@@ -49,7 +53,11 @@ public class ProgressBar : Widget
             else
                 fill = new Rect(bg.X, bg.Bottom - bg.Height * _value, bg.Width, bg.Height * _value);
 
-            renderer.FillRoundedRect(fill, cr, theme.AccentColor);
+            // Fill: accent gradient (lighter top → darker bottom = raised bar)
+            var fillGrad = renderer.LinearGradient(
+                new Vector2(fill.X, fill.Y), new Vector2(fill.X, fill.Bottom),
+                theme.AccentColor.Lighten(0.18f), theme.AccentColor.Darken(0.12f));
+            renderer.FillRoundedRectWithPaint(fill, cr, fillGrad);
         }
 
         if (ShowLabel)

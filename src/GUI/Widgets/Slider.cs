@@ -55,14 +55,30 @@ public class Slider : Widget
             float cy = h * 0.5f;
             var trackR = new Rect(thumb, cy - track * 0.5f, w - thumb * 2f, track);
 
-            renderer.FillRoundedRect(trackR, track * 0.5f, theme.SliderTrackColor);
+            // Track: inset gradient (darker top edge = sunken look)
+            var trackGrad = renderer.LinearGradient(
+                new Vector2(trackR.X, trackR.Y), new Vector2(trackR.X, trackR.Bottom),
+                theme.SliderTrackColor.Darken(0.18f), theme.SliderTrackColor.Lighten(0.08f));
+            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackGrad);
+
+            // Fill: accent gradient
             float fillW = trackR.Width * t;
             if (fillW > 0)
-                renderer.FillRoundedRect(new Rect(trackR.X, trackR.Y, fillW, track), track * 0.5f, theme.AccentColor);
+            {
+                var fillR = new Rect(trackR.X, trackR.Y, fillW, track);
+                var fillGrad = renderer.LinearGradient(
+                    new Vector2(fillR.X, fillR.Y), new Vector2(fillR.X, fillR.Bottom),
+                    theme.AccentColor.Lighten(0.15f), theme.AccentColor.Darken(0.12f));
+                renderer.FillRoundedRectWithPaint(fillR, track * 0.5f, fillGrad);
+            }
 
+            // Thumb: gradient sphere + accent ring
             float tx = thumb + trackR.Width * t;
-            renderer.FillCircle(tx, cy, thumb * 0.5f,
-                IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor);
+            var thumbCol = IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor;
+            var thumbGrad = renderer.LinearGradient(
+                new Vector2(tx, cy - thumb * 0.5f), new Vector2(tx, cy + thumb * 0.5f),
+                thumbCol.Lighten(0.22f), thumbCol.Darken(0.15f));
+            renderer.FillCircleWithPaint(tx, cy, thumb * 0.5f, thumbGrad);
             renderer.StrokeCircle(tx, cy, thumb * 0.5f, 1.5f, theme.AccentColor);
         }
         else
@@ -70,15 +86,30 @@ public class Slider : Widget
             float cx = w * 0.5f;
             var trackR = new Rect(cx - track * 0.5f, thumb, track, h - thumb * 2f);
 
-            renderer.FillRoundedRect(trackR, track * 0.5f, theme.SliderTrackColor);
+            // Track: inset gradient (darker left edge = sunken look)
+            var trackGrad = renderer.LinearGradient(
+                new Vector2(trackR.X, trackR.Y), new Vector2(trackR.Right, trackR.Y),
+                theme.SliderTrackColor.Darken(0.18f), theme.SliderTrackColor.Lighten(0.08f));
+            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackGrad);
+
+            // Fill: accent gradient
             float fillH = trackR.Height * (1f - t);
             if (fillH < trackR.Height)
-                renderer.FillRoundedRect(new Rect(trackR.X, trackR.Y + fillH, track, trackR.Height - fillH),
-                    track * 0.5f, theme.AccentColor);
+            {
+                var fillR = new Rect(trackR.X, trackR.Y + fillH, track, trackR.Height - fillH);
+                var fillGrad = renderer.LinearGradient(
+                    new Vector2(fillR.X, fillR.Y), new Vector2(fillR.Right, fillR.Y),
+                    theme.AccentColor.Lighten(0.15f), theme.AccentColor.Darken(0.12f));
+                renderer.FillRoundedRectWithPaint(fillR, track * 0.5f, fillGrad);
+            }
 
+            // Thumb: gradient sphere + accent ring
             float ty = thumb + trackR.Height * (1f - t);
-            renderer.FillCircle(cx, ty, thumb * 0.5f,
-                IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor);
+            var thumbCol = IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor;
+            var thumbGrad = renderer.LinearGradient(
+                new Vector2(cx, ty - thumb * 0.5f), new Vector2(cx, ty + thumb * 0.5f),
+                thumbCol.Lighten(0.22f), thumbCol.Darken(0.15f));
+            renderer.FillCircleWithPaint(cx, ty, thumb * 0.5f, thumbGrad);
             renderer.StrokeCircle(cx, ty, thumb * 0.5f, 1.5f, theme.AccentColor);
         }
     }

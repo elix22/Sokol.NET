@@ -84,15 +84,38 @@ public class RadioButton : Widget
         float cy   = Bounds.Height * 0.5f;
         float cx   = Padding.Left + size * 0.5f;
 
-        var bg = IsChecked ? theme.AccentColor
-               : IsHovered ? theme.CheckBoxHoverColor
-               : theme.CheckBoxColor;
-
-        renderer.FillCircle(cx, cy, size * 0.5f, bg);
-        renderer.StrokeCircle(cx, cy, size * 0.5f, 1f, IsChecked ? theme.AccentColor : theme.BorderColor);
+        // Circle gradient (top-light → bottom-dark = raised/sphere look)
+        {
+            UIColor gTop, gBot;
+            if (IsChecked)
+            {
+                gTop = theme.AccentColor.Lighten(0.15f);
+                gBot = theme.AccentColor.Darken(0.20f);
+            }
+            else
+            {
+                var baseCol = IsHovered ? theme.CheckBoxHoverColor : theme.CheckBoxColor;
+                gTop = baseCol.Lighten(0.08f);
+                gBot = baseCol.Darken(0.12f);
+            }
+            var grad = renderer.LinearGradient(
+                new Vector2(cx, cy - size * 0.5f),
+                new Vector2(cx, cy + size * 0.5f),
+                gTop, gBot);
+            renderer.FillCircleWithPaint(cx, cy, size * 0.5f, grad);
+        }
+        renderer.StrokeCircle(cx, cy, size * 0.5f, 1f, IsChecked ? theme.AccentColor.Darken(0.20f) : theme.BorderColor);
 
         if (IsChecked)
-            renderer.FillCircle(cx, cy, size * 0.25f, theme.ButtonTextColor);
+        {
+            // Inner dot with gradient for a 3D sphere illusion
+            var dotGrad = renderer.LinearGradient(
+                new Vector2(cx, cy - size * 0.25f),
+                new Vector2(cx, cy + size * 0.25f),
+                theme.ButtonTextColor.WithAlpha(0.9f),
+                theme.ButtonTextColor.WithAlpha(0.55f));
+            renderer.FillCircleWithPaint(cx, cy, size * 0.25f, dotGrad);
+        }
 
         if (!string.IsNullOrEmpty(Label))
         {

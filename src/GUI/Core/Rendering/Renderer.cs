@@ -176,6 +176,17 @@ public sealed class Renderer
         nvgFill(_vg);
     }
 
+    public void FillRoundedRectWithPaint(Rect r, float cr, NVGpaint paint) =>
+        FillRoundedRectWithPaint(r, new CornerRadius(cr), paint);
+
+    public void FillCircleWithPaint(float cx, float cy, float radius, NVGpaint paint)
+    {
+        nvgBeginPath(_vg);
+        nvgCircle(_vg, cx, cy, radius);
+        nvgFillPaint(_vg, paint);
+        nvgFill(_vg);
+    }
+
     // -------------------------------------------------------------------------
     // Images
     // -------------------------------------------------------------------------

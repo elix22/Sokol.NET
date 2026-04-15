@@ -1,3 +1,5 @@
+using System;
+
 namespace Sokol.GUI;
 
 /// <summary>
@@ -41,24 +43,66 @@ public class Button : Widget
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cr   = CornerRadius > 0 ? CornerRadius : theme.ButtonCornerRadius;
 
-        // Background
-        UIColor bg = IsPressed ? (PressColor ?? theme.ButtonPressedColor)
-                   : IsHovered ? (HoverColor  ?? theme.ButtonHoverColor)
-                   : (BackColor ?? (Enabled ? theme.ButtonColor : theme.ButtonDisabledColor));
+        // ── Background gradient (top-light → bottom-dark = raised look) ──────
+        UIColor gradTop, gradBot;
+        if (!Enabled)
+        {
+            gradTop = gradBot = theme.ButtonDisabledColor;
+        }
+        else if (IsPressed)
+        {
+            // Pressed: inverted depth — darker top, lighter bottom
+            var pressBase = PressColor ?? theme.ButtonPressedColor;
+            gradTop = pressBase.Darken(0.08f);
+            gradBot = pressBase.Lighten(0.05f);
+        }
+        else if (IsHovered)
+        {
+            var hoverBase = HoverColor ?? theme.ButtonHoverColor;
+            gradTop = hoverBase;
+            gradBot = hoverBase.Darken(0.15f);
+        }
+        else
+        {
+            var baseCol = BackColor ?? theme.ButtonColor;
+            gradTop = baseCol;
+            gradBot = baseCol.Darken(0.18f);
+        }
+        var bgGrad = renderer.LinearGradient(
+            new Vector2(0, 0), new Vector2(0, bounds.Height), gradTop, gradBot);
+        renderer.FillRoundedRectWithPaint(bounds, cr, bgGrad);
 
-        renderer.FillRoundedRect(bounds, cr, bg);
-
-        // Border
+        // ── Border ────────────────────────────────────────────────────────────
         if (BorderWidth > 0)
-            renderer.StrokeRoundedRect(bounds, cr, BorderWidth, BorderColor ?? theme.BorderColor);
+        {
+            var borderCol = BorderColor ?? (Enabled
+                ? theme.BorderColor.WithAlpha(0.8f)
+                : theme.BorderColor.WithAlpha(0.4f));
+            renderer.StrokeRoundedRect(bounds, cr, BorderWidth, borderCol);
+        }
 
-        // Label
+        // ── Inner top highlight (glassy sheen when not pressed) ───────────────
+        if (Enabled && !IsPressed)
+        {
+            var hlGrad = renderer.LinearGradient(
+                new Vector2(0, 1f), new Vector2(0, bounds.Height * 0.5f),
+                UIColor.White.WithAlpha(0.14f), UIColor.Transparent);
+            var inner = bounds.Deflate(new Thickness(1));
+            renderer.FillRoundedRectWithPaint(inner, MathF.Max(0f, cr - 1f), hlGrad);
+        }
+
+        // ── Label ─────────────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(Text))
         {
-            var fg = ForeColor ?? (Enabled ? theme.ButtonTextColor : theme.TextDisabledColor);
+            float tx = bounds.Width * 0.5f;
+            float ty = bounds.Height * 0.5f + (IsPressed ? 0.5f : 0f);
+            var   fg = ForeColor ?? (Enabled ? theme.ButtonTextColor : theme.TextDisabledColor);
             ApplyFont(renderer, theme);
             renderer.SetTextAlign(TextHAlign.Center);
-            renderer.DrawText(bounds.X + bounds.Width * 0.5f, bounds.Y + bounds.Height * 0.5f, Text, fg);
+            // Subtle text shadow for legibility on gradient background
+            if (Enabled)
+                renderer.DrawText(tx, ty + 1f, Text, UIColor.Black.WithAlpha(0.28f));
+            renderer.DrawText(tx, ty, Text, fg);
         }
     }
 

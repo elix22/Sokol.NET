@@ -44,12 +44,27 @@ public class CheckBox : Widget
 
         // Box background
         var boxR = new Rect(Padding.Left, cy - size * 0.5f, size, size);
-        var bg   = IsChecked ? theme.AccentColor
-                 : IsHovered ? theme.CheckBoxHoverColor
-                 : theme.CheckBoxColor;
-        renderer.FillRoundedRect(boxR, theme.CheckBoxCornerRadius, bg);
-        renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f,
-            IsChecked ? theme.AccentColor : theme.BorderColor);
+        if (IsChecked)
+        {
+            // Checked: accent gradient (lighter top → darker bottom = raised filled look)
+            var gTop = theme.AccentColor.Lighten(0.15f);
+            var gBot = theme.AccentColor.Darken(0.20f);
+            var grad = renderer.LinearGradient(
+                new Vector2(boxR.X, boxR.Y), new Vector2(boxR.X, boxR.Bottom), gTop, gBot);
+            renderer.FillRoundedRectWithPaint(boxR, theme.CheckBoxCornerRadius, grad);
+            renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f, theme.AccentColor.Darken(0.30f));
+        }
+        else
+        {
+            // Unchecked: subtle inset look (darker top → lighter bottom = pressed/sunken feel)
+            var baseCol = IsHovered ? theme.CheckBoxHoverColor : theme.CheckBoxColor;
+            var gTop = baseCol.Darken(0.08f);
+            var gBot = baseCol.Lighten(0.08f);
+            var grad = renderer.LinearGradient(
+                new Vector2(boxR.X, boxR.Y), new Vector2(boxR.X, boxR.Bottom), gTop, gBot);
+            renderer.FillRoundedRectWithPaint(boxR, theme.CheckBoxCornerRadius, grad);
+            renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f, theme.BorderColor);
+        }
 
         // Checkmark
         if (IsChecked)
