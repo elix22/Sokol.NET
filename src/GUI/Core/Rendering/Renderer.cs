@@ -179,6 +179,15 @@ public sealed class Renderer
     public void FillRoundedRectWithPaint(Rect r, float cr, NVGpaint paint) =>
         FillRoundedRectWithPaint(r, new CornerRadius(cr), paint);
 
+    /// <summary>Fill a rect with only the top-left and top-right corners rounded, filled with a paint (gradient/image).</summary>
+    public void FillRoundedRectTopWithPaint(Rect r, float cr, NVGpaint paint)
+    {
+        nvgBeginPath(_vg);
+        nvgRoundedRectVarying(_vg, r.X, r.Y, r.Width, r.Height, cr, cr, 0f, 0f);
+        nvgFillPaint(_vg, paint);
+        nvgFill(_vg);
+    }
+
     public void FillCircleWithPaint(float cx, float cy, float radius, NVGpaint paint)
     {
         nvgBeginPath(_vg);
@@ -331,6 +340,16 @@ public sealed class Renderer
         nvgBeginPath(_vg);
         nvgRoundedRectVarying(_vg, r.X, r.Y, r.Width, r.Height, cr, cr, 0f, 0f);
         nvgFill(_vg);
+    }
+
+    /// <summary>Stroke a rect with only the top-left and top-right corners rounded.</summary>
+    public void StrokeRoundedRectTop(Rect r, float cr, float width, UIColor c)
+    {
+        SetStrokeColor(c);
+        SetStrokeWidth(width);
+        nvgBeginPath(_vg);
+        nvgRoundedRectVarying(_vg, r.X, r.Y, r.Width, r.Height, cr, cr, 0f, 0f);
+        nvgStroke(_vg);
     }
 
     public void StrokeRect(Rect r, float width, UIColor c)

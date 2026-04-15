@@ -62,31 +62,80 @@ public class TabView : Widget
         if (log)
             Sokol.SLog.Info($"TabView.Draw[{Screen.DbgFrame}]: Bounds={Bounds} w={w} h={h} hdrH={hdrH} tabs={_tabs.Count} sel={_selectedIndex}", "Sokol.GUI");
 
-        // Tab bar background
-        renderer.FillRect(new Rect(0, 0, w, hdrH), theme.TabBarColor);
+        // ── 1. Full-widget content background ─────────────────────────────────
+        renderer.FillRect(new Rect(0, 0, w, h), theme.SurfaceColor);
 
-        // Tab headers
+        // ── 2. Tab bar strip background (slightly darker than surface) ─────────
+        var tabStripRect = new Rect(0, 0, w, hdrH);
+        renderer.FillRect(tabStripRect, theme.TabBarColor);
+
+        // ── 3. Measure all tab widths first ────────────────────────────────────
         ApplyFont(renderer, theme);
-        float x = 0;
+        renderer.SetTextAlign(TextHAlign.Left, TextVAlign.Middle);
+        float[] tabWidths = new float[_tabs.Count];
+        for (int i = 0; i < _tabs.Count; i++)
+            tabWidths[i] = renderer.MeasureText(_tabs[i].Title) + theme.TabPaddingH * 2;
+
+        // ── 4. Separator line (drawn before tabs so active tab can cover it) ───
+        renderer.DrawLine(0, hdrH, w, hdrH, 1f, theme.TabBorder);
+
+        // ── 5. Draw each tab ───────────────────────────────────────────────────
+        float cr = 4f;   // top-corner radius
+        float x  = 4f;   // slight left inset so first tab doesn't hug the edge
+        const float tabTopPad = 2f;   // gap at very top of bar
+
         for (int i = 0; i < _tabs.Count; i++)
         {
-            renderer.SetTextAlign(TextHAlign.Left);
-            float tw = renderer.MeasureText(_tabs[i].Title) + theme.TabPaddingH * 2;
-            var tabR = new Rect(x, 0, tw, hdrH);
+            float tw  = tabWidths[i];
+            bool  sel = i == _selectedIndex;
 
-            bool sel = i == _selectedIndex;
-            renderer.FillRect(tabR, sel ? theme.SurfaceColor : theme.TabBarColor);
+            // Active tab is 1px taller to overlap (and thereby hide) the separator line.
+            // Inactive tab is 1px shorter and sits inside the bar, leaving the separator visible.
+            float tabY = tabTopPad;
+            float tabH = sel ? (hdrH - tabTopPad + 1f) : (hdrH - tabTopPad - 2f);
+            var   tabR = new Rect(x, tabY, tw, tabH);
+
             if (sel)
-                renderer.FillRect(new Rect(tabR.X, tabR.Bottom - 2, tabR.Width, 2), theme.AccentColor);
+            {
+                // ── Active: raised effect ─────────────────────────────────────
+                // Gradient goes from a brighter surface tone at top → surface at bottom
+                // so the active tab blends seamlessly into the content panel.
+                var topC = theme.SurfaceColor.Lighten(0.18f);
+                var botC = theme.SurfaceColor;
+                var grad = renderer.LinearGradient(
+                    new Vector2(tabR.X, tabR.Y),
+                    new Vector2(tabR.X, tabR.Bottom),
+                    topC, botC);
+                renderer.FillRoundedRectTopWithPaint(tabR, cr, grad);
 
-            renderer.DrawText(tabR.X + theme.TabPaddingH, hdrH * 0.5f, _tabs[i].Title,
-                sel ? theme.TextColor : theme.TextMutedColor);
+                // Left / right border (same as tab border but fades at bottom)
+                renderer.DrawLine(tabR.X,     tabR.Y + cr, tabR.X,     tabR.Bottom, 1f, theme.TabBorder);
+                renderer.DrawLine(tabR.Right, tabR.Y + cr, tabR.Right, tabR.Bottom, 1f, theme.TabBorder);
 
-            x += tw;
+                // Top edge shine
+                renderer.DrawLine(tabR.X + cr, tabR.Y + 0.5f, tabR.Right - cr, tabR.Y + 0.5f, 1f,
+                    theme.SurfaceColor.Lighten(0.45f).WithAlpha(0.9f));
+            }
+            else
+            {
+                // ── Inactive: inset / sunken effect ─────────────────────────
+                // BoxGradient gives a slight inner-shadow look.
+                var insetGrad = renderer.BoxGradient(
+                    tabR, cr, 4f,
+                    theme.TabBarColor.Darken(0.12f),
+                    theme.TabBarColor.Lighten(0.04f));
+                renderer.FillRoundedRectTopWithPaint(tabR, cr, insetGrad);
+
+                // Subtle border around the inactive tab
+                renderer.StrokeRoundedRectTop(tabR, cr, 1f, theme.TabBorder.WithAlpha(0.6f));
+            }
+
+            // ── Tab label ─────────────────────────────────────────────────────
+            var labelColor = sel ? theme.TextColor : theme.TextMutedColor;
+            renderer.DrawText(x + theme.TabPaddingH, tabY + tabH * 0.5f, _tabs[i].Title, labelColor);
+
+            x += tw + 1f;   // 1px gap between tabs
         }
-
-        // Divider
-        renderer.DrawLine(0, hdrH, w, hdrH, 1f, theme.BorderColor);
 
         // Content area
         if (_selectedIndex >= 0 && _selectedIndex < _tabs.Count)
