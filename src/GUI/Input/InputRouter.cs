@@ -29,7 +29,12 @@ public sealed class InputRouter
 
     public unsafe void Dispatch(sapp_event* ev)
     {
-        float dpi = sapp_dpi_scale();
+
+#if __ANDROID__
+        float dpi  = 1f; // TBD ELI , unreliable on Android
+#else
+        float dpi  = sapp_dpi_scale();
+#endif
 
         switch (ev->type)
         {
