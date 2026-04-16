@@ -199,13 +199,25 @@ public abstract class Widget
         return new Vector2(screenPoint.X - origin.X, screenPoint.Y - origin.Y);
     }
 
+    /// <summary>
+    /// Scroll offset this widget contributes when computing children's ScreenPosition.
+    /// Override in scrollable containers (e.g. ScrollView) to return (_scrollX, _scrollY).
+    /// </summary>
+    public virtual Vector2 ScrollOffset => Vector2.Zero;
+
     /// <summary>Walk up the tree to compute screen-space top-left corner.</summary>
     public Vector2 ScreenPosition
     {
         get
         {
             var pos = new Vector2(Bounds.X, Bounds.Y);
-            if (Parent != null) pos = new Vector2(pos.X + Parent.ScreenPosition.X, pos.Y + Parent.ScreenPosition.Y);
+            if (Parent != null)
+            {
+                var parentSP     = Parent.ScreenPosition;
+                var parentScroll = Parent.ScrollOffset;
+                pos = new Vector2(pos.X + parentSP.X - parentScroll.X,
+                                  pos.Y + parentSP.Y - parentScroll.Y);
+            }
             return pos;
         }
     }

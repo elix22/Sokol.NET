@@ -95,7 +95,33 @@ public class ScrollView : Widget
     private float ContentHeight => Content?.PreferredSize(Screen.Instance.Renderer).Y ?? Bounds.Height;
     private float ContentWidth  => Content?.PreferredSize(Screen.Instance.Renderer).X ?? Bounds.Width;
 
-    // ─── Input ───────────────────────────────────────────────────────────────
+    // ScrollOffset tells ScreenPosition to subtract our scroll from children's positions.
+    public override Vector2 ScrollOffset => new Vector2(_scrollX, _scrollY);
+
+    // ─── Hit testing ─────────────────────────────────────────────────────
+    public override Widget? HitTestDeep(Vector2 screenPoint)
+    {
+        if (!Visible || !Enabled) return null;
+        var local = ToLocal(screenPoint);
+        if (!HitTest(local)) return null;
+
+        // Scrollbar areas belong to ScrollView — don’t let content steal those clicks.
+        var   theme = ThemeManager.Current;
+        float sbW   = theme.ScrollBarWidth;
+        bool  showV = CanScrollVertical   && ContentHeight > Bounds.Height;
+        bool  showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
+        if (showV && local.X >= Bounds.Width  - sbW) return this;
+        if (showH && local.Y >= Bounds.Height - sbW) return this;
+
+        // Children have scroll-aware ScreenPositions — recurse with original screenPoint.
+        var kids = Children;
+        for (int i = kids.Count - 1; i >= 0; i--)
+        {
+            var hit = kids[i].HitTestDeep(screenPoint);
+            if (hit != null) return hit;
+        }
+        return this;
+    }
     public override bool OnMouseScroll(MouseEvent e)
     {
         float spd = ThemeManager.Current.ScrollSpeed;

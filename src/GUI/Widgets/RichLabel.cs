@@ -169,7 +169,8 @@ public class RichLabel : Widget
 
         float x      = startX;
         float y      = startY;
-        float lineH  = GetDefaultLineHeight(renderer);
+        float defaultLineH = GetDefaultLineHeight(renderer);
+        float lineH        = defaultLineH;
 
         for (int i = 0; i < _spans.Count; i++)
         {
@@ -178,8 +179,9 @@ public class RichLabel : Widget
             // Explicit newline — advance to next line without rendering anything.
             if (span.IsLineBreak)
             {
-                x  = startX;
-                y += lineH;
+                x     = startX;
+                y    += lineH;
+                lineH = defaultLineH;  // reset — the new line hasn’t seen any spans yet
                 continue;
             }
 
