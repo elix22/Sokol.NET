@@ -131,7 +131,7 @@ public class Theme
     public virtual float ButtonHeight       => 30f;
     public virtual float InputHeight        => 28f;
     public virtual float TabBarHeight       => 32f;
-    public virtual float ScrollBarWidth     => 8f;
+    public virtual float ScrollBarWidth     => 12f;
     public virtual float SliderTrackHeight  => 4f;
     public virtual float SliderThumbRadius  => 8f;
     public virtual float TooltipCornerRadius=> 4f;

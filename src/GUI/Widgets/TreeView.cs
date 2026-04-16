@@ -41,6 +41,7 @@ public class TreeView : Widget
     private bool      _sbDragging;
     private float     _sbDragStartY;
     private float     _sbDragStartScroll;
+    private int       _anchorRowIdx = -1;
     private readonly HashSet<TreeNode> _selectedNodes = [];
     public  const float ItemHeight   = 22f;
     public  const float IndentWidth  = 16f;
@@ -49,7 +50,7 @@ public class TreeView : Widget
     public TreeNode? Root
     {
         get => _root;
-        set { _root = value; _selected = null; _selectedNodes.Clear(); _scrollY = 0f; InvalidateLayout(); }
+        set { _root = value; _selected = null; _selectedNodes.Clear(); _anchorRowIdx = -1; _scrollY = 0f; InvalidateLayout(); }
     }
 
     public TreeNode?              SelectedNode  => _selected;
@@ -196,20 +197,56 @@ public class TreeView : Widget
         if (hit == null) return true;
         var node = hit.Value.node;
 
-        bool addToSel = MultiSelect && (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+        bool ctrl  = MultiSelect && (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+        bool shift = MultiSelect && (e.Modifiers & KeyModifiers.Shift) != 0;
 
-        // Any click on a parent row → toggle expand + select
+        // Expand/collapse parent nodes (always)
         if (node.Children.Count > 0)
         {
             node.IsExpanded = !node.IsExpanded;
             if (node.IsExpanded) NodeExpanded?.Invoke(node);
             InvalidateLayout();
-            Select(node, addToSel);
-            return true;
+            // After rebuild, anchor is no longer meaningful unless we recalculate it
+            if (!shift) _anchorRowIdx = _flatRows.FindIndex(r => r.node == node);
         }
 
-        // Leaf row click → select only
-        Select(node, addToSel);
+        if (shift && _anchorRowIdx >= 0)
+        {
+            // Range select from anchor to current row
+            int curIdx = _flatRows.FindIndex(r => r.node == node);
+            if (curIdx >= 0)
+            {
+                int lo = Math.Min(_anchorRowIdx, curIdx);
+                int hi = Math.Max(_anchorRowIdx, curIdx);
+                if (!ctrl)
+                {
+                    foreach (var n in _selectedNodes) n.IsSelected = false;
+                    _selectedNodes.Clear();
+                    if (_selected != null) _selected.IsSelected = false;
+                }
+                for (int i = lo; i <= hi; i++)
+                {
+                    _flatRows[i].node.IsSelected = true;
+                    _selectedNodes.Add(_flatRows[i].node);
+                }
+                _selected = node;
+                node.IsSelected = true;
+                SelectionChanged?.Invoke(node);
+            }
+        }
+        else if (ctrl)
+        {
+            int curIdx = _flatRows.FindIndex(r => r.node == node);
+            _anchorRowIdx = curIdx;
+            Select(node, addToSelection: true);
+        }
+        else
+        {
+            int curIdx = _flatRows.FindIndex(r => r.node == node);
+            _anchorRowIdx = curIdx;
+            Select(node, addToSelection: false);
+        }
+
         return true;
     }
 

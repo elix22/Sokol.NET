@@ -10,6 +10,7 @@ public class ComboBox : Widget
 {
     private int                 _selectedIndex = -1;
     private bool                _open;
+    private int                 _hoveredIndex  = -1;
     private readonly List<string> _items = [];
 
     public IReadOnlyList<string> Items => _items;
@@ -98,6 +99,8 @@ public class ComboBox : Widget
             var rowR = new Rect(0, ddY + i * itemH, bounds.Width, itemH);
             if (i == _selectedIndex)
                 renderer.FillRect(rowR, theme.SelectionColor);
+            else if (i == _hoveredIndex)
+                renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.12f));
             renderer.DrawText(rowR.X + 6, rowR.Y + rowR.Height * 0.5f, _items[i], theme.TextColor);
         }
     }
@@ -127,6 +130,7 @@ public class ComboBox : Widget
     public override void OnPopupDismiss()
     {
         _open = false;
+        _hoveredIndex = -1;
         Sokol.SLog.Info($"ComboBox: dismissed", "Sokol.GUI");
     }
 
@@ -147,6 +151,7 @@ public class ComboBox : Widget
                 SelectedIndex = idx;
             }
             _open = false;
+            _hoveredIndex = -1;
             Screen.SetActivePopup(null);
             return true;
         }
@@ -154,6 +159,7 @@ public class ComboBox : Widget
         if (e.Button == MouseButton.Left && Enabled)
         {
             _open = true;
+            _hoveredIndex = -1;
             Screen.SetActivePopup(this);
             Sokol.SLog.Info($"ComboBox: opened, registered as popup", "Sokol.GUI");
             return true;
@@ -161,7 +167,20 @@ public class ComboBox : Widget
         return false;
     }
 
-    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return false; }
+    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _hoveredIndex = -1; return false; }
+
+    public override bool OnMouseMove(MouseEvent e)
+    {
+        if (!_open) return false;
+        var   local = e.LocalPosition;
+        float itemH = ThemeManager.Current.InputHeight;
+        float ddY   = Bounds.Height;
+        if (local.Y >= ddY && local.Y < ddY + _items.Count * itemH)
+            _hoveredIndex = (int)((local.Y - ddY) / itemH);
+        else
+            _hoveredIndex = -1;
+        return true;
+    }
 
     private void ApplyFont(Renderer renderer, Theme theme)
     {

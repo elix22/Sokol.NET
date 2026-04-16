@@ -15,6 +15,7 @@ public class ListBox : Widget
     private float _scrollY;
     private float _lastClickTime;
     private int   _lastClickIndex = -1;
+    private int   _anchorIndex = -1;
     private bool  _sbDragging;
     private float _sbDragStartY;
     private float _sbDragStartScroll;
@@ -56,12 +57,13 @@ public class ListBox : Widget
         _items.AddRange(items);
         _selectedIndex = -1;
         _selectedSet.Clear();
+        _anchorIndex = -1;
         _scrollY = 0f;
     }
 
     public void AddItem(string item)    => _items.Add(item);
     public void PrependItem(string item) { _items.Insert(0, item); if (_selectedIndex >= 0) _selectedIndex++; }
-    public void Clear() { _items.Clear(); _selectedIndex = -1; _selectedSet.Clear(); _scrollY = 0f; }
+    public void Clear() { _items.Clear(); _selectedIndex = -1; _selectedSet.Clear(); _anchorIndex = -1; _scrollY = 0f; }
 
     /// <summary>Scrolls to show the last item without changing selection.</summary>
     public void ScrollToBottom()
@@ -191,18 +193,33 @@ public class ListBox : Widget
         _lastClickTime  = now;
         _lastClickIndex = idx;
 
-        bool ctrl = (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
-        if (MultiSelect && ctrl)
+        bool ctrl  = (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+        bool shift = (e.Modifiers & KeyModifiers.Shift) != 0;
+
+        if (MultiSelect && shift && _anchorIndex >= 0)
         {
+            // Range select from anchor to current; Ctrl+Shift adds to existing selection
+            int lo = Math.Min(_anchorIndex, idx);
+            int hi = Math.Max(_anchorIndex, idx);
+            if (!ctrl) _selectedSet.Clear();
+            for (int i = lo; i <= hi; i++) _selectedSet.Add(i);
+            _selectedIndex = idx;
+        }
+        else if (MultiSelect && ctrl)
+        {
+            // Toggle individual item; update anchor
             if (_selectedSet.Contains(idx)) _selectedSet.Remove(idx);
             else _selectedSet.Add(idx);
             _selectedIndex = idx;
+            _anchorIndex   = idx;
         }
         else
         {
+            // Plain click: clear and select just this item; reset anchor
             _selectedSet.Clear();
             _selectedIndex = idx;
             _selectedSet.Add(idx);
+            _anchorIndex   = idx;
         }
         SelectionChanged?.Invoke(_selectedIndex);
         if (dbl) ItemDoubleClicked?.Invoke(idx);
