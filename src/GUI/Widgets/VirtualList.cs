@@ -7,17 +7,15 @@ namespace Sokol.GUI;
 /// A virtualized scrollable list that renders only visible items.
 /// Items are drawn using a user-supplied <see cref="ItemTemplate"/> factory; widget
 /// instances are cached in a reuse pool to avoid per-frame allocation.
+/// Inherits scroll state, scrollbar rendering and common mouse handling from
+/// <see cref="ScrollableList"/>.
 /// </summary>
-public class VirtualList : Widget
+public class VirtualList : ScrollableList
 {
-    // ─── Public API ──────────────────────────────────────────────────────────
+    // ─── Data source ─────────────────────────────────────────────────────────
     private IReadOnlyList<object>? _itemsSource;
     private Func<object, Widget>?  _itemTemplate;
-    private int   _selectedIndex = -1;
-    private float _scrollY;
-    private bool  _sbDragging;
-    private float _sbDragStartY;
-    private float _sbDragStartScroll;
+    private int                    _selectedIndex = -1;
 
     /// <summary>The data source. Setting this clears selection and scroll position.</summary>
     public IReadOnlyList<object>? ItemsSource
@@ -36,8 +34,7 @@ public class VirtualList : Widget
         set { _itemTemplate = value; _pool.Clear(); }
     }
 
-    public float ItemHeight    { get; set; }  = 28f;
-    public int   SelectedIndex
+    public int SelectedIndex
     {
         get => _selectedIndex;
         set
@@ -47,184 +44,82 @@ public class VirtualList : Widget
             if (next == _selectedIndex) return;
             _selectedIndex = next;
             ScrollToIndex(_selectedIndex);
-            SelectionChanged?.Invoke(_selectedIndex);
+            RaiseSelectionChanged(_selectedIndex);
         }
     }
 
-    public event Action<int>? SelectionChanged;
+    public VirtualList()
+    {
+        ItemHeight = 28f;   // override base default of 24f
+    }
 
     // ─── Pool ─────────────────────────────────────────────────────────────────
-    // Maps item-index → cached Widget. Cleared when ItemsSource / ItemTemplate changes.
     private readonly Dictionary<int, Widget> _pool = new();
 
     private Widget GetOrCreate(int index)
     {
         var item = _itemsSource![index];
         if (_pool.TryGetValue(index, out var w)) return w;
-        if (_itemTemplate != null)
-        {
-            w = _itemTemplate(item);
-        }
-        else
-        {
-            // Fallback: plain label
-            w = new Label { Text = item?.ToString() ?? string.Empty };
-        }
+        w = _itemTemplate != null
+            ? _itemTemplate(item)
+            : new Label { Text = item?.ToString() ?? string.Empty };
         _pool[index] = w;
         return w;
     }
 
-    // ─── Draw ────────────────────────────────────────────────────────────────
-    public override void Draw(Renderer renderer)
+    // ─── Abstract overrides ──────────────────────────────────────────────────
+    protected override int ItemCount => _itemsSource?.Count ?? 0;
+
+    protected override void DrawItems(Renderer renderer, float viewW, float viewH)
     {
-        if (!Visible) return;
-
-        var theme = ThemeManager.Current;
-        float w   = Bounds.Width;
-        float h   = Bounds.Height;
-        int   n   = _itemsSource?.Count ?? 0;
-
-        // Background
-        renderer.FillRect(new Rect(0, 0, w, h), theme.InputBackColor);
-
+        int n = ItemCount;
         if (n == 0) return;
 
-        int  first = (int)(_scrollY / ItemHeight);
-        int  last  = Math.Min(n - 1, (int)((_scrollY + h) / ItemHeight) + 1);
-
-        float sbW = theme.ScrollBarWidth;
-        float contentW = w - (TotalH(n) > h ? sbW : 0f);
-
-        renderer.Save();
-        renderer.IntersectClip(new Rect(0, 0, contentW, h));
+        var theme = ThemeManager.Current;
+        int first = (int)(_scrollY / ItemHeight);
+        int last  = Math.Min(n - 1, (int)((_scrollY + viewH) / ItemHeight) + 1);
 
         for (int i = first; i <= last; i++)
         {
-            float rowY  = i * ItemHeight - _scrollY;
-            var   rowR  = new Rect(0, rowY, contentW, ItemHeight);
+            float rowY = i * ItemHeight;    // list-space y (base already translated by -_scrollY)
+            var   rowR = new Rect(0, rowY, viewW, ItemHeight);
 
-            // Selection / hover highlight
             if (i == _selectedIndex)
                 renderer.FillRect(rowR, theme.SelectionColor);
 
-            // Draw item widget
             var widget = GetOrCreate(i);
-            widget.Bounds = new Rect(0, 0, contentW, ItemHeight);
+            widget.Bounds = new Rect(0, 0, viewW, ItemHeight);
             widget.PerformLayout(renderer);
             renderer.Save();
             renderer.Translate(0, rowY);
             widget.Draw(renderer);
             renderer.Restore();
         }
-
-        renderer.Restore();
-
-        // ── Scrollbar ──────────────────────────────────────────────────────
-        float totalH    = TotalH(n);
-        float maxScroll = MathF.Max(0f, totalH - h);
-        if (maxScroll > 0f)
-        {
-            float thumbH  = MathF.Max(20f, h * (h / totalH));
-            float thumbY  = (maxScroll > 0 ? _scrollY / maxScroll : 0f) * (h - thumbH);
-            var   trackR  = new Rect(w - sbW, 0, sbW, h);
-            renderer.FillRect(trackR, theme.ScrollBarTrackColor);
-            renderer.FillRoundedRect(
-                new Rect(w - sbW + 2, thumbY + 2, sbW - 4, thumbH - 4),
-                (sbW - 4) * 0.5f,
-                theme.ScrollBarThumbColor);
-        }
     }
 
-    // ─── Input ───────────────────────────────────────────────────────────────
-    public override bool OnMouseDown(MouseEvent e)
+    protected override bool OnItemClick(MouseEvent e, int index)
     {
-        if (e.Button != MouseButton.Left) return false;
-        int   n      = _itemsSource?.Count ?? 0;
-        float totalH = TotalH(n);
-        float h      = Bounds.Height;
-        float sbW    = ThemeManager.Current.ScrollBarWidth;
-
-        // Scrollbar click → start drag
-        if (totalH > h && e.LocalPosition.X >= Bounds.Width - sbW)
-        {
-            _sbDragging        = true;
-            _sbDragStartY      = e.Position.Y;
-            _sbDragStartScroll = _scrollY;
-            return true;
-        }
-
-        int idx = (int)((e.LocalPosition.Y + _scrollY) / ItemHeight);
-        if (idx >= 0 && idx < n)
-            SelectedIndex = idx;
+        if (index >= 0 && index < ItemCount)
+            SelectedIndex = index;
         return true;
     }
 
-    public override bool OnMouseMove(MouseEvent e)
-    {
-        if (!_sbDragging) return false;
-        int   n          = _itemsSource?.Count ?? 0;
-        float totalH     = TotalH(n);
-        float h          = Bounds.Height;
-        float maxScroll  = MathF.Max(0f, totalH - h);
-        float thumbH     = MathF.Max(20f, h * (h / totalH));
-        float trackRange = h - thumbH;
-        if (trackRange > 0)
-        {
-            float delta = e.Position.Y - _sbDragStartY;
-            _scrollY = Math.Clamp(_sbDragStartScroll + delta * maxScroll / trackRange, 0f, maxScroll);
-        }
-        return true;
-    }
-
-    public override bool OnMouseUp(MouseEvent e)
-    {
-        if (_sbDragging) { _sbDragging = false; return true; }
-        return false;
-    }
-
-    public override bool OnMouseScroll(MouseEvent e)
-    {
-        int   n        = _itemsSource?.Count ?? 0;
-        float maxScroll = MathF.Max(0f, TotalH(n) - Bounds.Height);
-        _scrollY = Math.Clamp(_scrollY - e.Scroll.Y * ItemHeight * 2f, 0f, maxScroll);
-        return true;
-    }
-
+    // ─── Keyboard ─────────────────────────────────────────────────────────────
     public override bool OnKeyDown(KeyEvent e)
     {
         int count = _itemsSource?.Count ?? 0;
         if (count == 0) return false;
 
-        const int KEY_UP   = 265;
-        const int KEY_DOWN = 264;
-        const int KEY_HOME = 268;
-        const int KEY_END  = 269;
-
         int next = _selectedIndex < 0 ? 0 : _selectedIndex;
         switch (e.KeyCode)
         {
-            case KEY_UP:   next = Math.Max(0, next - 1); break;
-            case KEY_DOWN: next = Math.Min(count - 1, next + 1); break;
-            case KEY_HOME: next = 0; break;
-            case KEY_END:  next = count - 1; break;
-            default:       return false;
+            case 265: next = Math.Max(0, next - 1);         break;  // Up
+            case 264: next = Math.Min(count - 1, next + 1); break;  // Down
+            case 268: next = 0;                              break;  // Home
+            case 269: next = count - 1;                     break;  // End
+            default:  return false;
         }
         SelectedIndex = next;
         return true;
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-    private float TotalH(int count) => count * ItemHeight;
-
-    private void ScrollToIndex(int idx)
-    {
-        if (idx < 0) return;
-        float itemTop    = idx * ItemHeight;
-        float itemBottom = itemTop + ItemHeight;
-        float viewH      = Bounds.Height > 0 ? Bounds.Height : 200f;
-        if (itemTop < _scrollY)
-            _scrollY = itemTop;
-        else if (itemBottom > _scrollY + viewH)
-            _scrollY = itemBottom - viewH;
     }
 }

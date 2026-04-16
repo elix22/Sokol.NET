@@ -5,7 +5,7 @@ namespace Sokol.GUI;
 /// <summary>
 /// Scrollable container with vertical (and optionally horizontal) scrollbars.
 /// </summary>
-public class ScrollView : Widget
+public class ScrollView : Panel
 {
     private float _scrollX, _scrollY;
     private bool  _dragV, _dragH;
@@ -37,8 +37,9 @@ public class ScrollView : Widget
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float sb   = theme.ScrollBarWidth;
 
-        // Background
-        renderer.FillRect(bounds, theme.SurfaceColor);
+        // Background — use Panel.BackgroundColor if set, otherwise theme surface color
+        var bg = BackgroundColor ?? theme.SurfaceColor;
+        renderer.FillRect(bounds, bg);
 
         // Clip to viewport (shrunk for scrollbars if visible)
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;

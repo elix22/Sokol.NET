@@ -8,7 +8,7 @@ public enum TextWrap  { None, Wrap }
 /// </
 public class Label : Widget
 {
-    public string  Text      { get; set; } = string.Empty;
+    public virtual string  Text      { get; set; } = string.Empty;
     public UIColor? ForeColor { get; set; }
     public Font?   Font      { get; set; }
     public float   FontSize  { get; set; } = 0f;   // 0 = theme default
@@ -63,7 +63,7 @@ public class Label : Widget
         base.Draw(renderer);
     }
 
-    private void ApplyFont(Renderer renderer)
+    protected void ApplyFont(Renderer renderer)
     {
         var theme = ThemeManager.Current;
         renderer.SetFont(Font?.Name ?? theme.DefaultFont);
