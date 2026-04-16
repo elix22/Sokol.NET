@@ -38,6 +38,7 @@ public class RichLabel : Widget
 
         // Run-time layout cache (filled during Draw)
         public float X, Y, Width;
+        public bool  IsLineBreak;   // synthetic span emitted for \n; no content to draw
     }
 
     // ─── Parser ──────────────────────────────────────────────────────────────
@@ -110,15 +111,17 @@ public class RichLabel : Widget
         bool bold, bool italic, UIColor? color, float size, string? link)
     {
         if (string.IsNullOrEmpty(content)) return;
-        spans.Add(new Span
+        // Split on explicit newlines so that \n never ends up inside a Span's Content.
+        var parts = content.Split('\n');
+        for (int i = 0; i < parts.Length; i++)
         {
-            Content  = content,
-            Bold     = bold,
-            Italic   = italic,
-            Color    = color,
-            FontSize = size,
-            Link     = link,
-        });
+            if (parts[i].Length > 0)
+                spans.Add(new Span { Content = parts[i], Bold = bold, Italic = italic,
+                                     Color = color, FontSize = size, Link = link });
+            // After every part except the last, emit an explicit line-break marker.
+            if (i < parts.Length - 1)
+                spans.Add(new Span { IsLineBreak = true });
+        }
     }
 
     private static UIColor? TryParseColor(string hex)
@@ -171,16 +174,29 @@ public class RichLabel : Widget
         for (int i = 0; i < _spans.Count; i++)
         {
             var span = _spans[i];
+
+            // Explicit newline — advance to next line without rendering anything.
+            if (span.IsLineBreak)
+            {
+                x  = startX;
+                y += lineH;
+                continue;
+            }
+
             ApplySpanFont(renderer, theme, span);
 
             renderer.MeasureTextMetrics(out _, out _, out float lh);
             float sw = renderer.MeasureText(span.Content);
 
-            // Line wrap
-            if (x > startX && x + sw > startX + maxW)
+            // Line wrap — allow wrapping at the start of a line too so that long
+            // spans don't silently overflow the widget's right edge.
+            if (x + sw > startX + maxW && maxW > 0)
             {
-                x  = startX;
-                y += lh;
+                if (x > startX)   // not already at line start
+                {
+                    x  = startX;
+                    y += lh;
+                }
             }
 
             // Cache position for hit-testing
@@ -219,14 +235,14 @@ public class RichLabel : Widget
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        _hoverSpan = FindSpan(e.Position);
+        _hoverSpan = FindSpan(e.LocalPosition);
         return false;
     }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        int idx = FindSpan(e.Position);
+        int idx = FindSpan(e.LocalPosition);
         if (idx >= 0 && _spans[idx].Link != null)
         {
             LinkClicked?.Invoke(_spans[idx].Link!);
@@ -255,6 +271,7 @@ public class RichLabel : Widget
         float x      = 0, y = 0, lineH = 0;
         foreach (var span in _spans)
         {
+            if (span.IsLineBreak) { x = 0; y += lineH; continue; }
             ApplySpanFont(renderer, theme, span);
             renderer.MeasureTextMetrics(out _, out _, out float lh);
             float sw = renderer.MeasureText(span.Content);
@@ -271,7 +288,7 @@ public class RichLabel : Widget
         for (int i = 0; i < _spans.Count; i++)
         {
             var s = _spans[i];
-            if (s.Width <= 0) continue;
+            if (s.IsLineBreak || s.Width <= 0) continue;
             float lh = theme.FontSize;
             var r = new Rect(s.X + Padding.Left, s.Y + Padding.Top, s.Width, lh);
             if (r.Contains(pos)) return i;

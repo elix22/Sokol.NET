@@ -68,7 +68,7 @@ public class Window : Panel
     // ─── Input ───────────────────────────────────────────────────────────────
     public override bool OnMouseDown(MouseEvent e)
     {
-        var local = ToLocal(e.Position);
+        var local = e.LocalPosition;
         float tbH = TitleBarHeight;
 
         // Close button hit
@@ -92,7 +92,7 @@ public class Window : Panel
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        var local  = ToLocal(e.Position);
+        var local  = e.LocalPosition;
         float tbH  = TitleBarHeight;
         _hoverClose = IsClosable && local.Y < tbH && local.X > Bounds.Width - tbH;
 

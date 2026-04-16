@@ -98,7 +98,7 @@ public sealed class ContextMenu : Widget
     // ─── Input ───────────────────────────────────────────────────────────────
     public override bool OnMouseMove(MouseEvent e)
     {
-        var   local   = ToLocal(e.Position);
+        var   local   = e.LocalPosition;
         float y       = Pad;
         int   newHov  = -1;
         for (int i = 0; i < _items.Count; i++)
@@ -119,7 +119,7 @@ public sealed class ContextMenu : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        var   local   = ToLocal(e.Position);
+        var   local   = e.LocalPosition;
         float y       = Pad;
         for (int i = 0; i < _items.Count; i++)
         {

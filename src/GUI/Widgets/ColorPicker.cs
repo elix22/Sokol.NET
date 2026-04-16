@@ -207,15 +207,15 @@ public class ColorPicker : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        _drag = HitZone(e.Position);
-        if (_drag != DragZone.None) UpdateFromPos(e.Position);
+        _drag = HitZone(e.LocalPosition);
+        if (_drag != DragZone.None) UpdateFromPos(e.LocalPosition);
         return _drag != DragZone.None;
     }
 
     public override bool OnMouseMove(MouseEvent e)
     {
         if (_drag == DragZone.None) return false;
-        UpdateFromPos(e.Position);
+        UpdateFromPos(e.LocalPosition);
         return true;
     }
 

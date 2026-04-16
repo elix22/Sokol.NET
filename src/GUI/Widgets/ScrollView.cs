@@ -110,10 +110,10 @@ public class ScrollView : Widget
         var theme = ThemeManager.Current;
         float sb  = theme.ScrollBarWidth;
         bool showV = CanScrollVertical && ContentHeight > Bounds.Height;
-        if (showV && e.Position.X >= ScreenPosition.X + Bounds.Width - sb)
+        if (showV && e.LocalPosition.X >= Bounds.Width - sb)
         {
-            _dragV         = true;
-            _dragStartY    = e.Position.Y;
+            _dragV            = true;
+            _dragStartY       = e.LocalPosition.Y;
             _dragStartScrollY = _scrollY;
             return true;
         }
@@ -126,7 +126,7 @@ public class ScrollView : Widget
         {
             float cH = MathF.Max(ContentHeight, 1f);
             float ratio = Bounds.Height / cH;
-            float dy = (e.Position.Y - _dragStartY) / ratio;
+            float dy = (e.LocalPosition.Y - _dragStartY) / ratio;
             ScrollY = MathF.Max(0, _dragStartScrollY + dy);
             return true;
         }

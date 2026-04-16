@@ -126,7 +126,7 @@ public class SplitView : Widget
     {
         float w = Bounds.Width, h = Bounds.Height;
         var divR = DividerRect(w, h);
-        var localPos = ToLocal(e.Position);  // e.Position is screen coords
+        var localPos = e.LocalPosition;
         _dividerHovered = divR.Contains(localPos);
 
         if (_dragging)
@@ -155,7 +155,7 @@ public class SplitView : Widget
     {
         if (e.Button != MouseButton.Left) return false;
         float w = Bounds.Width, h = Bounds.Height;
-        var localPos = ToLocal(e.Position);  // e.Position is screen coords; DividerRect is local
+        var localPos = e.LocalPosition;  // already in widget-local coords via InputRouter
         if (!DividerRect(w, h).Contains(localPos)) return false;
         _dragging = true;
         _dragStartPos   = Orientation == SliderOrientation.Horizontal ? e.Position.X : e.Position.Y;

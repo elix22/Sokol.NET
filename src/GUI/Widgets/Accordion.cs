@@ -163,7 +163,7 @@ public class Accordion : Widget
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
-    public override bool OnMouseMove(MouseEvent e)  { _mousePos = ToLocal(e.Position); return true; }
+    public override bool OnMouseMove(MouseEvent e)  { _mousePos = e.LocalPosition; return true; }
 
     public override bool OnMouseDown(MouseEvent e)
     {

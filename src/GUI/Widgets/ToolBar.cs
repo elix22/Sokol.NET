@@ -27,7 +27,8 @@ public sealed class ToolBarItem
 public class ToolBar : Widget
 {
     private readonly List<ToolBarItem> _items = [];
-    private int _hoveredIdx = -1;
+    private int    _hoveredIdx = -1;
+    private Rect[] _itemRects  = [];   // cached during Draw; index matches _items
 
     public const float DefaultItemSize = 28f;
 
@@ -85,6 +86,9 @@ public class ToolBar : Widget
 
         ApplyFont(renderer, theme);
 
+        if (_itemRects.Length != _items.Count)
+            _itemRects = new Rect[_items.Count];
+
         float pos = 2f;
         for (int i = 0; i < _items.Count; i++)
         {
@@ -96,6 +100,7 @@ public class ToolBar : Widget
                     renderer.DrawLine(pos + sep * 0.5f, 4f, pos + sep * 0.5f, h - 4f, 1f, theme.BorderColor);
                 else
                     renderer.DrawLine(4f, pos + sep * 0.5f, w - 4f, pos + sep * 0.5f, 1f, theme.BorderColor);
+                _itemRects[i] = default;
                 pos += sep;
                 continue;
             }
@@ -104,6 +109,8 @@ public class ToolBar : Widget
             var   itemR = Orientation == SliderOrientation.Horizontal
                 ? new Rect(pos, 2f, iw, h - 4f)
                 : new Rect(2f, pos, w - 4f, iw);
+
+            _itemRects[i] = itemR;
 
             bool hov     = i == _hoveredIdx && item.Enabled;
             bool pressed = item.Pressed && item.Type == ToolBarItemType.Toggle;
@@ -134,14 +141,14 @@ public class ToolBar : Widget
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        _hoveredIdx = HitItem(e.Position);
+        _hoveredIdx = HitItem(e.LocalPosition);
         return _hoveredIdx >= 0;
     }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        int idx = HitItem(e.Position);
+        int idx = HitItem(e.LocalPosition);
         if (idx < 0) return false;
         var item = _items[idx];
         if (!item.Enabled) return true;
@@ -165,16 +172,10 @@ public class ToolBar : Widget
 
     private int HitItem(Vector2 pos)
     {
-        float coord = Orientation == SliderOrientation.Horizontal ? pos.X : pos.Y;
-        float cur   = 2f;
-        for (int i = 0; i < _items.Count; i++)
+        for (int i = 0; i < _itemRects.Length; i++)
         {
-            var item = _items[i];
-            float size = item.Type == ToolBarItemType.Separator
-                ? SepSize()
-                : ItemWidth(item, null) + 2f;
-            if (coord >= cur && coord < cur + size) return i;
-            cur += size;
+            if (_items[i].Type == ToolBarItemType.Separator) continue;
+            if (_itemRects[i].Contains(pos)) return i;
         }
         return -1;
     }

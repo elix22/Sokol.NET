@@ -40,11 +40,12 @@ public sealed class InputRouter
         {
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE:
             {
-                var pos = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
+                var pos   = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
                 var delta = new Vector2(ev->mouse_dx / dpi, ev->mouse_dy / dpi);
-                var me = new MouseEvent { Position = pos, Delta = delta, Modifiers = Mods(ev) };
+                var me    = new MouseEvent { Position = pos, Delta = delta, Modifiers = Mods(ev) };
                 UpdateHovered(pos, me);
-                (_captured ?? _hovered)?.OnMouseMove(me);
+                var moveTarget = _captured ?? _hovered;
+                moveTarget?.OnMouseMove(Localize(moveTarget, me));
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
@@ -65,7 +66,7 @@ public sealed class InputRouter
                     _captured = target;
                     if (btn == MouseButton.Left)
                         _focus.SetFocus(target);
-                    target.OnMouseDown(me);
+                    target.OnMouseDown(Localize(target, me));
                 }
                 break;
             }
@@ -73,16 +74,17 @@ public sealed class InputRouter
             {
                 var pos = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
                 var btn = MapButton(ev->mouse_button);
-                var me = new MouseEvent { Position = pos, Button = btn, Clicks = _clickCount, Modifiers = Mods(ev) };
-                (_captured ?? _hovered)?.OnMouseUp(me);
+                var me  = new MouseEvent { Position = pos, Button = btn, Clicks = _clickCount, Modifiers = Mods(ev) };
+                var upTarget = _captured ?? _hovered;
+                upTarget?.OnMouseUp(Localize(upTarget, me));
                 _captured = null;
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_SCROLL:
             {
                 var pos = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
-                var me = new MouseEvent { Position = pos, Scroll = new Vector2(ev->scroll_x, ev->scroll_y), Modifiers = Mods(ev) };
-                _hovered?.OnMouseScroll(me);
+                var me  = new MouseEvent { Position = pos, Scroll = new Vector2(ev->scroll_x, ev->scroll_y), Modifiers = Mods(ev) };
+                if (_hovered != null) _hovered.OnMouseScroll(Localize(_hovered, me));
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
@@ -137,6 +139,21 @@ public sealed class InputRouter
         float dx = pos.X - _lastClickX, dy = pos.Y - _lastClickY;
         return (now - _lastClickTime) < kDoubleClickSec &&
                (dx * dx + dy * dy) < kDoubleClickDist * kDoubleClickDist;
+    }
+
+    private static MouseEvent Localize(Widget target, MouseEvent e)
+    {
+        var local = target.ToLocal(e.Position);
+        return new MouseEvent
+        {
+            Position      = e.Position,
+            LocalPosition = local,
+            Delta         = e.Delta,
+            Button        = e.Button,
+            Clicks        = e.Clicks,
+            Scroll        = e.Scroll,
+            Modifiers     = e.Modifiers,
+        };
     }
 
     private static MouseButton MapButton(sapp_mousebutton b) => b switch

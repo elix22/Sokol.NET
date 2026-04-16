@@ -130,14 +130,14 @@ public class StatusBar : Widget
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        _hoveredIdx = HitSegment(e.Position.X);
+        _hoveredIdx = HitSegment(e.LocalPosition.X);
         return true;
     }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        int idx = HitSegment(e.Position.X);
+        int idx = HitSegment(e.LocalPosition.X);
         if (idx >= 0) _items[idx].OnClick?.Invoke();
         return true;
     }

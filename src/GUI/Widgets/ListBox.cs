@@ -63,6 +63,15 @@ public class ListBox : Widget
     public void PrependItem(string item) { _items.Insert(0, item); if (_selectedIndex >= 0) _selectedIndex++; }
     public void Clear() { _items.Clear(); _selectedIndex = -1; _selectedSet.Clear(); _scrollY = 0f; }
 
+    /// <summary>Scrolls to show the last item without changing selection.</summary>
+    public void ScrollToBottom()
+    {
+        float totalH   = _items.Count * ItemHeight;
+        float viewH    = Bounds.Height > 0 ? Bounds.Height : 200f;
+        float maxScroll = MathF.Max(0f, totalH - viewH);
+        _scrollY = maxScroll;
+    }
+
     // ─── Layout ──────────────────────────────────────────────────────────────
     public override Vector2 PreferredSize(Renderer renderer)
     {
@@ -138,7 +147,7 @@ public class ListBox : Widget
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
     public override bool OnMouseMove(MouseEvent e)
     {
-        _mouseLocal = ToLocal(e.Position);
+        _mouseLocal = e.LocalPosition;
         if (_sbDragging)
         {
             float totalH    = _items.Count * ItemHeight;
@@ -159,7 +168,7 @@ public class ListBox : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        var   localPos = ToLocal(e.Position);
+        var   localPos = e.LocalPosition;
         float sb       = ThemeManager.Current.ScrollBarWidth;
         float totalH   = _items.Count * ItemHeight;
         float viewH    = Bounds.Height;

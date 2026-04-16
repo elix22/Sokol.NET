@@ -15,6 +15,9 @@ public class VirtualList : Widget
     private Func<object, Widget>?  _itemTemplate;
     private int   _selectedIndex = -1;
     private float _scrollY;
+    private bool  _sbDragging;
+    private float _sbDragStartY;
+    private float _sbDragStartScroll;
 
     /// <summary>The data source. Setting this clears selection and scroll position.</summary>
     public IReadOnlyList<object>? ItemsSource
@@ -107,6 +110,7 @@ public class VirtualList : Widget
             // Draw item widget
             var widget = GetOrCreate(i);
             widget.Bounds = new Rect(0, 0, contentW, ItemHeight);
+            widget.PerformLayout(renderer);
             renderer.Save();
             renderer.Translate(0, rowY);
             widget.Draw(renderer);
@@ -135,11 +139,47 @@ public class VirtualList : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        int idx = (int)((e.Position.Y + _scrollY) / ItemHeight);
-        int n   = _itemsSource?.Count ?? 0;
+        int   n      = _itemsSource?.Count ?? 0;
+        float totalH = TotalH(n);
+        float h      = Bounds.Height;
+        float sbW    = ThemeManager.Current.ScrollBarWidth;
+
+        // Scrollbar click → start drag
+        if (totalH > h && e.LocalPosition.X >= Bounds.Width - sbW)
+        {
+            _sbDragging        = true;
+            _sbDragStartY      = e.Position.Y;
+            _sbDragStartScroll = _scrollY;
+            return true;
+        }
+
+        int idx = (int)((e.LocalPosition.Y + _scrollY) / ItemHeight);
         if (idx >= 0 && idx < n)
             SelectedIndex = idx;
         return true;
+    }
+
+    public override bool OnMouseMove(MouseEvent e)
+    {
+        if (!_sbDragging) return false;
+        int   n          = _itemsSource?.Count ?? 0;
+        float totalH     = TotalH(n);
+        float h          = Bounds.Height;
+        float maxScroll  = MathF.Max(0f, totalH - h);
+        float thumbH     = MathF.Max(20f, h * (h / totalH));
+        float trackRange = h - thumbH;
+        if (trackRange > 0)
+        {
+            float delta = e.Position.Y - _sbDragStartY;
+            _scrollY = Math.Clamp(_sbDragStartScroll + delta * maxScroll / trackRange, 0f, maxScroll);
+        }
+        return true;
+    }
+
+    public override bool OnMouseUp(MouseEvent e)
+    {
+        if (_sbDragging) { _sbDragging = false; return true; }
+        return false;
     }
 
     public override bool OnMouseScroll(MouseEvent e)

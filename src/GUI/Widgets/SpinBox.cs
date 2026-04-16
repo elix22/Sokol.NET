@@ -152,7 +152,7 @@ public class SpinBox : Widget
     public override bool OnMouseMove(MouseEvent e)
     {
         float btnW  = Bounds.Height;
-        float localX = ToLocal(e.Position).X;
+        float localX = e.LocalPosition.X;
         _leftHovered  = localX < btnW;
         _rightHovered = localX >= Bounds.Width - btnW;
         return true;
@@ -162,7 +162,7 @@ public class SpinBox : Widget
     {
         if (e.Button != MouseButton.Left) return false;
         float btnW   = Bounds.Height;
-        float localX = ToLocal(e.Position).X;
+        float localX = e.LocalPosition.X;
         if (localX < btnW)
         {
             _leftPressed  = true;

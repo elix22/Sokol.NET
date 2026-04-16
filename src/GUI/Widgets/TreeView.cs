@@ -41,6 +41,7 @@ public class TreeView : Widget
     private bool      _sbDragging;
     private float     _sbDragStartY;
     private float     _sbDragStartScroll;
+    private readonly HashSet<TreeNode> _selectedNodes = [];
     public  const float ItemHeight   = 22f;
     public  const float IndentWidth  = 16f;
     public  const float ChevronWidth = 14f;
@@ -48,17 +49,21 @@ public class TreeView : Widget
     public TreeNode? Root
     {
         get => _root;
-        set { _root = value; _selected = null; _scrollY = 0f; InvalidateLayout(); }
+        set { _root = value; _selected = null; _selectedNodes.Clear(); _scrollY = 0f; InvalidateLayout(); }
     }
 
-    public TreeNode? SelectedNode => _selected;
+    public TreeNode?              SelectedNode  => _selected;
+    public IReadOnlySet<TreeNode> SelectedNodes => _selectedNodes;
+
+    /// <summary>When true, Ctrl/Cmd+Click adds to selection instead of replacing it.</summary>
+    public bool MultiSelect { get; set; } = false;
 
     public Font?  Font     { get; set; }
     public float  FontSize { get; set; } = 0f;
     public bool   ShowRoot { get; set; } = false;
 
-    public event Action<TreeNode>? SelectionChanged;
-    public event Action<TreeNode>? NodeExpanded;
+    public event Action<TreeNode>?  SelectionChanged;
+    public event Action<TreeNode>?  NodeExpanded;
 
     // ─── Layout ──────────────────────────────────────────────────────────────
     public override Vector2 PreferredSize(Renderer renderer)
@@ -101,7 +106,8 @@ public class TreeView : Widget
             var rowR = new Rect(0, rowY, viewW, ItemHeight);
 
             // Selection / hover
-            if (node.IsSelected)
+            bool isMultiSel = MultiSelect && _selectedNodes.Contains(node);
+            if (node.IsSelected || isMultiSel)
                 renderer.FillRect(rowR, theme.SelectionColor);
             else if (IsHovered && HoveredRow()?.node == node)
                 renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.1f));
@@ -151,7 +157,7 @@ public class TreeView : Widget
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
     public override bool OnMouseMove(MouseEvent e)
     {
-        _mousePos = ToLocal(e.Position);
+        _mousePos = e.LocalPosition;
         if (_sbDragging)
         {
             float totalH    = _flatRows.Count * ItemHeight;
@@ -172,7 +178,7 @@ public class TreeView : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        _mousePos = ToLocal(e.Position);
+        _mousePos = e.LocalPosition;
 
         // Scrollbar click → start drag
         float sb     = ThemeManager.Current.ScrollBarWidth;
@@ -190,18 +196,20 @@ public class TreeView : Widget
         if (hit == null) return true;
         var node = hit.Value.node;
 
+        bool addToSel = MultiSelect && (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+
         // Any click on a parent row → toggle expand + select
         if (node.Children.Count > 0)
         {
             node.IsExpanded = !node.IsExpanded;
             if (node.IsExpanded) NodeExpanded?.Invoke(node);
             InvalidateLayout();
-            Select(node);
+            Select(node, addToSel);
             return true;
         }
 
         // Leaf row click → select only
-        Select(node);
+        Select(node, addToSel);
         return true;
     }
 
@@ -273,8 +281,24 @@ public class TreeView : Widget
         return _flatRows[idx];
     }
 
-    private void Select(TreeNode node)
+    private void Select(TreeNode node, bool addToSelection = false)
     {
+        if (MultiSelect && addToSelection)
+        {
+            // Toggle in multi-selection set; primary _selected tracks last clicked
+            if (_selectedNodes.Contains(node))
+                _selectedNodes.Remove(node);
+            else
+                _selectedNodes.Add(node);
+        }
+        else
+        {
+            // Clear all previous selections
+            foreach (var n in _selectedNodes) n.IsSelected = false;
+            _selectedNodes.Clear();
+            if (_selected != null) _selected.IsSelected = false;
+            _selectedNodes.Add(node);
+        }
         if (_selected != null) _selected.IsSelected = false;
         _selected = node;
         if (node != null) node.IsSelected = true;

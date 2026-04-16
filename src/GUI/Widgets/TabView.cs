@@ -185,7 +185,7 @@ public class TabView : Widget
 
     public override bool OnMouseDown(MouseEvent e)
     {
-        var local  = ToLocal(e.Position);
+        var local  = e.LocalPosition;
         float hdrH = ThemeManager.Current.TabBarHeight;
 
         if (local.Y < hdrH)

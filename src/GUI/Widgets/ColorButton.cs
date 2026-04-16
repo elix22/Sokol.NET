@@ -100,7 +100,7 @@ public class ColorButton : Widget
 
         if (_open && _pickerCache != null)
         {
-            var local = ToLocal(e.Position);
+            var local = e.LocalPosition;
             var popR  = _pickerCache.Bounds;
             if (popR.Contains(local))
             {
@@ -124,7 +124,7 @@ public class ColorButton : Widget
     public override bool OnMouseMove(MouseEvent e)
     {
         if (!_open || _pickerCache == null) return false;
-        var local = ToLocal(e.Position);
+        var local = e.LocalPosition;
         var popR  = _pickerCache.Bounds;
         var pl    = new Vector2(local.X - popR.X, local.Y - popR.Y);
         return _pickerCache.OnMouseMove(new MouseEvent { Position = pl, Button = e.Button });
@@ -133,7 +133,7 @@ public class ColorButton : Widget
     public override bool OnMouseUp(MouseEvent e)
     {
         if (!_open || _pickerCache == null) return false;
-        var local = ToLocal(e.Position);
+        var local = e.LocalPosition;
         var popR  = _pickerCache.Bounds;
         var pl    = new Vector2(local.X - popR.X, local.Y - popR.Y);
         return _pickerCache.OnMouseUp(new MouseEvent { Position = pl, Button = e.Button });

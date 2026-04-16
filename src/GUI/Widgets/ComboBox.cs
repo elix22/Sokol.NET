@@ -133,7 +133,7 @@ public class ComboBox : Widget
     // ─── Input ───────────────────────────────────────────────────────────────
     public override bool OnMouseDown(MouseEvent e)
     {
-        var local = ToLocal(e.Position);
+        var local = e.LocalPosition;
         float itemH = ThemeManager.Current.InputHeight;
 
         if (_open)

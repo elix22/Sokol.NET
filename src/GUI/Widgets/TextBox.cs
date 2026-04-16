@@ -34,6 +34,24 @@ public class TextBox : Widget
     private float   _innerLeft;
     private float   _innerWidth;
 
+    // ─── Extensibility hooks for derived classes ──────────────────────────────
+    /// <summary>Current caret position (character index). Readable/settable by derived classes.</summary>
+    protected int Cursor
+    {
+        get => _cursor;
+        set => _cursor = Math.Clamp(value, 0, _sb.Length);
+    }
+
+    /// <summary>Return false to block a typed character. Default: allow all printable chars.</summary>
+    protected virtual bool IsCharAllowed(char c) => true;
+
+    /// <summary>Override to customise the border colour (e.g. red for invalid input).</summary>
+    protected virtual UIColor GetBorderColor(Theme theme) =>
+        IsFocused ? theme.AccentColor : theme.BorderColor;
+
+    /// <summary>Override to customise the border width.</summary>
+    protected virtual float GetBorderWidth(Theme theme) => IsFocused ? 2f : 1.5f;
+
     // ─── Public API ───────────────────────────────────────────────────────────
     public string Text
     {
@@ -87,8 +105,7 @@ public class TextBox : Widget
 
         // Background + border
         renderer.FillRoundedRect(bounds, cr, BackColor ?? theme.InputBackColor);
-        renderer.StrokeRoundedRect(bounds, cr, 1.5f,
-            IsFocused ? theme.AccentColor : theme.BorderColor);
+        renderer.StrokeRoundedRect(bounds, cr, GetBorderWidth(theme), GetBorderColor(theme));
 
         // Font setup
         ApplyFont(renderer, theme);
@@ -157,7 +174,7 @@ public class TextBox : Widget
     {
         if (e.Button != MouseButton.Left) return false;
 
-        var  local  = ToLocal(e.Position);
+        var  local  = e.LocalPosition;
         float textX = local.X - _innerLeft + _scrollX;
         int   idx   = XToCharIndex(textX);
 
@@ -189,7 +206,7 @@ public class TextBox : Widget
     {
         if (!_mouseDragging) return false;
 
-        var   local  = ToLocal(e.Position);
+        var   local  = e.LocalPosition;
         float textX  = local.X - _innerLeft + _scrollX;
         int   idx    = XToCharIndex(textX);
         if (_selStart < 0) _selStart = _cursor;
@@ -214,9 +231,10 @@ public class TextBox : Widget
         if (e.CharCode < 32 || e.CharCode == 127) return false;
         if (MaxLength > 0 && SelectionLength() == 0 && _sb.Length >= MaxLength) return false;
 
+        char ch = (char)e.CharCode;
+        if (!IsCharAllowed(ch)) return false;
         SaveUndo();
         DeleteSelection();
-        char ch = (char)e.CharCode;
         _sb.Insert(_cursor, ch);
         _cursor++;
         TextChanged?.Invoke(Text);
@@ -389,6 +407,7 @@ public class TextBox : Widget
         foreach (char ch in paste)
         {
             if (ch < 32 || ch == 127) continue;
+            if (!IsCharAllowed(ch)) continue;
             if (MaxLength > 0 && _sb.Length >= MaxLength) break;
             _sb.Insert(_cursor, ch);
             _cursor++;

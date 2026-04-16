@@ -178,22 +178,22 @@ public class PropertyGrid : Widget
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        float localY = e.Position.Y + _scrollY;
+        float localY = e.LocalPosition.Y + _scrollY;
         float w      = Bounds.Width;
         float sb     = theme.ScrollBarWidth;
         float viewW  = w - sb;
         float nameW  = viewW * SplitRatio;
 
         // Only forward clicks on the editor column
-        if (e.Position.X <= nameW) return true;
+        if (e.LocalPosition.X <= nameW) return true;
 
         int idx;
         if (!RowIndexFromY(localY, out idx)) return false;
         var editor = _editors.TryGetValue(idx, out var ed) ? ed : null;
         if (editor == null) return false;
 
-        float ex = e.Position.X - nameW - 2;
-        float ey = e.Position.Y + _scrollY - RowYOfIndex(idx) - 2;
+        float ex = e.LocalPosition.X - nameW - 2;
+        float ey = e.LocalPosition.Y + _scrollY - RowYOfIndex(idx) - 2;
         editor.OnMouseDown(new MouseEvent { Position = new Vector2(ex, ey), Button = e.Button, Clicks = e.Clicks });
         return true;
     }

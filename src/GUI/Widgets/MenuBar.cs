@@ -184,7 +184,7 @@ public class MenuBar : Widget
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        _lastMousePos = ToLocal(e.Position); // screen→local
+        _lastMousePos = e.LocalPosition;
         int idx = HitHeader(e.Position);
         if (idx >= 0) _hoveredIdx = idx;
 
