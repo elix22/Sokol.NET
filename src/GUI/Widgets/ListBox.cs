@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using static Sokol.SApp;
 
 namespace Sokol.GUI;
 
@@ -13,6 +15,10 @@ public class ListBox : Widget
     private float _scrollY;
     private float _lastClickTime;
     private int   _lastClickIndex = -1;
+    private bool  _sbDragging;
+    private float _sbDragStartY;
+    private float _sbDragStartScroll;
+    private readonly HashSet<int> _selectedSet = new();
     public const float ItemHeight = 24f;
 
     public IReadOnlyList<string> Items => _items;
@@ -25,6 +31,8 @@ public class ListBox : Widget
             int v = (_items.Count == 0) ? -1 : Math.Clamp(value, -1, _items.Count - 1);
             if (v == _selectedIndex) return;
             _selectedIndex = v;
+            _selectedSet.Clear();
+            if (v >= 0) _selectedSet.Add(v);
             ScrollToSelected();
             SelectionChanged?.Invoke(_selectedIndex);
         }
@@ -47,11 +55,13 @@ public class ListBox : Widget
         _items.Clear();
         _items.AddRange(items);
         _selectedIndex = -1;
+        _selectedSet.Clear();
         _scrollY = 0f;
     }
 
-    public void AddItem(string item) => _items.Add(item);
-    public void Clear() { _items.Clear(); _selectedIndex = -1; _scrollY = 0f; }
+    public void AddItem(string item)    => _items.Add(item);
+    public void PrependItem(string item) { _items.Insert(0, item); if (_selectedIndex >= 0) _selectedIndex++; }
+    public void Clear() { _items.Clear(); _selectedIndex = -1; _selectedSet.Clear(); _scrollY = 0f; }
 
     // ─── Layout ──────────────────────────────────────────────────────────────
     public override Vector2 PreferredSize(Renderer renderer)
@@ -91,7 +101,7 @@ public class ListBox : Widget
             if (itemY > _scrollY + h)          break;
 
             var  rowR = new Rect(0, itemY, viewW, ItemHeight);
-            bool sel  = i == _selectedIndex;
+            bool sel  = _selectedSet.Count > 0 ? _selectedSet.Contains(i) : i == _selectedIndex;
             bool hov  = IsHovered && HoveredIndex() == i;
 
             if (sel)
@@ -126,13 +136,44 @@ public class ListBox : Widget
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
-    public override bool OnMouseMove(MouseEvent e)  { _mouseLocal = ToLocal(e.Position); return true; }
+    public override bool OnMouseMove(MouseEvent e)
+    {
+        _mouseLocal = ToLocal(e.Position);
+        if (_sbDragging)
+        {
+            float totalH    = _items.Count * ItemHeight;
+            float h         = Bounds.Height;
+            float maxScroll = MathF.Max(0f, totalH - h);
+            float thumbH    = MathF.Max(h * h / totalH, 20f);
+            float trackRange = h - thumbH;
+            if (trackRange > 0)
+            {
+                float delta = e.Position.Y - _sbDragStartY;
+                _scrollY = Math.Clamp(_sbDragStartScroll + delta * maxScroll / trackRange, 0f, maxScroll);
+            }
+            return true;
+        }
+        return true;
+    }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
+        var   localPos = ToLocal(e.Position);
+        float sb       = ThemeManager.Current.ScrollBarWidth;
+        float totalH   = _items.Count * ItemHeight;
+        float viewH    = Bounds.Height;
 
-        int idx = IndexFromY(ToLocal(e.Position).Y);
+        // Scrollbar drag
+        if (totalH > viewH && localPos.X >= Bounds.Width - sb)
+        {
+            _sbDragging        = true;
+            _sbDragStartY      = e.Position.Y;
+            _sbDragStartScroll = _scrollY;
+            return true;
+        }
+
+        int idx = IndexFromY(localPos.Y);
         if (idx < 0 || idx >= _items.Count) return true;
 
         // Double-click detection
@@ -141,10 +182,28 @@ public class ListBox : Widget
         _lastClickTime  = now;
         _lastClickIndex = idx;
 
-        _selectedIndex = idx;
+        bool ctrl = (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+        if (MultiSelect && ctrl)
+        {
+            if (_selectedSet.Contains(idx)) _selectedSet.Remove(idx);
+            else _selectedSet.Add(idx);
+            _selectedIndex = idx;
+        }
+        else
+        {
+            _selectedSet.Clear();
+            _selectedIndex = idx;
+            _selectedSet.Add(idx);
+        }
         SelectionChanged?.Invoke(_selectedIndex);
         if (dbl) ItemDoubleClicked?.Invoke(idx);
         return true;
+    }
+
+    public override bool OnMouseUp(MouseEvent e)
+    {
+        if (_sbDragging) { _sbDragging = false; return true; }
+        return false;
     }
 
     public override bool OnMouseScroll(MouseEvent e)
@@ -159,6 +218,21 @@ public class ListBox : Widget
     {
         int count = _items.Count;
         if (count == 0) return false;
+        bool ctrl  = (e.Modifiers & KeyModifiers.Control) != 0;
+        bool cmd   = (e.Modifiers & KeyModifiers.Super)   != 0;
+        if ((ctrl || cmd) && e.KeyCode == 67)   // Ctrl/Cmd+C — copy selected items
+        {
+            if (MultiSelect && _selectedSet.Count > 0)
+            {
+                var text = string.Join("\n", _selectedSet.OrderBy(i => i).Select(i => _items[i]));
+                try { sapp_set_clipboard_string(text); } catch { }
+            }
+            else if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
+            {
+                try { sapp_set_clipboard_string(_items[_selectedIndex]); } catch { }
+            }
+            return true;
+        }
         int next = _selectedIndex;
         switch (e.KeyCode)
         {

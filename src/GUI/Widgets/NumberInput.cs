@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using static Sokol.SApp;
 
 namespace Sokol.GUI;
 
@@ -113,6 +114,29 @@ public class NumberInput : Widget
     public override bool OnKeyDown(KeyEvent e)
     {
         if (!_focused) return false;
+
+        bool ctrl  = (e.Modifiers & KeyModifiers.Control) != 0;
+        bool cmd   = (e.Modifiers & KeyModifiers.Super)   != 0;
+        if (ctrl || cmd)
+        {
+            switch (e.KeyCode)
+            {
+                case 65: // Ctrl+A — move caret to end
+                    _cursor = _text.Length; ResetBlink(); return true;
+                case 67: // Ctrl+C — copy number text
+                    try { sapp_set_clipboard_string(_text); } catch { } return true;
+                case 86: // Ctrl+V — paste number text
+                    string paste = "";
+                    try { paste = sapp_get_clipboard_string() ?? ""; } catch { }
+                    paste = paste.Trim();
+                    if (!string.IsNullOrEmpty(paste))
+                    { _text = paste; _cursor = _text.Length; Validate(); TryFireValueChanged(); ResetBlink(); }
+                    return true;
+                case 88: // Ctrl+X — cut number text
+                    try { sapp_set_clipboard_string(_text); } catch { }
+                    _text = ""; _cursor = 0; Validate(); ResetBlink(); return true;
+            }
+        }
 
         const int KEY_BACKSPACE = 259;
         const int KEY_DELETE    = 261;

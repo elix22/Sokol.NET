@@ -38,6 +38,9 @@ public class TreeView : Widget
     private TreeNode? _root;
     private TreeNode? _selected;
     private float     _scrollY;
+    private bool      _sbDragging;
+    private float     _sbDragStartY;
+    private float     _sbDragStartScroll;
     public  const float ItemHeight   = 22f;
     public  const float IndentWidth  = 16f;
     public  const float ChevronWidth = 14f;
@@ -114,11 +117,14 @@ public class TreeView : Widget
 
             // Label
             renderer.SetTextAlign(TextHAlign.Left);
+            UIColor labelCol = node.IsSelected        ? theme.AccentColor
+                                : node.Children.Count > 0 ? theme.TextColor
+                                : theme.TextMutedColor;
             renderer.DrawText(
                 indentX + ChevronWidth + 2f,
                 rowY + ItemHeight * 0.5f,
                 node.Label,
-                node.IsSelected ? theme.AccentColor : theme.TextColor);
+                labelCol);
         }
 
         renderer.Restore();
@@ -143,30 +149,66 @@ public class TreeView : Widget
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
-    public override bool OnMouseMove(MouseEvent e)  { _mousePos = ToLocal(e.Position); return true; }
+    public override bool OnMouseMove(MouseEvent e)
+    {
+        _mousePos = ToLocal(e.Position);
+        if (_sbDragging)
+        {
+            float totalH    = _flatRows.Count * ItemHeight;
+            float h         = Bounds.Height;
+            float maxScroll = MathF.Max(0f, totalH - h);
+            float thumbH    = MathF.Max(h * h / totalH, 20f);
+            float trackRange = h - thumbH;
+            if (trackRange > 0)
+            {
+                float delta = e.Position.Y - _sbDragStartY;
+                _scrollY = Math.Clamp(_sbDragStartScroll + delta * maxScroll / trackRange, 0f, maxScroll);
+            }
+            return true;
+        }
+        return true;
+    }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
+        _mousePos = ToLocal(e.Position);
+
+        // Scrollbar click → start drag
+        float sb     = ThemeManager.Current.ScrollBarWidth;
+        float totalH = _flatRows.Count * ItemHeight;
+        float h      = Bounds.Height;
+        if (totalH > h && _mousePos.X >= Bounds.Width - sb)
+        {
+            _sbDragging        = true;
+            _sbDragStartY      = e.Position.Y;
+            _sbDragStartScroll = _scrollY;
+            return true;
+        }
+
         var hit = HoveredRow();
         if (hit == null) return true;
+        var node = hit.Value.node;
 
-        var (node, _, depth) = hit.Value;
-        float indentX = depth * IndentWidth;
-        float localX  = ToLocal(e.Position).X;
-
-        // Chevron click → toggle expand
-        if (node.Children.Count > 0 && localX >= indentX && localX < indentX + ChevronWidth)
+        // Any click on a parent row → toggle expand + select
+        if (node.Children.Count > 0)
         {
             node.IsExpanded = !node.IsExpanded;
             if (node.IsExpanded) NodeExpanded?.Invoke(node);
             InvalidateLayout();
+            Select(node);
             return true;
         }
 
-        // Row click → select
+        // Leaf row click → select only
         Select(node);
         return true;
+    }
+
+    public override bool OnMouseUp(MouseEvent e)
+    {
+        if (_sbDragging) { _sbDragging = false; return true; }
+        return false;
     }
 
     public override bool OnMouseScroll(MouseEvent e)
