@@ -13,6 +13,7 @@ public class NumberInput : Widget
     private bool   _focused;
     private int    _cursor;
     private bool   _isInvalid;
+    private long   _blinkEpoch;   // TickCount64 when caret was last reset
 
     // ─── Properties ───────────────────────────────────────────────────────────
     public float Value
@@ -81,8 +82,8 @@ public class NumberInput : Widget
         else
             renderer.DrawText(6, h * 0.5f, display, textC);
 
-        // Cursor
-        if (_focused)
+        // Cursor — blinking at ~1 Hz
+        if (_focused && CaretVisible())
         {
             float cx = 6f + (display.Length > 0 && _cursor > 0
                 ? renderer.MeasureText(display[.._cursor])
@@ -94,7 +95,7 @@ public class NumberInput : Widget
     }
 
     // ─── Input ───────────────────────────────────────────────────────────────
-    public override void OnFocusGained() { _focused = true; }
+    public override void OnFocusGained() { _focused = true; ResetBlink(); }
     public override void OnFocusLost  ()
     {
         _focused = false;
@@ -105,6 +106,7 @@ public class NumberInput : Widget
     {
         if (e.Button != MouseButton.Left) return false;
         _cursor = _text.Length; // place caret at end (simple)
+        ResetBlink();
         return true;
     }
 
@@ -192,6 +194,7 @@ public class NumberInput : Widget
         _cursor = Math.Min(_text.Length, _cursor + 1);
         Validate();
         TryFireValueChanged();
+        ResetBlink();
         return true;
     }
 
@@ -262,6 +265,11 @@ public class NumberInput : Widget
         string fmt = DecimalPlaces > 0 ? $"F{DecimalPlaces}" : "F0";
         return v.ToString(fmt, CultureInfo.InvariantCulture);
     }
+
+    private bool CaretVisible() =>
+        ((Environment.TickCount64 - _blinkEpoch) % (530 + 530)) < 530;
+
+    private void ResetBlink() => _blinkEpoch = Environment.TickCount64;
 
     private void ApplyFont(Renderer renderer, Theme theme)
     {

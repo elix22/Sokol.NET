@@ -142,29 +142,34 @@ public class SpinBox : Widget
     public override bool OnMouseLeave(MouseEvent e)
     {
         _leftHovered = _rightHovered = false;
-        StopHold();
+        // Only stop auto-repeat when no button is held (mouse can leave during a
+        // fast press; InputRouter still routes MouseUp through _captured).
+        if (!_leftPressed && !_rightPressed)
+            StopHold();
         return true;
     }
 
     public override bool OnMouseMove(MouseEvent e)
     {
-        float btnW = Bounds.Height;
-        _leftHovered  = e.Position.X < btnW;
-        _rightHovered = e.Position.X >= Bounds.Width - btnW;
+        float btnW  = Bounds.Height;
+        float localX = ToLocal(e.Position).X;
+        _leftHovered  = localX < btnW;
+        _rightHovered = localX >= Bounds.Width - btnW;
         return true;
     }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
-        float btnW = Bounds.Height;
-        if (e.Position.X < btnW)
+        float btnW   = Bounds.Height;
+        float localX = ToLocal(e.Position).X;
+        if (localX < btnW)
         {
             _leftPressed  = true;
             ChangeValue(-1f);
             StartHold(-1f);
         }
-        else if (e.Position.X >= Bounds.Width - btnW)
+        else if (localX >= Bounds.Width - btnW)
         {
             _rightPressed = true;
             ChangeValue(+1f);

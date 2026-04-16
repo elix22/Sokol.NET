@@ -117,7 +117,8 @@ public class SplitView : Widget
     public override bool OnMouseLeave(MouseEvent e)
     {
         _dividerHovered = false;
-        _dragging = false;
+        // Do NOT clear _dragging here: mouse can leave bounds during a fast drag
+        // and the InputRouter still routes moves/up through _captured.
         return true;
     }
 

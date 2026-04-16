@@ -126,13 +126,13 @@ public class ListBox : Widget
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
-    public override bool OnMouseMove(MouseEvent e)  { _mouseLocal = e.Position; return true; }
+    public override bool OnMouseMove(MouseEvent e)  { _mouseLocal = ToLocal(e.Position); return true; }
 
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button != MouseButton.Left) return false;
 
-        int idx = IndexFromY(e.Position.Y);
+        int idx = IndexFromY(ToLocal(e.Position).Y);
         if (idx < 0 || idx >= _items.Count) return true;
 
         // Double-click detection

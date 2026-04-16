@@ -143,7 +143,7 @@ public class TreeView : Widget
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
     public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
-    public override bool OnMouseMove(MouseEvent e)  { _mousePos = e.Position; return true; }
+    public override bool OnMouseMove(MouseEvent e)  { _mousePos = ToLocal(e.Position); return true; }
 
     public override bool OnMouseDown(MouseEvent e)
     {
@@ -153,7 +153,7 @@ public class TreeView : Widget
 
         var (node, _, depth) = hit.Value;
         float indentX = depth * IndentWidth;
-        float localX  = e.Position.X;
+        float localX  = ToLocal(e.Position).X;
 
         // Chevron click → toggle expand
         if (node.Children.Count > 0 && localX >= indentX && localX < indentX + ChevronWidth)
