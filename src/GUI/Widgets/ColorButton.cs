@@ -105,7 +105,7 @@ public class ColorButton : Widget
             if (popR.Contains(local))
             {
                 var pl = new Vector2(local.X - popR.X, local.Y - popR.Y);
-                _pickerCache.OnMouseDown(new MouseEvent { Position = pl, Button = e.Button, Clicks = e.Clicks });
+                _pickerCache.OnMouseDown(new MouseEvent { Position = pl, LocalPosition = pl, Button = e.Button, Clicks = e.Clicks });
                 return true;
             }
             _open = false;
@@ -127,7 +127,7 @@ public class ColorButton : Widget
         var local = e.LocalPosition;
         var popR  = _pickerCache.Bounds;
         var pl    = new Vector2(local.X - popR.X, local.Y - popR.Y);
-        return _pickerCache.OnMouseMove(new MouseEvent { Position = pl, Button = e.Button });
+        return _pickerCache.OnMouseMove(new MouseEvent { Position = pl, LocalPosition = pl, Button = e.Button });
     }
 
     public override bool OnMouseUp(MouseEvent e)
@@ -136,7 +136,7 @@ public class ColorButton : Widget
         var local = e.LocalPosition;
         var popR  = _pickerCache.Bounds;
         var pl    = new Vector2(local.X - popR.X, local.Y - popR.Y);
-        return _pickerCache.OnMouseUp(new MouseEvent { Position = pl, Button = e.Button });
+        return _pickerCache.OnMouseUp(new MouseEvent { Position = pl, LocalPosition = pl, Button = e.Button });
     }
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
