@@ -57,52 +57,24 @@ namespace BidiSharp
             }
         }
 
-        // Entry point for algorithm to return at final correct display order
-        public static string LogicalToVisual(string input, int[] lineBreaks = null)
+        // Core: compute the visual→logical reorder map (newIndexes[visualPos] = logicalPos)
+        private static int[] ComputeReorderMap(string input, int[] lineBreaks = null)
         {
-            // Optimization:
-            // Only continue if an RTL character is present
-            
             int     inputLength               = input.Length;
             byte[]  typesList                 = new byte[input.Length];
             byte[]  levelsList                = new byte[input.Length];
             int[]   matchingPDI;
             int[]   matchingIsolateInitiator;
 
-            // Analyze text bidi_class types
             ClassifyCharacters(input, ref typesList);
-
-            // Determine Matching PDI
             GetMatchingPDI(typesList, out matchingPDI, out matchingIsolateInitiator);
-
-            // 3.3.1 Determine paragraph embedding level
             byte baseLevel = GetParagraphEmbeddingLevel(typesList, matchingPDI);
-
-            // Initialize levelsList to paragraph embedding level
             SetLevels(ref levelsList, baseLevel);
-
-            // 3.3.2 (X1-X8) Determine explicit embedding levels and directions
             GetExplicitEmbeddingLevels(baseLevel, typesList, ref levelsList, matchingPDI);
-
-            /*
-            ** Isolating run sequences
-            ** 3.3.3,  3.3.4,  3.3.5,  3.3.6
-            ** X9,X10  W1-W7   N0-N2   I1-I2
-            */
-            
-            // X9 Remove all RLE, LRE, RLO, LRO, PDF and BN characters
-            // Instead of removing, assign the embedding level to each formatting 
-            // character and turn it (type or level?) to BN.
-            // The goal in marking a formatting or control character as BN is that it 
-            // has no effect on the rest of the algorithm (ZWJ and ZWNJ are exceptions).
             RemoveX9Characters(ref typesList);
 
-            // X10 steps
-            // .1 Compute isolating run sequences according to BD13. Apply next rules to each sequence
             var levelRuns = GetLevelRuns(levelsList);
             int nRuns = levelRuns.Count;
-
-            // Determine each character belongs to what run
             int[] runCharsArray = GetRunForCharacter(levelRuns, inputLength);
 
             var sequences = GetIsolatingRunSequences(baseLevel, typesList, levelsList, levelRuns, matchingIsolateInitiator,
@@ -110,26 +82,28 @@ namespace BidiSharp
 
             foreach (var sequence in sequences)
             {
-                // Rules W1-W7
                 sequence.ResolveWeaks();
-
-                // Rules N0-N2
                 sequence.ResolveNeutrals();
-
-                // Rules I1-I2
                 sequence.ResolveImplicit();
-
                 sequence.ApplyTypesAndLevels(ref typesList, ref levelsList);
             }
 
-            // Rules L1-L2
             var lines = lineBreaks == null ? new int[] { typesList.Length } : lineBreaks;
-            int[] newIndexes = GetReorderedIndexes(baseLevel, typesList, levelsList, lines);
+            return GetReorderedIndexes(baseLevel, typesList, levelsList, lines);
+        }
 
-            // Return new text from ordered levels
-            var finalStr = GetOrderedString(input, newIndexes);
+        // Entry point for algorithm to return at final correct display order
+        public static string LogicalToVisual(string input, int[] lineBreaks = null)
+        {
+            int[] newIndexes = ComputeReorderMap(input, lineBreaks);
+            return GetOrderedString(input, newIndexes);
+        }
 
-            return finalStr;
+        // Returns (visualString, visualToLogicalMap) where map[visualPos] = logicalPos
+        public static (string visual, int[] visualToLogical) LogicalToVisualWithMap(string input, int[] lineBreaks = null)
+        {
+            int[] map = ComputeReorderMap(input, lineBreaks);
+            return (GetOrderedString(input, map), map);
         }
 
         // 3.2 Determine Bidi_class of each input character

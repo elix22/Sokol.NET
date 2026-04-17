@@ -26,11 +26,12 @@ public class TextArea : Widget
         }
     }
 
-    public bool     IsEditable { get; set; }
-    public UIColor? ForeColor  { get; set; }
-    public UIColor? BackColor  { get; set; }
-    public Font?    Font       { get; set; }
-    public float    FontSize   { get; set; } = 0f;
+    public bool      IsEditable { get; set; }
+    public UIColor?  ForeColor  { get; set; }
+    public UIColor?  BackColor  { get; set; }
+    public Font?     Font       { get; set; }
+    public float     FontSize   { get; set; } = 0f;
+    public TextAlign Align      { get; set; } = TextAlign.Left;
 
     public event Action<string>? TextChanged;
 
@@ -96,7 +97,13 @@ public class TextArea : Widget
             (IsEditable && IsFocused) ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         ApplyFont(renderer);
-        renderer.SetTextAlign(TextHAlign.Left, TextVAlign.Top);
+        var hAlign = Align switch
+        {
+            TextAlign.Center => TextHAlign.Center,
+            TextAlign.Right  => TextHAlign.Right,
+            _                => TextHAlign.Left,
+        };
+        renderer.SetTextAlign(hAlign, TextVAlign.Top);
 
         float sbW    = theme.ScrollBarWidth;
         var   inner  = new Rect(0, 0, w, h).Deflate(Padding);
@@ -160,8 +167,8 @@ public class TextArea : Widget
         if (line < _lineCount)
         {
             var li = _lines[line];
-            string lineText = text[li.Start..Math.Min(li.Start + col, li.End)];
-            x += renderer.MeasureTextRaw(lineText);
+            float ao = LineAlignOffset(li, textW, renderer, text);
+            x += ao + VisualCaretX(renderer, text, li, col);
         }
         renderer.DrawLine(x, y, x, y + _lineH, 1.5f,
             ThemeManager.Current.AccentColor);
@@ -185,12 +192,27 @@ public class TextArea : Widget
             int c1 = (li == eLine) ? eCol : lineLen;
             if (c0 >= c1 && li != eLine) c1 = lineLen; // full line
 
-            string prefix = text[info.Start..Math.Min(info.Start + c0, info.End)];
-            string selStr = text[Math.Min(info.Start + c0, info.End)..Math.Min(info.Start + c1, info.End)];
-            float x0 = inner.X + renderer.MeasureTextRaw(prefix);
-            float x1 = x0 + renderer.MeasureTextRaw(selStr);
-            float y  = inner.Y - _scrollY + li * _lineH;
-            renderer.FillRect(new Rect(x0, y, x1 - x0, _lineH), selColor);
+            string lineStr = text[info.Start..info.End];
+            var (visual, v2l) = BidiHelper.ToVisualWithMap(lineStr);
+
+            float lineY = inner.Y - _scrollY + li * _lineH;
+            float ao = LineAlignOffset(info, textW, renderer, text);
+
+            // Find contiguous visual ranges where the logical index is selected
+            int rangeStart = -1;
+            for (int v = 0; v <= visual.Length; v++)
+            {
+                bool selected = v < visual.Length && v2l[v] >= c0 && v2l[v] < c1;
+                if (selected && rangeStart < 0)
+                    rangeStart = v;
+                else if (!selected && rangeStart >= 0)
+                {
+                    float x0 = inner.X + ao + renderer.MeasureTextRaw(visual[..rangeStart]);
+                    float x1 = inner.X + ao + renderer.MeasureTextRaw(visual[..v]);
+                    renderer.FillRect(new Rect(x0, lineY, x1 - x0, _lineH), selColor);
+                    rangeStart = -1;
+                }
+            }
         }
     }
 
@@ -706,26 +728,49 @@ public class TextArea : Widget
         int line = Math.Clamp((int)(relY / _lineH), 0, _lineCount - 1);
         var li = _lines[line];
 
-        float relX = localPos.X - inner.X;
-        if (relX <= 0) return li.Start;
-
         string text = _sb.ToString();
         string lineStr = text[li.Start..li.End];
-        if (lineStr.Length == 0) return li.Start;
 
-        // Walk characters to find nearest position
         var renderer = Screen.Instance?.Renderer;
         if (renderer == null) return li.Start;
         ApplyFont(renderer);
 
-        for (int i = 0; i < lineStr.Length; i++)
+        float ao = LineAlignOffset(li, textW, renderer, text);
+        float relX = localPos.X - inner.X - ao;
+        if (lineStr.Length == 0) return li.Start;
+
+        var (visual, v2l) = BidiHelper.ToVisualWithMap(lineStr);
+
+        // Walk visual characters to find the clicked boundary
+        int visualIdx = visual.Length;
+        for (int i = 0; i < visual.Length; i++)
         {
-            float w0 = renderer.MeasureTextRaw(lineStr[..i]);
-            float w1 = renderer.MeasureTextRaw(lineStr[..(i + 1)]);
+            float w0 = renderer.MeasureTextRaw(visual[..i]);
+            float w1 = renderer.MeasureTextRaw(visual[..(i + 1)]);
             float mid = (w0 + w1) * 0.5f;
-            if (relX <= mid) return li.Start + i;
+            if (relX <= mid) { visualIdx = i; break; }
         }
-        return li.End;
+
+        // Map visual boundary to logical cursor position
+        int cursor;
+        if (visualIdx == 0)
+        {
+            // Before/on first visual char
+            cursor = BidiHelper.IsRtlChar(visual[0]) ? v2l[0] + 1 : v2l[0];
+        }
+        else if (visualIdx >= visual.Length)
+        {
+            // After last visual char
+            cursor = BidiHelper.IsRtlChar(visual[^1]) ? v2l[^1] : v2l[^1] + 1;
+        }
+        else
+        {
+            // Boundary between visual[visualIdx-1] and visual[visualIdx]
+            char leftChar = visual[visualIdx - 1];
+            cursor = BidiHelper.IsRtlChar(leftChar) ? v2l[visualIdx - 1] : v2l[visualIdx - 1] + 1;
+        }
+
+        return li.Start + cursor;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -752,5 +797,63 @@ public class TextArea : Widget
     {
         long elapsed = Environment.TickCount64 - _blinkEpoch;
         return (elapsed % (BlinkOnMs + BlinkOffMs)) < BlinkOnMs;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Alignment offset per visual line
+    // ─────────────────────────────────────────────────────────────────────────
+    private float LineAlignOffset(LineInfo li, float textW, Renderer renderer, string text)
+    {
+        if (Align == TextAlign.Left) return 0f;
+        float lineW = li.Width > 0 ? li.Width : renderer.MeasureTextRaw(text[li.Start..li.End]);
+        return Align switch
+        {
+            TextAlign.Center => MathF.Max(0f, (textW - lineW) * 0.5f),
+            TextAlign.Right  => MathF.Max(0f, textW - lineW),
+            _                => 0f,
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // BiDi-aware caret X offset within a visual line
+    // ─────────────────────────────────────────────────────────────────────────
+    private float VisualCaretX(Renderer renderer, string text, LineInfo li, int col)
+    {
+        string lineStr = text[li.Start..li.End];
+        int len = lineStr.Length;
+        if (len == 0) return 0f;
+
+        var (visual, v2l) = BidiHelper.ToVisualWithMap(lineStr);
+        if (visual.Length == 0) return 0f;
+
+        // Build inverse map: logicalToVisual[logicalIdx] = visualIdx
+        int[] l2v = new int[len];
+        for (int i = 0; i < v2l.Length; i++)
+            l2v[v2l[i]] = i;
+
+        col = Math.Clamp(col, 0, len);
+
+        // Determine the visual boundary position for the caret.
+        // For a char to the left of the caret (col-1 in logical order):
+        //   LTR char → caret is at the RIGHT edge of its visual position (v+1)
+        //   RTL char → caret is at the LEFT  edge of its visual position (v)
+        int visualPos;
+        if (col == 0)
+        {
+            int v = l2v[0];
+            visualPos = BidiHelper.IsRtlChar(lineStr[0]) ? v + 1 : v;
+        }
+        else if (col >= len)
+        {
+            int v = l2v[len - 1];
+            visualPos = BidiHelper.IsRtlChar(lineStr[len - 1]) ? v : v + 1;
+        }
+        else
+        {
+            int v = l2v[col - 1];
+            visualPos = BidiHelper.IsRtlChar(lineStr[col - 1]) ? v : v + 1;
+        }
+
+        return renderer.MeasureTextRaw(visual[..visualPos]);
     }
 }

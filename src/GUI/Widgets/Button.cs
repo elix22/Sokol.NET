@@ -17,6 +17,7 @@ public class Button : Widget
     public float    CornerRadius { get; set; } = 0f;  // 0 = theme default
     public Font?    Font        { get; set; }
     public float    FontSize    { get; set; } = 0f;
+    public TextAlign Align      { get; set; } = TextAlign.Center;
 
     public Button() { }
     public Button(string text) => Text = text;
@@ -101,11 +102,22 @@ public class Button : Widget
         // ── Label ─────────────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(Text))
         {
-            float tx = bounds.Width * 0.5f;
+            var hAlign = Align switch
+            {
+                TextAlign.Left   => TextHAlign.Left,
+                TextAlign.Right  => TextHAlign.Right,
+                _                => TextHAlign.Center,
+            };
+            float tx = Align switch
+            {
+                TextAlign.Left  => Padding.Left + 4f,
+                TextAlign.Right => bounds.Width - Padding.Right - 4f,
+                _               => bounds.Width * 0.5f,
+            };
             float ty = bounds.Height * 0.5f - 1f + (IsPressed ? 1f : 0f);
             var   fg = ForeColor ?? (Enabled ? theme.ButtonTextColor : theme.TextDisabledColor);
             ApplyFont(renderer, theme);
-            renderer.SetTextAlign(TextHAlign.Center);
+            renderer.SetTextAlign(hAlign);
             // Text shadow (NanoGUI: draws text with m_text_color_shadow offset 1px)
             if (Enabled)
                 renderer.DrawText(tx, ty + 1f, Text, theme.TextShadow);

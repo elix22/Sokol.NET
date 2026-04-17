@@ -84,4 +84,40 @@ public static class BidiHelper
         }
         return false;
     }
+
+    /// <summary>
+    /// Returns true if a single character belongs to an RTL script (Hebrew, Arabic).
+    /// Used for caret positioning in BiDi-aware text editing.
+    /// </summary>
+    public static bool IsRtlChar(char c)
+    {
+        if (c >= '\u0590' && c <= '\u05FF') return true;  // Hebrew
+        if (c >= '\u0600' && c <= '\u06FF') return true;  // Arabic
+        if (c >= '\u0750' && c <= '\u077F') return true;  // Arabic Supplement
+        if (c >= '\u08A0' && c <= '\u08FF') return true;  // Arabic Extended-A
+        if (c >= '\uFB50' && c <= '\uFDFF') return true;  // Arabic Presentation Forms-A
+        if (c >= '\uFE70' && c <= '\uFEFF') return true;  // Arabic Presentation Forms-B
+        if (c >= '\uFB1D' && c <= '\uFB4F') return true;  // Hebrew Presentation Forms
+        return false;
+    }
+
+    /// <summary>
+    /// Reorder a single line of text to visual order and return both the visual string
+    /// and the visual-to-logical index mapping (map[visualPos] = logicalPos).
+    /// For pure-LTR text, returns identity mapping for performance.
+    /// </summary>
+    public static (string visual, int[] visualToLogical) ToVisualWithMap(string lineText)
+    {
+        if (string.IsNullOrEmpty(lineText))
+        {
+            return (lineText ?? "", Array.Empty<int>());
+        }
+        if (!ContainsRTL(lineText))
+        {
+            var identity = new int[lineText.Length];
+            for (int i = 0; i < identity.Length; i++) identity[i] = i;
+            return (lineText, identity);
+        }
+        return Bidi.LogicalToVisualWithMap(lineText);
+    }
 }

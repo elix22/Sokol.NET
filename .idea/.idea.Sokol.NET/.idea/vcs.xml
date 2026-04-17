@@ -10,6 +10,7 @@
     <mapping directory="$PROJECT_DIR$/ext/joltc" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/ext/lynx" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/ext/manifold" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/nanovg" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/ext/sokol" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/tools/emsdk" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/tools/sokol-tools" vcs="Git" />

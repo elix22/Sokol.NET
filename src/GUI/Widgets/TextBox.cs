@@ -33,6 +33,7 @@ public class TextBox : Widget
     private float[] _charXCache  = Array.Empty<float>();
     private float   _innerLeft;
     private float   _innerWidth;
+    private float   _alignOffset;
 
     // ─── Extensibility hooks for derived classes ──────────────────────────────
     /// <summary>Current caret position (character index). Readable/settable by derived classes.</summary>
@@ -78,6 +79,7 @@ public class TextBox : Widget
     public UIColor? CursorColor      { get; set; }
     public Font?    Font             { get; set; }
     public float    FontSize         { get; set; } = 0f;
+    public TextAlign Align           { get; set; } = TextAlign.Left;
 
     public event Action<string>? TextChanged;
     public event Action?         Submitted;
@@ -134,6 +136,15 @@ public class TextBox : Widget
         // Rebuild character X-position cache (used for hit-testing and scrolling)
         RebuildCharCache(renderer, display);
 
+        // Compute alignment offset when text is shorter than the box
+        float totalTextW = _charXCache.Length > 0 ? _charXCache[^1] : 0f;
+        _alignOffset = Align switch
+        {
+            TextAlign.Center => MathF.Max(0f, (inner.Width - totalTextW) * 0.5f),
+            TextAlign.Right  => MathF.Max(0f, inner.Width - totalTextW),
+            _                => 0f,
+        };
+
         // Scroll to keep caret visible
         UpdateScroll();
 
@@ -141,7 +152,7 @@ public class TextBox : Widget
 
         renderer.Save();
         renderer.IntersectClip(inner);
-        renderer.Translate(-_scrollX, 0);
+        renderer.Translate(-_scrollX + _alignOffset, 0);
 
         // Selection highlight
         if (IsFocused && _selStart >= 0 && _selStart != _cursor)
@@ -193,7 +204,7 @@ public class TextBox : Widget
         if (e.Button != MouseButton.Left) return false;
 
         var  local  = e.LocalPosition;
-        float textX = local.X - _innerLeft + _scrollX;
+        float textX = local.X - _innerLeft + _scrollX - _alignOffset;
         int   idx   = XToCharIndex(textX);
 
         if (e.Clicks == 2)
@@ -225,7 +236,7 @@ public class TextBox : Widget
         if (!_mouseDragging) return false;
 
         var   local  = e.LocalPosition;
-        float textX  = local.X - _innerLeft + _scrollX;
+        float textX  = local.X - _innerLeft + _scrollX - _alignOffset;
         int   idx    = XToCharIndex(textX);
         if (_selStart < 0) _selStart = _cursor;
         _cursor = idx;
