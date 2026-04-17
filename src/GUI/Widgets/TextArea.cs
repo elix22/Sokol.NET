@@ -72,15 +72,9 @@ public class TextArea : Widget
         // Vertical scrollbar
         if (showSb)
         {
-            float sbX    = inner.X + textW;
-            float thumbH = MathF.Max(16f, inner.Height * inner.Height / measH);
-            float thumbY = inner.Y +
-                           (maxScroll > 0 ? _scrollY / maxScroll : 0f) * (inner.Height - thumbH);
-            renderer.FillRect(new Rect(sbX, inner.Y, sbW, inner.Height),
-                theme.ScrollBarTrackColor);
-            renderer.FillRoundedRect(
-                new Rect(sbX + 2, thumbY + 2, sbW - 4, thumbH - 4),
-                (sbW - 4) * 0.5f, theme.ScrollBarThumbColor);
+            float sbX = inner.X + textW;
+            ScrollbarRenderer.DrawVertical(renderer, sbX, inner.Y, sbW, inner.Height,
+                _scrollY, measH, inner.Height);
         }
     }
 

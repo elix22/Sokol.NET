@@ -47,7 +47,8 @@ public class Button : Widget
         UIColor gradTop, gradBot;
         if (!Enabled)
         {
-            gradTop = gradBot = theme.ButtonDisabledColor;
+            gradTop = theme.ButtonDisabledColor.Lighten(0.06f);
+            gradBot = theme.ButtonDisabledColor.Darken(0.06f);
         }
         else if (IsPressed)
         {
@@ -88,7 +89,13 @@ public class Button : Widget
         }
         else
         {
-            renderer.StrokeRoundedRect(bounds, cr, 1f, theme.BorderColor.WithAlpha(0.4f));
+            // Muted bevel for disabled state — still gives depth, just subdued
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, 1.5f, bounds.Width - 1f, bounds.Height - 2f), cr,
+                1f, theme.BorderLight.WithAlpha(0.3f));
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, 0.5f, bounds.Width - 1f, bounds.Height - 2f), cr,
+                1f, theme.BorderDark.WithAlpha(0.4f));
         }
 
         // ── Label ─────────────────────────────────────────────────────────────

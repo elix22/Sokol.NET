@@ -77,42 +77,16 @@ public class ScrollView : Panel
         if (showV)
         {
             float cH = MathF.Max(ContentHeight, 1f);
-            float ratio = viewport.Height / cH;
-            float thumbH = MathF.Max(viewport.Height * ratio, 16f);
-            float maxScroll = MathF.Max(cH - viewport.Height, 1f);
-            float thumbY = (_scrollY / maxScroll) * (viewport.Height - thumbH);
-            var rTrack = new Rect(viewport.Width, 0, sb, viewport.Height);
-            renderer.FillRect(rTrack, theme.ScrollBarTrackColor);
-            var thumbR = new Rect(rTrack.X + 2, thumbY, sb - 4, thumbH);
-            var thumbGrad = renderer.LinearGradient(
-                new Vector2(thumbR.X, thumbR.Y),
-                new Vector2(thumbR.Right, thumbR.Y),
-                theme.ScrollBarThumbColor.Lighten(0.18f),
-                theme.ScrollBarThumbColor.Darken(0.12f));
-            renderer.FillRoundedRectWithPaint(thumbR, (sb - 4) * 0.5f, thumbGrad);
-            renderer.StrokeRoundedRect(thumbR, (sb - 4) * 0.5f, 1f,
-                theme.ScrollBarThumbColor.Darken(0.25f));
+            ScrollbarRenderer.DrawVertical(renderer, viewport.Width, 0, sb, viewport.Height,
+                _scrollY, cH, viewport.Height);
         }
 
         // Horizontal scrollbar
         if (showH)
         {
             float cW = MathF.Max(ContentWidth, 1f);
-            float ratio = viewport.Width / cW;
-            float thumbW = MathF.Max(viewport.Width * ratio, 16f);
-            float maxScroll = MathF.Max(cW - viewport.Width, 1f);
-            float thumbX = (_scrollX / maxScroll) * (viewport.Width - thumbW);
-            var rTrack2 = new Rect(0, viewport.Height, viewport.Width, sb);
-            renderer.FillRect(rTrack2, theme.ScrollBarTrackColor);
-            var hThumbR = new Rect(thumbX, rTrack2.Y + 2, thumbW, sb - 4);
-            var hThumbGrad = renderer.LinearGradient(
-                new Vector2(hThumbR.X, hThumbR.Y),
-                new Vector2(hThumbR.X, hThumbR.Bottom),
-                theme.ScrollBarThumbColor.Lighten(0.18f),
-                theme.ScrollBarThumbColor.Darken(0.12f));
-            renderer.FillRoundedRectWithPaint(hThumbR, (sb - 4) * 0.5f, hThumbGrad);
-            renderer.StrokeRoundedRect(hThumbR, (sb - 4) * 0.5f, 1f,
-                theme.ScrollBarThumbColor.Darken(0.25f));
+            ScrollbarRenderer.DrawHorizontal(renderer, 0, viewport.Height, viewport.Width, sb,
+                _scrollX, cW, viewport.Width);
         }
     }
 

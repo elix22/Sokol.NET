@@ -147,15 +147,8 @@ public class TreeView : Widget
         // Scrollbar
         if (needSB)
         {
-            float maxScroll = totalH - h;
-            float ratio     = h / totalH;
-            float thumbH    = MathF.Max(h * ratio, 20f);
-            float thumbY    = (maxScroll > 0 ? _scrollY / maxScroll : 0f) * (h - thumbH);
-            var trackR = new Rect(w - sb, 0, sb, h);
-            renderer.FillRect(trackR, theme.ScrollBarTrackColor);
-            renderer.FillRoundedRect(
-                new Rect(trackR.X + 2f, thumbY, sb - 4f, thumbH),
-                (sb - 4f) * 0.5f, theme.ScrollBarThumbColor);
+            float totalHH = _flatRows.Count * ItemHeight;
+            ScrollbarRenderer.DrawVertical(renderer, w - sb, 0, sb, h, _scrollY, totalHH, h);
         }
     }
 
