@@ -37,19 +37,19 @@ public class ScrollView : Panel
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float sb   = theme.ScrollBarWidth;
 
-        // Background — subtle gradient for depth
-        var bg = BackgroundColor ?? theme.SurfaceColor;
-        var svGrad = renderer.LinearGradient(
-            new Vector2(0, 0),
-            new Vector2(0, bounds.Height),
-            bg.Darken(0.04f), bg.Lighten(0.02f));
-        renderer.FillRoundedRectWithPaint(bounds, 0f, svGrad);
-
-        // Inner edge shadow (sunken container — darkens only the perimeter)
+        // NanoGUI-style sunken container
+        float cr = theme.InputCornerRadius;
+        var bg = BackgroundColor ?? theme.InputBackColor;
+        renderer.FillRoundedRect(bounds, cr, bg);
         var svInset = renderer.BoxGradient(
-            new Rect(2, 2, bounds.Width - 4, bounds.Height - 4), 0f, 8f,
-            UIColor.Black.WithAlpha(0f), UIColor.Black.WithAlpha(0.18f));
-        renderer.FillRoundedRectWithPaint(bounds, 0f, svInset);
+            new Rect(1, 2, bounds.Width - 2, bounds.Height - 2), cr, 4f,
+            new UIColor(1f, 1f, 1f, 0.06f),
+            new UIColor(0f, 0f, 0f, 0.15f));
+        renderer.FillRoundedRectWithPaint(bounds, cr, svInset);
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, bounds.Width - 1f, bounds.Height - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         // Clip to viewport (shrunk for scrollbars if visible)
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;

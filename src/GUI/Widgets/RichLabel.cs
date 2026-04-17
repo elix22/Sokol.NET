@@ -141,6 +141,21 @@ public class RichLabel : Label
         if (!Visible) return;
 
         var   theme        = ThemeManager.Current;
+        float w            = Bounds.Width, h = Bounds.Height;
+        float cr           = theme.InputCornerRadius;
+
+        // NanoGUI-style sunken container background
+        renderer.FillRoundedRect(new Rect(0, 0, w, h), cr, theme.InputBackColor);
+        var insetPaint = renderer.BoxGradient(
+            new Rect(1, 2, w - 2, h - 2), cr, 4f,
+            new UIColor(1f, 1f, 1f, 0.06f),
+            new UIColor(0f, 0f, 0f, 0.15f));
+        renderer.FillRoundedRectWithPaint(new Rect(0, 0, w, h), cr, insetPaint);
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, w - 1f, h - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            UIColor.Black.WithAlpha(0.188f));
+
         float maxW         = Bounds.Width - Padding.Horizontal;
         float startX       = Padding.Left;
         float startY       = Padding.Top;

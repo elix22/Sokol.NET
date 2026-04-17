@@ -31,8 +31,20 @@ public class TextArea : Widget
 
         var   theme = ThemeManager.Current;
         float w     = Bounds.Width, h = Bounds.Height;
-        renderer.FillRoundedRect(new Rect(0, 0, w, h), theme.InputCornerRadius,
-            BackColor ?? theme.InputBackColor);
+        float cr    = theme.InputCornerRadius;
+        var   bgCol = BackColor ?? theme.InputBackColor;
+
+        // NanoGUI-style sunken container
+        renderer.FillRoundedRect(new Rect(0, 0, w, h), cr, bgCol);
+        var insetPaint = renderer.BoxGradient(
+            new Rect(1, 2, w - 2, h - 2), cr, 4f,
+            new UIColor(1f, 1f, 1f, 0.06f),
+            new UIColor(0f, 0f, 0f, 0.15f));
+        renderer.FillRoundedRectWithPaint(new Rect(0, 0, w, h), cr, insetPaint);
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, w - 1f, h - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         ApplyFont(renderer);
         renderer.SetTextAlign(TextHAlign.Left, TextVAlign.Top);

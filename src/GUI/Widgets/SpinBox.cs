@@ -67,7 +67,7 @@ public class SpinBox : Widget
 
         // Background box — NanoGUI-style sunken input
         var bgPaint = renderer.BoxGradient(
-            new Rect(1, 2, w - 2, h - 2), 3f, 4f,
+            new Rect(1, 1, w - 2, h - 2), 3f, 4f,
             new UIColor(1f, 1f, 1f, 0.125f),
             new UIColor(0.125f, 0.125f, 0.125f, 0.125f));
         renderer.FillRoundedRectWithPaint(fullR, cr, bgPaint);

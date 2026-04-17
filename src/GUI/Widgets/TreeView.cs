@@ -87,10 +87,18 @@ public class TreeView : Widget
         bool needSB  = totalH > h;
         float viewW  = needSB ? w - sb : w;
 
-        // Background
-        renderer.FillRoundedRect(new Rect(0, 0, w, h), theme.InputCornerRadius, theme.InputBackColor);
-        renderer.StrokeRoundedRect(new Rect(0, 0, w, h), theme.InputCornerRadius, 1.5f,
-            IsFocused ? theme.AccentColor : theme.BorderColor);
+        // NanoGUI-style sunken container
+        float cr = theme.InputCornerRadius;
+        renderer.FillRoundedRect(new Rect(0, 0, w, h), cr, theme.InputBackColor);
+        var tvInset = renderer.BoxGradient(
+            new Rect(1, 2, w - 2, h - 2), cr, 4f,
+            new UIColor(1f, 1f, 1f, 0.06f),
+            new UIColor(0f, 0f, 0f, 0.15f));
+        renderer.FillRoundedRectWithPaint(new Rect(0, 0, w, h), cr, tvInset);
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, w - 1f, h - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         // Clipped rows
         renderer.Save();
