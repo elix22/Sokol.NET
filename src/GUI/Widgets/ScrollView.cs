@@ -55,6 +55,13 @@ public class ScrollView : Panel
         // Clip to viewport (shrunk for scrollbars if visible)
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
         bool showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
+
+        // Clamp scroll offset so content doesn't stay shifted when viewport grows
+        float maxScrollY = MathF.Max(0, ContentHeight - Bounds.Height + (showH ? sb : 0));
+        float maxScrollX = MathF.Max(0, ContentWidth  - Bounds.Width  + (showV ? sb : 0));
+        _scrollY = MathF.Min(_scrollY, maxScrollY);
+        _scrollX = MathF.Min(_scrollX, maxScrollX);
+
         var viewport = new Rect(0, 0,
             Bounds.Width  - (showV ? sb : 0),
             Bounds.Height - (showH ? sb : 0));
