@@ -39,11 +39,14 @@ public class ProgressBar : Widget
         var bg    = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cr  = theme.ProgressBarCornerRadius;
 
-        // Track: inset gradient (darker top = sunken look)
-        var trackGrad = renderer.LinearGradient(
-            new Vector2(bg.X, bg.Y), new Vector2(bg.X, bg.Bottom),
-            theme.ProgressBarTrackColor.Darken(0.15f), theme.ProgressBarTrackColor.Lighten(0.05f));
-        renderer.FillRoundedRectWithPaint(bg, cr, trackGrad);
+        // Track: NanoGUI-style BoxGradient (sunken groove)
+        var trackInset = renderer.BoxGradient(
+            new Rect(bg.X + 1, bg.Y + 1, bg.Width - 2, bg.Height - 2),
+            cr, 3f,
+            UIColor.Black.WithAlpha(0.32f),
+            UIColor.Black.WithAlpha(0.05f));
+        renderer.FillRoundedRectWithPaint(bg, cr, trackInset);
+        renderer.StrokeRoundedRect(bg, cr, 1f, UIColor.Black.WithAlpha(0.25f));
 
         if (_value > 0f)
         {

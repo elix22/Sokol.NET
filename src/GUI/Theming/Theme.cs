@@ -48,11 +48,17 @@ public class Theme
     public virtual UIColor TextOnPrimary  => UIColor.FromHex("#1E1E2E");
 
     // -------------------------------------------------------------------------
-    // Borders
+    // Borders (NanoGUI-style bevel: light highlight + dark shadow)
     // -------------------------------------------------------------------------
     public virtual UIColor Border        => UIColor.FromHex("#45475A");
     public virtual UIColor BorderFocus   => UIColor.FromHex("#89B4FA");
     public virtual UIColor BorderHover   => UIColor.FromHex("#6C7086");
+    /// <summary>NanoGUI border_light — bright inner highlight for raised bevel (Color(92,255)).</summary>
+    public virtual UIColor BorderLight   => new UIColor(0.361f, 0.361f, 0.361f, 1f);
+    /// <summary>NanoGUI border_dark — dark outer edge for raised bevel (Color(29,255)).</summary>
+    public virtual UIColor BorderDark    => new UIColor(0.114f, 0.114f, 0.114f, 1f);
+    /// <summary>NanoGUI text_color_shadow — subtle drop shadow behind text (Color(0,160)).</summary>
+    public virtual UIColor TextShadow    => new UIColor(0f, 0f, 0f, 0.627f);
 
     // -------------------------------------------------------------------------
     // Button
@@ -182,6 +188,7 @@ public class Theme
     public virtual UIColor PlaceholderColor      => InputPlaceholder;
     public virtual UIColor ScrollBarTrackColor   => ScrollBarTrack;
     public virtual UIColor ScrollBarThumbColor   => ScrollBarThumb;
+    public virtual UIColor ScrollBarThumbHoverColor => ScrollBarThumbHover;
     public virtual float   TooltipFontSize       => SmallFontSize;
     public virtual float   TooltipPaddingH       => 8f;
     public virtual float   TooltipPaddingV       => 4f;

@@ -65,9 +65,16 @@ public class SpinBox : Widget
         var textR   = new Rect(btnW, 0, w - btnW * 2f, h);
         var rightR  = new Rect(w - btnW, 0, btnW, h);
 
-        // Background box
-        renderer.FillRoundedRect(fullR, cr, theme.InputBackColor);
-        renderer.StrokeRoundedRect(fullR, cr, 1.5f, IsFocused ? theme.AccentColor : theme.BorderColor);
+        // Background box — NanoGUI-style sunken input
+        var bgPaint = renderer.BoxGradient(
+            new Rect(1, 2, w - 2, h - 2), 3f, 4f,
+            new UIColor(1f, 1f, 1f, 0.125f),
+            new UIColor(0.125f, 0.125f, 0.125f, 0.125f));
+        renderer.FillRoundedRectWithPaint(fullR, cr, bgPaint);
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, w - 1f, h - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         // Left button [−]
         DrawArrowButton(renderer, theme, leftR, "−", _leftHovered, _leftPressed, true, cr);
@@ -95,24 +102,39 @@ public class SpinBox : Widget
     private void DrawArrowButton(Renderer renderer, Theme theme, Rect r, string label,
                                   bool hovered, bool pressed, bool isLeft, float cr)
     {
-        UIColor col;
-        if (pressed) col = theme.ButtonPressedColor;
-        else if (hovered) col = theme.ButtonHoverColor;
-        else col = UIColor.Transparent;
+        // NanoGUI-style gradient button fill
+        UIColor gradTop, gradBot;
+        if (pressed)      { gradTop = theme.ButtonPressedTop; gradBot = theme.ButtonPressedBottom; }
+        else if (hovered) { gradTop = theme.ButtonHoverTop;   gradBot = theme.ButtonHoverBottom; }
+        else              { gradTop = theme.ButtonGradientTop; gradBot = theme.ButtonGradientBottom; }
 
-        if (col.A > 0.01f)
-        {
-            // Only round the appropriate corners (TL, TR, BR, BL)
-            var corners = isLeft
-                ? new CornerRadius(cr, 0f, 0f, cr)
-                : new CornerRadius(0f, cr, cr, 0f);
-            renderer.FillRoundedRect(r, corners, col);
-        }
+        var corners = isLeft
+            ? new CornerRadius(cr, 0f, 0f, cr)
+            : new CornerRadius(0f, cr, cr, 0f);
+
+        var fillR = new Rect(r.X + 1, r.Y + 1, r.Width - 2, r.Height - 2);
+        var grad = renderer.LinearGradient(
+            new Vector2(r.X, r.Y), new Vector2(r.X, r.Bottom),
+            gradTop, gradBot);
+        renderer.FillRoundedRectWithPaint(fillR, MathF.Max(0f, cr - 1f), grad);
+
+        // Inner highlight
+        if (!pressed)
+            renderer.StrokeRoundedRect(
+                new Rect(r.X + 0.5f, r.Y + 1.5f, r.Width - 1f, r.Height - 2f),
+                corners, 1f, theme.BorderLight);
+        // Dark outer
+        renderer.StrokeRoundedRect(
+            new Rect(r.X + 0.5f, r.Y + 0.5f, r.Width - 1f, r.Height - 1f),
+            corners, 1f, theme.BorderDark);
 
         // Symbol
         ApplyFont(renderer, theme);
         renderer.SetTextAlign(TextHAlign.Center);
-        renderer.DrawText(r.X + r.Width * 0.5f, r.Height * 0.5f, label,
+        float ty = r.Height * 0.5f + (pressed ? 1f : 0f);
+        if (!pressed)
+            renderer.DrawText(r.X + r.Width * 0.5f, ty + 1f, label, theme.TextShadow);
+        renderer.DrawText(r.X + r.Width * 0.5f, ty, label,
             hovered ? theme.TextColor : theme.TextMutedColor);
     }
 

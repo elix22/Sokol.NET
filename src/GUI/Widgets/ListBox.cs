@@ -102,12 +102,24 @@ public class ListBox : ScrollableList
             bool sel  = _selectedSet.Count > 0 ? _selectedSet.Contains(i) : i == _selectedIndex;
             bool hov  = IsHovered && HoveredIndex() == i;
 
-            if (sel)      renderer.FillRect(rowR, theme.SelectionColor);
-            else if (hov) renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.12f));
+            if (sel)
+            {
+                // Gradient selection highlight: lighter top → softer bottom
+                var selGrad = renderer.LinearGradient(
+                    new Vector2(rowR.X, rowR.Y), new Vector2(rowR.X, rowR.Bottom),
+                    theme.AccentColor.WithAlpha(0.38f), theme.AccentColor.WithAlpha(0.20f));
+                renderer.FillRoundedRectWithPaint(rowR, 2f, selGrad);
+                // Left accent bar
+                renderer.FillRect(new Rect(rowR.X, rowR.Y + 3f, 3f, rowR.Height - 6f), theme.AccentColor);
+            }
+            else if (hov) renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.10f));
 
             renderer.SetTextAlign(TextHAlign.Left);
-            renderer.DrawText(8f, itemY + ItemHeight * 0.5f, _items[i],
-                sel ? theme.AccentColor : theme.TextColor);
+            float textX = sel ? 12f : 8f;   // indent slightly under the left accent bar
+            if (sel)
+                renderer.DrawText(textX, itemY + ItemHeight * 0.5f + 1f, _items[i], UIColor.Black.WithAlpha(0.28f));
+            renderer.DrawText(textX, itemY + ItemHeight * 0.5f, _items[i],
+                sel ? theme.AccentColor.Lighten(0.15f) : theme.TextColor);
         }
     }
 

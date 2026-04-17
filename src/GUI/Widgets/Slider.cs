@@ -55,11 +55,14 @@ public class Slider : Widget
             float cy = h * 0.5f;
             var trackR = new Rect(thumb, cy - track * 0.5f, w - thumb * 2f, track);
 
-            // Track: inset gradient (darker top edge = sunken look)
-            var trackGrad = renderer.LinearGradient(
-                new Vector2(trackR.X, trackR.Y), new Vector2(trackR.X, trackR.Bottom),
-                theme.SliderTrackColor.Darken(0.18f), theme.SliderTrackColor.Lighten(0.08f));
-            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackGrad);
+            // Track: NanoGUI-style BoxGradient (sunken groove)
+            var trackInset = renderer.BoxGradient(
+                new Rect(trackR.X + 1, trackR.Y + 1, trackR.Width - 2, trackR.Height - 2),
+                track * 0.5f, 3f,
+                UIColor.Black.WithAlpha(0.32f),    // dark center
+                UIColor.Black.WithAlpha(0.05f));   // bright edges
+            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackInset);
+            renderer.StrokeRoundedRect(trackR, track * 0.5f, 1f, UIColor.Black.WithAlpha(0.25f));
 
             // Fill: accent gradient
             float fillW = trackR.Width * t;
@@ -72,25 +75,35 @@ public class Slider : Widget
                 renderer.FillRoundedRectWithPaint(fillR, track * 0.5f, fillGrad);
             }
 
-            // Thumb: gradient sphere + accent ring
+            // Thumb: NanoGUI-style gradient sphere + dark border + bright highlight
             float tx = thumb + trackR.Width * t;
             var thumbCol = IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor;
             var thumbGrad = renderer.LinearGradient(
                 new Vector2(tx, cy - thumb * 0.5f), new Vector2(tx, cy + thumb * 0.5f),
-                thumbCol.Lighten(0.22f), thumbCol.Darken(0.15f));
+                thumbCol.Lighten(0.30f), thumbCol.Darken(0.20f));
+            // Drop shadow under thumb
+            renderer.DrawDropShadow(
+                new Rect(tx - thumb * 0.5f, cy - thumb * 0.5f, thumb, thumb),
+                thumb * 0.5f, new Vector2(0, 1), 3f, new UIColor(0f, 0f, 0f, 0.4f));
             renderer.FillCircleWithPaint(tx, cy, thumb * 0.5f, thumbGrad);
-            renderer.StrokeCircle(tx, cy, thumb * 0.5f, 1.5f, theme.AccentColor);
+            // Dark outer border
+            renderer.StrokeCircle(tx, cy, thumb * 0.5f, 1f, theme.BorderDark);
+            // Light highlight at top
+            renderer.StrokeCircle(tx, cy - 0.5f, thumb * 0.5f - 1f, 0.5f, theme.BorderLight.WithAlpha(0.5f));
         }
         else
         {
             float cx = w * 0.5f;
             var trackR = new Rect(cx - track * 0.5f, thumb, track, h - thumb * 2f);
 
-            // Track: inset gradient (darker left edge = sunken look)
-            var trackGrad = renderer.LinearGradient(
-                new Vector2(trackR.X, trackR.Y), new Vector2(trackR.Right, trackR.Y),
-                theme.SliderTrackColor.Darken(0.18f), theme.SliderTrackColor.Lighten(0.08f));
-            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackGrad);
+            // Track: NanoGUI-style BoxGradient (sunken groove)
+            var trackInsetV = renderer.BoxGradient(
+                new Rect(trackR.X + 1, trackR.Y + 1, trackR.Width - 2, trackR.Height - 2),
+                track * 0.5f, 3f,
+                UIColor.Black.WithAlpha(0.32f),
+                UIColor.Black.WithAlpha(0.05f));
+            renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackInsetV);
+            renderer.StrokeRoundedRect(trackR, track * 0.5f, 1f, UIColor.Black.WithAlpha(0.25f));
 
             // Fill: accent gradient
             float fillH = trackR.Height * (1f - t);
@@ -103,14 +116,18 @@ public class Slider : Widget
                 renderer.FillRoundedRectWithPaint(fillR, track * 0.5f, fillGrad);
             }
 
-            // Thumb: gradient sphere + accent ring
+            // Thumb: NanoGUI-style gradient sphere + shadow + bevel
             float ty = thumb + trackR.Height * (1f - t);
             var thumbCol = IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor;
             var thumbGrad = renderer.LinearGradient(
                 new Vector2(cx, ty - thumb * 0.5f), new Vector2(cx, ty + thumb * 0.5f),
-                thumbCol.Lighten(0.22f), thumbCol.Darken(0.15f));
+                thumbCol.Lighten(0.30f), thumbCol.Darken(0.20f));
+            renderer.DrawDropShadow(
+                new Rect(cx - thumb * 0.5f, ty - thumb * 0.5f, thumb, thumb),
+                thumb * 0.5f, new Vector2(0, 1), 3f, new UIColor(0f, 0f, 0f, 0.4f));
             renderer.FillCircleWithPaint(cx, ty, thumb * 0.5f, thumbGrad);
-            renderer.StrokeCircle(cx, ty, thumb * 0.5f, 1.5f, theme.AccentColor);
+            renderer.StrokeCircle(cx, ty, thumb * 0.5f, 1f, theme.BorderDark);
+            renderer.StrokeCircle(cx, ty - 0.5f, thumb * 0.5f - 1f, 0.5f, theme.BorderLight.WithAlpha(0.5f));
         }
     }
 

@@ -54,9 +54,24 @@ public class ComboBox : Widget
         float cr    = theme.InputCornerRadius;
         float arrowW = bounds.Height;
 
-        // Box
-        renderer.FillRoundedRect(bounds, cr, theme.InputBackColor);
-        renderer.StrokeRoundedRect(bounds, cr, 1.5f, IsFocused ? theme.AccentColor : theme.BorderColor);
+        // Box — NanoGUI bevel button (ComboBox main control is button-like)
+        var fillR = new Rect(1, 1, bounds.Width - 2, bounds.Height - 2);
+        UIColor gradTop, gradBot;
+        if (IsHovered) { gradTop = theme.ButtonHoverTop;   gradBot = theme.ButtonHoverBottom; }
+        else           { gradTop = theme.ButtonGradientTop; gradBot = theme.ButtonGradientBottom; }
+        var bgGrad = renderer.LinearGradient(
+            new Vector2(0, 0), new Vector2(0, bounds.Height),
+            gradTop, gradBot);
+        renderer.FillRoundedRectWithPaint(fillR, MathF.Max(0f, cr - 1f), bgGrad);
+
+        // Inner highlight
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 1.5f, bounds.Width - 1f, bounds.Height - 2f), cr,
+            1f, theme.BorderLight);
+        // Outer dark border
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, bounds.Width - 1f, bounds.Height - 2f), cr,
+            1f, theme.BorderDark);
 
         // Selected text
         ApplyFont(renderer, theme);
@@ -88,8 +103,12 @@ public class ComboBox : Widget
         float ddY    = bounds.Height;
         var   ddRect = new Rect(0, ddY, bounds.Width, ddH);
 
+        // Drop shadow under the popup
+        renderer.DrawDropShadow(ddRect, theme.InputCornerRadius,
+            new Vector2(0, 2), 8f, new UIColor(0f, 0f, 0f, 0.5f));
+
         renderer.FillRoundedRect(ddRect, theme.InputCornerRadius, theme.InputBackColor);
-        renderer.StrokeRoundedRect(ddRect, theme.InputCornerRadius, 1f, theme.BorderColor);
+        renderer.StrokeRoundedRect(ddRect, theme.InputCornerRadius, 1f, theme.BorderDark);
 
         ApplyFont(renderer, theme);
         renderer.SetTextAlign(TextHAlign.Left);

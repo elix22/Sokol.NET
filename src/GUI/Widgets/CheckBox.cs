@@ -42,28 +42,31 @@ public class CheckBox : Widget
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cy   = bounds.Height * 0.5f;
 
-        // Box background
+        // Box background — NanoGUI-style BoxGradient: dark center → very dark edges = deep inset
+        // NanoGUI: nvgBoxGradient(ctx, x+1.5, y+1.5, sz-2, sz-2, 3, 3,
+        //          pushed ? Color(0,100) : Color(0,32), Color(0,0,0,180));
         var boxR = new Rect(Padding.Left, cy - size * 0.5f, size, size);
+        var boxInner = new Rect(boxR.X + 1.5f, boxR.Y + 1.5f, size - 2f, size - 2f);
+
+        UIColor chkInner = IsPressed
+            ? UIColor.Black.WithAlpha(0.392f)    // Color(0,100) — deeper when pushed
+            : UIColor.Black.WithAlpha(0.125f);   // Color(0,32)
+        UIColor chkOuter = new UIColor(0f, 0f, 0f, 0.706f); // Color(0,0,0,180)
+
+        var chkPaint = renderer.BoxGradient(boxInner, 3f, 3f, chkInner, chkOuter);
+        renderer.FillRoundedRectWithPaint(
+            new Rect(boxR.X + 1f, boxR.Y + 1f, size - 2f, size - 2f),
+            theme.CheckBoxCornerRadius, chkPaint);
+
+        // If checked, draw a filled accent background on top
         if (IsChecked)
         {
-            // Checked: accent gradient (lighter top → darker bottom = raised filled look)
-            var gTop = theme.AccentColor.Lighten(0.15f);
-            var gBot = theme.AccentColor.Darken(0.20f);
-            var grad = renderer.LinearGradient(
-                new Vector2(boxR.X, boxR.Y), new Vector2(boxR.X, boxR.Bottom), gTop, gBot);
-            renderer.FillRoundedRectWithPaint(boxR, theme.CheckBoxCornerRadius, grad);
-            renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f, theme.AccentColor.Darken(0.30f));
-        }
-        else
-        {
-            // Unchecked: subtle inset look (darker top → lighter bottom = pressed/sunken feel)
-            var baseCol = IsHovered ? theme.CheckBoxHoverColor : theme.CheckBoxColor;
-            var gTop = baseCol.Darken(0.08f);
-            var gBot = baseCol.Lighten(0.08f);
-            var grad = renderer.LinearGradient(
-                new Vector2(boxR.X, boxR.Y), new Vector2(boxR.X, boxR.Bottom), gTop, gBot);
-            renderer.FillRoundedRectWithPaint(boxR, theme.CheckBoxCornerRadius, grad);
-            renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f, theme.BorderColor);
+            var accentGrad = renderer.LinearGradient(
+                new Vector2(boxR.X, boxR.Y), new Vector2(boxR.X, boxR.Bottom),
+                theme.AccentColor.Lighten(0.15f), theme.AccentColor.Darken(0.20f));
+            renderer.FillRoundedRectWithPaint(boxR, theme.CheckBoxCornerRadius, accentGrad);
+            // Outer dark border on checked box
+            renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f, theme.AccentColor.Darken(0.35f));
         }
 
         // Checkmark

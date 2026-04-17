@@ -40,14 +40,31 @@ public class Window : Panel
         // Window frame (shadow handled by Panel.Draw)
         base.Draw(renderer);
 
-        // Title bar overlay
-        var tbR = new Rect(0, 0, w, tbH);
-        renderer.FillRoundedRectTop(tbR, cr, TitleBarColor ?? theme.WindowTitleBarColor);
+        // Title bar: NanoGUI-style raised header with double-bevel
+        var tbR       = new Rect(0, 0, w, tbH);
+        var tbBaseCol = TitleBarColor ?? theme.WindowTitleBarColor;
+        var tbGrad = renderer.LinearGradient(
+            new Vector2(0, 0), new Vector2(0, tbH),
+            tbBaseCol.Lighten(0.20f), tbBaseCol.Darken(0.15f));
+        renderer.FillRoundedRectTopWithPaint(tbR, cr, tbGrad);
 
-        // Title text
+        // NanoGUI-style: bright inner highlight at top (border_light)
+        renderer.StrokeRoundedRectTop(
+            new Rect(0.5f, 1.5f, w - 1f, tbH - 2f), cr, 1f,
+            theme.BorderLight.WithAlpha(0.6f));
+        // Dark outer border on title bar
+        renderer.StrokeRoundedRectTop(
+            new Rect(0.5f, 0.5f, w - 1f, tbH - 1f), cr, 1f,
+            theme.BorderDark);
+
+        // Bottom separator between title bar and content
+        renderer.DrawLine(0, tbH, w, tbH, 1f, theme.BorderDark);
+
+        // Title text with shadow
         renderer.SetFont(TitleFont?.Name ?? theme.DefaultFont);
         renderer.SetFontSize(theme.FontSize);
         renderer.SetTextAlign(TextHAlign.Left);
+        renderer.DrawText(cr + 4, tbH * 0.5f + 1f, Title, theme.TextShadow);
         renderer.DrawText(cr + 4, tbH * 0.5f, Title, TitleTextColor ?? theme.TextColor);
 
         // Close button

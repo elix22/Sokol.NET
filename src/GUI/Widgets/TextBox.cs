@@ -103,9 +103,29 @@ public class TextBox : Widget
         _innerLeft  = inner.X;
         _innerWidth = inner.Width;
 
-        // Background + border
-        renderer.FillRoundedRect(bounds, cr, BackColor ?? theme.InputBackColor);
-        renderer.StrokeRoundedRect(bounds, cr, GetBorderWidth(theme), GetBorderColor(theme));
+        // NanoGUI-style sunken input: BoxGradient with bright center → dark edges
+        // NanoGUI: bg = nvgBoxGradient(ctx, x+1, y+1+1, w-2, h-2, 3, 4, Color(255,32), Color(32,32))
+        var fillR  = new Rect(1, 2, bounds.Width - 2, bounds.Height - 2);
+        UIColor bgInner, bgOuter;
+        if (IsFocused)
+        {
+            // Focused: slightly brighter center (NanoGUI fg1)
+            bgInner = new UIColor(0.588f, 0.588f, 0.588f, 0.125f);   // Color(150, 32)
+            bgOuter = new UIColor(0.125f, 0.125f, 0.125f, 0.125f);   // Color(32, 32)
+        }
+        else
+        {
+            bgInner = new UIColor(1f, 1f, 1f, 0.125f);               // Color(255, 32)
+            bgOuter = new UIColor(0.125f, 0.125f, 0.125f, 0.125f);   // Color(32, 32)
+        }
+        var bgPaint = renderer.BoxGradient(fillR, 3f, 4f, bgInner, bgOuter);
+        renderer.FillRoundedRectWithPaint(fillR, cr, bgPaint);
+
+        // Dark border stroke (NanoGUI: Color(0, 48))
+        renderer.StrokeRoundedRect(
+            new Rect(0.5f, 0.5f, bounds.Width - 1f, bounds.Height - 1f),
+            MathF.Max(cr - 0.5f, 0f), 1f,
+            IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         // Font setup
         ApplyFont(renderer, theme);

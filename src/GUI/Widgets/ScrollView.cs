@@ -37,9 +37,19 @@ public class ScrollView : Panel
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float sb   = theme.ScrollBarWidth;
 
-        // Background — use Panel.BackgroundColor if set, otherwise theme surface color
+        // Background — subtle gradient for depth
         var bg = BackgroundColor ?? theme.SurfaceColor;
-        renderer.FillRect(bounds, bg);
+        var svGrad = renderer.LinearGradient(
+            new Vector2(0, 0),
+            new Vector2(0, bounds.Height),
+            bg.Darken(0.04f), bg.Lighten(0.02f));
+        renderer.FillRoundedRectWithPaint(bounds, 0f, svGrad);
+
+        // Inner edge shadow (sunken container)
+        var svInset = renderer.BoxGradient(
+            new Rect(1, 1, bounds.Width - 2, bounds.Height - 2), 0f, 5f,
+            UIColor.Black.WithAlpha(0.12f), UIColor.Black.WithAlpha(0f));
+        renderer.FillRoundedRectWithPaint(bounds, 0f, svInset);
 
         // Clip to viewport (shrunk for scrollbars if visible)
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
@@ -73,8 +83,15 @@ public class ScrollView : Panel
             float thumbY = (_scrollY / maxScroll) * (viewport.Height - thumbH);
             var rTrack = new Rect(viewport.Width, 0, sb, viewport.Height);
             renderer.FillRect(rTrack, theme.ScrollBarTrackColor);
-            renderer.FillRoundedRect(new Rect(rTrack.X + 2, thumbY, sb - 4, thumbH),
-                (sb - 4) * 0.5f, theme.ScrollBarThumbColor);
+            var thumbR = new Rect(rTrack.X + 2, thumbY, sb - 4, thumbH);
+            var thumbGrad = renderer.LinearGradient(
+                new Vector2(thumbR.X, thumbR.Y),
+                new Vector2(thumbR.Right, thumbR.Y),
+                theme.ScrollBarThumbColor.Lighten(0.18f),
+                theme.ScrollBarThumbColor.Darken(0.12f));
+            renderer.FillRoundedRectWithPaint(thumbR, (sb - 4) * 0.5f, thumbGrad);
+            renderer.StrokeRoundedRect(thumbR, (sb - 4) * 0.5f, 1f,
+                theme.ScrollBarThumbColor.Darken(0.25f));
         }
 
         // Horizontal scrollbar
@@ -85,10 +102,17 @@ public class ScrollView : Panel
             float thumbW = MathF.Max(viewport.Width * ratio, 16f);
             float maxScroll = MathF.Max(cW - viewport.Width, 1f);
             float thumbX = (_scrollX / maxScroll) * (viewport.Width - thumbW);
-            var rTrack = new Rect(0, viewport.Height, viewport.Width, sb);
-            renderer.FillRect(rTrack, theme.ScrollBarTrackColor);
-            renderer.FillRoundedRect(new Rect(thumbX, rTrack.Y + 2, thumbW, sb - 4),
-                (sb - 4) * 0.5f, theme.ScrollBarThumbColor);
+            var rTrack2 = new Rect(0, viewport.Height, viewport.Width, sb);
+            renderer.FillRect(rTrack2, theme.ScrollBarTrackColor);
+            var hThumbR = new Rect(thumbX, rTrack2.Y + 2, thumbW, sb - 4);
+            var hThumbGrad = renderer.LinearGradient(
+                new Vector2(hThumbR.X, hThumbR.Y),
+                new Vector2(hThumbR.X, hThumbR.Bottom),
+                theme.ScrollBarThumbColor.Lighten(0.18f),
+                theme.ScrollBarThumbColor.Darken(0.12f));
+            renderer.FillRoundedRectWithPaint(hThumbR, (sb - 4) * 0.5f, hThumbGrad);
+            renderer.StrokeRoundedRect(hThumbR, (sb - 4) * 0.5f, 1f,
+                theme.ScrollBarThumbColor.Darken(0.25f));
         }
     }
 

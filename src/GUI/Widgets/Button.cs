@@ -43,7 +43,7 @@ public class Button : Widget
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cr   = CornerRadius > 0 ? CornerRadius : theme.ButtonCornerRadius;
 
-        // ── Background gradient (top-light → bottom-dark = raised look) ──────
+        // ── Background gradient (NanoGUI-style: fill inset rect + two border strokes) ──
         UIColor gradTop, gradBot;
         if (!Enabled)
         {
@@ -51,57 +51,57 @@ public class Button : Widget
         }
         else if (IsPressed)
         {
-            // Pressed: inverted depth — darker top, lighter bottom
-            var pressBase = PressColor ?? theme.ButtonPressedColor;
-            gradTop = pressBase.Darken(0.08f);
-            gradBot = pressBase.Lighten(0.05f);
+            gradTop = theme.ButtonPressedTop;
+            gradBot = theme.ButtonPressedBottom;
         }
         else if (IsHovered)
         {
-            var hoverBase = HoverColor ?? theme.ButtonHoverColor;
-            gradTop = hoverBase;
-            gradBot = hoverBase.Darken(0.15f);
+            gradTop = theme.ButtonHoverTop;
+            gradBot = theme.ButtonHoverBottom;
         }
         else
         {
-            var baseCol = BackColor ?? theme.ButtonColor;
-            gradTop = baseCol;
-            gradBot = baseCol.Darken(0.18f);
+            gradTop = BackColor ?? theme.ButtonGradientTop;
+            gradBot = theme.ButtonGradientBottom;
         }
+
+        // Fill: slightly inset (like NanoGUI: pos+1, size-2)
+        var fillR = new Rect(1, 1, bounds.Width - 2, bounds.Height - 2);
         var bgGrad = renderer.LinearGradient(
             new Vector2(0, 0), new Vector2(0, bounds.Height), gradTop, gradBot);
-        renderer.FillRoundedRectWithPaint(bounds, cr, bgGrad);
+        renderer.FillRoundedRectWithPaint(fillR, MathF.Max(0f, cr - 1f), bgGrad);
 
-        // ── Border ────────────────────────────────────────────────────────────
-        if (BorderWidth > 0)
+        // ── NanoGUI double-stroke bevel ───────────────────────────────────────
+        if (Enabled)
         {
-            var borderCol = BorderColor ?? (Enabled
-                ? theme.BorderColor.WithAlpha(0.8f)
-                : theme.BorderColor.WithAlpha(0.4f));
-            renderer.StrokeRoundedRect(bounds, cr, BorderWidth, borderCol);
+            // Inner highlight (border_light): bright edge, shifted down when not pushed
+            float iy = IsPressed ? 0.5f : 1.5f;
+            float ih = bounds.Height - 1f - (IsPressed ? 0f : 1f);
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, iy, bounds.Width - 1f, ih), cr,
+                1f, theme.BorderLight);
+
+            // Outer dark border (border_dark): overall outline
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, 0.5f, bounds.Width - 1f, bounds.Height - 2f), cr,
+                1f, theme.BorderDark);
         }
-
-        // ── Inner top highlight (glassy sheen when not pressed) ───────────────
-        if (Enabled && !IsPressed)
+        else
         {
-            var hlGrad = renderer.LinearGradient(
-                new Vector2(0, 1f), new Vector2(0, bounds.Height * 0.5f),
-                UIColor.White.WithAlpha(0.14f), UIColor.Transparent);
-            var inner = bounds.Deflate(new Thickness(1));
-            renderer.FillRoundedRectWithPaint(inner, MathF.Max(0f, cr - 1f), hlGrad);
+            renderer.StrokeRoundedRect(bounds, cr, 1f, theme.BorderColor.WithAlpha(0.4f));
         }
 
         // ── Label ─────────────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(Text))
         {
             float tx = bounds.Width * 0.5f;
-            float ty = bounds.Height * 0.5f + (IsPressed ? 0.5f : 0f);
+            float ty = bounds.Height * 0.5f - 1f + (IsPressed ? 1f : 0f);
             var   fg = ForeColor ?? (Enabled ? theme.ButtonTextColor : theme.TextDisabledColor);
             ApplyFont(renderer, theme);
             renderer.SetTextAlign(TextHAlign.Center);
-            // Subtle text shadow for legibility on gradient background
+            // Text shadow (NanoGUI: draws text with m_text_color_shadow offset 1px)
             if (Enabled)
-                renderer.DrawText(tx, ty + 1f, Text, UIColor.Black.WithAlpha(0.28f));
+                renderer.DrawText(tx, ty + 1f, Text, theme.TextShadow);
             renderer.DrawText(tx, ty, Text, fg);
         }
     }

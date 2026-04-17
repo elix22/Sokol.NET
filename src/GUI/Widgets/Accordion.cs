@@ -98,13 +98,20 @@ public class Accordion : Widget
             float crBR  = roundBot ? cr : 0f;
             float crBL  = roundBot ? cr : 0f;
 
-            var hdrBg = renderer.LinearGradient(
+            // NanoGUI-style gradient header + double bevel
+            var hdrGrad = renderer.LinearGradient(
                 new Vector2(0, y), new Vector2(0, y + HeaderHeight),
-                theme.ButtonColor, theme.ButtonColor.Darken(0.18f));
-            renderer.Save();
-            renderer.Translate(0, y);
-            renderer.FillRoundedRectTop(new Rect(0, 0, w, HeaderHeight), cr, theme.ButtonColor.Darken(0.1f));
-            renderer.Restore();
+                theme.ButtonGradientTop, theme.ButtonGradientBottom);
+            renderer.FillRoundedRectWithPaint(hdrR, 0f, hdrGrad);
+
+            // Inner bright highlight (light top edge = raised)
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, y + 1.5f, w - 1f, HeaderHeight - 2f), 0f,
+                1f, theme.BorderLight);
+            // Outer dark border
+            renderer.StrokeRoundedRect(
+                new Rect(0.5f, y + 0.5f, w - 1f, HeaderHeight - 1f), 0f,
+                1f, theme.BorderDark);
 
             // Header hover highlight
             if (IsHovered && HoveredSection() == i)
