@@ -264,6 +264,8 @@ public sealed class InputRouter
             {
                 var me = new MouseEvent { Position = pos, Button = MouseButton.Left, Clicks = 1 };
                 var target = _screen.HitTestDeep(pos);
+                // Dismiss any open popup if touch landed outside it.
+                Screen.DismissActivePopupIfNeeded(target);
                 if (target != null)
                 {
                     _captured = target;
@@ -273,9 +275,13 @@ public sealed class InputRouter
                     {
                         _hovered?.OnMouseLeave(me);
                         _hovered = target;
-                        _hovered.OnMouseEnter(me);
+                        _hovered.OnMouseEnter(Localize(target, me));
                     }
-                    target.OnMouseDown(me);
+                    // Fire a synthetic MouseMove before MouseDown so widgets that
+                    // cache _mousePos from OnMouseMove (Accordion, TreeView, etc.)
+                    // have the correct local position before OnMouseDown runs.
+                    target.OnMouseMove(Localize(target, me));
+                    target.OnMouseDown(Localize(target, me));
                 }
                 break;
             }
@@ -283,14 +289,18 @@ public sealed class InputRouter
             {
                 var me = new MouseEvent { Position = pos };
                 UpdateHovered(pos, me);
-                (_captured ?? _hovered)?.OnMouseMove(me);
+                var moveTarget = _captured ?? _hovered;
+                if (moveTarget != null)
+                    moveTarget.OnMouseMove(Localize(moveTarget, me));
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED:
             case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_CANCELLED:
             {
                 var me = new MouseEvent { Position = pos, Button = MouseButton.Left, Clicks = 1 };
-                (_captured ?? _hovered)?.OnMouseUp(me);
+                var upTarget = _captured ?? _hovered;
+                if (upTarget != null)
+                    upTarget.OnMouseUp(Localize(upTarget, me));
                 // Leave hover on touch-end so the widget can visually deactivate
                 _hovered?.OnMouseLeave(me);
                 _hovered   = null;
