@@ -46,6 +46,14 @@ public sealed class CanvasLayout : ILayout
         {
             if (!child.Visible) continue;
             var size = EffectiveSize(child, renderer, available);
+            // Expand: fill remaining space from the child's position to the parent edge.
+            if (child.Expand)
+            {
+                if (size.X < available.X - child.Position.X)
+                    size = new Vector2(available.X - child.Position.X, size.Y);
+                if (size.Y < available.Y - child.Position.Y)
+                    size = new Vector2(size.X, available.Y - child.Position.Y);
+            }
             child.Bounds = new Rect(
                 child.Position.X,
                 child.Position.Y,

@@ -44,6 +44,23 @@ public sealed class ContextMenu : Widget
         var   theme = ThemeManager.Current;
         float w     = CalcWidth(renderer, theme);
         float h     = CalcHeight();
+
+        // Clamp popup position so it stays fully visible within the screen.
+        // Screen already translated to the original _screenPos, so we apply a correction delta.
+        var screen = Screen.Instance;
+        float sx = _screenPos.X;
+        float sy = _screenPos.Y;
+        if (sx + w > screen.LogicalWidth)  sx = MathF.Max(0f, screen.LogicalWidth  - w);
+        if (sy + h > screen.LogicalHeight) sy = MathF.Max(0f, screen.LogicalHeight - h);
+        float dx = sx - _screenPos.X;
+        float dy = sy - _screenPos.Y;
+        if (dx != 0f || dy != 0f)
+        {
+            _screenPos = new Vector2(sx, sy);
+            Bounds = new Rect(sx, sy, 0f, 0f);
+            renderer.Translate(dx, dy);
+        }
+
         var   popR  = new Rect(0, 0, w, h);
 
         renderer.DrawDropShadow(popR, 4f, new Vector2(2f, 3f), 8f,

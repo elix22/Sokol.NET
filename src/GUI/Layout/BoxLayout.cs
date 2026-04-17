@@ -94,6 +94,7 @@ public sealed class BoxLayout : ILayout
         // Collect visible children and their preferred sizes.
         var children = new List<(Widget w, float mainSize, float crossSize)>();
         float totalMain = 0f;
+        int expandCount = 0;
         bool first = true;
 
         foreach (var child in parent.Children)
@@ -104,9 +105,17 @@ public sealed class BoxLayout : ILayout
             var size = EffectiveSize(child, renderer);
             float ms = vertical ? size.Y + child.Margin.Vertical   : size.X + child.Margin.Horizontal;
             float cs = vertical ? size.X + child.Margin.Horizontal : size.Y + child.Margin.Vertical;
-            totalMain += ms;
+            if (!child.Expand) totalMain += ms;
             children.Add((child, ms, cs));
+            if (child.Expand) expandCount++;
         }
+
+        // Distribute remaining space among Expand children
+        float mainAvail = vertical
+            ? inner.Height - Margin.Vertical
+            : inner.Width  - Margin.Horizontal;
+        float remaining = mainAvail - totalMain;
+        float expandSize = (expandCount > 0 && remaining > 0f) ? remaining / expandCount : 0f;
 
         float cursor = vertical ? inner.Top + Margin.Top : inner.Left + Margin.Left;
         float crossMax = vertical ? inner.Width - Margin.Horizontal : inner.Height - Margin.Vertical;
@@ -115,9 +124,12 @@ public sealed class BoxLayout : ILayout
         {
             float cm = child.Margin.Left;
             float cmt = child.Margin.Top;
-            float childMain    = mainSize  - (vertical ? child.Margin.Vertical   : child.Margin.Horizontal);
+            float childMarginMain = vertical ? child.Margin.Vertical : child.Margin.Horizontal;
+            float childMain = child.Expand
+                ? MathF.Max(0f, expandSize - childMarginMain)
+                : mainSize - childMarginMain;
             float childCrossReq= crossSize - (vertical ? child.Margin.Horizontal : child.Margin.Vertical);
-            float childCross   = Alignment == Alignment.Stretch ? crossMax : childCrossReq;
+            float childCross   = (Alignment == Alignment.Stretch || child.Expand) ? crossMax : childCrossReq;
             // FixedSize component of 0 in the cross axis means "fill available"
             if (child.FixedSize.HasValue)
             {
@@ -150,9 +162,10 @@ public sealed class BoxLayout : ILayout
                 child.Bounds = new Rect(cursor + cm, crossPos + cmt, childMain, childCross - child.Margin.Vertical);
 
             if (log)
-                Sokol.SLog.Info($"BoxLayout[{Screen.DbgFrame}]: {parent.GetType().Name}/{child.GetType().Name} FixedSize={child.FixedSize} → Bounds={child.Bounds}", "Sokol.GUI");
+                Sokol.SLog.Info($"BoxLayout[{Screen.DbgFrame}]: {parent.GetType().Name}/{child.GetType().Name} FixedSize={child.FixedSize} Expand={child.Expand} → Bounds={child.Bounds}", "Sokol.GUI");
 
-            cursor += mainSize + Spacing;
+            float actualMain = childMain + (vertical ? child.Margin.Vertical : child.Margin.Horizontal);
+            cursor += actualMain + Spacing;
         }
     }
 }

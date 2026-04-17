@@ -66,6 +66,9 @@ public abstract class Widget
     }
     /// <summary>Override width+height; null = auto.</summary>
     public Vector2? FixedSize   { get; set; }
+    /// <summary>When true, this widget expands to fill remaining space in a BoxLayout (main axis)
+    /// or available space in a CanvasLayout.</summary>
+    public bool     Expand      { get; set; }
     public Thickness Margin     { get; set; }
     public Thickness Padding    { get; set; }
     /// <summary>Layout algorithm applied to children (default: CanvasLayout).</summary>
