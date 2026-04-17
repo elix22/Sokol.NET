@@ -145,6 +145,17 @@ public sealed class Renderer
         nvgStroke(_vg);
     }
 
+    public void FillTriangle(Vector2 a, Vector2 b, Vector2 c, UIColor color)
+    {
+        SetFillColor(color);
+        nvgBeginPath(_vg);
+        nvgMoveTo(_vg, a.X, a.Y);
+        nvgLineTo(_vg, b.X, b.Y);
+        nvgLineTo(_vg, c.X, c.Y);
+        nvgClosePath(_vg);
+        nvgFill(_vg);
+    }
+
     // -------------------------------------------------------------------------
     // Gradients
     // -------------------------------------------------------------------------

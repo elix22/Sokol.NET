@@ -14,6 +14,13 @@ public class TreeNode
     public bool            IsSelected { get; set; } = false;
     public object?         Tag        { get; set; }
 
+    /// <summary>
+    /// Optional widget content. When set, this widget is rendered in the row
+    /// instead of the <see cref="Label"/> text (Avalonia-style templated items).
+    /// The widget is sized to fit the available row space.
+    /// </summary>
+    public Widget? Content { get; set; }
+
     public TreeNode(string label = "") => Label = label;
 
     public TreeNode Add(string label)
@@ -31,7 +38,9 @@ public class TreeNode
 }
 
 /// <summary>
-/// Hierarchical tree widget with expand/collapse and keyboard navigation.
+/// Hierarchical tree widget with triangle expand/collapse indicators,
+/// double-click or arrow-click to expand, keyboard navigation, and
+/// support for widget content items (not just text labels).
 /// </summary>
 public class TreeView : Widget
 {
@@ -44,9 +53,17 @@ public class TreeView : Widget
     private float     _sbDragStartScroll;
     private int       _anchorRowIdx = -1;
     private readonly HashSet<TreeNode> _selectedNodes = [];
-    public  const float ItemHeight   = 22f;
+
+    // Double-click tracking
+    private float     _lastClickTime;
+    private TreeNode? _lastClickNode;
+    // Widget content click forwarding
+    private Widget?   _contentClickTarget;
+
+    public  float ItemHeight   { get; set; } = 22f;
     public  const float IndentWidth  = 16f;
-    public  const float ChevronWidth = 14f;
+    public  const float ArrowWidth   = 16f;  // area for the disclosure triangle
+    private const float ArrowSize    = 5f;   // half-size of the triangle shape
 
     public TreeNode? Root
     {
@@ -66,6 +83,7 @@ public class TreeView : Widget
 
     public event Action<TreeNode>?  SelectionChanged;
     public event Action<TreeNode>?  NodeExpanded;
+    public event Action<TreeNode>?  NodeDoubleClicked;
 
     // ─── Layout ──────────────────────────────────────────────────────────────
     public override Vector2 PreferredSize(Renderer renderer)
@@ -122,25 +140,53 @@ public class TreeView : Widget
             else if (IsHovered && HoveredRow()?.node == node)
                 renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.1f));
 
-            // Chevron for nodes with children
+            // Disclosure triangle for nodes with children
             if (node.Children.Count > 0)
             {
-                float cx = indentX + ChevronWidth * 0.5f;
+                float cx = indentX + ArrowWidth * 0.5f;
                 float cy = rowY + ItemHeight * 0.5f;
-                renderer.SetTextAlign(TextHAlign.Center);
-                renderer.DrawText(cx, cy, node.IsExpanded ? "▾" : "▸", theme.TextMutedColor);
+
+                if (node.IsExpanded)
+                {
+                    // Down-pointing triangle: ▾
+                    renderer.FillTriangle(
+                        new Vector2(cx - ArrowSize, cy - ArrowSize * 0.5f),
+                        new Vector2(cx + ArrowSize, cy - ArrowSize * 0.5f),
+                        new Vector2(cx, cy + ArrowSize * 0.5f),
+                        theme.TextMutedColor);
+                }
+                else
+                {
+                    // Right-pointing triangle: ▸
+                    renderer.FillTriangle(
+                        new Vector2(cx - ArrowSize * 0.5f, cy - ArrowSize),
+                        new Vector2(cx + ArrowSize * 0.5f, cy),
+                        new Vector2(cx - ArrowSize * 0.5f, cy + ArrowSize),
+                        theme.TextMutedColor);
+                }
             }
 
-            // Label
-            renderer.SetTextAlign(TextHAlign.Left);
-            UIColor labelCol = node.IsSelected        ? theme.AccentColor
-                                : node.Children.Count > 0 ? theme.TextColor
-                                : theme.TextMutedColor;
-            renderer.DrawText(
-                indentX + ChevronWidth + 2f,
-                rowY + ItemHeight * 0.5f,
-                node.Label,
-                labelCol);
+            // Content: widget or text label
+            float contentX = indentX + ArrowWidth + 2f;
+            if (node.Content != null)
+            {
+                // Render widget content
+                float contentW = viewW - contentX - 2f;
+                node.Content.Bounds = new Rect(contentX, rowY, contentW, ItemHeight);
+                renderer.Save();
+                renderer.Translate(contentX, rowY);
+                node.Content.Draw(renderer);
+                renderer.Restore();
+            }
+            else
+            {
+                // Text label
+                renderer.SetTextAlign(TextHAlign.Left);
+                UIColor labelCol = node.IsSelected        ? theme.AccentColor
+                                    : node.Children.Count > 0 ? theme.TextColor
+                                    : theme.TextMutedColor;
+                renderer.DrawText(contentX, rowY + ItemHeight * 0.5f, node.Label, labelCol);
+            }
         }
 
         renderer.Restore();
@@ -200,24 +246,53 @@ public class TreeView : Widget
 
         var hit = HoveredRow();
         if (hit == null) return true;
-        var node = hit.Value.node;
+        var node  = hit.Value.node;
+        int depth = hit.Value.depth;
 
-        bool ctrl  = MultiSelect && (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
-        bool shift = MultiSelect && (e.Modifiers & KeyModifiers.Shift) != 0;
+        // ── Double-click detection ──
+        float now = (float)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0);
+        bool isDoubleClick = (node == _lastClickNode) && (now - _lastClickTime < 0.4f);
+        _lastClickTime = now;
+        _lastClickNode = node;
 
-        // Expand/collapse parent nodes (always)
-        if (node.Children.Count > 0)
+        float indentX  = depth * IndentWidth;
+        float contentX = indentX + ArrowWidth + 2f;
+
+        // ── Forward click to widget content (e.g. CheckBox) ──
+        if (node.Content != null && _mousePos.X >= contentX)
+        {
+            float rowY = hit.Value.y;
+            var widgetEvent = new MouseEvent
+            {
+                LocalPosition = new Vector2(_mousePos.X - contentX, _mousePos.Y + _scrollY - rowY),
+                Position      = e.Position,
+                Button        = e.Button,
+                Modifiers     = e.Modifiers,
+                Clicks        = isDoubleClick ? 2 : 1,
+            };
+            _contentClickTarget = node.Content;
+            node.Content.OnMouseDown(widgetEvent);
+        }
+
+        // ── Double-click on row → toggle expand ──
+        if (isDoubleClick && node.Children.Count > 0)
         {
             node.IsExpanded = !node.IsExpanded;
             if (node.IsExpanded) NodeExpanded?.Invoke(node);
             InvalidateLayout();
-            // After rebuild, anchor is no longer meaningful unless we recalculate it
-            if (!shift) _anchorRowIdx = _flatRows.FindIndex(r => r.node == node);
+            NodeDoubleClicked?.Invoke(node);
         }
+        else if (isDoubleClick)
+        {
+            NodeDoubleClicked?.Invoke(node);
+        }
+
+        // ── Selection logic (always on click) ──
+        bool ctrl  = MultiSelect && (e.Modifiers & (KeyModifiers.Control | KeyModifiers.Super)) != 0;
+        bool shift = MultiSelect && (e.Modifiers & KeyModifiers.Shift) != 0;
 
         if (shift && _anchorRowIdx >= 0)
         {
-            // Range select from anchor to current row
             int curIdx = _flatRows.FindIndex(r => r.node == node);
             if (curIdx >= 0)
             {
@@ -258,6 +333,19 @@ public class TreeView : Widget
     public override bool OnMouseUp(MouseEvent e)
     {
         if (_sbDragging) { _sbDragging = false; return true; }
+        if (_contentClickTarget != null)
+        {
+            var widgetEvent = new MouseEvent
+            {
+                LocalPosition = new Vector2(_mousePos.X, _mousePos.Y),
+                Position      = e.Position,
+                Button        = e.Button,
+                Modifiers     = e.Modifiers,
+            };
+            _contentClickTarget.OnMouseUp(widgetEvent);
+            _contentClickTarget = null;
+            return true;
+        }
         return false;
     }
 
@@ -275,21 +363,54 @@ public class TreeView : Widget
         if (rows.Count == 0) return false;
 
         int curIdx = rows.FindIndex(r => r.node == _selected);
+        bool alt   = (e.Modifiers & KeyModifiers.Alt) != 0;
+
         switch (e.KeyCode)
         {
-            case 265:
+            case 265: // Up
                 if (curIdx > 0) Select(rows[curIdx - 1].node);
                 return true;
-            case 264:
+
+            case 264: // Down
                 if (curIdx < rows.Count - 1) Select(rows[curIdx + 1].node);
                 return true;
-            case 263:
+
+            case 263: // Left — collapse selected node (Option+Left = collapse recursively)
                 if (_selected != null && _selected.IsExpanded)
-                { _selected.IsExpanded = false; InvalidateLayout(); }
+                {
+                    if (alt)
+                        CollapseRecursive(_selected);
+                    else
+                        _selected.IsExpanded = false;
+                    InvalidateLayout();
+                }
+                else if (_selected != null)
+                {
+                    // Move to parent node
+                    var parent = FindParent(_selected);
+                    if (parent != null) Select(parent);
+                }
                 return true;
-            case 262:
-                if (_selected?.Children.Count > 0 && !_selected.IsExpanded)
-                { _selected.IsExpanded = true; NodeExpanded?.Invoke(_selected); InvalidateLayout(); }
+
+            case 262: // Right — expand selected node (Option+Right = expand recursively)
+                if (_selected?.Children.Count > 0)
+                {
+                    if (!_selected.IsExpanded)
+                    {
+                        if (alt)
+                            ExpandRecursive(_selected);
+                        else
+                            _selected.IsExpanded = true;
+                        NodeExpanded?.Invoke(_selected);
+                        InvalidateLayout();
+                    }
+                    else
+                    {
+                        // Already expanded: move to first child
+                        if (_selected.Children.Count > 0)
+                            Select(rows.Find(r => r.node == _selected.Children[0]).node);
+                    }
+                }
                 return true;
         }
         return false;
@@ -327,7 +448,6 @@ public class TreeView : Widget
     {
         if (MultiSelect && addToSelection)
         {
-            // Toggle in multi-selection set; primary _selected tracks last clicked
             if (_selectedNodes.Contains(node))
                 _selectedNodes.Remove(node);
             else
@@ -335,7 +455,6 @@ public class TreeView : Widget
         }
         else
         {
-            // Clear all previous selections
             foreach (var n in _selectedNodes) n.IsSelected = false;
             _selectedNodes.Clear();
             if (_selected != null) _selected.IsSelected = false;
@@ -346,7 +465,6 @@ public class TreeView : Widget
         if (node != null) node.IsSelected = true;
         SelectionChanged?.Invoke(node!);
 
-        // Scroll to make selected item visible
         if (node != null)
         {
             int idx = _flatRows.FindIndex(r => r.node == node);
@@ -359,6 +477,37 @@ public class TreeView : Widget
                 else if (itemY + ItemHeight > _scrollY + viewH) _scrollY = itemY + ItemHeight - viewH;
                 _scrollY = Math.Clamp(_scrollY, 0f, maxScr);
             }
+        }
+    }
+
+    private void ExpandRecursive(TreeNode node)
+    {
+        node.IsExpanded = true;
+        foreach (var c in node.Children)
+            if (c.Children.Count > 0) ExpandRecursive(c);
+    }
+
+    private void CollapseRecursive(TreeNode node)
+    {
+        node.IsExpanded = false;
+        foreach (var c in node.Children)
+            if (c.Children.Count > 0) CollapseRecursive(c);
+    }
+
+    private TreeNode? FindParent(TreeNode target)
+    {
+        if (_root == null) return null;
+        return FindParentIn(_root, target);
+
+        static TreeNode? FindParentIn(TreeNode parent, TreeNode target)
+        {
+            foreach (var child in parent.Children)
+            {
+                if (child == target) return parent;
+                var found = FindParentIn(child, target);
+                if (found != null) return found;
+            }
+            return null;
         }
     }
 
