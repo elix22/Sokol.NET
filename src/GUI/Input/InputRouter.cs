@@ -84,7 +84,13 @@ public sealed class InputRouter
             {
                 var pos = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
                 var me  = new MouseEvent { Position = pos, Scroll = new Vector2(ev->scroll_x, ev->scroll_y), Modifiers = Mods(ev) };
-                if (_hovered != null) _hovered.OnMouseScroll(Localize(_hovered, me));
+                // Bubble up the parent chain until a widget consumes the scroll.
+                var scrollTarget = _hovered;
+                while (scrollTarget != null)
+                {
+                    if (scrollTarget.OnMouseScroll(Localize(scrollTarget, me))) break;
+                    scrollTarget = scrollTarget.Parent;
+                }
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
