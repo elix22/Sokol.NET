@@ -300,7 +300,10 @@ public class PropertyGrid : Widget
             var ni = new NumberInput { Value = cur, Min = float.MinValue, Max = float.MaxValue };
             ni.ValueChanged += v =>
             {
-                desc.Set?.Invoke(desc.PropertyType == typeof(double) ? (double)v : v);
+                if (desc.PropertyType == typeof(double))
+                    desc.Set?.Invoke((double)v);
+                else
+                    desc.Set?.Invoke(v);
             };
             editor = ni;
         }
