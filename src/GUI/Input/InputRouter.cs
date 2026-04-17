@@ -264,6 +264,7 @@ public sealed class InputRouter
             {
                 var me = new MouseEvent { Position = pos, Button = MouseButton.Left, Clicks = 1 };
                 var target = _screen.HitTestDeep(pos);
+                Sokol.SLog.Info($"GUI: TouchBegan ({pos.X:F0},{pos.Y:F0}) → {target?.GetType().Name ?? "none"}[{target?.Id ?? "-"}]", "Sokol.GUI");
                 // Dismiss any open popup if touch landed outside it.
                 Screen.DismissActivePopupIfNeeded(target);
                 if (target != null)
