@@ -17,7 +17,22 @@ public static class BidiHelper
     {
         if (string.IsNullOrEmpty(logicalText)) return logicalText;
         if (!ContainsRTL(logicalText)) return logicalText;
-        return Bidi.LogicalToVisual(logicalText);
+
+        // Process each paragraph (line) independently so each gets its own
+        // paragraph embedding level.  Without this, a single RTL line makes
+        // ALL subsequent neutral-only lines (e.g. "?") inherit RTL order.
+        var lines = logicalText.Split('\n');
+        if (lines.Length <= 1)
+            return Bidi.LogicalToVisual(logicalText);
+
+        var sb = new System.Text.StringBuilder(logicalText.Length);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (i > 0) sb.Append('\n');
+            var line = lines[i];
+            sb.Append(ContainsRTL(line) ? Bidi.LogicalToVisual(line) : line);
+        }
+        return sb.ToString();
     }
 
     /// <summary>

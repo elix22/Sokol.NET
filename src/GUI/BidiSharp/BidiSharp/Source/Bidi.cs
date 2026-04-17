@@ -330,6 +330,14 @@ namespace BidiSharp
                         validIsolateCount = 0;
                         dirStatusStack.Clear();     // Also pop off initialization entry
 
+                        // Re-push the initial entry so subsequent characters have a valid stack
+                        dirStatusStack.Push(new DirectionalStatus
+                        {
+                            paragraphEmbeddingLevel = level,
+                            directionalOverrideStatus = (int)BidiClass.ON,
+                            directionalIsolateStatus = false
+                        });
+
                         // 2 Assign separator character an embedding level equal to paragraph embedding level
                         levels[i] = level;
                     }
