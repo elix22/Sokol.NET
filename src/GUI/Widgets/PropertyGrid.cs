@@ -34,6 +34,7 @@ public class PropertyGrid : Widget
     private readonly Dictionary<int, Widget>      _editors = new();
     private object?  _target;
     private float    _scrollY;
+    private int      _activeEditorIdx = -1;
 
     public object? Target
     {
@@ -186,7 +187,9 @@ public class PropertyGrid : Widget
         float localY = e.LocalPosition.Y + _scrollY;
         float w      = Bounds.Width;
         float sb     = theme.ScrollBarWidth;
-        float viewW  = w - sb;
+        float totalH = CalcTotalHeight();
+        bool  needSB = totalH > Bounds.Height;
+        float viewW  = needSB ? w - sb : w;
         float nameW  = viewW * SplitRatio;
 
         // Only forward clicks on the editor column
@@ -199,9 +202,45 @@ public class PropertyGrid : Widget
 
         float ex = e.LocalPosition.X - nameW - 2;
         float ey = e.LocalPosition.Y + _scrollY - RowYOfIndex(idx) - 2;
-        editor.OnMouseDown(new MouseEvent { Position = new Vector2(ex, ey), Button = e.Button, Clicks = e.Clicks });
+        var local = new Vector2(ex, ey);
+        editor.OnMouseDown(new MouseEvent { Position = local, LocalPosition = local, Button = e.Button, Clicks = e.Clicks });
         Screen.Instance.Focus.SetFocus(editor);
+        _activeEditorIdx = idx;
         return true;
+    }
+
+    public override bool OnMouseMove(MouseEvent e)
+    {
+        if (_activeEditorIdx < 0) return false;
+        if (!_editors.TryGetValue(_activeEditorIdx, out var editor)) return false;
+
+        var local = EditorLocalPos(e.LocalPosition);
+        editor.OnMouseMove(new MouseEvent { Position = local, LocalPosition = local, Button = e.Button });
+        return true;
+    }
+
+    public override bool OnMouseUp(MouseEvent e)
+    {
+        if (_activeEditorIdx < 0) return false;
+        if (!_editors.TryGetValue(_activeEditorIdx, out var editor)) { _activeEditorIdx = -1; return false; }
+
+        var local = EditorLocalPos(e.LocalPosition);
+        editor.OnMouseUp(new MouseEvent { Position = local, LocalPosition = local, Button = e.Button });
+        _activeEditorIdx = -1;
+        return true;
+    }
+
+    private Vector2 EditorLocalPos(Vector2 localPos)
+    {
+        float w      = Bounds.Width;
+        float sb     = theme.ScrollBarWidth;
+        float totalH = CalcTotalHeight();
+        bool  needSB = totalH > Bounds.Height;
+        float viewW  = needSB ? w - sb : w;
+        float nameW  = viewW * SplitRatio;
+        float ex = localPos.X - nameW - 2;
+        float ey = localPos.Y + _scrollY - RowYOfIndex(_activeEditorIdx) - 2;
+        return new Vector2(ex, ey);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

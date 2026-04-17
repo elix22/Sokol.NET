@@ -13,7 +13,7 @@ public class ScrollView : Panel
     private float _dragStartX, _dragStartScrollX;
     private bool  _sbHoveredV, _sbHoveredH;
 
-    public bool CanScrollHorizontal { get; set; } = false;
+    public bool CanScrollHorizontal { get; set; } = true;
     public bool CanScrollVertical   { get; set; } = true;
 
     public float ScrollX { get => _scrollX; set => _scrollX = MathF.Max(0, value); }
@@ -76,8 +76,10 @@ public class ScrollView : Panel
 
         if (Content != null)
         {
-            Content.Bounds = new Rect(0, 0, ContentWidth, ContentHeight);
-            Content.PerformLayout(renderer);
+            // Content width should be at least the viewport width so children fill the visible area.
+            float cw = MathF.Max(ContentWidth, viewport.Width);
+            Content.Bounds = new Rect(0, 0, cw, ContentHeight);
+            Content.PerformLayout(renderer, force: true);
             renderer.Save();
             Content.Draw(renderer);
             renderer.Restore();
@@ -150,11 +152,13 @@ public class ScrollView : Panel
 
     public override bool OnMouseDown(MouseEvent e)
     {
-        // Check if clicked on vertical scrollbar
         var theme = ThemeManager.Current;
         float sb  = theme.ScrollBarWidth;
-        bool showV = CanScrollVertical && ContentHeight > Bounds.Height;
+        bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
+        bool showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
         bool rtlDn = ResolvedFlowDirection == FlowDirection.RightToLeft;
+
+        // Check if clicked on vertical scrollbar
         bool hitVSb = showV && (rtlDn ? e.LocalPosition.X <= sb : e.LocalPosition.X >= Bounds.Width - sb);
         if (hitVSb)
         {
@@ -163,6 +167,17 @@ public class ScrollView : Panel
             _dragStartScrollY = _scrollY;
             return true;
         }
+
+        // Check if clicked on horizontal scrollbar
+        bool hitHSb = showH && e.LocalPosition.Y >= Bounds.Height - sb;
+        if (hitHSb)
+        {
+            _dragH            = true;
+            _dragStartX       = e.LocalPosition.X;
+            _dragStartScrollX = _scrollX;
+            return true;
+        }
+
         return Content?.OnMouseDown(e) ?? false;
     }
 
@@ -181,6 +196,14 @@ public class ScrollView : Panel
             float ratio = Bounds.Height / cH;
             float dy = (e.LocalPosition.Y - _dragStartY) / ratio;
             ScrollY = MathF.Max(0, _dragStartScrollY + dy);
+            return true;
+        }
+        if (_dragH)
+        {
+            float cW = MathF.Max(ContentWidth, 1f);
+            float ratio = Bounds.Width / cW;
+            float dx = (e.LocalPosition.X - _dragStartX) / ratio;
+            ScrollX = MathF.Max(0, _dragStartScrollX + dx);
             return true;
         }
         return false;

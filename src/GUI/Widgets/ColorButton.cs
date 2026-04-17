@@ -68,7 +68,15 @@ public class ColorButton : Widget
         var   theme = ThemeManager.Current;
         var   pref  = _pickerCache.PreferredSize(renderer);
         float gap   = 4f;
-        var   popR  = new Rect(0, Bounds.Height + gap, pref.X, pref.Y);
+
+        // Flip upward if the popup would extend below the screen.
+        var   sp       = ScreenPosition;
+        float screenH  = Screen.Instance.LogicalHeight;
+        float belowY   = Bounds.Height + gap;
+        float belowBot = sp.Y + belowY + pref.Y;
+        float popY     = belowBot <= screenH ? belowY : -(pref.Y + gap);
+
+        var   popR  = new Rect(0, popY, pref.X, pref.Y);
 
         renderer.DrawDropShadow(popR, 4f, new Vector2(2f, 2f), 8f,
             new UIColor(0f, 0f, 0f, 0.3f));

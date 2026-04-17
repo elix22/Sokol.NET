@@ -56,7 +56,8 @@ public class ColorPicker : Widget
     public override Vector2 PreferredSize(Renderer renderer)
     {
         if (FixedSize.HasValue) return FixedSize.Value;
-        float w        = 220f;
+        // Use actual Bounds.Width when laid out (the SV square is width-dependent).
+        float w        = Bounds.Width > 0 ? Bounds.Width : 220f;
         float svSize   = w - PadH * 2;
         float total    = PadH + svSize + SliderGap + HueH + SliderGap;
         if (ShowAlpha)  total += AlphaH + SliderGap;
