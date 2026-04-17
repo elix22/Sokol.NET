@@ -39,6 +39,7 @@ public class TreeView : Widget
     private TreeNode? _selected;
     private float     _scrollY;
     private bool      _sbDragging;
+    private bool      _sbHovered;
     private float     _sbDragStartY;
     private float     _sbDragStartScroll;
     private int       _anchorRowIdx = -1;
@@ -148,7 +149,7 @@ public class TreeView : Widget
         if (needSB)
         {
             float totalHH = _flatRows.Count * ItemHeight;
-            ScrollbarRenderer.DrawVertical(renderer, w - sb, 0, sb, h, _scrollY, totalHH, h);
+            ScrollbarRenderer.DrawVertical(renderer, w - sb, 0, sb, h, _scrollY, totalHH, h, _sbHovered);
         }
     }
 
@@ -156,10 +157,13 @@ public class TreeView : Widget
     private Vector2 _mousePos;
 
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
-    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; return true; }
+    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _sbHovered = false; return true; }
     public override bool OnMouseMove(MouseEvent e)
     {
         _mousePos = e.LocalPosition;
+        float tvSb = ThemeManager.Current.ScrollBarWidth;
+        float tvTotalH = _flatRows.Count * ItemHeight;
+        _sbHovered = tvTotalH > Bounds.Height && _mousePos.X >= Bounds.Width - tvSb;
         if (_sbDragging)
         {
             float totalH    = _flatRows.Count * ItemHeight;

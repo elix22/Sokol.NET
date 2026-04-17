@@ -28,6 +28,7 @@ public class ToolBar : Widget
 {
     private readonly List<ToolBarItem> _items = [];
     private int    _hoveredIdx = -1;
+    private int    _pressedIdx = -1;   // mouse-down visual feedback
     private Rect[] _itemRects  = [];   // cached during Draw; index matches _items
 
     public const float DefaultItemSize = 28f;
@@ -112,19 +113,53 @@ public class ToolBar : Widget
 
             _itemRects[i] = itemR;
 
-            bool hov     = i == _hoveredIdx && item.Enabled;
-            bool pressed = item.Pressed && item.Type == ToolBarItemType.Toggle;
+            bool hov      = i == _hoveredIdx && item.Enabled;
+            bool toggled   = item.Pressed && item.Type == ToolBarItemType.Toggle;
+            bool mouseDown = i == _pressedIdx && item.Enabled;
 
-            if (pressed)
-                renderer.FillRoundedRect(itemR, cr, theme.AccentColor.WithAlpha(0.25f));
+            if (mouseDown)
+            {
+                // Actively being pressed — sunken look
+                var downGrad = renderer.LinearGradient(
+                    new Vector2(itemR.X, itemR.Y), new Vector2(itemR.X, itemR.Bottom),
+                    theme.SurfaceVariant.Darken(0.12f), theme.SurfaceVariant.Darken(0.04f));
+                renderer.FillRoundedRectWithPaint(itemR, cr, downGrad);
+                renderer.StrokeRoundedRect(itemR, cr, 1f, UIColor.Black.WithAlpha(0.25f));
+            }
+            else if (toggled)
+            {
+                // Active toggle — accent inset
+                var pressGrad = renderer.LinearGradient(
+                    new Vector2(itemR.X, itemR.Y), new Vector2(itemR.X, itemR.Bottom),
+                    theme.AccentColor.Darken(0.15f), theme.AccentColor.WithAlpha(0.18f));
+                renderer.FillRoundedRectWithPaint(itemR, cr, pressGrad);
+                renderer.StrokeRoundedRect(itemR, cr, 1f, theme.AccentColor.WithAlpha(0.35f));
+            }
             else if (hov)
-                renderer.FillRoundedRect(itemR, cr, theme.ButtonHoverColor.WithAlpha(0.4f));
+            {
+                // Hover — raised gradient + bevel
+                var hovGrad = renderer.LinearGradient(
+                    new Vector2(itemR.X, itemR.Y), new Vector2(itemR.X, itemR.Bottom),
+                    theme.SurfaceVariant.Lighten(0.12f), theme.SurfaceVariant.Darken(0.04f));
+                renderer.FillRoundedRectWithPaint(itemR, cr, hovGrad);
+                renderer.StrokeRoundedRect(itemR, cr, 1f, UIColor.White.WithAlpha(0.10f));
+            }
+            else
+            {
+                // Normal — subtle raised button so items are visually distinct
+                var normGrad = renderer.LinearGradient(
+                    new Vector2(itemR.X, itemR.Y), new Vector2(itemR.X, itemR.Bottom),
+                    theme.SurfaceVariant.Lighten(0.06f), theme.SurfaceVariant.Darken(0.03f));
+                renderer.FillRoundedRectWithPaint(itemR, cr, normGrad);
+                renderer.StrokeRoundedRect(itemR, cr, 1f, UIColor.Black.WithAlpha(0.12f));
+            }
 
             // Label
             var labelColor = !item.Enabled ? theme.TextDisabledColor
-                            : pressed ? theme.AccentColor
-                            : hov     ? theme.TextColor
-                            :           theme.TextMutedColor;
+                            : toggled   ? theme.AccentColor
+                            : mouseDown ? theme.TextColor
+                            : hov       ? theme.TextColor
+                            :             theme.TextMutedColor;
 
             float cx = itemR.X + itemR.Width  * 0.5f;
             float cy = itemR.Y + itemR.Height * 0.5f;
@@ -137,11 +172,13 @@ public class ToolBar : Widget
 
     // ─── Input ───────────────────────────────────────────────────────────────
     public override bool OnMouseEnter(MouseEvent e) { IsHovered = true;  return true; }
-    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _hoveredIdx = -1; return true; }
+    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _hoveredIdx = -1; Tooltip = null; return true; }
 
     public override bool OnMouseMove(MouseEvent e)
     {
         _hoveredIdx = HitItem(e.LocalPosition);
+        // Expose hovered item's tooltip so the Screen tooltip pass picks it up.
+        Tooltip = _hoveredIdx >= 0 ? _items[_hoveredIdx].Tooltip : null;
         return _hoveredIdx >= 0;
     }
 
@@ -153,10 +190,28 @@ public class ToolBar : Widget
         var item = _items[idx];
         if (!item.Enabled) return true;
 
-        if (item.Type == ToolBarItemType.Toggle)
-            item.Pressed = !item.Pressed;
+        _pressedIdx = idx;
+        return true;
+    }
 
-        item.OnClick?.Invoke();
+    public override bool OnMouseUp(MouseEvent e)
+    {
+        if (_pressedIdx < 0) return false;
+        int idx = _pressedIdx;
+        _pressedIdx = -1;
+
+        // Only fire if released over the same item
+        int hitIdx = HitItem(e.LocalPosition);
+        if (hitIdx == idx && idx >= 0 && idx < _items.Count)
+        {
+            var item = _items[idx];
+            if (item.Enabled)
+            {
+                if (item.Type == ToolBarItemType.Toggle)
+                    item.Pressed = !item.Pressed;
+                item.OnClick?.Invoke();
+            }
+        }
         return true;
     }
 

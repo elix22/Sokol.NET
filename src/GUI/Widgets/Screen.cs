@@ -79,6 +79,9 @@ public sealed class Screen : Widget
         // Animate all widgets.
         AnimationManager.Instance?.Update();
 
+        // Check tooltip hover-delay each frame.
+        Input.UpdateTooltip();
+
         // Screen root children fill the window — bypass CanvasLayout measurement.
         // CanvasLayout would measure TabView as (0,0) because tabs live in _tabs not _children.
         // Instead, set each root child's Bounds to the full window then run its internal layout.
@@ -111,6 +114,17 @@ public sealed class Screen : Widget
         // Draw notification toasts on top of everything.
         _notificationHost.Bounds = new Rect(0, 0, width, height);
         _notificationHost.Draw(Renderer);
+
+        // Draw tooltip overlay on top of everything else.
+        var tip = TooltipControl.Shared;
+        if (tip.Visible)
+        {
+            Renderer.Save();
+            Renderer.Translate(tip.Bounds.X, tip.Bounds.Y);
+            tip.Draw(Renderer);
+            Renderer.Restore();
+        }
+
         Renderer.EndFrame();
     }
 

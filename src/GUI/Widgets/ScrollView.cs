@@ -11,6 +11,7 @@ public class ScrollView : Panel
     private bool  _dragV, _dragH;
     private float _dragStartY, _dragStartScrollY;
     private float _dragStartX, _dragStartScrollX;
+    private bool  _sbHoveredV, _sbHoveredH;
 
     public bool CanScrollHorizontal { get; set; } = false;
     public bool CanScrollVertical   { get; set; } = true;
@@ -78,7 +79,7 @@ public class ScrollView : Panel
         {
             float cH = MathF.Max(ContentHeight, 1f);
             ScrollbarRenderer.DrawVertical(renderer, viewport.Width, 0, sb, viewport.Height,
-                _scrollY, cH, viewport.Height);
+                _scrollY, cH, viewport.Height, _sbHoveredV);
         }
 
         // Horizontal scrollbar
@@ -86,7 +87,7 @@ public class ScrollView : Panel
         {
             float cW = MathF.Max(ContentWidth, 1f);
             ScrollbarRenderer.DrawHorizontal(renderer, 0, viewport.Height, viewport.Width, sb,
-                _scrollX, cW, viewport.Width);
+                _scrollX, cW, viewport.Width, _sbHoveredH);
         }
     }
 
@@ -121,6 +122,10 @@ public class ScrollView : Panel
         }
         return this;
     }
+
+    public override bool OnMouseEnter(MouseEvent e) { return true; }
+    public override bool OnMouseLeave(MouseEvent e) { _sbHoveredV = false; _sbHoveredH = false; return true; }
+
     public override bool OnMouseScroll(MouseEvent e)
     {
         float spd = ThemeManager.Current.ScrollSpeed;
@@ -147,6 +152,12 @@ public class ScrollView : Panel
 
     public override bool OnMouseMove(MouseEvent e)
     {
+        var theme = ThemeManager.Current;
+        float sb  = theme.ScrollBarWidth;
+        bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
+        bool showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
+        _sbHoveredV = showV && e.LocalPosition.X >= Bounds.Width  - sb;
+        _sbHoveredH = showH && e.LocalPosition.Y >= Bounds.Height - sb;
         if (_dragV)
         {
             float cH = MathF.Max(ContentHeight, 1f);

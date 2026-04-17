@@ -17,6 +17,7 @@ public class TextArea : Widget
     private bool  _sbDragging;
     private float _sbDragStartY;
     private float _sbDragStartScroll;
+    private bool  _sbHovered;
 
     private void ApplyFont(Renderer renderer)
     {
@@ -74,9 +75,12 @@ public class TextArea : Widget
         {
             float sbX = inner.X + textW;
             ScrollbarRenderer.DrawVertical(renderer, sbX, inner.Y, sbW, inner.Height,
-                _scrollY, measH, inner.Height);
+                _scrollY, measH, inner.Height, _sbHovered);
         }
     }
+
+    public override bool OnMouseEnter(MouseEvent e) { return true; }
+    public override bool OnMouseLeave(MouseEvent e) { _sbHovered = false; return true; }
 
     public override bool OnMouseScroll(MouseEvent e)
     {
@@ -105,6 +109,12 @@ public class TextArea : Widget
 
     public override bool OnMouseMove(MouseEvent e)
     {
+        var thm = ThemeManager.Current;
+        float sbW2 = thm.ScrollBarWidth;
+        var inner2 = new Rect(0, 0, Bounds.Width, Bounds.Height).Deflate(Padding);
+        float textW2 = MathF.Max(10f, inner2.Width - sbW2);
+        _sbHovered = e.LocalPosition.X >= inner2.X + textW2;
+
         if (!_sbDragging) return false;
         var renderer = Screen.Instance?.Renderer;
         if (renderer == null) return true;

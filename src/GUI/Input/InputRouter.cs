@@ -15,6 +15,13 @@ public sealed class InputRouter
     private          Widget?      _hovered;
     private          Widget?      _captured;   // widget that captured mouse-down
 
+    // Tooltip hover-delay tracking
+    private Vector2 _lastMousePos;
+    private double  _hoverStartTime;
+    private bool    _tooltipShown;
+    private string? _lastTooltipText;
+    private const double TooltipDelaySec = 0.5;
+
     // Button-click tracking
     private MouseButton _lastButton;
     private float       _lastClickX, _lastClickY;
@@ -50,6 +57,10 @@ public sealed class InputRouter
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
             {
+                // Hide tooltip on click
+                _tooltipShown = false;
+                TooltipControl.Shared.Hide();
+
                 var pos = new Vector2(ev->mouse_x / dpi, ev->mouse_y / dpi);
                 var btn = MapButton(ev->mouse_button);
                 _clickCount = IsDoubleClick(pos, btn) ? 2 : 1;
@@ -133,6 +144,42 @@ public sealed class InputRouter
             _hovered?.OnMouseLeave(me);
             _hovered = newHover;
             _hovered?.OnMouseEnter(me);
+            // Reset tooltip tracking on hover change
+            _hoverStartTime = stm_sec(stm_now());
+            _tooltipShown = false;
+            TooltipControl.Shared.Hide();
+        }
+        _lastMousePos = pos;
+    }
+
+    /// <summary>
+    /// Called each frame by Screen.Update to check whether the tooltip delay has elapsed.
+    /// </summary>
+    internal void UpdateTooltip()
+    {
+        var currentText = _hovered?.Tooltip;
+
+        // If tooltip text changed (e.g. ToolBar item changed), reset the timer
+        if (currentText != _lastTooltipText)
+        {
+            _lastTooltipText = currentText;
+            _hoverStartTime = stm_sec(stm_now());
+            _tooltipShown = false;
+            TooltipControl.Shared.Hide();
+        }
+
+        if (_tooltipShown) return;
+        if (_hovered == null || string.IsNullOrEmpty(currentText))
+        {
+            TooltipControl.Shared.Hide();
+            return;
+        }
+
+        double now = stm_sec(stm_now());
+        if (now - _hoverStartTime >= TooltipDelaySec)
+        {
+            _tooltipShown = true;
+            TooltipControl.Shared.Show(currentText!, _lastMousePos);
         }
     }
 

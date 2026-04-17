@@ -36,6 +36,8 @@ public class RichLabel : Label
 
         // Layout cache (populated during Draw; used for hit-testing)
         public float X, Y, Width;
+        public float SpanH;       // this span's own line height
+        public float LineH;       // max line height of the line this span belongs to
         public bool  IsLineBreak;   // synthetic span for \n — nothing to draw
     }
 
@@ -161,24 +163,25 @@ public class RichLabel : Label
         float startY       = Padding.Top;
         float defaultLineH = GetDefaultLineHeight(renderer);
 
+        // ── Pass 1: layout — compute span positions and per-line max height ──
         float x     = startX;
         float y     = startY;
         float lineH = defaultLineH;
-
-        // Clip to widget bounds so text never bleeds into adjacent widgets.
-        renderer.Save();
-        renderer.IntersectClip(new Rect(0, 0, Bounds.Width, Bounds.Height));
+        int   lineStart = 0;   // first span index on the current line
 
         for (int i = 0; i < _spans.Count; i++)
         {
             var span = _spans[i];
 
-            // Explicit newline — advance line, reset line height accumulator.
             if (span.IsLineBreak)
             {
+                // Finalise current line: propagate lineH to all spans on this line
+                for (int j = lineStart; j < i; j++)
+                    _spans[j].LineH = lineH;
                 x     = startX;
                 y    += lineH;
                 lineH = defaultLineH;
+                lineStart = i + 1;
                 continue;
             }
 
@@ -186,39 +189,54 @@ public class RichLabel : Label
             renderer.MeasureTextMetrics(out _, out _, out float lh);
             float sw = renderer.MeasureText(span.Content);
 
-            // Wrap before the span when it overflows the right edge.
-            // The guard (x > startX) prevents infinite wrapping for spans wider than maxW.
             if (maxW > 0f && x + sw > startX + maxW && x > startX)
             {
+                for (int j = lineStart; j < i; j++)
+                    _spans[j].LineH = lineH;
                 x  = startX;
-                y += lh;
+                y += lineH;
+                lineH = defaultLineH;
+                lineStart = i;
             }
 
-            // Cache for hit-testing (span.X/Y are in widget-local space, padding included)
             span.X     = x;
             span.Y     = y;
             span.Width = sw;
+            span.SpanH = lh;
 
-            // Resolve foreground color
+            x    += sw;
+            lineH = MathF.Max(lineH, lh);
+        }
+        // Finalise the last line
+        for (int j = lineStart; j < _spans.Count; j++)
+            _spans[j].LineH = lineH;
+
+        // ── Pass 2: draw — centre every span vertically within its line ──
+        renderer.Save();
+        renderer.IntersectClip(new Rect(0, 0, Bounds.Width, Bounds.Height));
+
+        for (int i = 0; i < _spans.Count; i++)
+        {
+            var span = _spans[i];
+            if (span.IsLineBreak) continue;
+
+            ApplySpanFont(renderer, theme, span);
+
             UIColor fg;
             if (span.Link != null)
             {
                 bool hovered = (i == _hoverSpan);
                 fg = hovered ? theme.AccentColor : theme.Primary;
                 if (hovered)
-                    renderer.FillRect(new Rect(x, y + lh * 0.85f, sw, 1f), fg);
+                    renderer.FillRect(new Rect(span.X, span.Y + span.LineH * 0.85f, span.Width, 1f), fg);
             }
             else if (span.Color.HasValue) fg = span.Color.Value;
             else if (span.Italic)          fg = theme.TextMutedColor;
             else                           fg = ForeColor ?? theme.TextColor;
 
             renderer.SetTextAlign(TextHAlign.Left);
-            // SetTextAlign defaults to TextVAlign.Middle: y coordinate is text vertical centre.
-            // Centre of a line starting at y with height lh  →  y + lh * 0.5f
-            renderer.DrawText(x, y + lh * 0.5f, span.Content, fg);
-
-            x    += sw;
-            lineH = MathF.Max(lineH, lh);
+            // Centre the span within the line's max height so all sizes align.
+            renderer.DrawText(span.X, span.Y + span.LineH * 0.5f, span.Content, fg);
         }
 
         renderer.Restore();
