@@ -95,7 +95,7 @@ public abstract class Widget
     /// <summary>Runs layout on this widget and all descendants.</summary>
     /// <param name="force">When true, layout runs even if the dirty flag is clear
     /// (used by containers that update child Bounds manually each frame, e.g. TabView).</param>
-    public void PerformLayout(Renderer renderer, bool force = false)
+    public virtual void PerformLayout(Renderer renderer, bool force = false)
     {
         if (!force && !_layoutDirty) return;
         _layoutDirty = false;

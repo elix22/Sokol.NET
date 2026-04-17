@@ -17,7 +17,7 @@ public class Panel : Widget
 
         var theme  = ThemeManager.Current;
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
-        var bg     = BackgroundColor ?? theme.SurfaceColor;
+        var bg     = BackgroundColor;          // null = transparent (no fill)
         var cr     = CornerRadius;
         bool uniform = cr.IsUniform;
 
@@ -25,13 +25,14 @@ public class Panel : Widget
         if (DrawShadow)
             renderer.DrawDropShadow(bounds, cr.TopLeft, theme.ShadowOffset, theme.ShadowBlur, theme.ShadowColor);
 
-        // Background fill — NanoGUI-style subtle vertical gradient for depth.
-        if (bg.A > 0f)
+        // Background fill — only when an explicit BackgroundColor is set.
+        if (bg.HasValue && bg.Value.A > 0f)
         {
+            var bgColor   = bg.Value;
             var panelGrad = renderer.LinearGradient(
                 new Vector2(0, 0),
                 new Vector2(0, bounds.Height),
-                bg.Lighten(0.06f), bg.Darken(0.06f));
+                bgColor.Lighten(0.06f), bgColor.Darken(0.06f));
             if (uniform)
                 renderer.FillRoundedRectWithPaint(bounds, cr.TopLeft, panelGrad);
             else

@@ -58,6 +58,10 @@ public class CheckBox : Widget
             new Rect(boxR.X + 1f, boxR.Y + 1f, size - 2f, size - 2f),
             theme.CheckBoxCornerRadius, chkPaint);
 
+        // Visible outer border — drawn for both checked and unchecked states.
+        renderer.StrokeRoundedRect(boxR, theme.CheckBoxCornerRadius, 1f,
+            IsChecked ? theme.AccentColor.Darken(0.25f) : theme.Border);
+
         // If checked, draw a filled accent background on top
         if (IsChecked)
         {

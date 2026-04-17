@@ -45,10 +45,10 @@ public class ScrollView : Panel
             bg.Darken(0.04f), bg.Lighten(0.02f));
         renderer.FillRoundedRectWithPaint(bounds, 0f, svGrad);
 
-        // Inner edge shadow (sunken container)
+        // Inner edge shadow (sunken container — darkens only the perimeter)
         var svInset = renderer.BoxGradient(
-            new Rect(1, 1, bounds.Width - 2, bounds.Height - 2), 0f, 5f,
-            UIColor.Black.WithAlpha(0.12f), UIColor.Black.WithAlpha(0f));
+            new Rect(2, 2, bounds.Width - 4, bounds.Height - 4), 0f, 8f,
+            UIColor.Black.WithAlpha(0f), UIColor.Black.WithAlpha(0.18f));
         renderer.FillRoundedRectWithPaint(bounds, 0f, svInset);
 
         // Clip to viewport (shrunk for scrollbars if visible)

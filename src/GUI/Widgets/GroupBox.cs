@@ -10,6 +10,12 @@ public class GroupBox : Panel
 {
     private string _title = string.Empty;
 
+    // Use BoxLayout so children respect Padding (CanvasLayout ignores it).
+    public GroupBox()
+    {
+        Layout = new BoxLayout(Orientation.Vertical, Alignment.Stretch);
+    }
+
     public string Title
     {
         get => _title;
@@ -21,6 +27,25 @@ public class GroupBox : Panel
     public Font?  TitleFont    { get; set; }
     public UIColor? TitleColor { get; set; }
 
+    /// <summary>
+    /// Ensures the top Padding accounts for the title bar height before the layout
+    /// algorithm places children.  Must run before base.PerformLayout.
+    /// </summary>
+    public override void PerformLayout(Renderer renderer, bool force = false)
+    {
+        var theme = ThemeManager.Current;
+        float lh = theme.InputHeight * 0.7f;
+        float minTop = lh + 6f;
+        // Push children below the title/border — always at least minTop.
+        if (Padding.Top < minTop)
+            Padding = new Thickness(
+                Padding.Left  > 0f ? Padding.Left  : 6f,
+                minTop,
+                Padding.Right > 0f ? Padding.Right : 6f,
+                Padding.Bottom > 0f ? Padding.Bottom : 4f);
+        base.PerformLayout(renderer, force);
+    }
+
     public override void Draw(Renderer renderer)
     {
         if (!Visible) return;
@@ -29,7 +54,6 @@ public class GroupBox : Panel
         float w    = Bounds.Width, h = Bounds.Height;
         float cr   = theme.WindowCornerRadius;
         float lh   = theme.InputHeight * 0.7f;   // title bar height = where border gap sits
-        float gap  = 2f;                          // top of border relative to title midpoint
 
         // ── Background fill ───────────────────────────────────────────────────
         var bg = BackgroundColor ?? theme.SurfaceColor;
@@ -72,13 +96,8 @@ public class GroupBox : Panel
             renderer.DrawText(gapX, ty, _title, TitleColor ?? theme.TextColor);
         }
 
-        // ── Children (base Widget.Draw with inset bounds) ─────────────────────
-        // We apply padding so children start below the title line.
-        var savedPadding = Padding;
-        if (Padding.Top < lh + 2f)
-            Padding = new Thickness(Padding.Left, lh + 4f, Padding.Right, Padding.Bottom);
+        // ── Children — PerformLayout already positioned them below the title ──
         base.Draw(renderer);
-        Padding = savedPadding;
     }
 
     private void ApplyTitleFont(Renderer renderer, Theme theme)
