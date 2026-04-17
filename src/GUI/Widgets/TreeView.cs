@@ -104,7 +104,10 @@ public class TreeView : Widget
         float sb  = theme.ScrollBarWidth;
         float totalH = BuildFlatRows() * ItemHeight;
         bool needSB  = totalH > h;
-        float viewW  = needSB ? w - sb : w;
+        bool rtl  = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        float sbLeft  = needSB && rtl  ? sb  : 0;   // RTL: scrollbar on the left
+        float sbRight = needSB && !rtl ? sb  : 0;
+        float viewW  = w - sbLeft - sbRight;
 
         // NanoGUI-style sunken container
         float cr = theme.InputCornerRadius;
@@ -121,8 +124,9 @@ public class TreeView : Widget
 
         // Clipped rows
         renderer.Save();
-        renderer.IntersectClip(new Rect(1, 1, viewW - 2, h - 2));
-        renderer.Translate(0, -_scrollY);
+        float clipX = rtl ? sbLeft : 1;
+        renderer.IntersectClip(new Rect(clipX, 1, viewW - 2, h - 2));
+        renderer.Translate(rtl ? sbLeft : 0, -_scrollY);
 
         ApplyFont(renderer, theme);
         foreach (var (node, rowY, depth) in _flatRows)
@@ -143,7 +147,9 @@ public class TreeView : Widget
             // Disclosure triangle for nodes with children
             if (node.Children.Count > 0)
             {
-                float cx = indentX + ArrowWidth * 0.5f;
+                float cx = rtl
+                    ? viewW - indentX - ArrowWidth * 0.5f
+                    : indentX + ArrowWidth * 0.5f;
                 float cy = rowY + ItemHeight * 0.5f;
 
                 if (node.IsExpanded)
@@ -157,21 +163,37 @@ public class TreeView : Widget
                 }
                 else
                 {
-                    // Right-pointing triangle: ▸
-                    renderer.FillTriangle(
-                        new Vector2(cx - ArrowSize * 0.5f, cy - ArrowSize),
-                        new Vector2(cx + ArrowSize * 0.5f, cy),
-                        new Vector2(cx - ArrowSize * 0.5f, cy + ArrowSize),
-                        theme.TextMutedColor);
+                    // RTL collapsed: left-pointing ◂, LTR: right-pointing ▸
+                    if (rtl)
+                    {
+                        renderer.FillTriangle(
+                            new Vector2(cx + ArrowSize * 0.5f, cy - ArrowSize),
+                            new Vector2(cx - ArrowSize * 0.5f, cy),
+                            new Vector2(cx + ArrowSize * 0.5f, cy + ArrowSize),
+                            theme.TextMutedColor);
+                    }
+                    else
+                    {
+                        renderer.FillTriangle(
+                            new Vector2(cx - ArrowSize * 0.5f, cy - ArrowSize),
+                            new Vector2(cx + ArrowSize * 0.5f, cy),
+                            new Vector2(cx - ArrowSize * 0.5f, cy + ArrowSize),
+                            theme.TextMutedColor);
+                    }
                 }
             }
 
             // Content: widget or text label
-            float contentX = indentX + ArrowWidth + 2f;
+            float contentX = rtl
+                ? 2f
+                : indentX + ArrowWidth + 2f;
+            float contentRight = rtl
+                ? viewW - indentX - ArrowWidth - 2f
+                : viewW - 2f;
             if (node.Content != null)
             {
                 // Render widget content
-                float contentW = viewW - contentX - 2f;
+                float contentW = contentRight - contentX;
                 node.Content.Bounds = new Rect(contentX, rowY, contentW, ItemHeight);
                 renderer.Save();
                 renderer.Translate(contentX, rowY);
@@ -181,11 +203,20 @@ public class TreeView : Widget
             else
             {
                 // Text label
-                renderer.SetTextAlign(TextHAlign.Left);
-                UIColor labelCol = node.IsSelected        ? theme.AccentColor
-                                    : node.Children.Count > 0 ? theme.TextColor
-                                    : theme.TextMutedColor;
-                renderer.DrawText(contentX, rowY + ItemHeight * 0.5f, node.Label, labelCol);
+                if (rtl)
+                {
+                    renderer.SetTextAlign(TextHAlign.Right);
+                    renderer.DrawText(contentRight, rowY + ItemHeight * 0.5f, node.Label,
+                        node.IsSelected ? theme.AccentColor : node.Children.Count > 0 ? theme.TextColor : theme.TextMutedColor);
+                }
+                else
+                {
+                    renderer.SetTextAlign(TextHAlign.Left);
+                    UIColor labelCol = node.IsSelected        ? theme.AccentColor
+                                        : node.Children.Count > 0 ? theme.TextColor
+                                        : theme.TextMutedColor;
+                    renderer.DrawText(contentX, rowY + ItemHeight * 0.5f, node.Label, labelCol);
+                }
             }
         }
 
@@ -195,7 +226,8 @@ public class TreeView : Widget
         if (needSB)
         {
             float totalHH = _flatRows.Count * ItemHeight;
-            ScrollbarRenderer.DrawVertical(renderer, w - sb, 0, sb, h, _scrollY, totalHH, h, _sbHovered);
+            float sbX = rtl ? 0 : w - sb;
+            ScrollbarRenderer.DrawVertical(renderer, sbX, 0, sb, h, _scrollY, totalHH, h, _sbHovered);
         }
     }
 

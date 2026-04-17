@@ -50,9 +50,15 @@ public class ProgressBar : Widget
 
         if (_value > 0f)
         {
+            bool rtl = Orientation == ProgressBarOrientation.Horizontal
+                       && ResolvedFlowDirection == FlowDirection.RightToLeft;
             Rect fill;
             if (Orientation == ProgressBarOrientation.Horizontal)
-                fill = new Rect(bg.X, bg.Y, bg.Width * _value, bg.Height);
+            {
+                float fillW = bg.Width * _value;
+                float fillX = rtl ? (bg.Right - fillW) : bg.X;
+                fill = new Rect(fillX, bg.Y, fillW, bg.Height);
+            }
             else
                 fill = new Rect(bg.X, bg.Bottom - bg.Height * _value, bg.Width, bg.Height * _value);
 

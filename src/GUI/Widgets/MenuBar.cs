@@ -64,7 +64,13 @@ public class MenuBar : Widget
 
         ApplyFont(renderer, theme);
 
-        float x = 4f;
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        // Measure total width for RTL start position
+        float totalMenuW = 0;
+        for (int i = 0; i < _menus.Count; i++)
+            totalMenuW += renderer.MeasureText(_menus[i].Header) + 16f + 2f;
+
+        float x = rtl ? (w - 4f - totalMenuW) : 4f;
         for (int i = 0; i < _menus.Count; i++)
         {
             string header = _menus[i].Header;

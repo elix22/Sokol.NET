@@ -41,11 +41,11 @@ public class CheckBox : Widget
         float size = theme.CheckBoxSize;
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cy   = bounds.Height * 0.5f;
+        bool  rtl  = ResolvedFlowDirection == FlowDirection.RightToLeft;
 
-        // Box background — NanoGUI-style BoxGradient: dark center → very dark edges = deep inset
-        // NanoGUI: nvgBoxGradient(ctx, x+1.5, y+1.5, sz-2, sz-2, 3, 3,
-        //          pushed ? Color(0,100) : Color(0,32), Color(0,0,0,180));
-        var boxR = new Rect(Padding.Left, cy - size * 0.5f, size, size);
+        // Box position: LTR = left edge, RTL = right edge
+        float boxLeft = rtl ? (Bounds.Width - Padding.Right - size) : Padding.Left;
+        var boxR = new Rect(boxLeft, cy - size * 0.5f, size, size);
         var boxInner = new Rect(boxR.X + 1.5f, boxR.Y + 1.5f, size - 2f, size - 2f);
 
         UIColor chkInner = IsPressed
@@ -86,13 +86,22 @@ public class CheckBox : Widget
                               2f, theme.ButtonTextColor);
         }
 
-        // Label
+        // Label — LTR: to the right of the box; RTL: to the left of the box
         if (!string.IsNullOrEmpty(Label))
         {
-            float lx = boxR.Right + theme.CheckBoxLabelSpacing;
             ApplyFont(renderer, theme);
-            renderer.SetTextAlign(TextHAlign.Left);
-            renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            if (rtl)
+            {
+                float lx = boxLeft - theme.CheckBoxLabelSpacing;
+                renderer.SetTextAlign(TextHAlign.Right);
+                renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            }
+            else
+            {
+                float lx = boxR.Right + theme.CheckBoxLabelSpacing;
+                renderer.SetTextAlign(TextHAlign.Left);
+                renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            }
         }
     }
 

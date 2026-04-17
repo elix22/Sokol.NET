@@ -25,4 +25,20 @@ public static class ThemeManager
         _current = theme ?? throw new ArgumentNullException(nameof(theme));
         ThemeChanged?.Invoke();
     }
+
+    /// <summary>
+    /// Override the global flow direction without swapping the entire theme.
+    /// All widgets whose <see cref="FlowDirection"/> is <see cref="FlowDirection.Auto"/>
+    /// will resolve to this direction at the root.
+    /// </summary>
+    public static void SetFlowDirection(FlowDirection direction)
+    {
+        _globalFlowDirection = direction;
+        ThemeChanged?.Invoke(); // reuse same notification channel to force relayout
+    }
+
+    private static FlowDirection _globalFlowDirection = FlowDirection.LeftToRight;
+
+    /// <summary>The active global flow direction (used as root fallback for Auto widgets).</summary>
+    public static FlowDirection GlobalFlowDirection => _globalFlowDirection;
 }

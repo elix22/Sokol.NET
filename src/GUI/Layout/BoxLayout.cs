@@ -120,6 +120,11 @@ public sealed class BoxLayout : ILayout
         float cursor = vertical ? inner.Top + Margin.Top : inner.Left + Margin.Left;
         float crossMax = vertical ? inner.Width - Margin.Horizontal : inner.Height - Margin.Vertical;
 
+        // RTL: reverse horizontal cursor direction
+        bool rtlH = !vertical && parent.ResolvedFlowDirection == FlowDirection.RightToLeft;
+        if (rtlH)
+            cursor = inner.Right - Margin.Right;
+
         foreach (var (child, mainSize, crossSize) in children)
         {
             float cm = child.Margin.Left;
@@ -157,15 +162,28 @@ public sealed class BoxLayout : ILayout
             }
 
             if (vertical)
+            {
                 child.Bounds = new Rect(crossPos + cm, cursor + cmt, childCross - child.Margin.Horizontal, childMain);
+            }
+            else if (rtlH)
+            {
+                // RTL: cursor is the right edge; advance leftward
+                float childLeft = cursor - childMain - child.Margin.Right;
+                child.Bounds = new Rect(childLeft, crossPos + cmt, childMain, childCross - child.Margin.Vertical);
+            }
             else
+            {
                 child.Bounds = new Rect(cursor + cm, crossPos + cmt, childMain, childCross - child.Margin.Vertical);
+            }
 
             if (log)
                 Sokol.SLog.Info($"BoxLayout[{Screen.DbgFrame}]: {parent.GetType().Name}/{child.GetType().Name} FixedSize={child.FixedSize} Expand={child.Expand} → Bounds={child.Bounds}", "Sokol.GUI");
 
             float actualMain = childMain + (vertical ? child.Margin.Vertical : child.Margin.Horizontal);
-            cursor += actualMain + Spacing;
+            if (rtlH)
+                cursor -= actualMain + Spacing;
+            else
+                cursor += actualMain + Spacing;
         }
     }
 }

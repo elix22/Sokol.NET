@@ -117,21 +117,28 @@ public class Accordion : Widget
             if (IsHovered && HoveredSection() == i)
                 renderer.FillRoundedRect(hdrR, 0f, theme.ButtonHoverColor.WithAlpha(0.15f));
 
-            // Chevron (right side) ▸ or ▾
+            // Chevron: RTL = left side, LTR = right side
+            bool rtlAcc = ResolvedFlowDirection == FlowDirection.RightToLeft;
             renderer.Save();
-            renderer.Translate(w - HeaderHeight * 0.5f, y + HeaderHeight * 0.5f);
-            float chevRot  = s.IsExpanded ? MathF.PI * 0.5f : 0f;
-            float chevSize = 5f;
-            // Approximate chevron as two lines
+            float chevX = rtlAcc ? HeaderHeight * 0.5f : w - HeaderHeight * 0.5f;
+            renderer.Translate(chevX, y + HeaderHeight * 0.5f);
             ApplyFont(renderer, theme);
             renderer.SetTextAlign(TextHAlign.Center);
-            renderer.DrawText(0, 0, s.IsExpanded ? "▾" : "▸", theme.TextMutedColor);
+            renderer.DrawText(0, 0, s.IsExpanded ? "▾" : (rtlAcc ? "◂" : "▸"), theme.TextMutedColor);
             renderer.Restore();
 
-            // Header label
+            // Header label: RTL = right-aligned from right margin
             ApplyFont(renderer, theme);
-            renderer.SetTextAlign(TextHAlign.Left);
-            renderer.DrawText(12f, y + HeaderHeight * 0.5f, s.Header, theme.TextColor);
+            if (rtlAcc)
+            {
+                renderer.SetTextAlign(TextHAlign.Right);
+                renderer.DrawText(w - HeaderHeight - 4f, y + HeaderHeight * 0.5f, s.Header, theme.TextColor);
+            }
+            else
+            {
+                renderer.SetTextAlign(TextHAlign.Left);
+                renderer.DrawText(12f, y + HeaderHeight * 0.5f, s.Header, theme.TextColor);
+            }
 
             // Separator line under header
             renderer.DrawLine(0, y + HeaderHeight, w, y + HeaderHeight, 1f, theme.BorderColor);

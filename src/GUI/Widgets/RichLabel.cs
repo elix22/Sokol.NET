@@ -212,6 +212,7 @@ public class RichLabel : Label
             _spans[j].LineH = lineH;
 
         // ── Pass 2: draw — centre every span vertically within its line ──
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
         renderer.Save();
         renderer.IntersectClip(new Rect(0, 0, Bounds.Width, Bounds.Height));
 
@@ -234,9 +235,13 @@ public class RichLabel : Label
             else if (span.Italic)          fg = theme.TextMutedColor;
             else                           fg = ForeColor ?? theme.TextColor;
 
+            // RTL: mirror X within the line so spans appear right-to-left
+            float drawX = rtl
+                ? startX + maxW - (span.X - startX) - span.Width
+                : span.X;
             renderer.SetTextAlign(TextHAlign.Left);
             // Centre the span within the line's max height so all sizes align.
-            renderer.DrawText(span.X, span.Y + span.LineH * 0.5f, span.Content, fg);
+            renderer.DrawText(drawX, span.Y + span.LineH * 0.5f, span.Content, fg);
         }
 
         renderer.Restore();

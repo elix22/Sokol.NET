@@ -201,4 +201,8 @@ public class Theme
     public virtual float   WindowTitleBarHeight  => WindowHeaderHeight;
     public virtual UIColor WindowCloseButtonColor => SurfaceVariant;
     public virtual float   ScrollSpeed            => 30f;
+
+    // ─── Layout direction ─────────────────────────────────────────────────────
+    /// <summary>Default flow direction applied to the root Screen widget.</summary>
+    public virtual FlowDirection DefaultFlowDirection => FlowDirection.LeftToRight;
 }

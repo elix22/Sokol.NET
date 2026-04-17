@@ -90,7 +90,15 @@ public class ToolBar : Widget
         if (_itemRects.Length != _items.Count)
             _itemRects = new Rect[_items.Count];
 
-        float pos = 2f;
+        // RTL: horizontal toolbar items go right-to-left
+        bool rtl = Orientation == SliderOrientation.Horizontal
+                   && ResolvedFlowDirection == FlowDirection.RightToLeft;
+        float totalItemW = 0;
+        if (rtl)
+            foreach (var it in _items)
+                totalItemW += it.Type == ToolBarItemType.Separator ? SepSize() : ItemWidth(it, renderer);
+
+        float pos = rtl ? (w - 2f - totalItemW) : 2f;
         for (int i = 0; i < _items.Count; i++)
         {
             var item = _items[i];

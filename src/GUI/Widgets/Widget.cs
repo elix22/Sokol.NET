@@ -128,7 +128,7 @@ public abstract class Widget
         get
         {
             if (FlowDirection != FlowDirection.Auto) return FlowDirection;
-            return Parent?.ResolvedFlowDirection ?? FlowDirection.LeftToRight;
+            return Parent?.ResolvedFlowDirection ?? ThemeManager.GlobalFlowDirection;
         }
     }
 

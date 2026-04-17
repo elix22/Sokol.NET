@@ -52,6 +52,9 @@ public class Slider : Widget
 
         if (Orientation == SliderOrientation.Horizontal)
         {
+            bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+            float tDraw = rtl ? (1f - t) : t;  // mirror progress fraction visually
+
             float cy = h * 0.5f;
             var trackR = new Rect(thumb, cy - track * 0.5f, w - thumb * 2f, track);
 
@@ -64,19 +67,20 @@ public class Slider : Widget
             renderer.FillRoundedRectWithPaint(trackR, track * 0.5f, trackInset);
             renderer.StrokeRoundedRect(trackR, track * 0.5f, 1f, UIColor.Black.WithAlpha(0.25f));
 
-            // Fill: accent gradient
-            float fillW = trackR.Width * t;
+            // Fill: accent gradient (always drawn from the "start" side)
+            float fillW = trackR.Width * tDraw;
             if (fillW > 0)
             {
-                var fillR = new Rect(trackR.X, trackR.Y, fillW, track);
+                float fillX = rtl ? (trackR.Right - fillW) : trackR.X;
+                var fillR = new Rect(fillX, trackR.Y, fillW, track);
                 var fillGrad = renderer.LinearGradient(
                     new Vector2(fillR.X, fillR.Y), new Vector2(fillR.X, fillR.Bottom),
                     theme.AccentColor.Lighten(0.15f), theme.AccentColor.Darken(0.12f));
                 renderer.FillRoundedRectWithPaint(fillR, track * 0.5f, fillGrad);
             }
 
-            // Thumb: NanoGUI-style gradient sphere + dark border + bright highlight
-            float tx = thumb + trackR.Width * t;
+            // Thumb position
+            float tx = rtl ? (thumb + trackR.Width * (1f - t)) : (thumb + trackR.Width * t);
             var thumbCol = IsPressed ? theme.AccentColor : IsHovered ? theme.SliderThumbHoverColor : theme.SliderThumbColor;
             var thumbGrad = renderer.LinearGradient(
                 new Vector2(tx, cy - thumb * 0.5f), new Vector2(tx, cy + thumb * 0.5f),
@@ -161,6 +165,8 @@ public class Slider : Widget
         {
             float range = Bounds.Width - thumb * 2f;
             t = range > 0 ? (local.X - thumb) / range : 0f;
+            if (ResolvedFlowDirection == FlowDirection.RightToLeft)
+                t = 1f - t;
         }
         else
         {

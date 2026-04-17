@@ -55,6 +55,7 @@ public class ScrollView : Panel
         // Clip to viewport (shrunk for scrollbars if visible)
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
         bool showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
+        bool rtl   = ResolvedFlowDirection == FlowDirection.RightToLeft;
 
         // Clamp scroll offset so content doesn't stay shifted when viewport grows
         float maxScrollY = MathF.Max(0, ContentHeight - Bounds.Height + (showH ? sb : 0));
@@ -62,13 +63,16 @@ public class ScrollView : Panel
         _scrollY = MathF.Min(_scrollY, maxScrollY);
         _scrollX = MathF.Min(_scrollX, maxScrollX);
 
-        var viewport = new Rect(0, 0,
-            Bounds.Width  - (showV ? sb : 0),
+        // RTL: vertical scrollbar goes on the left
+        float sbLeft  = showV && rtl  ? sb : 0;
+        float sbRight = showV && !rtl ? sb : 0;
+        var viewport = new Rect(sbLeft, 0,
+            Bounds.Width  - sbLeft - sbRight,
             Bounds.Height - (showH ? sb : 0));
 
         renderer.Save();
         renderer.IntersectClip(viewport);
-        renderer.Translate(-_scrollX, -_scrollY);
+        renderer.Translate(sbLeft - _scrollX, -_scrollY);
 
         if (Content != null)
         {
@@ -85,7 +89,8 @@ public class ScrollView : Panel
         if (showV)
         {
             float cH = MathF.Max(ContentHeight, 1f);
-            ScrollbarRenderer.DrawVertical(renderer, viewport.Width, 0, sb, viewport.Height,
+            float sbX = rtl ? 0 : viewport.Right;
+            ScrollbarRenderer.DrawVertical(renderer, sbX, 0, sb, viewport.Height,
                 _scrollY, cH, viewport.Height, _sbHoveredV);
         }
 
@@ -93,7 +98,7 @@ public class ScrollView : Panel
         if (showH)
         {
             float cW = MathF.Max(ContentWidth, 1f);
-            ScrollbarRenderer.DrawHorizontal(renderer, 0, viewport.Height, viewport.Width, sb,
+            ScrollbarRenderer.DrawHorizontal(renderer, sbLeft, viewport.Height, viewport.Width, sb,
                 _scrollX, cW, viewport.Width, _sbHoveredH);
         }
     }
@@ -117,7 +122,9 @@ public class ScrollView : Panel
         float sbW   = theme.ScrollBarWidth;
         bool  showV = CanScrollVertical   && ContentHeight > Bounds.Height;
         bool  showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
-        if (showV && local.X >= Bounds.Width  - sbW) return this;
+        bool  rtlHT = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        if (showV && rtlHT  && local.X <= sbW)                   return this;  // RTL: sb on left
+        if (showV && !rtlHT && local.X >= Bounds.Width  - sbW)   return this;  // LTR: sb on right
         if (showH && local.Y >= Bounds.Height - sbW) return this;
 
         // Children have scroll-aware ScreenPositions — recurse with original screenPoint.
@@ -147,7 +154,9 @@ public class ScrollView : Panel
         var theme = ThemeManager.Current;
         float sb  = theme.ScrollBarWidth;
         bool showV = CanScrollVertical && ContentHeight > Bounds.Height;
-        if (showV && e.LocalPosition.X >= Bounds.Width - sb)
+        bool rtlDn = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        bool hitVSb = showV && (rtlDn ? e.LocalPosition.X <= sb : e.LocalPosition.X >= Bounds.Width - sb);
+        if (hitVSb)
         {
             _dragV            = true;
             _dragStartY       = e.LocalPosition.Y;
@@ -163,7 +172,8 @@ public class ScrollView : Panel
         float sb  = theme.ScrollBarWidth;
         bool showV = CanScrollVertical   && ContentHeight > Bounds.Height;
         bool showH = CanScrollHorizontal && ContentWidth  > Bounds.Width;
-        _sbHoveredV = showV && e.LocalPosition.X >= Bounds.Width  - sb;
+        bool rtlMv = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        _sbHoveredV = showV && (rtlMv ? e.LocalPosition.X <= sb : e.LocalPosition.X >= Bounds.Width - sb);
         _sbHoveredH = showH && e.LocalPosition.Y >= Bounds.Height - sb;
         if (_dragV)
         {

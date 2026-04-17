@@ -136,6 +136,11 @@ public class SplitView : Widget
                 ? e.Position.X - _dragStartPos
                 : e.Position.Y - _dragStartPos;
 
+            // RTL: dragging right (positive travel) should decrease _splitRatio
+            if (Orientation == SliderOrientation.Horizontal &&
+                ResolvedFlowDirection == FlowDirection.RightToLeft)
+                travel = -travel;
+
             float rawRatio = _dragStartRatio + travel / (total - DividerWidth);
             float minR = MinSize / total;
             float maxR = 1f - minR;
@@ -175,7 +180,9 @@ public class SplitView : Widget
     {
         if (Orientation == SliderOrientation.Horizontal)
         {
-            float x = (w - DividerWidth) * _splitRatio;
+            bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+            float ratio = rtl ? (1f - _splitRatio) : _splitRatio;
+            float x = (w - DividerWidth) * ratio;
             return new Rect(x, 0, DividerWidth, h);
         }
         else

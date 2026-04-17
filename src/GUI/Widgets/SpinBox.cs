@@ -61,9 +61,14 @@ public class SpinBox : Widget
         float cr   = theme.InputCornerRadius;
 
         var fullR   = new Rect(0, 0, w, h);
+        bool rtl    = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        // RTL: [+] on left, [−] on right
         var leftR   = new Rect(0, 0, btnW, h);
         var textR   = new Rect(btnW, 0, w - btnW * 2f, h);
         var rightR  = new Rect(w - btnW, 0, btnW, h);
+        string minusBtnLabel = "−", plusBtnLabel = "+";
+        Rect minusBtnR = rtl ? rightR : leftR;
+        Rect plusBtnR  = rtl ? leftR  : rightR;
 
         // Background box — NanoGUI-style sunken input
         var bgPaint = renderer.BoxGradient(
@@ -76,11 +81,11 @@ public class SpinBox : Widget
             MathF.Max(cr - 0.5f, 0f), 1f,
             IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
-        // Left button [−]
-        DrawArrowButton(renderer, theme, leftR, "−", _leftHovered, _leftPressed, true, cr);
+        // Left button [−] or [+] depending on RTL
+        DrawArrowButton(renderer, theme, minusBtnR, minusBtnLabel, _leftHovered, _leftPressed, !rtl, cr);
 
-        // Right button [+]
-        DrawArrowButton(renderer, theme, rightR, "+", _rightHovered, _rightPressed, false, cr);
+        // Right button [+] or [−] depending on RTL
+        DrawArrowButton(renderer, theme, plusBtnR, plusBtnLabel, _rightHovered, _rightPressed, rtl, cr);
 
         // Divider lines
         renderer.DrawLine(btnW, 3f, btnW, h - 3f, 1f, theme.BorderColor);

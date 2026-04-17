@@ -93,6 +93,10 @@ public class PropertyGrid : Widget
         float viewW   = needSB ? w - sb : w;
         float nameW   = viewW * SplitRatio;
         float editorW = viewW - nameW;
+        bool  rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        // RTL: name (label) on the right, editor on the left
+        float nameColX  = rtl ? editorW : 0f;
+        float editorColX = rtl ? 0f    : nameW;
 
         // Background
         renderer.FillRect(new Rect(0, 0, w, h), theme.InputBackColor);
@@ -112,8 +116,8 @@ public class PropertyGrid : Widget
             if (cat != null)
             {
                 renderer.FillRect(new Rect(0, y, viewW, HeaderHeight), theme.SurfaceColor);
-                renderer.SetTextAlign(TextHAlign.Left);
-                renderer.DrawText(8f, y + HeaderHeight * 0.5f, cat, theme.TextMutedColor);
+                renderer.SetTextAlign(rtl ? TextHAlign.Right : TextHAlign.Left);
+                renderer.DrawText(rtl ? viewW - 8f : 8f, y + HeaderHeight * 0.5f, cat, theme.TextMutedColor);
                 y += HeaderHeight;
             }
 
@@ -129,11 +133,12 @@ public class PropertyGrid : Widget
                     theme.BorderColor.WithAlpha(0.3f));
 
                 // Name column
-                renderer.SetTextAlign(TextHAlign.Left);
-                renderer.DrawText(8f, y + RowHeight * 0.5f, desc.Name, theme.TextColor);
+                renderer.SetTextAlign(rtl ? TextHAlign.Right : TextHAlign.Left);
+                float nameTx = rtl ? nameColX + nameW - 8f : nameColX + 8f;
+                renderer.DrawText(nameTx, y + RowHeight * 0.5f, desc.Name, theme.TextColor);
 
                 // Vertical divider
-                renderer.DrawLine(nameW, y, nameW, y + RowHeight, 1f,
+                renderer.DrawLine(nameColX, y, nameColX, y + RowHeight, 1f,
                     theme.BorderColor.WithAlpha(0.4f));
 
                 // Editor widget
@@ -142,7 +147,7 @@ public class PropertyGrid : Widget
                 {
                     editor.Bounds = new Rect(0, 0, editorW - 4, RowHeight - 4);
                     renderer.Save();
-                    renderer.Translate(nameW + 2, y + 2);
+                    renderer.Translate(editorColX + 2, y + 2);
                     editor.Draw(renderer);
                     renderer.Restore();
                 }
@@ -195,6 +200,7 @@ public class PropertyGrid : Widget
         float ex = e.LocalPosition.X - nameW - 2;
         float ey = e.LocalPosition.Y + _scrollY - RowYOfIndex(idx) - 2;
         editor.OnMouseDown(new MouseEvent { Position = new Vector2(ex, ey), Button = e.Button, Clicks = e.Clicks });
+        Screen.Instance.Focus.SetFocus(editor);
         return true;
     }
 
@@ -297,7 +303,11 @@ public class PropertyGrid : Widget
             editor = tb;
         }
 
-        if (editor != null) _editors[idx] = editor;
+        if (editor != null)
+        {
+            editor.Parent = this;
+            _editors[idx] = editor;
+        }
         return editor;
     }
 

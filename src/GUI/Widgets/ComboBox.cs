@@ -75,15 +75,25 @@ public class ComboBox : Widget
 
         // Selected text
         ApplyFont(renderer, theme);
-        renderer.SetTextAlign(TextHAlign.Left);
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
         var text = SelectedItem ?? string.Empty;
         renderer.Save();
-        renderer.IntersectClip(new Rect(4, 0, bounds.Width - arrowW - 8, bounds.Height));
-        renderer.DrawText(4, bounds.Height * 0.5f, text, theme.TextColor);
+        if (rtl)
+        {
+            renderer.SetTextAlign(TextHAlign.Right);
+            renderer.IntersectClip(new Rect(arrowW + 4, 0, bounds.Width - arrowW - 8, bounds.Height));
+            renderer.DrawText(bounds.Width - 4, bounds.Height * 0.5f, text, theme.TextColor);
+        }
+        else
+        {
+            renderer.SetTextAlign(TextHAlign.Left);
+            renderer.IntersectClip(new Rect(4, 0, bounds.Width - arrowW - 8, bounds.Height));
+            renderer.DrawText(4, bounds.Height * 0.5f, text, theme.TextColor);
+        }
         renderer.Restore();
 
-        // Arrow
-        float ax = bounds.Width - arrowW * 0.5f;
+        // Arrow: RTL = left side, LTR = right side
+        float ax = rtl ? arrowW * 0.5f : bounds.Width - arrowW * 0.5f;
         float ay = bounds.Height * 0.5f;
         float as2 = 4f;
         renderer.Translate(ax, ay);
