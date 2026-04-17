@@ -232,8 +232,6 @@ public class TreeView : Widget
         if (e.Button != MouseButton.Left) return false;
         _mousePos = e.LocalPosition;
 
-        Sokol.SLog.Info($"TreeView.OnMouseDown: pos={e.Position} local={e.LocalPosition} Bounds={Bounds} flatRows={_flatRows.Count} scrollY={_scrollY}", "Sokol.GUI");
-
         // Scrollbar click → start drag
         float sb     = ThemeManager.Current.ScrollBarWidth;
         float totalH = _flatRows.Count * ItemHeight;
@@ -247,7 +245,6 @@ public class TreeView : Widget
         }
 
         var hit = HoveredRow();
-        Sokol.SLog.Info($"TreeView.OnMouseDown: hit={hit?.node.Label ?? "null"} depth={hit?.depth ?? -1}", "Sokol.GUI");
         if (hit == null) return true;
         var node  = hit.Value.node;
         int depth = hit.Value.depth;
@@ -269,7 +266,6 @@ public class TreeView : Widget
         bool clickedArrow = node.Children.Count > 0 &&
                             _mousePos.X >= indentX &&
                             _mousePos.X < arrowHitEnd;
-        Sokol.SLog.Info($"TreeView.OnMouseDown: node={node.Label} children={node.Children.Count} indentX={indentX} arrowEnd={arrowHitEnd} mouseX={_mousePos.X} clickedArrow={clickedArrow}", "Sokol.GUI");
         if (clickedArrow)
         {
             node.IsExpanded = !node.IsExpanded;
