@@ -55,7 +55,7 @@ public class TreeView : Widget
     private readonly HashSet<TreeNode> _selectedNodes = [];
 
     // Double-click tracking
-    private float     _lastClickTime;
+    private long      _lastClickMs;
     private TreeNode? _lastClickNode;
     // Widget content click forwarding
     private Widget?   _contentClickTarget;
@@ -250,16 +250,27 @@ public class TreeView : Widget
         int depth = hit.Value.depth;
 
         // ── Double-click detection ──
-        float now = (float)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0);
-        bool isDoubleClick = (node == _lastClickNode) && (now - _lastClickTime < 0.4f);
-        _lastClickTime = now;
+        long nowMs = Environment.TickCount64;
+        bool isDoubleClick = (node == _lastClickNode) && (nowMs - _lastClickMs < 400);
+        _lastClickMs   = nowMs;
         _lastClickNode = node;
 
         float indentX  = depth * IndentWidth;
         float contentX = indentX + ArrowWidth + 2f;
 
+        // ── Click on disclosure triangle → toggle expand (single click) ──
+        bool clickedArrow = node.Children.Count > 0 &&
+                            _mousePos.X >= indentX &&
+                            _mousePos.X < indentX + ArrowWidth;
+        if (clickedArrow)
+        {
+            node.IsExpanded = !node.IsExpanded;
+            if (node.IsExpanded) NodeExpanded?.Invoke(node);
+            InvalidateLayout();
+        }
+
         // ── Forward click to widget content (e.g. CheckBox) ──
-        if (node.Content != null && _mousePos.X >= contentX)
+        if (!clickedArrow && node.Content != null && _mousePos.X >= contentX)
         {
             float rowY = hit.Value.y;
             var widgetEvent = new MouseEvent
@@ -275,7 +286,7 @@ public class TreeView : Widget
         }
 
         // ── Double-click on row → toggle expand ──
-        if (isDoubleClick && node.Children.Count > 0)
+        if (!clickedArrow && isDoubleClick && node.Children.Count > 0)
         {
             node.IsExpanded = !node.IsExpanded;
             if (node.IsExpanded) NodeExpanded?.Invoke(node);
