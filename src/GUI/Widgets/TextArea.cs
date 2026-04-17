@@ -222,7 +222,7 @@ public class TextArea : Widget
     public override void OnFocusGained()
     {
         ResetBlink();
-        sapp_show_keyboard(true);
+        if (IsEditable) sapp_show_keyboard(true);
     }
 
     public override void OnFocusLost()
