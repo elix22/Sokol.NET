@@ -234,18 +234,26 @@ public sealed class Renderer
     public void SetLetterSpacing(float sp)   => nvgTextLetterSpacing(_vg, sp);
     public void SetLineHeight(float lh)      => nvgTextLineHeight(_vg, lh);
 
-    /// <summary>Draw a single-line text string. Returns the x-advance.</summary>
+    /// <summary>Draw a single-line text string with automatic BiDi reordering. Returns the x-advance.</summary>
     public float DrawText(Vector2 pos, string text) =>
-        nvgText(_vg, pos.X, pos.Y, text, null);
+        nvgText(_vg, pos.X, pos.Y, BidiHelper.ToVisual(text), null);
 
     public float DrawText(float x, float y, string text) =>
+        nvgText(_vg, x, y, BidiHelper.ToVisual(text), null);
+
+    /// <summary>Draw text wrapped inside a bounding box with automatic BiDi reordering.</summary>
+    public void DrawTextBox(Rect bounds, string text) =>
+        nvgTextBox(_vg, bounds.X, bounds.Y, bounds.Width, BidiHelper.ToVisual(text), null);
+
+    /// <summary>Draw a single-line text string without BiDi reordering (for widgets that handle BiDi at a higher level).</summary>
+    public float DrawTextRaw(float x, float y, string text) =>
         nvgText(_vg, x, y, text, null);
 
-    /// <summary>Draw text wrapped inside a bounding box.</summary>
-    public void DrawTextBox(Rect bounds, string text) =>
-        nvgTextBox(_vg, bounds.X, bounds.Y, bounds.Width, text, null);
+    /// <summary>Draw text wrapped inside a bounding box without BiDi reordering.</summary>
+    public void DrawTextBoxRaw(float x, float y, float maxW, string text) =>
+        nvgTextBox(_vg, x, y, maxW, text, null);
 
-    /// <summary>Measure rendered advance width of a string at current font/size settings.</summary>
+    /// <summary>Measure rendered advance width of a string at current font/size settings. Applies BiDi reordering.</summary>
     public float MeasureText(string text)
     {
         // nvgTextBounds writes 4 floats into the bounds array even though we only
@@ -254,22 +262,35 @@ public sealed class Renderer
         // function then writes out-of-bounds and corrupts the stack (SIGSEGV on
         // iOS/Android).  Always provide a proper 4-element buffer.
         if (string.IsNullOrEmpty(text)) return 0f;
+        var visual = BidiHelper.ToVisual(text);
+        unsafe
+        {
+            float* bounds = stackalloc float[4];
+            return nvgTextBounds(_vg, 0f, 0f, visual, null, ref bounds[0]);
+        }
+    }
+
+    /// <summary>Measure the bounding rect of a string at current font/size settings. Applies BiDi reordering.</summary>
+    public Rect MeasureTextBounds(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return default;
+        var visual = BidiHelper.ToVisual(text);
+        unsafe
+        {
+            float* bounds = stackalloc float[4];
+            nvgTextBounds(_vg, 0f, 0f, visual, null, ref bounds[0]);
+            return Rect.FromLTRB(bounds[0], bounds[1], bounds[2], bounds[3]);
+        }
+    }
+
+    /// <summary>Measure rendered advance width without BiDi reordering.</summary>
+    public float MeasureTextRaw(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0f;
         unsafe
         {
             float* bounds = stackalloc float[4];
             return nvgTextBounds(_vg, 0f, 0f, text, null, ref bounds[0]);
-        }
-    }
-
-    /// <summary>Measure the bounding rect of a string at current font/size settings.</summary>
-    public Rect MeasureTextBounds(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return default;
-        unsafe
-        {
-            float* bounds = stackalloc float[4];
-            nvgTextBounds(_vg, 0f, 0f, text, null, ref bounds[0]);
-            return Rect.FromLTRB(bounds[0], bounds[1], bounds[2], bounds[3]);
         }
     }
 
@@ -410,7 +431,7 @@ public sealed class Renderer
     }
 
     public void DrawTextBox(float x, float y, float maxW, string text)
-        => nvgTextBox(_vg, x, y, maxW, text, null);
+        => nvgTextBox(_vg, x, y, maxW, BidiHelper.ToVisual(text), null);
 
     public void DrawTextBox(float x, float y, float maxW, string text, UIColor c)
     {
@@ -418,13 +439,14 @@ public sealed class Renderer
         DrawTextBox(x, y, maxW, text);
     }
 
-    /// <summary>Returns (width, height) of the wrapped text at current font/size settings.</summary>
+    /// <summary>Returns (width, height) of the wrapped text at current font/size settings. Applies BiDi reordering.</summary>
     public (float width, float height) MeasureTextBounds(float x, float y, float maxW, string text)
     {
+        var visual = BidiHelper.ToVisual(text);
         unsafe
         {
             float* b = stackalloc float[4];
-            nvgTextBoxBounds(_vg, x, y, maxW, text, null, ref b[0]);
+            nvgTextBoxBounds(_vg, x, y, maxW, visual, null, ref b[0]);
             return (b[2] - b[0], b[3] - b[1]);
         }
     }

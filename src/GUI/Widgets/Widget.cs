@@ -113,6 +113,22 @@ public abstract class Widget
     public bool IsPressed   { get; internal set; }
     public string? Tooltip  { get; set; }
 
+    // ─── Flow Direction (BiDi / RTL) ─────────────────────────────────────────
+    public FlowDirection FlowDirection { get; set; } = FlowDirection.Auto;
+
+    /// <summary>
+    /// Resolved flow direction: walks up the parent chain for <see cref="FlowDirection.Auto"/>.
+    /// Returns <see cref="FlowDirection.LeftToRight"/> at the root if all ancestors are Auto.
+    /// </summary>
+    public FlowDirection ResolvedFlowDirection
+    {
+        get
+        {
+            if (FlowDirection != FlowDirection.Auto) return FlowDirection;
+            return Parent?.ResolvedFlowDirection ?? FlowDirection.LeftToRight;
+        }
+    }
+
     // ─── Data binding ────────────────────────────────────────────────────────
     private object? _dataContext;
     public  object? DataContext

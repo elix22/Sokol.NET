@@ -74,10 +74,60 @@ public sealed class FontRegistry
                 int id = nvgCreateFontMem(vg, name, (byte*)unmanaged, bytes.Length, 1);
                 Register(name, id);
                 Sokol.SLog.Info($"GUI: Font '{name}' loaded — nvgId={id}, {bytes.Length} bytes", "Sokol.GUI");
+                // Resolve any fallback fonts waiting for this base font
+                ResolvePendingFallbacks(vg);
             }
             else
             {
                 Sokol.SLog.Warning($"GUI: Font '{name}' FAILED to load from '{assetPath}' (status={status})", "Sokol.GUI");
+            }
+        }, bufferSize);
+    }
+
+    /// <summary>
+    /// Load a font asynchronously and register it as a NanoVG fallback for one
+    /// or more base fonts.  When NanoVG renders text with a base font and
+    /// encounters a glyph not found in it, it automatically tries the fallback.
+    /// </summary>
+    /// <param name="vg">NanoVG context.</param>
+    /// <param name="name">Internal name for the fallback font.</param>
+    /// <param name="assetPath">Sokol FileSystem asset path (e.g. "fonts/NotoSansHebrew-Regular.ttf").</param>
+    /// <param name="baseFontNames">Names of already-registered fonts that should use this as fallback.</param>
+    /// <param name="bufferSize">File read buffer size.</param>
+    public unsafe void RegisterFallbackAsync(IntPtr vg, string name, string assetPath,
+        string[] baseFontNames, uint bufferSize = 512 * 1024)
+    {
+        Sokol.SLog.Info($"GUI: Requesting fallback font '{name}' from '{assetPath}'", "Sokol.GUI");
+        Sokol.SFileSystem.FileSystem.Instance.LoadFile(assetPath, (path, bytes, status) =>
+        {
+            if (status == Sokol.SFileSystem.FileLoadStatus.Success && bytes != null)
+            {
+                IntPtr unmanaged = Marshal.AllocHGlobal(bytes.Length);
+                Marshal.Copy(bytes, 0, unmanaged, bytes.Length);
+                int id = nvgCreateFontMem(vg, name, (byte*)unmanaged, bytes.Length, 1);
+                Register(name, id);
+                // Wire up as NanoVG fallback for each base font
+                foreach (var baseName in baseFontNames)
+                {
+                    var baseFont = Get(baseName);
+                    if (baseFont != null && baseFont.IsValid)
+                    {
+                        nvgAddFallbackFontId(vg, baseFont.Id, id);
+                        Sokol.SLog.Info($"GUI: Added '{name}' (id={id}) as fallback for '{baseName}' (id={baseFont.Id})", "Sokol.GUI");
+                    }
+                    else
+                    {
+                        // Base font not loaded yet — store for deferred wiring
+                        _pendingFallbacks.Add((baseName, id));
+                        Sokol.SLog.Info($"GUI: Deferred fallback '{name}' for '{baseName}' (base not yet loaded)", "Sokol.GUI");
+                    }
+                }
+                // Also check if any pending fallbacks can now be resolved
+                ResolvePendingFallbacks(vg);
+            }
+            else
+            {
+                Sokol.SLog.Warning($"GUI: Fallback font '{name}' FAILED to load from '{assetPath}' (status={status})", "Sokol.GUI");
             }
         }, bufferSize);
     }
@@ -109,10 +159,36 @@ public sealed class FontRegistry
         foreach (var ptr in _unmanagedBuffers)
             Marshal.FreeHGlobal(ptr);
         _unmanagedBuffers.Clear();
+        _pendingFallbacks.Clear();
         _fonts.Clear();
         _default = null;
     }
 
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Try to wire up any pending fallbacks whose base font has now been loaded.
+    /// Called after every font registration.
+    /// </summary>
+    private void ResolvePendingFallbacks(IntPtr vg)
+    {
+        for (int i = _pendingFallbacks.Count - 1; i >= 0; i--)
+        {
+            var (baseName, fallbackId) = _pendingFallbacks[i];
+            var baseFont = Get(baseName);
+            if (baseFont != null && baseFont.IsValid)
+            {
+                nvgAddFallbackFontId(vg, baseFont.Id, fallbackId);
+                Sokol.SLog.Info($"GUI: Resolved deferred fallback id={fallbackId} for '{baseName}' (id={baseFont.Id})", "Sokol.GUI");
+                _pendingFallbacks.RemoveAt(i);
+            }
+        }
+    }
+
     // Keep references to any unmanaged memory we manage (not owned by NanoVG).
     private readonly List<IntPtr> _unmanagedBuffers = new();
+    // Fallbacks waiting for their base font to load (baseFontName, fallbackFontId).
+    private readonly List<(string baseName, int fallbackId)> _pendingFallbacks = new();
 }

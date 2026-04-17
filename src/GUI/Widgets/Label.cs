@@ -39,15 +39,29 @@ public class Label : Widget
         var bounds   = new Rect(0, 0, Bounds.Width, Bounds.Height);
         var inner    = bounds.Deflate(Padding);
 
+        // Resolve effective alignment: if Auto flow + RTL paragraph, flip to Right
+        var effectiveAlign = Align;
+        if (effectiveAlign == TextAlign.Left &&
+            ResolvedFlowDirection == FlowDirection.Auto &&
+            BidiHelper.IsRTLParagraph(Text))
+        {
+            effectiveAlign = TextAlign.Right;
+        }
+        else if (ResolvedFlowDirection == FlowDirection.RightToLeft &&
+                 effectiveAlign == TextAlign.Left)
+        {
+            effectiveAlign = TextAlign.Right;
+        }
+
         ApplyFont(renderer);
-        renderer.SetTextAlign(Align switch
+        renderer.SetTextAlign(effectiveAlign switch
         {
             TextAlign.Center => TextHAlign.Center,
             TextAlign.Right  => TextHAlign.Right,
             _                => TextHAlign.Left,
         });
 
-        float x = Align switch
+        float x = effectiveAlign switch
         {
             TextAlign.Center => inner.X + inner.Width * 0.5f,
             TextAlign.Right  => inner.Right,
