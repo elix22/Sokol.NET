@@ -134,10 +134,7 @@ public class TabView : Widget
         if (!_allowReorder || e.Data.Format != ReorderFormat) return;
         if (e.Data.Payload is not (TabView src, int srcIdx)) return;
         if (src != this) return;
-        float hdrH = ThemeManager.Current.TabBarHeight;
-        int dstIdx = e.LocalPosition.Y < hdrH
-            ? TabIndexFromLocalX(e.LocalPosition.X)
-            : _tabs.Count - 1;
+        int dstIdx = TabIndexFromLocalX(e.LocalPosition.X);
         if (dstIdx < 0) dstIdx = e.LocalPosition.X >= _cachedTabAreaLeft ? _tabs.Count : 0;
         if (dstIdx == srcIdx) { e.Handled = true; e.Effect = DragDropEffect.Move; return; }
         var item = _tabs[srcIdx];
