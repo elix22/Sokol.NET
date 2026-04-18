@@ -257,6 +257,41 @@ public abstract class Widget
     public virtual void OnFocusGained()              { }
     public virtual void OnFocusLost  ()              { }
 
+    // ─── Drag & Drop ─────────────────────────────────────────────────────────
+    /// <summary>True if this widget can initiate a drag operation.</summary>
+    public bool IsDragSource { get; set; }
+
+    /// <summary>True if this widget can receive drops.</summary>
+    public bool IsDropTarget { get; set; }
+
+    /// <summary>
+    /// Build and return the data payload to drag. Return null to cancel the
+    /// drag operation. Called by <see cref="DragManager"/> once the cursor has
+    /// moved past the dead-zone threshold.
+    /// </summary>
+    public virtual DragDropData? OnDragBegin(Vector2 localPos) => null;
+
+    /// <summary>Called when the drag ends (drop accepted or cancelled).</summary>
+    public virtual void OnDragEnd(DragDropEffect effect) { }
+
+    /// <summary>Called when a drag enters this widget's bounds.</summary>
+    public virtual void OnDragEnter(DragDropEventArgs e) { }
+
+    /// <summary>
+    /// Called while a drag hovers over this widget. Set <see cref="DragDropEventArgs.Effect"/>
+    /// to indicate whether the drop will be accepted at the current position.
+    /// </summary>
+    public virtual void OnDragOver(DragDropEventArgs e) { }
+
+    /// <summary>Called when the drag leaves this widget's bounds.</summary>
+    public virtual void OnDragLeave() { }
+
+    /// <summary>
+    /// Perform the drop. Implementations should set
+    /// <see cref="DragDropEventArgs.Handled"/> when the drop is consumed.
+    /// </summary>
+    public virtual void OnDrop(DragDropEventArgs e) { }
+
     // ─── Convenience ─────────────────────────────────────────────────────────
     public event Action? Clicked;
     protected void RaiseClicked() => Clicked?.Invoke();

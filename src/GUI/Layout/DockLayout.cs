@@ -30,11 +30,18 @@ public sealed class DockLayout : ILayout
             finalRect.Height - pad.Vertical);
 
         float l = inner.Left, t = inner.Top, r = inner.Right, b = inner.Bottom;
+        bool rtl = parent.ResolvedFlowDirection == FlowDirection.RightToLeft;
 
         foreach (var child in parent.Children)
         {
             if (!child.Visible) continue;
             var dock = GetDock(child);
+            // In RTL, swap Left/Right so "Left" means the leading edge.
+            if (rtl)
+            {
+                if (dock == DockPosition.Left)       dock = DockPosition.Right;
+                else if (dock == DockPosition.Right) dock = DockPosition.Left;
+            }
             var size = child.FixedSize ?? child.PreferredSize(renderer);
 
             switch (dock)

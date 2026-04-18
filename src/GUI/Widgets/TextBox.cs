@@ -136,9 +136,17 @@ public class TextBox : Widget
         // Rebuild character X-position cache (used for hit-testing and scrolling)
         RebuildCharCache(renderer, display);
 
+        // Mirror Left/Right alignment for RTL so leading edge follows flow direction.
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        TextAlign effAlign = rtl
+            ? (Align == TextAlign.Left ? TextAlign.Right
+               : Align == TextAlign.Right ? TextAlign.Left
+               : Align)
+            : Align;
+
         // Compute alignment offset when text is shorter than the box
         float totalTextW = _charXCache.Length > 0 ? _charXCache[^1] : 0f;
-        _alignOffset = Align switch
+        _alignOffset = effAlign switch
         {
             TextAlign.Center => MathF.Max(0f, (inner.Width - totalTextW) * 0.5f),
             TextAlign.Right  => MathF.Max(0f, inner.Width - totalTextW),

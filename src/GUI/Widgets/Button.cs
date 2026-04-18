@@ -102,13 +102,20 @@ public class Button : Widget
         // ── Label ─────────────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(Text))
         {
-            var hAlign = Align switch
+            // In RTL, visually mirror Left/Right so leading edge follows flow direction.
+            bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+            TextAlign effectiveAlign = rtl
+                ? (Align == TextAlign.Left ? TextAlign.Right
+                   : Align == TextAlign.Right ? TextAlign.Left
+                   : Align)
+                : Align;
+            var hAlign = effectiveAlign switch
             {
                 TextAlign.Left   => TextHAlign.Left,
                 TextAlign.Right  => TextHAlign.Right,
                 _                => TextHAlign.Center,
             };
-            float tx = Align switch
+            float tx = effectiveAlign switch
             {
                 TextAlign.Left  => Padding.Left + 4f,
                 TextAlign.Right => bounds.Width - Padding.Right - 4f,

@@ -97,7 +97,14 @@ public class TextArea : Widget
             (IsEditable && IsFocused) ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
         ApplyFont(renderer);
-        var hAlign = Align switch
+        // Mirror Left/Right alignment when RTL so the leading edge follows flow direction.
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        TextAlign effAlign = rtl
+            ? (Align == TextAlign.Left ? TextAlign.Right
+               : Align == TextAlign.Right ? TextAlign.Left
+               : Align)
+            : Align;
+        var hAlign = effAlign switch
         {
             TextAlign.Center => TextHAlign.Center,
             TextAlign.Right  => TextHAlign.Right,

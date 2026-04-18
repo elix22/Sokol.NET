@@ -53,6 +53,9 @@ public sealed class InputRouter
                 UpdateHovered(pos, me);
                 var moveTarget = _captured ?? _hovered;
                 moveTarget?.OnMouseMove(Localize(moveTarget, me));
+                // Drag-and-drop tracking runs after the widget's own move handler
+                // so widgets can observe state before drag callbacks fire.
+                _screen.Drag.OnMouseMove(_hovered, pos);
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
@@ -78,6 +81,8 @@ public sealed class InputRouter
                         _focus.SetFocus(target);
                     target.OnMouseDown(Localize(target, me));
                 }
+                if (btn == MouseButton.Left)
+                    _screen.Drag.OnMouseDown(target, pos);
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
@@ -88,6 +93,8 @@ public sealed class InputRouter
                 var upTarget = _captured ?? _hovered;
                 upTarget?.OnMouseUp(Localize(upTarget, me));
                 _captured = null;
+                if (btn == MouseButton.Left)
+                    _screen.Drag.OnMouseUp(_hovered, pos);
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_SCROLL:

@@ -65,7 +65,16 @@ public class TooltipControl : Widget
 
         renderer.SetFont(Font?.Name ?? theme.DefaultFont);
         renderer.SetFontSize(FontSize > 0 ? FontSize : theme.TooltipFontSize);
-        renderer.SetTextAlign(TextHAlign.Left);
-        renderer.DrawText(theme.TooltipPaddingH, sz.Y * 0.5f, Text, theme.TooltipTextColor);
+        bool rtl = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        if (rtl)
+        {
+            renderer.SetTextAlign(TextHAlign.Right);
+            renderer.DrawText(sz.X - theme.TooltipPaddingH, sz.Y * 0.5f, Text, theme.TooltipTextColor);
+        }
+        else
+        {
+            renderer.SetTextAlign(TextHAlign.Left);
+            renderer.DrawText(theme.TooltipPaddingH, sz.Y * 0.5f, Text, theme.TooltipTextColor);
+        }
     }
 }

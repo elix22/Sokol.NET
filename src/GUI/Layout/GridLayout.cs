@@ -54,6 +54,7 @@ public sealed class GridLayout : ILayout
         foreach (var child in parent.Children)
             if (child.Visible) visible.Add(child);
 
+        bool rtl = parent.ResolvedFlowDirection == FlowDirection.RightToLeft;
         int idx   = 0;
         float y   = inner.Top;
         int rows  = (int)MathF.Ceiling((float)visible.Count / MathF.Max(1, Columns));
@@ -67,12 +68,11 @@ public sealed class GridLayout : ILayout
                 if (i < sizes.Count) rowH = MathF.Max(rowH, sizes[i].Y);
             }
 
-            float x = inner.Left;
             for (int c = 0; c < Columns && idx < visible.Count; c++, idx++)
             {
-                var sz = sizes[idx];
+                int col = rtl ? (Columns - 1 - c) : c;
+                float x = inner.Left + col * (cellW + HSpacing);
                 visible[idx].Bounds = new Rect(x, y, cellW, rowH);
-                x += cellW + HSpacing;
             }
             y += rowH + VSpacing;
         }

@@ -20,6 +20,35 @@ public sealed class Screen : Widget
     public FocusManager  Focus         { get; } = new();
     public InputRouter   Input         { get; private set; } = null!;
 
+    /// <summary>
+    /// Lazily-constructed docking manager. The first access wires a root
+    /// <see cref="DockSpace"/> and a <see cref="FloatingPanelHost"/> into the
+    /// screen's children so dock panels are drawn and hit-tested alongside
+    /// other root-level UI.
+    /// </summary>
+    public DockManager DockManager
+    {
+        get
+        {
+            if (_dockManager == null)
+            {
+                var dockSpace = new DockSpace { Id = "__RootDockSpace__" };
+                var floatHost = new FloatingPanelHost { Id = "__FloatingPanelHost__" };
+                AddChild(dockSpace);
+                AddChild(floatHost); // added last → draws on top.
+                _dockManager = new DockManager(dockSpace, floatHost);
+            }
+            return _dockManager;
+        }
+    }
+    private DockManager? _dockManager;
+
+    /// <summary>Returns the DockManager only if already created (no lazy init).</summary>
+    internal DockManager? DockManagerOrNull => _dockManager;
+
+    /// <summary>Manages cross-widget drag-and-drop.</summary>
+    public DragManager Drag { get; } = new();
+
     // ─── Logical size ────────────────────────────────────────────────────────
     public float LogicalWidth  { get; private set; }
     public float LogicalHeight { get; private set; }
@@ -54,8 +83,15 @@ public sealed class Screen : Widget
         return _instance;
     }
 
+    /// <summary>
+    /// Fired once during <see cref="Shutdown"/> before the singleton is cleared.
+    /// Applications can use this to persist layout / widget state.
+    /// </summary>
+    public static event Action? ShuttingDown;
+
     public static void Shutdown()
     {
+        try { ShuttingDown?.Invoke(); } catch { /* persistence errors must not prevent shutdown */ }
         _instance?.Fonts.Clear();
         _instance = null;
     }
@@ -115,6 +151,9 @@ public sealed class Screen : Widget
         _notificationHost.Bounds = new Rect(0, 0, width, height);
         _notificationHost.Draw(Renderer);
 
+        // Drag ghost on top of popups/notifications, under tooltip.
+        Drag.DrawGhost(Renderer);
+
         // Draw tooltip overlay on top of everything else.
         var tip = TooltipControl.Shared;
         if (tip.Visible)
@@ -135,13 +174,19 @@ public sealed class Screen : Widget
         if (logDraw)
             Sokol.SLog.Info($"GUI.Draw[{DbgFrame}]: {Children.Count} direct screen children", "Sokol.GUI");
 
-        foreach (var child in Children)
+        // Snapshot the list to avoid "collection modified during enumeration" if a
+        // child adds/removes siblings during Draw (e.g. Notification, Tooltip, Popup).
+        var count = Children.Count;
+        var list = new Widget[count];
+        for (int i = 0; i < count; i++) list[i] = Children[i];
+
+        for (int i = 0; i < count; i++)
         {
+            var child = list[i];
             if (logDraw)
                 Sokol.SLog.Info($"GUI.Draw[{DbgFrame}]:   {child.GetType().Name} Bounds={child.Bounds} Visible={child.Visible}", "Sokol.GUI");
 
             if (!child.Visible) continue;
-            // Each child draws at its own (0,0) local origin — translate to its Bounds position.
             renderer.Save();
             renderer.Translate(child.Bounds.X, child.Bounds.Y);
             child.Draw(renderer);

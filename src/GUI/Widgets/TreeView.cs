@@ -563,4 +563,93 @@ public class TreeView : Widget
         renderer.SetFont(Font?.Name ?? theme.DefaultFont);
         renderer.SetFontSize(FontSize > 0 ? FontSize : theme.FontSize);
     }
+
+    // ─── Drag-to-reparent ────────────────────────────────────────────────────
+
+    /// <summary>When true, tree nodes can be dragged onto other nodes to re-parent.</summary>
+    public bool AllowDragDrop
+    {
+        get => _allowDragDrop;
+        set
+        {
+            _allowDragDrop = value;
+            IsDragSource   = value;
+            IsDropTarget   = value;
+        }
+    }
+    private bool _allowDragDrop;
+
+    /// <summary>
+    /// Called to decide whether <paramref name="source"/> may be dropped onto
+    /// <paramref name="target"/>. Default allows any drop except onto itself
+    /// or its own descendants (which would create a cycle).
+    /// </summary>
+    public Func<TreeNode, TreeNode, bool>? CanDrop { get; set; }
+
+    /// <summary>Wire format for in-tree reparent drags.</summary>
+    public const string ReparentFormat = "sokol.treeview/reparent";
+
+    private TreeNode? NodeAtLocalY(float localY)
+    {
+        int idx = (int)((localY + _scrollY) / ItemHeight);
+        if (idx < 0 || idx >= _flatRows.Count) return null;
+        return _flatRows[idx].node;
+    }
+
+    private static bool IsDescendant(TreeNode ancestor, TreeNode candidate)
+    {
+        foreach (var c in ancestor.Children)
+        {
+            if (c == candidate) return true;
+            if (IsDescendant(c, candidate)) return true;
+        }
+        return false;
+    }
+
+    public override DragDropData? OnDragBegin(Vector2 localPos)
+    {
+        if (!_allowDragDrop) return null;
+        var node = NodeAtLocalY(localPos.Y);
+        if (node == null || node == _root) return null;
+        return new DragDropData
+        {
+            Format         = ReparentFormat,
+            Payload        = (this, node),
+            Source         = this,
+            DragLabel      = node.Label,
+            AllowedEffects = DragDropEffect.Move,
+        };
+    }
+
+    public override void OnDragOver(DragDropEventArgs e)
+    {
+        if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
+        if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
+        if (src != this) return;
+        var target = NodeAtLocalY(e.LocalPosition.Y);
+        if (target == null || target == moving) return;
+        if (IsDescendant(moving, target)) return;
+        if (CanDrop != null && !CanDrop(moving, target)) return;
+        e.Effect = DragDropEffect.Move;
+    }
+
+    public override void OnDrop(DragDropEventArgs e)
+    {
+        if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
+        if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
+        if (src != this) return;
+        var target = NodeAtLocalY(e.LocalPosition.Y);
+        if (target == null || target == moving) return;
+        if (IsDescendant(moving, target)) return;
+        if (CanDrop != null && !CanDrop(moving, target)) return;
+
+        var oldParent = FindParent(moving);
+        if (oldParent == null) return;
+        oldParent.Children.Remove(moving);
+        target.Children.Add(moving);
+        target.IsExpanded = true;
+        InvalidateLayout();
+        e.Handled = true;
+        e.Effect  = DragDropEffect.Move;
+    }
 }

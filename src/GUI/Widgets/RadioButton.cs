@@ -82,7 +82,9 @@ public class RadioButton : Widget
         var theme  = ThemeManager.Current;
         float size = theme.CheckBoxSize;
         float cy   = Bounds.Height * 0.5f;
-        float cx   = Padding.Left + size * 0.5f;
+        bool  rtl  = ResolvedFlowDirection == FlowDirection.RightToLeft;
+        float cx   = rtl ? Bounds.Width - Padding.Right - size * 0.5f
+                         : Padding.Left + size * 0.5f;
 
         // Circle gradient (top-light → bottom-dark = raised/sphere look)
         {
@@ -119,10 +121,19 @@ public class RadioButton : Widget
 
         if (!string.IsNullOrEmpty(Label))
         {
-            float lx = Padding.Left + size + theme.CheckBoxLabelSpacing;
             ApplyFont(renderer, theme);
-            renderer.SetTextAlign(TextHAlign.Left);
-            renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            if (rtl)
+            {
+                float lx = Bounds.Width - Padding.Right - size - theme.CheckBoxLabelSpacing;
+                renderer.SetTextAlign(TextHAlign.Right);
+                renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            }
+            else
+            {
+                float lx = Padding.Left + size + theme.CheckBoxLabelSpacing;
+                renderer.SetTextAlign(TextHAlign.Left);
+                renderer.DrawText(lx, cy, Label, ForeColor ?? theme.TextColor);
+            }
         }
     }
 

@@ -251,4 +251,62 @@ public class ListBox : ScrollableList
         }
         return true;
     }
+
+    // ─── Drag & drop (reorder) ───────────────────────────────────────────────
+
+    /// <summary>When true, items may be reordered by dragging.</summary>
+    public bool AllowReorder
+    {
+        get => _allowReorder;
+        set
+        {
+            _allowReorder = value;
+            IsDragSource  = value;
+            IsDropTarget  = value;
+        }
+    }
+    private bool _allowReorder;
+
+    /// <summary>Wire format used for in-list reorder drags.</summary>
+    public const string ReorderFormat = "sokol.listbox/reorder";
+
+    public override DragDropData? OnDragBegin(Vector2 localPos)
+    {
+        if (!_allowReorder) return null;
+        int idx = IndexFromY(localPos.Y);
+        if (idx < 0 || idx >= _items.Count) return null;
+        return new DragDropData
+        {
+            Format          = ReorderFormat,
+            Payload         = (this, idx),
+            Source          = this,
+            DragLabel       = _items[idx],
+            AllowedEffects  = DragDropEffect.Move,
+        };
+    }
+
+    public override void OnDragOver(DragDropEventArgs e)
+    {
+        if (!_allowReorder) return;
+        if (e.Data.Format != ReorderFormat) return;
+        if (e.Data.Payload is (ListBox src, int _) && src == this)
+            e.Effect = DragDropEffect.Move;
+    }
+
+    public override void OnDrop(DragDropEventArgs e)
+    {
+        if (!_allowReorder || e.Data.Format != ReorderFormat) return;
+        if (e.Data.Payload is not (ListBox src, int srcIdx)) return;
+        if (src != this) return;
+        int dstIdx = IndexFromY(e.LocalPosition.Y);
+        if (dstIdx < 0) dstIdx = _items.Count - 1;
+        if (dstIdx == srcIdx) { e.Handled = true; e.Effect = DragDropEffect.Move; return; }
+        var item = _items[srcIdx];
+        _items.RemoveAt(srcIdx);
+        if (dstIdx > srcIdx) dstIdx--;
+        _items.Insert(dstIdx, item);
+        SelectedIndex = dstIdx;
+        e.Handled = true;
+        e.Effect  = DragDropEffect.Move;
+    }
 }

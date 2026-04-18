@@ -59,6 +59,81 @@ public class TabView : Widget
         if (_selectedIndex >= _tabs.Count) _selectedIndex = _tabs.Count - 1;
     }
 
+    // ─── Drag-to-reorder tabs ────────────────────────────────────────────────
+    /// <summary>Allow the user to reorder tabs by dragging their headers.</summary>
+    public bool AllowReorder
+    {
+        get => _allowReorder;
+        set
+        {
+            _allowReorder = value;
+            IsDragSource  = value;
+            IsDropTarget  = value;
+        }
+    }
+    private bool _allowReorder;
+
+    /// <summary>Drag wire-format for intra-TabView reorder.</summary>
+    public const string ReorderFormat = "sokol.tabview/reorder";
+
+    private int TabIndexFromLocalX(float localX)
+    {
+        if (_cachedTabWidths.Length == 0) return -1;
+        float x = _cachedTabAreaLeft - _tabScrollOffset;
+        for (int i = 0; i < _cachedTabWidths.Length && i < _tabs.Count; i++)
+        {
+            float tw = _cachedTabWidths[i];
+            if (localX >= MathF.Max(x, _cachedTabAreaLeft) && localX < MathF.Min(x + tw, _cachedTabAreaRight))
+                return i;
+            x += tw + 1f;
+        }
+        return -1;
+    }
+
+    public override DragDropData? OnDragBegin(Vector2 localPos)
+    {
+        if (!_allowReorder) return null;
+        float hdrH = ThemeManager.Current.TabBarHeight;
+        if (localPos.Y >= hdrH) return null;
+        int idx = TabIndexFromLocalX(localPos.X);
+        if (idx < 0) return null;
+        return new DragDropData
+        {
+            Format         = ReorderFormat,
+            Payload        = (this, idx),
+            Source         = this,
+            DragLabel      = _tabs[idx].Title,
+            AllowedEffects = DragDropEffect.Move,
+        };
+    }
+
+    public override void OnDragOver(DragDropEventArgs e)
+    {
+        if (!_allowReorder || e.Data.Format != ReorderFormat) return;
+        if (e.Data.Payload is (TabView src, int _) && src == this)
+            e.Effect = DragDropEffect.Move;
+    }
+
+    public override void OnDrop(DragDropEventArgs e)
+    {
+        if (!_allowReorder || e.Data.Format != ReorderFormat) return;
+        if (e.Data.Payload is not (TabView src, int srcIdx)) return;
+        if (src != this) return;
+        float hdrH = ThemeManager.Current.TabBarHeight;
+        int dstIdx = e.LocalPosition.Y < hdrH
+            ? TabIndexFromLocalX(e.LocalPosition.X)
+            : _tabs.Count - 1;
+        if (dstIdx < 0) dstIdx = _tabs.Count - 1;
+        if (dstIdx == srcIdx) { e.Handled = true; e.Effect = DragDropEffect.Move; return; }
+        var item = _tabs[srcIdx];
+        _tabs.RemoveAt(srcIdx);
+        if (dstIdx > srcIdx) dstIdx--;
+        _tabs.Insert(dstIdx, item);
+        SelectedIndex = dstIdx;
+        e.Handled = true;
+        e.Effect  = DragDropEffect.Move;
+    }
+
     public override void Draw(Renderer renderer)
     {
         if (!Visible) return;
