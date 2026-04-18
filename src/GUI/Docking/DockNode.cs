@@ -94,10 +94,15 @@ public sealed class DockNode
     /// </summary>
     public void CollapseIfDegenerate(ref DockNode root)
     {
-        if (IsLeaf) return;
+        if (IsLeaf)
+        {
+            Sokol.SLog.Info($"[Dock] CollapseIfDegenerate: node {Id[..8]} is a leaf — no-op", "Dock");
+            return;
+        }
 
         bool firstEmpty  = First  is { IsLeaf: true, Panels.Count: 0 };
         bool secondEmpty = Second is { IsLeaf: true, Panels.Count: 0 };
+        Sokol.SLog.Info($"[Dock] CollapseIfDegenerate: node {Id[..8]} type={Type} firstEmpty={firstEmpty} secondEmpty={secondEmpty} firstType={First?.Type} secondType={Second?.Type}", "Dock");
 
         DockNode? keeper = null;
         if (firstEmpty && !secondEmpty) keeper = Second;
@@ -105,12 +110,18 @@ public sealed class DockNode
         else if (firstEmpty && secondEmpty)
         {
             // Both empty → become an empty leaf.
+            Sokol.SLog.Info($"[Dock] CollapseIfDegenerate: both empty → become empty leaf", "Dock");
             Type = DockNodeType.Leaf;
             First = null;
             Second = null;
             return;
         }
-        if (keeper == null) return;
+        if (keeper == null)
+        {
+            Sokol.SLog.Info($"[Dock] CollapseIfDegenerate: no empty children — no collapse", "Dock");
+            return;
+        }
+        Sokol.SLog.Info($"[Dock] CollapseIfDegenerate: keeper={keeper.Id[..8]} panels=[{string.Join(",", keeper.Panels.ConvertAll(p => p.Title))}] keeperType={keeper.Type}", "Dock");
 
         // Replace self with keeper: copy keeper into this.
         Type             = keeper.Type;

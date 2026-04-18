@@ -39,6 +39,7 @@ public sealed class DockSpace : Widget
     {
         target ??= Root;
         if (!target.IsLeaf) target = target.EnumerateLeaves().GetEnumerator() is var e && e.MoveNext() ? e.Current : Root;
+        Sokol.SLog.Info($"[Dock] AddPanel '{panel.Title}' zone={zone} target={target.Id[..8]} targetPanels=[{string.Join(",", target.Panels.ConvertAll(p => p.Title))}]", "Dock");
 
         if (zone == DockDropZone.Center || target.Panels.Count == 0)
         {
@@ -56,6 +57,8 @@ public sealed class DockSpace : Widget
             };
             target.SplitLeaf(split, panel, newFirst);
         }
+        var leavesAfter = string.Join(" | ", System.Linq.Enumerable.Select(Root.EnumerateLeaves(), l => $"{l.Id[..8]}:[{string.Join(",", l.Panels.ConvertAll(p => p.Title))}]"));
+        Sokol.SLog.Info($"[Dock] AddPanel done. Tree leaves: {leavesAfter}", "Dock");
         InvalidateLayout();
         RaiseTreeChanged();
         return target;
@@ -64,12 +67,25 @@ public sealed class DockSpace : Widget
     public void RemovePanel(DockPanel panel)
     {
         var owner = panel.Owner;
-        if (owner == null) return;
+        if (owner == null)
+        {
+            Sokol.SLog.Info($"[Dock] RemovePanel \'{panel.Title}\' owner=null — skipping", "Dock");
+            return;
+        }
+        var parent = owner.Parent;
+        Sokol.SLog.Info($"[Dock] RemovePanel \'{panel.Title}\' from leaf {owner.Id[..8]} (panels=[{string.Join(",", owner.Panels.ConvertAll(p => p.Title))}]) parent={parent?.Id[..8] ?? "null(root)"}", "Dock");
         owner.RemovePanel(panel);
+        Sokol.SLog.Info($"[Dock] RemovePanel after remove: leaf panels=[{string.Join(",", owner.Panels.ConvertAll(p => p.Title))}]", "Dock");
+        // CollapseIfDegenerate must be called on a split node (the parent) to detect
+        // an empty leaf child. Calling it on the leaf itself is a no-op.
         var root = Root;
-        owner.CollapseIfDegenerate(ref root);
-        // If root itself collapsed and became the keeper, Root stays the same
-        // (keeper is copied into the existing root instance). No reassignment needed.
+        if (parent != null)
+        {
+            Sokol.SLog.Info($"[Dock] CollapseIfDegenerate on parent {parent.Id[..8]} type={parent.Type}", "Dock");
+            parent.CollapseIfDegenerate(ref root);
+        }
+        var leavesAfter = string.Join(" | ", System.Linq.Enumerable.Select(Root.EnumerateLeaves(), l => $"{l.Id[..8]}:[{string.Join(",", l.Panels.ConvertAll(p => p.Title))}]"));
+        Sokol.SLog.Info($"[Dock] RemovePanel done. Tree leaves: {leavesAfter}", "Dock");
         InvalidateLayout();
         RaiseTreeChanged();
     }

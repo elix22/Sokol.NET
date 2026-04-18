@@ -78,6 +78,8 @@ public sealed class DockManager
         ActiveDragPanel = panel;
         HoveredDropNode = null;
         HoveredDropZone = DockDropZone.None;
+        var ownerPanels = panel.Owner != null ? string.Join(",", panel.Owner.Panels.ConvertAll(p => p.Title)) : "(floating)";
+        Sokol.SLog.Info($"[Dock] BeginDrag panel='{panel.Title}' ownerPanels=[{ownerPanels}] ownerIsRoot={panel.Owner == RootDockSpace.Root}", "Dock");
     }
 
     public void UpdateDrag(Vector2 screenPos)
@@ -93,18 +95,31 @@ public sealed class DockManager
         if (ActiveDragPanel == null) return;
 
         var (node, zone) = RootDockSpace.ClassifyDropZone(screenPos);
+        Sokol.SLog.Info($"[Dock] EndDrag panel='{ActiveDragPanel.Title}' dropNode={node?.Id[..8] ?? "null"} zone={zone} sameNode={ActiveDragPanel.Owner == node} ownerCount={ActiveDragPanel.Owner?.Panels.Count}", "Dock");
         if (node != null && zone != DockDropZone.None && zone != DockDropZone.Floating)
         {
             // Re-dock at target.
             if (ActiveDragPanel.Owner != node || ActiveDragPanel.Owner?.Panels.Count > 1 || zone != DockDropZone.Center)
             {
+                Sokol.SLog.Info($"[Dock] EndDrag → Remove then AddPanel zone={zone}", "Dock");
+                // Snapshot an anchor panel from the target BEFORE RemovePanel.
+                // CollapseIfDegenerate may orphan `node` by copying its data into
+                // the parent in-place; anchorPanel.Owner resolves the surviving node.
+                var anchorPanel = node.ActivePanel ?? (node.Panels.Count > 0 ? node.Panels[0] : null);
                 RootDockSpace.RemovePanel(ActiveDragPanel);
-                RootDockSpace.AddPanel(ActiveDragPanel, node, zone);
+                var resolvedTarget = anchorPanel?.Owner ?? node;
+                Sokol.SLog.Info($"[Dock] EndDrag resolvedTarget={resolvedTarget.Id[..8]} (node={node.Id[..8]} anchorOwner={anchorPanel?.Owner?.Id[..8] ?? "null"})", "Dock");
+                RootDockSpace.AddPanel(ActiveDragPanel, resolvedTarget, zone);
+            }
+            else
+            {
+                Sokol.SLog.Info($"[Dock] EndDrag → same node/center, no-op", "Dock");
             }
         }
         else
         {
             // Drop outside → float.
+            Sokol.SLog.Info($"[Dock] EndDrag → Float (outside dockspace)", "Dock");
             var floatRect = new Rect(screenPos.X - 80f, screenPos.Y - 12f, 280f, 180f);
             RootDockSpace.RemovePanel(ActiveDragPanel);
             FloatingHost.Add(ActiveDragPanel, floatRect);
