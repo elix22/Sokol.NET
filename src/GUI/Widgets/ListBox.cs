@@ -298,8 +298,7 @@ public class ListBox : ScrollableList
         if (!_allowReorder || e.Data.Format != ReorderFormat) return;
         if (e.Data.Payload is not (ListBox src, int srcIdx)) return;
         if (src != this) return;
-        int dstIdx = IndexFromY(e.LocalPosition.Y);
-        if (dstIdx < 0) dstIdx = _items.Count - 1;
+        int dstIdx = Math.Clamp(IndexFromY(e.LocalPosition.Y), 0, _items.Count);
         if (dstIdx == srcIdx) { e.Handled = true; e.Effect = DragDropEffect.Move; return; }
         var item = _items[srcIdx];
         _items.RemoveAt(srcIdx);

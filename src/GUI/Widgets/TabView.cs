@@ -123,7 +123,7 @@ public class TabView : Widget
         int dstIdx = e.LocalPosition.Y < hdrH
             ? TabIndexFromLocalX(e.LocalPosition.X)
             : _tabs.Count - 1;
-        if (dstIdx < 0) dstIdx = _tabs.Count - 1;
+        if (dstIdx < 0) dstIdx = e.LocalPosition.X >= _cachedTabAreaLeft ? _tabs.Count : 0;
         if (dstIdx == srcIdx) { e.Handled = true; e.Effect = DragDropEffect.Move; return; }
         var item = _tabs[srcIdx];
         _tabs.RemoveAt(srcIdx);

@@ -289,6 +289,7 @@ public sealed class InputRouter
                     target.OnMouseMove(Localize(target, me));
                     target.OnMouseDown(Localize(target, me));
                 }
+                _screen.Drag.OnMouseDown(target, pos);
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED:
@@ -298,6 +299,7 @@ public sealed class InputRouter
                 var moveTarget = _captured ?? _hovered;
                 if (moveTarget != null)
                     moveTarget.OnMouseMove(Localize(moveTarget, me));
+                _screen.Drag.OnMouseMove(_hovered, pos);
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED:
@@ -307,6 +309,8 @@ public sealed class InputRouter
                 var upTarget = _captured ?? _hovered;
                 if (upTarget != null)
                     upTarget.OnMouseUp(Localize(upTarget, me));
+                // Drag.OnMouseUp must be called before clearing _hovered.
+                _screen.Drag.OnMouseUp(_hovered, pos);
                 // Leave hover on touch-end so the widget can visually deactivate
                 _hovered?.OnMouseLeave(me);
                 _hovered   = null;
