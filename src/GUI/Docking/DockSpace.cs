@@ -175,17 +175,40 @@ public sealed class DockSpace : Widget
         renderer.SetFontSize(theme.FontSize);
         renderer.SetTextAlign(TextHAlign.Left);
         float x = b.X + 4f;
+        float cr = 4f;
         for (int i = 0; i < leaf.Panels.Count; i++)
         {
             var p = leaf.Panels[i];
             float textW = renderer.MeasureText(p.Title);
             float tabW = textW + TabPaddingH * 2f;
-            var tabRect = new Rect(x, b.Y + 2f, tabW, TabBarHeight - 3f);
             var isActive = i == leaf.ActivePanelIndex;
-            renderer.FillRect(tabRect, isActive ? theme.TabActive : theme.TabInactive);
+            float tabH = isActive ? (TabBarHeight - 2f) : (TabBarHeight - 4f);
+            var tabRect = new Rect(x, b.Y + 2f, tabW, tabH);
+
             if (isActive)
-                renderer.FillRect(new Rect(tabRect.X, tabRect.Bottom - 2f, tabRect.Width, 2f), theme.Primary);
-            renderer.DrawText(tabRect.X + TabPaddingH, tabRect.Y + tabRect.Height * 0.5f, p.Title, theme.TabText);
+            {
+                var topC = theme.SurfaceColor.Lighten(0.18f);
+                var botC = theme.SurfaceColor;
+                var grad = renderer.LinearGradient(
+                    new Vector2(tabRect.X, tabRect.Y),
+                    new Vector2(tabRect.X, tabRect.Bottom),
+                    topC, botC);
+                renderer.FillRoundedRectTopWithPaint(tabRect, cr, grad);
+                renderer.DrawLine(tabRect.X,     tabRect.Y + cr, tabRect.X,     tabRect.Bottom, 1f, theme.TabBorder);
+                renderer.DrawLine(tabRect.Right, tabRect.Y + cr, tabRect.Right, tabRect.Bottom, 1f, theme.TabBorder);
+                renderer.DrawLine(tabRect.X + cr, tabRect.Y + 0.5f, tabRect.Right - cr, tabRect.Y + 0.5f, 1f,
+                    theme.SurfaceColor.Lighten(0.45f).WithAlpha(0.9f));
+            }
+            else
+            {
+                var insetGrad = renderer.BoxGradient(tabRect, cr, 4f,
+                    theme.TabBarColor.Darken(0.12f), theme.TabBarColor.Lighten(0.04f));
+                renderer.FillRoundedRectTopWithPaint(tabRect, cr, insetGrad);
+                renderer.StrokeRoundedRectTop(tabRect, cr, 1f, theme.TabBorder.WithAlpha(0.6f));
+            }
+
+            var labelColor = isActive ? theme.TabText : theme.TextMutedColor;
+            renderer.DrawText(tabRect.X + TabPaddingH, tabRect.Y + tabRect.Height * 0.5f, p.Title, labelColor);
             x += tabW + 2f;
         }
 
