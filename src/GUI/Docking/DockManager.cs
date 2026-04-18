@@ -28,6 +28,8 @@ public sealed class DockManager
     {
         RootDockSpace = rootDockSpace ?? throw new ArgumentNullException(nameof(rootDockSpace));
         FloatingHost  = floatingHost  ?? throw new ArgumentNullException(nameof(floatingHost));
+        RootDockSpace.Manager = this;
+        FloatingHost._manager = this;
         RootDockSpace.TreeChanged += () => LayoutChanged?.Invoke();
     }
 

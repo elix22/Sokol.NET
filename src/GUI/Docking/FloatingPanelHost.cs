@@ -23,6 +23,8 @@ public sealed class FloatingPanelHost : Widget
     private Vector2    _dragStartScreen;
     private bool       _dragBegun;
 
+    internal DockManager? _manager;
+
     public void Add(DockPanel panel, Rect screenBounds)
     {
         panel.IsFloating     = true;
@@ -147,7 +149,7 @@ public sealed class FloatingPanelHost : Widget
                 e.Position.Y - _dragOffsetLocal.Y,
                 b.Width, b.Height);
             // Let DockManager know so it can highlight drop zones.
-            Screen.Instance?.DockManagerOrNull?.UpdateFloatingDrag(_draggingPanel, e.Position);
+            _manager?.UpdateFloatingDrag(_draggingPanel, e.Position);
         }
         return true;
     }
@@ -156,7 +158,7 @@ public sealed class FloatingPanelHost : Widget
     {
         bool handled = _draggingPanel != null;
         if (_draggingPanel != null && _dragBegun)
-            Screen.Instance?.DockManagerOrNull?.EndFloatingDrag(_draggingPanel, e.Position);
+            _manager?.EndFloatingDrag(_draggingPanel, e.Position);
         _draggingPanel = null;
         _dragBegun     = false;
         return handled;

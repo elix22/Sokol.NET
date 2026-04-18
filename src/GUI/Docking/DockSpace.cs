@@ -25,6 +25,9 @@ public sealed class DockSpace : Widget
     private Vector2    _tabDragStartScreen;
     private bool       _tabDragBegun;
 
+    /// <summary>The DockManager that owns this DockSpace (set by the DockManager constructor).</summary>
+    internal DockManager? Manager { get; set; }
+
     /// <summary>Fired whenever the tree structure changes.</summary>
     public event Action? TreeChanged;
 
@@ -117,7 +120,7 @@ public sealed class DockSpace : Widget
         DrawDividers(renderer, Root, theme);
 
         // Drop-zone highlight from DockManager if a drag is in progress.
-        var dm = Screen.Instance?.DockManagerOrNull;
+        var dm = Manager;
         if (dm != null && dm.ActiveDragPanel != null &&
             dm.HoveredDropNode != null && dm.HoveredDropZone != DockDropZone.None &&
             IsAncestorOf(dm.HoveredDropNode))
@@ -270,10 +273,10 @@ public sealed class DockSpace : Widget
             if (!_tabDragBegun && (MathF.Abs(delta.X) > 5f || MathF.Abs(delta.Y) > 5f))
             {
                 _tabDragBegun = true;
-                Screen.Instance?.DockManagerOrNull?.BeginDragPanel(_draggingTabPanel, e.Position);
+                Manager?.BeginDragPanel(_draggingTabPanel, e.Position);
             }
             if (_tabDragBegun)
-                Screen.Instance?.DockManagerOrNull?.UpdateDrag(e.Position);
+                Manager?.UpdateDrag(e.Position);
             return true;
         }
         return false;
@@ -283,7 +286,7 @@ public sealed class DockSpace : Widget
     {
         bool handled = _draggingDivider != null || _draggingTabPanel != null;
         if (_tabDragBegun && _draggingTabPanel != null)
-            Screen.Instance?.DockManagerOrNull?.EndDrag(e.Position);
+            Manager?.EndDrag(e.Position);
         _draggingDivider   = null;
         _draggingTabPanel  = null;
         _tabDragBegun      = false;
