@@ -220,6 +220,31 @@ public class TreeView : Widget
             }
         }
 
+        // ── Drag-over indicator ───────────────────────────────────────────────
+        var accentCol = ThemeManager.Current.AccentColor;
+        if (_dropInd.zone == DropZone.Into && _dropInd.highlightNode != null)
+        {
+            // "Drop into" zone: highlight the target row
+            for (int di = 0; di < _flatRows.Count; di++)
+            {
+                if (_flatRows[di].node == _dropInd.highlightNode)
+                {
+                    float ry = _flatRows[di].y;
+                    renderer.FillRect(new Rect(0, ry, viewW, ItemHeight), accentCol.WithAlpha(0.22f));
+                    renderer.FillRect(new Rect(0, ry + 2f, 3f, ItemHeight - 4f), accentCol);
+                    break;
+                }
+            }
+        }
+        else if (_dropInd.lineY >= 0f)
+        {
+            // "Insert before/after" zone: draw a horizontal insertion line
+            float lx  = _dropInd.indentDepth * IndentWidth + ArrowWidth;
+            float dotR = 3.5f;
+            renderer.FillCircle(lx, _dropInd.lineY, dotR, accentCol);
+            renderer.DrawLine(lx + dotR, _dropInd.lineY, viewW - 4f, _dropInd.lineY, 2f, accentCol);
+        }
+
         renderer.Restore();
 
         // Scrollbar
@@ -578,6 +603,9 @@ public class TreeView : Widget
         }
     }
     private bool _allowDragDrop;
+    private enum DropZone { Before, Into, After }
+    // lineY < 0 means no indicator
+    private (float lineY, int indentDepth, DropZone zone, TreeNode? highlightNode) _dropInd = (-1f, 0, DropZone.Into, null);
 
     /// <summary>
     /// Called to decide whether <paramref name="source"/> may be dropped onto
@@ -594,6 +622,42 @@ public class TreeView : Widget
         int idx = (int)((localY + _scrollY) / ItemHeight);
         if (idx < 0 || idx >= _flatRows.Count) return null;
         return _flatRows[idx].node;
+    }
+
+    /// <summary>
+    /// Resolves the drop zone from a local Y position.
+    /// Returns the effective target node, its flat-row index, and the zone.
+    /// Returns null target when the drop is invalid (self, descendant, denied).
+    /// </summary>
+    private (TreeNode? target, int rowIdx, DropZone zone) ComputeDropZone(float localY, TreeNode moving)
+    {
+        int idx = (int)((localY + _scrollY) / ItemHeight);
+
+        // Below all rows → append as last sibling under root
+        if (idx >= _flatRows.Count)
+            return (_root, _flatRows.Count, DropZone.After);
+
+        if (idx < 0) idx = 0;
+        var (node, rowY, _) = _flatRows[idx];
+        if (node == moving || IsDescendant(moving, node))
+            return (null, idx, DropZone.Into); // would create cycle
+
+        float fraction = (localY + _scrollY - rowY) / ItemHeight;
+        DropZone zone = fraction < 0.3f ? DropZone.Before
+                      : fraction > 0.7f ? DropZone.After
+                      : DropZone.Into;
+
+        if (zone == DropZone.Into)
+        {
+            if (CanDrop != null && !CanDrop(moving, node)) return (null, idx, zone);
+            return (node, idx, zone);
+        }
+
+        // Before / After: new parent will be the parent of the hovered node
+        var newParent = FindParent(node) ?? _root;
+        if (newParent == null) return (null, idx, zone);
+        if (CanDrop != null && !CanDrop(moving, newParent)) return (null, idx, zone);
+        return (node, idx, zone);
     }
 
     private static bool IsDescendant(TreeNode ancestor, TreeNode candidate)
@@ -626,12 +690,24 @@ public class TreeView : Widget
         if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
         if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
         if (src != this) return;
-        // Null hit = empty space → reparent to root (unparent to top level)
-        var target = NodeAtLocalY(e.LocalPosition.Y) ?? _root;
-        if (target == null || target == moving) return;
-        if (IsDescendant(moving, target)) return;
-        if (CanDrop != null && !CanDrop(moving, target)) return;
+
+        var (target, rowIdx, zone) = ComputeDropZone(e.LocalPosition.Y, moving);
+        if (target == null) { _dropInd = (-1f, 0, DropZone.Into, null); return; }
+
+        int   depth = (rowIdx >= 0 && rowIdx < _flatRows.Count) ? _flatRows[rowIdx].depth : 0;
+        float lineY = zone switch
+        {
+            DropZone.Before => rowIdx < _flatRows.Count ? _flatRows[rowIdx].y                : _flatRows.Count * ItemHeight,
+            DropZone.After  => rowIdx < _flatRows.Count ? _flatRows[rowIdx].y + ItemHeight   : _flatRows.Count * ItemHeight,
+            _               => -1f,
+        };
+        _dropInd = (lineY, depth, zone, zone == DropZone.Into ? target : null);
         e.Effect = DragDropEffect.Move;
+    }
+
+    public override void OnDragLeave()
+    {
+        _dropInd = (-1f, 0, DropZone.Into, null);
     }
 
     public override void OnDrop(DragDropEventArgs e)
@@ -639,17 +715,32 @@ public class TreeView : Widget
         if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
         if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
         if (src != this) return;
-        // Null hit = empty space → reparent to root (unparent to top level)
-        var target = NodeAtLocalY(e.LocalPosition.Y) ?? _root;
-        if (target == null || target == moving) return;
-        if (IsDescendant(moving, target)) return;
-        if (CanDrop != null && !CanDrop(moving, target)) return;
+
+        var (target, _, zone) = ComputeDropZone(e.LocalPosition.Y, moving);
+        if (target == null) return;
 
         var oldParent = FindParent(moving);
         if (oldParent == null) return;
         oldParent.Children.Remove(moving);
-        target.Children.Add(moving);
-        target.IsExpanded = true;
+
+        if (zone == DropZone.Into)
+        {
+            target.Children.Add(moving);
+            target.IsExpanded = true;
+        }
+        else
+        {
+            // Sibling insert: new parent is the parent of the hovered node
+            var newParent = FindParent(target) ?? _root;
+            if (newParent == null) return;
+            int sibIdx = newParent.Children.IndexOf(target);
+            if (sibIdx < 0) sibIdx = newParent.Children.Count;
+            if (zone == DropZone.After) sibIdx++;
+            sibIdx = Math.Clamp(sibIdx, 0, newParent.Children.Count);
+            newParent.Children.Insert(sibIdx, moving);
+        }
+
+        _dropInd = (-1f, 0, DropZone.Into, null);
         InvalidateLayout();
         e.Handled = true;
         e.Effect  = DragDropEffect.Move;
