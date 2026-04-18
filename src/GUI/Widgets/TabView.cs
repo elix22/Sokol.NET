@@ -22,6 +22,7 @@ public class TabView : Widget
     private bool    _cachedNeedArrows;
     private float   _cachedTabAreaLeft, _cachedTabAreaRight, _cachedMaxScroll;
     private bool    _ensureTabVisible;   // set when SelectedIndex changes
+    private float   _dropInsertX = -1f; // x position of insertion indicator during drag (-1 = none)
 
     public int SelectedIndex
     {
@@ -111,7 +112,21 @@ public class TabView : Widget
     {
         if (!_allowReorder || e.Data.Format != ReorderFormat) return;
         if (e.Data.Payload is (TabView src, int _) && src == this)
+        {
+            int dstIdx = TabIndexFromLocalX(e.LocalPosition.X);
+            if (dstIdx < 0) dstIdx = e.LocalPosition.X >= _cachedTabAreaLeft ? _tabs.Count : 0;
+            // Compute x of the insertion gap
+            float ix = _cachedTabAreaLeft - _tabScrollOffset;
+            for (int i = 0; i < dstIdx && i < _cachedTabWidths.Length; i++)
+                ix += _cachedTabWidths[i] + 1f;
+            _dropInsertX = Math.Clamp(ix, _cachedTabAreaLeft, _cachedTabAreaRight);
             e.Effect = DragDropEffect.Move;
+        }
+    }
+
+    public override void OnDragLeave()
+    {
+        _dropInsertX = -1f;
     }
 
     public override void OnDrop(DragDropEventArgs e)
@@ -130,6 +145,7 @@ public class TabView : Widget
         if (dstIdx > srcIdx) dstIdx--;
         _tabs.Insert(dstIdx, item);
         SelectedIndex = dstIdx;
+        _dropInsertX = -1f;
         e.Handled = true;
         e.Effect  = DragDropEffect.Move;
     }
@@ -240,6 +256,16 @@ public class TabView : Widget
 
             x += tw + 1f;
         }
+
+        // Drag-reorder insertion indicator
+        if (_dropInsertX >= 0f)
+        {
+            var accent = theme.AccentColor;
+            renderer.DrawLine(_dropInsertX, 2f, _dropInsertX, hdrH - 2f, 2f, accent);
+            renderer.FillCircle(_dropInsertX, 2f, 3f, accent);
+            renderer.FillCircle(_dropInsertX, hdrH - 2f, 3f, accent);
+        }
+
         renderer.Restore();
 
         // ── 7. Content area ────────────────────────────────────────────────────

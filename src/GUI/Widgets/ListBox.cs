@@ -163,6 +163,16 @@ public class ListBox : ScrollableList
                     sel ? theme.AccentColor.Lighten(0.15f) : theme.TextColor);
             }
         }
+
+        // Drag-reorder insertion indicator
+        if (_dropLineIndex >= 0)
+        {
+            var accent = ThemeManager.Current.AccentColor;
+            float lineY = _dropLineIndex * ItemHeight;
+            float dotR  = 3.5f;
+            renderer.FillCircle(dotR, lineY, dotR, accent);
+            renderer.DrawLine(dotR * 2f, lineY, viewW, lineY, 2f, accent);
+        }
     }
 
     // ─── Item click ───────────────────────────────────────────────────────────
@@ -266,6 +276,7 @@ public class ListBox : ScrollableList
         }
     }
     private bool _allowReorder;
+    private int  _dropLineIndex = -1;  // insertion-point indicator during drag-over (-1 = none)
 
     /// <summary>Wire format used for in-list reorder drags.</summary>
     public const string ReorderFormat = "sokol.listbox/reorder";
@@ -290,7 +301,15 @@ public class ListBox : ScrollableList
         if (!_allowReorder) return;
         if (e.Data.Format != ReorderFormat) return;
         if (e.Data.Payload is (ListBox src, int _) && src == this)
+        {
+            _dropLineIndex = Math.Clamp(IndexFromY(e.LocalPosition.Y), 0, _items.Count);
             e.Effect = DragDropEffect.Move;
+        }
+    }
+
+    public override void OnDragLeave()
+    {
+        _dropLineIndex = -1;
     }
 
     public override void OnDrop(DragDropEventArgs e)
@@ -305,6 +324,7 @@ public class ListBox : ScrollableList
         if (dstIdx > srcIdx) dstIdx--;
         _items.Insert(dstIdx, item);
         SelectedIndex = dstIdx;
+        _dropLineIndex = -1;
         e.Handled = true;
         e.Effect  = DragDropEffect.Move;
     }

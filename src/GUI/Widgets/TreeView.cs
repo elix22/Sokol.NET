@@ -626,7 +626,8 @@ public class TreeView : Widget
         if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
         if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
         if (src != this) return;
-        var target = NodeAtLocalY(e.LocalPosition.Y);
+        // Null hit = empty space → reparent to root (unparent to top level)
+        var target = NodeAtLocalY(e.LocalPosition.Y) ?? _root;
         if (target == null || target == moving) return;
         if (IsDescendant(moving, target)) return;
         if (CanDrop != null && !CanDrop(moving, target)) return;
@@ -638,7 +639,8 @@ public class TreeView : Widget
         if (!_allowDragDrop || e.Data.Format != ReparentFormat) return;
         if (e.Data.Payload is not (TreeView src, TreeNode moving)) return;
         if (src != this) return;
-        var target = NodeAtLocalY(e.LocalPosition.Y);
+        // Null hit = empty space → reparent to root (unparent to top level)
+        var target = NodeAtLocalY(e.LocalPosition.Y) ?? _root;
         if (target == null || target == moving) return;
         if (IsDescendant(moving, target)) return;
         if (CanDrop != null && !CanDrop(moving, target)) return;
