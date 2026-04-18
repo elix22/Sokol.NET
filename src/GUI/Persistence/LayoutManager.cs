@@ -103,9 +103,9 @@ public sealed class LayoutManager
         foreach (var p in panelsById.Values)
         {
             if (p.IsFloating)
-            {
                 _dock.FloatingHost.Add(p, p.FloatingBounds);
-            }
+            else
+                _dock.RegisterPanel(p);
         }
     }
 

@@ -53,6 +53,17 @@ public sealed class DockManager
         LayoutChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Registers an existing panel with the manager without modifying the dock
+    /// tree. Used by <see cref="LayoutManager"/> after restoring a layout so
+    /// that <see cref="AllPanels"/> stays accurate.
+    /// </summary>
+    internal void RegisterPanel(DockPanel panel)
+    {
+        if (!_panels.Contains(panel))
+            _panels.Add(panel);
+    }
+
     /// <summary>Detach a panel from its docking tree leaf and put it into the floating overlay.</summary>
     public void Float(DockPanel panel, Rect floatingScreenBounds)
     {
