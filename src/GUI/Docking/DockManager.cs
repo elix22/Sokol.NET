@@ -113,10 +113,25 @@ public sealed class DockManager
             if (ActiveDragPanel.Owner != node || ActiveDragPanel.Owner?.Panels.Count > 1 || zone != DockDropZone.Center)
             {
                 Sokol.SLog.Info($"[Dock] EndDrag → Remove then AddPanel zone={zone}", "Dock");
-                // Snapshot an anchor panel from the target BEFORE RemovePanel.
-                // CollapseIfDegenerate may orphan `node` by copying its data into
-                // the parent in-place; anchorPanel.Owner resolves the surviving node.
-                var anchorPanel = node.ActivePanel ?? (node.Panels.Count > 0 ? node.Panels[0] : null);
+                // Snapshot an anchor panel from the target node BEFORE RemovePanel.
+                // CollapseIfDegenerate may orphan `node` by copying a sibling's data
+                // into the parent in-place; anchorPanel.Owner resolves the surviving node.
+                //
+                // Priority: pick any panel in `node` that is NOT the drag panel.
+                // If none exists (node only holds the drag panel), pick from the
+                // sibling subtree — after collapse its panels' Owner will point to
+                // the parent node that absorbed the sibling, which is the correct target.
+                DockPanel? anchorPanel = null;
+                foreach (var p in node.Panels)
+                    if (p != ActiveDragPanel) { anchorPanel = p; break; }
+                if (anchorPanel == null && node.Parent != null)
+                {
+                    var sibling = (node.Parent.First == node) ? node.Parent.Second : node.Parent.First;
+                    var siblingLeaf = sibling?.IsLeaf == true ? sibling
+                                   : sibling?.EnumerateLeaves().FirstOrDefault();
+                    anchorPanel = siblingLeaf?.Panels.Count > 0 ? siblingLeaf.Panels[0] : null;
+                }
+                Sokol.SLog.Info($"[Dock] EndDrag anchor={anchorPanel?.Title ?? "null"} (from {(anchorPanel == null ? "none" : anchorPanel.Owner?.Id[..8] ?? "?")})", "Dock");
                 RootDockSpace.RemovePanel(ActiveDragPanel);
                 var resolvedTarget = anchorPanel?.Owner ?? node;
                 Sokol.SLog.Info($"[Dock] EndDrag resolvedTarget={resolvedTarget.Id[..8]} (node={node.Id[..8]} anchorOwner={anchorPanel?.Owner?.Id[..8] ?? "null"})", "Dock");
