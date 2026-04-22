@@ -107,11 +107,14 @@ function openExample(example) {
     
     // Load the example's index.html in the iframe
     frame.src = `examples/${example.id}/index.html`;
-    
+
     modal.classList.add('active');
-    
+
     // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
+
+    // Focus the iframe once loaded so keyboard events reach the WebAssembly app
+    frame.onload = () => frame.focus();
 }
 
 // Close modal
