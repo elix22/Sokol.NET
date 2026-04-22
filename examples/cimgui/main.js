@@ -3,7 +3,7 @@
 
 import { dotnet } from './_framework/dotnet.js'
 
-const { setModuleImports, getAssemblyExports, getConfig } = await dotnet
+const { setModuleImports, getAssemblyExports, getConfig, runMain } = await dotnet
     .withDiagnosticTracing(false)
     .withApplicationArgumentsFromQuery()
     .create();
@@ -28,11 +28,11 @@ function GetUserAgent()
 dotnet.instance.Module["SetRendererSize"] = SetRendererSize;
 dotnet.instance.Module["GetUserAgent"]=GetUserAgent;
 
-// We're ready to dotnet.run, so let's remove the spinner
+// We're ready to run, so let's remove the spinner
 const loading_div = document.getElementById('spinner');
 loading_div.remove();
 
 const downloading = document.getElementById('Downloading');
 downloading.remove();
 
-await dotnet.run();
+await runMain();

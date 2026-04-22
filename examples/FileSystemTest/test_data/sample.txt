@@ -1,0 +1,5 @@
+Hello from SFilesystem test!
+This file lives in Assets/test_data/sample.txt.
+It is used to test sfs_open_file, sfs_read_file, sfs_seek_file,
+sfs_tell_file, sfs_eof_file, sfs_get_file_size and sfs_get_last_modified_time.
+Line five is the last line.
