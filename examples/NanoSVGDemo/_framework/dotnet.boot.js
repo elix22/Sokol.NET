@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
   "mainAssemblyName": "NanoSVGDemoWeb.dll",
   "resources": {
-    "hash": "sha256-8sbWQqRfyU6eYF+JlL1ROsqDd2IlAK7Cfd8rDHwbYOc=",
+    "hash": "sha256-qnk8x0dqtSXfUrtChstk4rk8U9eC5naZDMORyylP4eg=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,14 +15,14 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-bcel6bvdoAOR1W47gAyajEdGnmjxfWoeXj6B2gDSg0o="
+        "integrity": "sha256-lGO0hCBedJ0k1WqC9LnfZch7nQBrH1YL1hphkZdYyp8="
       }
     ],
     "coreAssembly": [
       {
         "virtualPath": "NanoSVGDemoWeb.wasm",
         "name": "NanoSVGDemoWeb.wasm",
-        "integrity": "sha256-6qRtJcIZCS3RQv1tb9CExeMVAzy1ScWhguGxwPF/SV0="
+        "integrity": "sha256-ktCTsK4Yok1cHGH+HRa2Z/+6QK0o9gZyA0RZxhVzZYA="
       },
       {
         "virtualPath": "System.Collections.Concurrent.wasm",
