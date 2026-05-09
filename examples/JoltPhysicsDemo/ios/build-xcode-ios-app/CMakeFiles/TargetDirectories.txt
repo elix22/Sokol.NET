@@ -1,3 +1,0 @@
-/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir
-/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/ALL_BUILD.dir
-/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/ZERO_CHECK.dir

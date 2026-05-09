@@ -1,4 +1,0 @@
-Target dependency graph (2 targets)
-Target 'JoltPhysicsDemo-ios-app' in project 'JoltPhysicsDemo-ios-app'
-➜ Explicit dependency on target 'ZERO_CHECK' in project 'JoltPhysicsDemo-ios-app'
-Target 'ZERO_CHECK' in project 'JoltPhysicsDemo-ios-app' (no dependencies)

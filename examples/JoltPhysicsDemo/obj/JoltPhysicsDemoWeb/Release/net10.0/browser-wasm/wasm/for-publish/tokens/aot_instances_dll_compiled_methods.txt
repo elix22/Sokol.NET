@@ -1,2 +1,0 @@
-/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/aot-in/aot-instances.dll
-55A778A8-6EE7-4930-BC8A-CA33F5963EAB

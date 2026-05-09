@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
   "mainAssemblyName": "JoltPhysicsDemoWeb.dll",
   "resources": {
-    "hash": "sha256-57AUSEYUtaWRWRbamrUJTd20VJgUKESpoOuTGg4SLxc=",
+    "hash": "sha256-ZdJXniX+mBeCYMk8h1WiSxASD0N+bF4LpUFYXWciXNc=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,14 +15,14 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-Q1z6IftNeOWe3MMzg4ULCXB1zAmxBDmbuZn/iZloEr0="
+        "integrity": "sha256-zc2SeEt3JWyMAfanLVBXPfr4dppoUawsqvyvexHiWl4="
       }
     ],
     "coreAssembly": [
       {
         "virtualPath": "JoltPhysicsDemoWeb.wasm",
         "name": "JoltPhysicsDemoWeb.wasm",
-        "integrity": "sha256-z+wArPPgiJLBnr+aY27Rw7R6Riqy83mv096TQjQr1dE="
+        "integrity": "sha256-XfOASOClLZA3hqFYFBP1VJ9sEitGtq0rGd4XHsC17sQ="
       },
       {
         "virtualPath": "System.Collections.wasm",
