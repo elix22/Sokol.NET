@@ -297,14 +297,6 @@
             "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/ShaderToyApp"
         },
         {
-            "id": "JoltPhysics",
-            "name": "JoltPhysics",
-            "category": "Physics",
-            "description": "10,000 dynamic physics bodies with GPU instancing and multithreading",
-            "thumbnail": "thumbnails/JoltPhysics.png",
-            "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/JoltPhysics"
-        },
-        {
             "id": "JoltPhysicsDemo",
             "name": "JoltPhysics Demo Browser",
             "category": "Physics",
