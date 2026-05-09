@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
-  "mainAssemblyName": "JoltPhysicsWeb.dll",
+  "mainAssemblyName": "JoltPhysicsDemoWeb.dll",
   "resources": {
-    "hash": "sha256-bjDL3QM581Hmt+L36mOVsV6zHRujrOE0T0LtGsmxW2M=",
+    "hash": "sha256-ZdJXniX+mBeCYMk8h1WiSxASD0N+bF4LpUFYXWciXNc=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,49 +15,24 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-JMpvHqU/FQJAZ8bq0Sa8XOi1Pz1ujlvkVC/+tZm2tag="
+        "integrity": "sha256-zc2SeEt3JWyMAfanLVBXPfr4dppoUawsqvyvexHiWl4="
       }
     ],
     "coreAssembly": [
       {
-        "virtualPath": "JoltPhysicsWeb.wasm",
-        "name": "JoltPhysicsWeb.wasm",
-        "integrity": "sha256-mBnniGfxg3GNidcq8yGEJEcI3Pp5aN7StskcG/H+5lk="
-      },
-      {
-        "virtualPath": "System.Collections.Concurrent.wasm",
-        "name": "System.Collections.Concurrent.wasm",
-        "integrity": "sha256-lhm6bty3gGSQLvwsoqA3f4K8MO67L4VKreayQziMZmw="
+        "virtualPath": "JoltPhysicsDemoWeb.wasm",
+        "name": "JoltPhysicsDemoWeb.wasm",
+        "integrity": "sha256-XfOASOClLZA3hqFYFBP1VJ9sEitGtq0rGd4XHsC17sQ="
       },
       {
         "virtualPath": "System.Collections.wasm",
         "name": "System.Collections.wasm",
-        "integrity": "sha256-oJNIqaRvIPPCpPwoNSMYQ/ijE1xbDlRL/aF8HlCq+ww="
-      },
-      {
-        "virtualPath": "System.ComponentModel.Primitives.wasm",
-        "name": "System.ComponentModel.Primitives.wasm",
-        "integrity": "sha256-/cVjyk5fRMzLlWrSaXXLL4RCu9NNgpRsK/o6bSWnfaM="
-      },
-      {
-        "virtualPath": "System.ComponentModel.TypeConverter.wasm",
-        "name": "System.ComponentModel.TypeConverter.wasm",
-        "integrity": "sha256-iaY8VtLBaSkWDtlpVtwnOrGqUkt4RTrilHdozI++kmc="
+        "integrity": "sha256-rBLlKFh6zkCzzbWUgANYsCpWbUOPCDZAIhT+F4KAD0w="
       },
       {
         "virtualPath": "System.Console.wasm",
         "name": "System.Console.wasm",
         "integrity": "sha256-wR4qIcJN815PI/UrRgRebEoUvZthKSOd0ZWwRkD+Daw="
-      },
-      {
-        "virtualPath": "System.Drawing.wasm",
-        "name": "System.Drawing.wasm",
-        "integrity": "sha256-bvSW4cCARXR3hTS0kQuXYnbiY3MMQFt27+AUYnm9FRM="
-      },
-      {
-        "virtualPath": "System.Drawing.Primitives.wasm",
-        "name": "System.Drawing.Primitives.wasm",
-        "integrity": "sha256-gz1gbRuZlNdQxU21i9+iNymD4JrqcTmeo/aLZwg/8EE="
       },
       {
         "virtualPath": "System.Memory.wasm",
@@ -70,24 +45,19 @@ export const config = /*json-start*/{
         "integrity": "sha256-bgDdUF4KhLlVGte9vhlItRr1crLp3djtfecWT6H8U/Y="
       },
       {
-        "virtualPath": "System.ObjectModel.wasm",
-        "name": "System.ObjectModel.wasm",
-        "integrity": "sha256-5mB7Xd5U3hbJNrcWxaucvtqxBy2oOJ/TANP1kFUoBro="
-      },
-      {
         "virtualPath": "System.Private.CoreLib.wasm",
         "name": "System.Private.CoreLib.wasm",
-        "integrity": "sha256-lkgcaN7Mm7zv2h0MAa2pe3WRZfs31iNCb5c0cWI7wbQ="
+        "integrity": "sha256-rOi6F7w8v/nUWvKzOVtiTty8LhILxQ/zTkdsFgdEZjg="
       },
       {
         "virtualPath": "System.Runtime.wasm",
         "name": "System.Runtime.wasm",
-        "integrity": "sha256-It6mOppvo7puOs3kcFg7rm5VQyd02dCng6dtTiWdldk="
+        "integrity": "sha256-gI46EEcTMNfWlFpgDpSxYxQyv/T1jINBEdIeIZ24h74="
       },
       {
         "virtualPath": "System.Runtime.InteropServices.wasm",
         "name": "System.Runtime.InteropServices.wasm",
-        "integrity": "sha256-VmfxYFuVd3czhEUaKZ2hm6siV83Ml3GzNIKPYA7UPn4="
+        "integrity": "sha256-6ZzWXUQudJJnd00L1v1WdCyDO+0XgAki4awYqRkSdAg="
       },
       {
         "virtualPath": "System.Runtime.InteropServices.JavaScript.wasm",
@@ -95,19 +65,9 @@ export const config = /*json-start*/{
         "integrity": "sha256-JFO5gf+OBukU3+s2xyTvPIO9yOBNNFvBiwfDzyP+RkE="
       },
       {
-        "virtualPath": "System.Runtime.Intrinsics.wasm",
-        "name": "System.Runtime.Intrinsics.wasm",
-        "integrity": "sha256-zpdK/pMOEnDH2/YPhP3RhPFD4WrdfbMyd9IgaENjjpQ="
-      },
-      {
-        "virtualPath": "System.Text.Encoding.Extensions.wasm",
-        "name": "System.Text.Encoding.Extensions.wasm",
-        "integrity": "sha256-MFV1rWqnq/S/AtEdCoyvydacYIxU2Sajb1ETJ+dT8Bk="
-      },
-      {
         "virtualPath": "System.Threading.wasm",
         "name": "System.Threading.wasm",
-        "integrity": "sha256-7XxDIukETeRx9jGgvgE+mYfIPXWOD6J6kM2g7E+PcTQ="
+        "integrity": "sha256-y0IMNw5mfCUIaaSpwxxKCFnHhUkX3qfY5shUP6/HS1Q="
       },
       {
         "virtualPath": "System.Threading.Thread.wasm",
@@ -122,7 +82,6 @@ export const config = /*json-start*/{
   "runtimeConfig": {
     "runtimeOptions": {
       "configProperties": {
-        "Microsoft.Extensions.Logging.Debug.MinLevel": "Trace",
         "Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability": true,
         "System.ComponentModel.DefaultValueAttribute.IsSupported": false,
         "System.ComponentModel.Design.IDesignerHost.IsSupported": false,

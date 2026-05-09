@@ -7,8 +7,17 @@
         "version": "10.0.3"
       }
     ],
+    "wasmHostProperties": {
+      "perHostConfig": [
+        {
+          "name": "browser",
+          "host": "browser"
+        }
+      ],
+      "runtimeArgs": [],
+      "mainAssembly": "JoltPhysicsDemoWeb.dll"
+    },
     "configProperties": {
-      "Microsoft.Extensions.Logging.Debug.MinLevel": "Trace",
       "Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability": true,
       "System.ComponentModel.DefaultValueAttribute.IsSupported": false,
       "System.ComponentModel.Design.IDesignerHost.IsSupported": false,
@@ -38,24 +47,6 @@
       "System.Text.Encoding.EnableUnsafeUTF7Encoding": false,
       "System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault": false,
       "System.Threading.Thread.EnableAutoreleasePool": false
-    },
-    "runtimeOptions": {
-      "tfm": "net8.0",
-      "configProperties": {
-        "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,
-        "DOTNET_GCHeapHardLimit": "0x80000000"
-      }
-    },
-    "wasmHostProperties": {
-      "perHostConfig": [
-        {
-          "name": "browser",
-          "host": "browser",
-          "html-path": "index.html"
-        }
-      ],
-      "runtimeArgs": [],
-      "mainAssembly": "JoltPhysicsWeb.dll"
     }
   }
 }
