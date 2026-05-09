@@ -1,0 +1,1 @@
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/linux-bionic-arm/publish/libJoltPhysicsDemo.so

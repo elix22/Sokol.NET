@@ -1,0 +1,76 @@
+-O2
+-s EXPORT_ALL=1
+                    -O3 
+                    --bind
+                    -s WASM=1
+                    -s VERBOSE=1
+                    -s FULL_ES3
+                    -s USE_WEBGL2=1
+                    -s MIN_WEBGL_VERSION=2 
+                    -s MAX_WEBGL_VERSION=2
+                    -s ASSERTIONS=1
+                    -s INITIAL_MEMORY=128MB
+                    -s MAXIMUM_MEMORY=2048MB
+                    -s ALLOW_MEMORY_GROWTH=1
+                    -s TOTAL_MEMORY=520MB
+-v
+-g
+-fwasm-exceptions
+-s EXPORT_ES6=1 -lexports.js
+-Wl,--allow-undefined
+-s ERROR_ON_UNDEFINED_SYMBOLS=0
+-s INITIAL_MEMORY=33554432
+-s STACK_SIZE=5MB
+-s WASM_BIGINT=1
+-s ASSERTIONS=1
+--pre-js "/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/src/es6/dotnet.es6.pre.js"
+--js-library "/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/src/es6/dotnet.es6.lib.js"
+--extern-post-js "/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/src/es6/dotnet.es6.extpost.js"
+"/Users/elialoni/Development/Graphics/Sokol.NET/libs/emscripten/x86/release/sokol.a"
+"/Users/elialoni/Development/Graphics/Sokol.NET/ext/JoltPhysics/libs/emscripten/x86/release/cjolt.a"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/pinvoke.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/driver.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/corebindings.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/runtime.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/JoltPhysicsDemoWeb.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Collections.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Console.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Memory.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Numerics.Vectors.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Private.CoreLib.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Runtime.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Runtime.InteropServices.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Runtime.InteropServices.JavaScript.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Threading.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/System.Threading.Thread.dll.o"
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/aot-instances.dll.o"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libbrotlicommon.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libbrotlidec.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libbrotlienc.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libicudata.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libicui18n.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libicuuc.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-component-debugger-stub-static.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-component-diagnostics_tracing-stub-static.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-component-hot_reload-stub-static.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-component-marshal-ilgen-static.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-ee-interp.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-icall-table.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-profiler-aot.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-profiler-browser.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-profiler-log.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-wasm-eh-wasm.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmono-wasm-nosimd.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libmonosgen-2.0.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libSystem.Globalization.Native.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libSystem.IO.Compression.Native.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libSystem.Native.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/libz.a"
+"/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Runtime.Mono.browser-wasm/10.0.3/runtimes/browser-wasm/native/wasm-bundled-timezones.a"
+-o "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/dotnet.native.js"
+-s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE="[]"
+-s EXPORTED_RUNTIME_METHODS="['FS','out','err','ccall','cwrap','setValue','getValue','UTF8ToString','UTF8ArrayToString','lengthBytesUTF8','stringToUTF8Array','FS_createPath','FS_createDataFile','removeRunDependency','addRunDependency','addFunction','safeSetTimeout','runtimeKeepalivePush','runtimeKeepalivePop','maybeExit','abort','wasmExports']"
+-s EXPORTED_FUNCTIONS=_free,_htons,_malloc,_sbrk,_memalign,_posix_memalign,_memset,_ntohs,stackAlloc,stackRestore,stackSave,_emscripten_force_exit,_fmod,_atan2,_fma,_pow,_fmodf,_atan2f,_fmaf,_powf,_asin,_asinh,_acos,_acosh,_atan,_atanh,_cbrt,_cos,_cosh,_exp,_log,_log2,_log10,_sin,_sinh,_tan,_tanh,_asinf,_asinhf,_acosf,_acoshf,_atanf,_atanhf,_cbrtf,_cosf,_coshf,_expf,_logf,_log2f,_log10f,_sinf,_sinhf,_tanf,_tanhf,___cpp_exception
+-lexports.js
+                    --js-library wwwroot/sokol_js_lib.js
+                    -s EXPORTED_RUNTIME_METHODS='[ 'ccall','dynCall','stackSave','stackRestore','stackAlloc', 'FS_createPath','addFunction','cwrap','UTF8ArrayToString','runtimeKeepalivePop','runtimeKeepalivePush','wasmExports']'

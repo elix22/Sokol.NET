@@ -1,0 +1,893 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		7910C0A0BBD34029AB9C56EB /* ZERO_CHECK */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 928333C92C9046F5959D3580 /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */;
+			buildPhases = (
+				B62D8E514DE769338E17DF1B /* Generate CMakeFiles/ZERO_CHECK */,
+			);
+			dependencies = (
+			);
+			name = ZERO_CHECK;
+			productName = ZERO_CHECK;
+		};
+		C2001375B04340B7BE5E49D2 /* ALL_BUILD */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = CFF283EE4ADB4CF9888128CD /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */;
+			buildPhases = (
+				C5DA673077A455514152F246 /* Generate CMakeFiles/ALL_BUILD */,
+			);
+			dependencies = (
+				559603429C1D4224B8A82233 /* PBXTargetDependency */,
+				B451B9618E9F4463A0AACF18 /* PBXTargetDependency */,
+			);
+			name = ALL_BUILD;
+			productName = ALL_BUILD;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		0958746C3F294743A51B48BB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png */ = {isa = PBXBuildFile; fileRef = C4C39B21A8564FAF9CDBD384 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png */; };
+		0EF529A68F8A450EB517B75C /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 186A42BD35324238ABBC8938 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist */; };
+		12AB7FF3E5954FE2A8FCE846 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = F9CEA3CF7CA5439596C6945C /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */; };
+		17A11EA799B641789D7EADD1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png */ = {isa = PBXBuildFile; fileRef = C21264F4CA5C4EE4AC183FA8 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png */; };
+		216A46D7BA4E429692B8880B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework */ = {isa = PBXBuildFile; fileRef = 0152FA5B6DD549BD85BFF377 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy); }; };
+		23A03D5A084341C1AD73C878 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework */ = {isa = PBXBuildFile; fileRef = E91DA9F1D28142AD8FB6CC84 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy); }; };
+		2B8EE514BC074FF7817B87B4 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework */ = {isa = PBXBuildFile; fileRef = E4A206D613004327A8A00520 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy); }; };
+		2F6D4CB1E11046F0BFA2A3FB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store */ = {isa = PBXBuildFile; fileRef = 973722CAC4444D53B008FBE1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store */; };
+		7568BE9809344CBE816F4E7E /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof */ = {isa = PBXBuildFile; fileRef = 2B599F7B08DC4C5C8121831B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof */; };
+		8888391365EA4685A9AE0531 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png */ = {isa = PBXBuildFile; fileRef = 99B960B533114113BCFE021A /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png */; };
+		B3231F6C2CC845ABB02247E9 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png */ = {isa = PBXBuildFile; fileRef = B63B0509EAE5495B99328955 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png */; };
+		B676EA49009F411A80526BDE /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human */ = {isa = PBXBuildFile; fileRef = 1888AC74782049FABD35AB5B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human */; };
+		D0E4B0FE70BB4C6BA20585F1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/Assets.xcassets */ = {isa = PBXBuildFile; fileRef = B93A4BA116ED45B5AD99602B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/Assets.xcassets */; };
+		E38E9EDC58C346CC98CACFAB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/main.m */ = {isa = PBXBuildFile; fileRef = 66C4EE2DFE3A46779FB39363 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/main.m */; };
+		E7AF6A72595D4A1BA427DFE0 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks */ = {isa = PBXBuildFile; fileRef = 44836D63B68A45A6A424ADAB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildStyle section */
+		1A825285B2DD47C6AE435FD8 /* MinSizeRel */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = MinSizeRel;
+		};
+		22FA8D5BC90B45B5B17551EF /* Debug */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Debug;
+		};
+		352A33C887C14353BC538B4C /* RelWithDebInfo */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = RelWithDebInfo;
+		};
+		6FC30198C091426EB5CD07F6 /* Release */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Release;
+		};
+/* End PBXBuildStyle section */
+
+/* Begin PBXContainerItemProxy section */
+		79523FD687C44D9892DE05FD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D50C6AC48CFC4B478DC03ACA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7910C0A0BBD34029AB9C56EB;
+			remoteInfo = ZERO_CHECK;
+		};
+		891864BA27EE46FCA66AC252 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D50C6AC48CFC4B478DC03ACA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F7B2D70F56F4134B68EF431;
+			remoteInfo = "JoltPhysicsDemo-ios-app";
+		};
+		F754FB75EE68493296DB28BA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D50C6AC48CFC4B478DC03ACA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7910C0A0BBD34029AB9C56EB;
+			remoteInfo = ZERO_CHECK;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0152FA5B6DD549BD85BFF377 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = wrapper.framework; name = sokol.framework; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework; sourceTree = "<absolute>"; };
+		186A42BD35324238ABBC8938 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist"; sourceTree = SOURCE_ROOT; };
+		1888AC74782049FABD35AB5B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = folder; name = Human; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human; sourceTree = "<absolute>"; };
+		2B599F7B08DC4C5C8121831B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof */ = {isa = PBXFileReference; explicitFileType = sourcecode; fileEncoding = 4; name = Human.tof; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof; sourceTree = "<absolute>"; };
+		44836D63B68A45A6A424ADAB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = folder; name = Racetracks; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks; sourceTree = "<absolute>"; };
+		66C4EE2DFE3A46779FB39363 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/main.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; fileEncoding = 4; name = main.m; path = main.m; sourceTree = SOURCE_ROOT; };
+		960F78F61AC441D394FBE911 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		973722CAC4444D53B008FBE1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store */ = {isa = PBXFileReference; explicitFileType = sourcecode; fileEncoding = 4; name = .DS_Store; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store; sourceTree = "<absolute>"; };
+		99B960B533114113BCFE021A /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = image; name = logo_full_small.png; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png; sourceTree = "<absolute>"; };
+		AD1FC7F08E394171989EC013 /* JoltPhysicsDemo-ios-app */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = "JoltPhysicsDemo-ios-app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B63B0509EAE5495B99328955 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = image; name = logo_full_large.png; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png; sourceTree = "<absolute>"; };
+		B93A4BA116ED45B5AD99602B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/Assets.xcassets */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		C21264F4CA5C4EE4AC183FA8 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = image; name = logo_s_small.png; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png; sourceTree = "<absolute>"; };
+		C4C39B21A8564FAF9CDBD384 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = image; name = logo_s_large.png; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png; sourceTree = "<absolute>"; };
+		E4A206D613004327A8A00520 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = wrapper.framework; name = JoltPhysicsDemo.framework; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework; sourceTree = "<absolute>"; };
+		E91DA9F1D28142AD8FB6CC84 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = wrapper.framework; name = cjolt.framework; path = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework; sourceTree = "<absolute>"; };
+		F9CEA3CF7CA5439596C6945C /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CE38D94ABA2D4C9CA9BF2AB9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2F004FC62B1D4BAF9FC6DDB5 /* JoltPhysicsDemo-ios-app */ = {
+			isa = PBXGroup;
+			children = (
+				B67C6E4F04E247DAACC93BBB /* Source Files */,
+				9BC6365066CA4150A553F2D4 /* Resources */,
+				973722CAC4444D53B008FBE1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store */,
+				1888AC74782049FABD35AB5B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human */,
+				2B599F7B08DC4C5C8121831B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof */,
+				44836D63B68A45A6A424ADAB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks */,
+				F9CEA3CF7CA5439596C6945C /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */,
+			);
+			name = "JoltPhysicsDemo-ios-app";
+			sourceTree = "<group>";
+		};
+		30CAB5A90B9B447E8030DF7A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AD1FC7F08E394171989EC013 /* JoltPhysicsDemo-ios-app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3199CF2060774BC0AAB38FDA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0152FA5B6DD549BD85BFF377 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework */,
+				E4A206D613004327A8A00520 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework */,
+				E91DA9F1D28142AD8FB6CC84 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		6E09C57EB7FE4F84A4123E13 /* ALL_BUILD */ = {
+			isa = PBXGroup;
+			children = (
+				E7FF439B1FF84F5686822194 /* CMake Rules */,
+				960F78F61AC441D394FBE911 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/CMakeLists.txt */,
+			);
+			name = ALL_BUILD;
+			sourceTree = "<group>";
+		};
+		8036DEB0C2D7432392BD5EF6 = {
+			isa = PBXGroup;
+			children = (
+				2F004FC62B1D4BAF9FC6DDB5 /* JoltPhysicsDemo-ios-app */,
+				6E09C57EB7FE4F84A4123E13 /* ALL_BUILD */,
+				30CAB5A90B9B447E8030DF7A /* Products */,
+				3199CF2060774BC0AAB38FDA /* Frameworks */,
+				8B8A727B9CC9460B9E166917 /* Resources */,
+			);
+			sourceTree = "<group>";
+		};
+		8B8A727B9CC9460B9E166917 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		9BC6365066CA4150A553F2D4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B63B0509EAE5495B99328955 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png */,
+				99B960B533114113BCFE021A /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png */,
+				C4C39B21A8564FAF9CDBD384 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png */,
+				C21264F4CA5C4EE4AC183FA8 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png */,
+				B93A4BA116ED45B5AD99602B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/Assets.xcassets */,
+				186A42BD35324238ABBC8938 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		B67C6E4F04E247DAACC93BBB /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				66C4EE2DFE3A46779FB39363 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/main.m */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		E7FF439B1FF84F5686822194 /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4F7B2D70F56F4134B68EF431 /* JoltPhysicsDemo-ios-app */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FAADA71085BA4820A5098B6C /* Build configuration list for PBXNativeTarget "JoltPhysicsDemo-ios-app" */;
+			buildPhases = (
+				D36339B0B46646EBB4E89C70 /* Resources */,
+				B0AEDCB6AA634BCF9C43FE60 /* Sources */,
+				4AEF24E981C54D1FA96E4CDE /* Embed Frameworks */,
+				CE38D94ABA2D4C9CA9BF2AB9 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				70728651D3AE47BDAC7DCD08 /* PBXTargetDependency */,
+			);
+			name = "JoltPhysicsDemo-ios-app";
+			productName = "JoltPhysicsDemo-ios-app";
+			productReference = AD1FC7F08E394171989EC013 /* JoltPhysicsDemo-ios-app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D50C6AC48CFC4B478DC03ACA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2620;
+			};
+			buildConfigurationList = FEB3AEFA2D5C4FC0BBBFCABA /* Build configuration list for PBXProject "JoltPhysicsDemo-ios-app" */;
+			buildSettings = {
+			};
+			buildStyles = (
+				22FA8D5BC90B45B5B17551EF /* Debug */,
+				6FC30198C091426EB5CD07F6 /* Release */,
+				1A825285B2DD47C6AE435FD8 /* MinSizeRel */,
+				352A33C887C14353BC538B4C /* RelWithDebInfo */,
+			);
+			compatibilityVersion = "Xcode 3.2";
+			hasScannedForEncodings = 0;
+			mainGroup = 8036DEB0C2D7432392BD5EF6;
+			projectDirPath = /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios;
+			projectRoot = "";
+			targets = (
+				C2001375B04340B7BE5E49D2 /* ALL_BUILD */,
+				4F7B2D70F56F4134B68EF431 /* JoltPhysicsDemo-ios-app */,
+				7910C0A0BBD34029AB9C56EB /* ZERO_CHECK */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		3C0110FC8322DE7E50886E21 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		9B50530E35CC49C82C2FACCF = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		B62D8E514DE769338E17DF1B /* Generate CMakeFiles/ZERO_CHECK */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ZERO_CHECK";
+			outputPaths = (
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/ZERO_CHECK"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeScripts/ReRunCMake.make
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		C5DA673077A455514152F246 /* Generate CMakeFiles/ALL_BUILD */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ALL_BUILD";
+			outputPaths = (
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/ALL_BUILD"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app
+  echo Build\\ all\\ projects
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D36339B0B46646EBB4E89C70 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2F6D4CB1E11046F0BFA2A3FB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/.DS_Store */,
+				B676EA49009F411A80526BDE /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human */,
+				7568BE9809344CBE816F4E7E /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Human.tof */,
+				E7AF6A72595D4A1BA427DFE0 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/Racetracks */,
+				B3231F6C2CC845ABB02247E9 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_large.png */,
+				8888391365EA4685A9AE0531 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_full_small.png */,
+				0958746C3F294743A51B48BB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_large.png */,
+				17A11EA799B641789D7EADD1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/Assets/logo_s_small.png */,
+				D0E4B0FE70BB4C6BA20585F1 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/Assets.xcassets */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B0AEDCB6AA634BCF9C43FE60 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E38E9EDC58C346CC98CACFAB /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/main.m */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4AEF24E981C54D1FA96E4CDE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				216A46D7BA4E429692B8880B /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework */,
+				2B8EE514BC074FF7817B87B4 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework */,
+				23A03D5A084341C1AD73C878 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		559603429C1D4224B8A82233 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4F7B2D70F56F4134B68EF431 /* JoltPhysicsDemo-ios-app */;
+			targetProxy = 891864BA27EE46FCA66AC252 /* PBXContainerItemProxy */;
+		};
+		70728651D3AE47BDAC7DCD08 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7910C0A0BBD34029AB9C56EB /* ZERO_CHECK */;
+			targetProxy = 79523FD687C44D9892DE05FD /* PBXContainerItemProxy */;
+		};
+		B451B9618E9F4463A0AACF18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7910C0A0BBD34029AB9C56EB /* ZERO_CHECK */;
+			targetProxy = F754FB75EE68493296DB28BA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0755355205124C20A2374191 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		290615A2AD8A4949A6EDA469 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/bin/Debug";
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DEVELOPMENT_TEAM = U627U428U4;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist";
+				INSTALL_PATH = "";
+				IPAD_PROVISIONING_PROFILE_SPECIFIER = "";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("   '-std=gnu17' ","$(inherited)");
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names","-F/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks","-framework sokol","-framework JoltPhysicsDemo","-framework cjolt","-framework UIKit","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "JoltPhysicsDemo-ios-app";
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build/JoltPhysicsDemo-ios-app.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				"UILaunchScreen~ipad" = "{}";
+				UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				"UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		315A0E4A0F344A32BC537F6D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		3E4F5DCD78C2429F99CAC75C /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				EMBED_FRAMEWORKS = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.7;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build";
+			};
+			name = MinSizeRel;
+		};
+		4464CAD80CDA4003888BB6DA /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		4EF31A9C1C9845F8AE905F61 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		8043078EF67549E5A9533E0C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		8AC8557DC4634D9EB42DBCBB /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		97005A92509B419F98E34749 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/bin/MinSizeRel";
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DEVELOPMENT_TEAM = U627U428U4;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist";
+				INSTALL_PATH = "";
+				IPAD_PROVISIONING_PROFILE_SPECIFIER = "";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu17' ","$(inherited)");
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names","-F/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks","-framework sokol","-framework JoltPhysicsDemo","-framework cjolt","-framework UIKit","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "JoltPhysicsDemo-ios-app";
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build/JoltPhysicsDemo-ios-app.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				"UILaunchScreen~ipad" = "{}";
+				UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				"UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		9FBA0461C9CA417AAB299B5A /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		A77EF480DFD94CFFB535249D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				EMBED_FRAMEWORKS = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.7;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build";
+			};
+			name = Release;
+		};
+		B3AD705402334116B62B949E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		D4424AAF57D049D6BA78B58A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				EMBED_FRAMEWORKS = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.7;
+				SDKROOT = iphoneos;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build";
+			};
+			name = Debug;
+		};
+		E6C56B9E4B1D41649C5215FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/bin/Release";
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DEVELOPMENT_TEAM = U627U428U4;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist";
+				INSTALL_PATH = "";
+				IPAD_PROVISIONING_PROFILE_SPECIFIER = "";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu17' ","$(inherited)");
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names","-F/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks","-framework sokol","-framework JoltPhysicsDemo","-framework cjolt","-framework UIKit","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "JoltPhysicsDemo-ios-app";
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build/JoltPhysicsDemo-ios-app.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				"UILaunchScreen~ipad" = "{}";
+				UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				"UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		ED74A89F0A2546CAA47DB487 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/bin/RelWithDebInfo";
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DEVELOPMENT_TEAM = U627U428U4;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/CMakeFiles/JoltPhysicsDemo-ios-app.dir/Info.plist";
+				INSTALL_PATH = "";
+				IPAD_PROVISIONING_PROFILE_SPECIFIER = "";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("       -DNDEBUG '-std=gnu17' ","$(inherited)");
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names","-F/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks","-framework sokol","-framework JoltPhysicsDemo","-framework cjolt","-framework UIKit","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "JoltPhysicsDemo-ios-app";
+				SECTORDER_FLAGS = "";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = "non-global";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build/JoltPhysicsDemo-ios-app.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				"UILaunchScreen~ipad" = "{}";
+				UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				"UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		F76889E4FC73419AAA9186E9 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				EMBED_FRAMEWORKS = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/sokol.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/JoltPhysicsDemo.framework;/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/frameworks/cjolt.framework";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.7;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/build-xcode-ios-app/build";
+			};
+			name = RelWithDebInfo;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		928333C92C9046F5959D3580 /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8043078EF67549E5A9533E0C /* Debug */,
+				315A0E4A0F344A32BC537F6D /* Release */,
+				0755355205124C20A2374191 /* MinSizeRel */,
+				4464CAD80CDA4003888BB6DA /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CFF283EE4ADB4CF9888128CD /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3AD705402334116B62B949E /* Debug */,
+				4EF31A9C1C9845F8AE905F61 /* Release */,
+				9FBA0461C9CA417AAB299B5A /* MinSizeRel */,
+				8AC8557DC4634D9EB42DBCBB /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FAADA71085BA4820A5098B6C /* Build configuration list for PBXNativeTarget "JoltPhysicsDemo-ios-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				290615A2AD8A4949A6EDA469 /* Debug */,
+				E6C56B9E4B1D41649C5215FE /* Release */,
+				97005A92509B419F98E34749 /* MinSizeRel */,
+				ED74A89F0A2546CAA47DB487 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FEB3AEFA2D5C4FC0BBBFCABA /* Build configuration list for PBXProject "JoltPhysicsDemo-ios-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4424AAF57D049D6BA78B58A /* Debug */,
+				A77EF480DFD94CFFB535249D /* Release */,
+				3E4F5DCD78C2429F99CAC75C /* MinSizeRel */,
+				F76889E4FC73419AAA9186E9 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D50C6AC48CFC4B478DC03ACA /* Project object */;
+}

@@ -1,0 +1,7 @@
+Target dependency graph (3 targets)
+Target 'ALL_BUILD' in project 'sokol'
+➜ Explicit dependency on target 'ZERO_CHECK' in project 'sokol'
+➜ Explicit dependency on target 'sokol' in project 'sokol'
+Target 'sokol' in project 'sokol'
+➜ Explicit dependency on target 'ZERO_CHECK' in project 'sokol'
+Target 'ZERO_CHECK' in project 'sokol' (no dependencies)

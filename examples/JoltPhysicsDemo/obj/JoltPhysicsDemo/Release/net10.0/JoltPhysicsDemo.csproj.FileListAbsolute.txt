@@ -1,0 +1,13 @@
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/JoltPhysicsDemo
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/JoltPhysicsDemo.deps.json
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/JoltPhysicsDemo.runtimeconfig.json
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/JoltPhysicsDemo.dll
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/bin/Release/net10.0/JoltPhysicsDemo.pdb
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.GeneratedMSBuildEditorConfig.editorconfig
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.csproj.CoreCompileInputs.cache
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.sourcelink.json
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.dll
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/refint/JoltPhysicsDemo.dll
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.pdb
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/JoltPhysicsDemo.genruntimeconfig.cache
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemo/Release/net10.0/ref/JoltPhysicsDemo.dll

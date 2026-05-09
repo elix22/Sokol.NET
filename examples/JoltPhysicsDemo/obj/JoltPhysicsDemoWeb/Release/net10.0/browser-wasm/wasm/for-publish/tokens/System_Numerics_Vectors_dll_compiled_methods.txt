@@ -1,0 +1,2 @@
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/aot-in/System.Numerics.Vectors.dll
+86253BD5-357A-4006-AED1-734AA8353AFD

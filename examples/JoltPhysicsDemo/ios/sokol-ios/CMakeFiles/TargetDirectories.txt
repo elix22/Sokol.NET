@@ -1,0 +1,3 @@
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/ALL_BUILD.dir
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/ZERO_CHECK.dir

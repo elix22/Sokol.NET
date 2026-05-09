@@ -1,0 +1,852 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		4092F84CD1434AC7AD7D0F20 /* ALL_BUILD */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 5110460FD0404180BB5C1BF9 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */;
+			buildPhases = (
+				F6905DF91A993FE895C6F0DA /* Generate CMakeFiles/ALL_BUILD */,
+			);
+			dependencies = (
+				54E227528B8C4BC797476F4E /* PBXTargetDependency */,
+				C71611631E0544AAB3620534 /* PBXTargetDependency */,
+			);
+			name = ALL_BUILD;
+			productName = ALL_BUILD;
+		};
+		5B97A4F2BC604993AD4CAC0C /* ZERO_CHECK */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = EC36E58F86D84BFDB144041A /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */;
+			buildPhases = (
+				868B601735593D0E033BB93F /* Generate CMakeFiles/ZERO_CHECK */,
+			);
+			dependencies = (
+			);
+			name = ZERO_CHECK;
+			productName = ZERO_CHECK;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		06203885DECA4CE9A62DE0D4 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/basisu/sokol_basisu.cpp */ = {isa = PBXBuildFile; fileRef = D301498A03914D388C3E34FC /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/basisu/sokol_basisu.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		1985AC4D41C44420B6449DFC /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_tables.cpp */ = {isa = PBXBuildFile; fileRef = 10B90CF87617473EBE813E9E /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_tables.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		24F8BA91A7B54E2AB9EC2B3C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_widgets.cpp */ = {isa = PBXBuildFile; fileRef = D0A8094127664007BF8C2082 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_widgets.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		48E0FBFDAB024418B5B31684 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/nanovg/src/nanovg_impl.c */ = {isa = PBXBuildFile; fileRef = 6492118D105F42069D9DB704 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/nanovg/src/nanovg_impl.c */; };
+		48EDCDAB0EDE4B4C86BEBE6C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/util/fileutil_osx.m */ = {isa = PBXBuildFile; fileRef = 21441E374D544F5D8103C70A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/util/fileutil_osx.m */; };
+		52B9D53381884F6D8EAF8362 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = 16F18E7D48024524BCDD2FA6 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */; };
+		606E4F87D801424C92FC0CA6 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui.cpp */ = {isa = PBXBuildFile; fileRef = 723DD326221A4913918D4C0A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		7971195997BB450FB835A6A8 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr_wrapper.cpp */ = {isa = PBXBuildFile; fileRef = EE0C64F0826B43B2BD5E8522 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr_wrapper.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		82797EB50620419083CF5D2E /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 8452FE62C46D4002A9FFB775 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist */; };
+		91BB1A3138ED4DC79581AAFE /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol.c */ = {isa = PBXBuildFile; fileRef = 3050A4DE5B644704BEC2EED7 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol.c */; };
+		958C8B4711EF4A639272F818 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/cimgui.cpp */ = {isa = PBXBuildFile; fileRef = 6C209578153747FB9B8FB98C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/cimgui.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		D927F47B117C4595901D35B5 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_draw.cpp */ = {isa = PBXBuildFile; fileRef = C729B1550E864D0F9E212440 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_draw.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+		F35A74004ADB470F83E2B578 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_demo.cpp */ = {isa = PBXBuildFile; fileRef = 8E8BC0ACC3BB40838BFA5622 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_demo.cpp */; settings = {COMPILER_FLAGS = "-x c++"; }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildStyle section */
+		04ACD2986E8E4DE39F9D9E06 /* MinSizeRel */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = MinSizeRel;
+		};
+		17D136D705164ED7ADB39DD0 /* RelWithDebInfo */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = RelWithDebInfo;
+		};
+		5A9A220131BE4FAC804083EC /* Release */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Release;
+		};
+		8BB0D5B7A18647FE98E941F3 /* Debug */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Debug;
+		};
+/* End PBXBuildStyle section */
+
+/* Begin PBXContainerItemProxy section */
+		2760004A60EE43A2B844F2B4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D37536893DC5432483790C2A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B97A4F2BC604993AD4CAC0C;
+			remoteInfo = ZERO_CHECK;
+		};
+		3F09D2DE5E454A5AA6912E23 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D37536893DC5432483790C2A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 29479C7461EF422993D7FD31;
+			remoteInfo = sokol;
+		};
+		911036F1EEDD48648DBD04C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D37536893DC5432483790C2A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B97A4F2BC604993AD4CAC0C;
+			remoteInfo = ZERO_CHECK;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		10B90CF87617473EBE813E9E /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_tables.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_tables.cpp; path = cimgui/imgui/imgui_tables.cpp; sourceTree = SOURCE_ROOT; };
+		16F18E7D48024524BCDD2FA6 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		21441E374D544F5D8103C70A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/util/fileutil_osx.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; fileEncoding = 4; name = fileutil_osx.m; path = util/fileutil_osx.m; sourceTree = SOURCE_ROOT; };
+		3050A4DE5B644704BEC2EED7 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = sokol.c; path = sokol.c; sourceTree = SOURCE_ROOT; };
+		6492118D105F42069D9DB704 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/nanovg/src/nanovg_impl.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = nanovg_impl.c; path = nanovg/src/nanovg_impl.c; sourceTree = SOURCE_ROOT; };
+		6C209578153747FB9B8FB98C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/cimgui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = cimgui.cpp; path = cimgui/cimgui.cpp; sourceTree = SOURCE_ROOT; };
+		71313DEB0C8746ED9826C422 /* sokol */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = sokol.framework/sokol; sourceTree = BUILT_PRODUCTS_DIR; };
+		723DD326221A4913918D4C0A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui.cpp; path = cimgui/imgui/imgui.cpp; sourceTree = SOURCE_ROOT; };
+		8452FE62C46D4002A9FFB775 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist"; sourceTree = "<absolute>"; };
+		8E8BC0ACC3BB40838BFA5622 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_demo.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_demo.cpp; path = cimgui/imgui/imgui_demo.cpp; sourceTree = SOURCE_ROOT; };
+		C729B1550E864D0F9E212440 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_draw.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_draw.cpp; path = cimgui/imgui/imgui_draw.cpp; sourceTree = SOURCE_ROOT; };
+		D0A8094127664007BF8C2082 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_widgets.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_widgets.cpp; path = cimgui/imgui/imgui_widgets.cpp; sourceTree = SOURCE_ROOT; };
+		D301498A03914D388C3E34FC /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/basisu/sokol_basisu.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = sokol_basisu.cpp; path = basisu/sokol_basisu.cpp; sourceTree = SOURCE_ROOT; };
+		EE0C64F0826B43B2BD5E8522 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr_wrapper.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = tinyexr_wrapper.cpp; path = tinyexr_wrapper.cpp; sourceTree = SOURCE_ROOT; };
+		F899D870924E4422A280A1A7 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		54661CBD45374E2EB1A7ECD6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		12E3206B6B5D4670BD848DA0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		16514A3DE51545588D482A80 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				71313DEB0C8746ED9826C422 /* sokol */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		55835C8BF30A4F4FB40C08FF /* ALL_BUILD */ = {
+			isa = PBXGroup;
+			children = (
+				8690BB7279184F318275612F /* CMake Rules */,
+				F899D870924E4422A280A1A7 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */,
+			);
+			name = ALL_BUILD;
+			sourceTree = "<group>";
+		};
+		61A075A3EA6340078F0BB9D7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		73ACDC251A3F493AB4C341BA /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				D301498A03914D388C3E34FC /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/basisu/sokol_basisu.cpp */,
+				6C209578153747FB9B8FB98C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/cimgui.cpp */,
+				723DD326221A4913918D4C0A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui.cpp */,
+				8E8BC0ACC3BB40838BFA5622 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_demo.cpp */,
+				C729B1550E864D0F9E212440 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_draw.cpp */,
+				10B90CF87617473EBE813E9E /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_tables.cpp */,
+				D0A8094127664007BF8C2082 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_widgets.cpp */,
+				6492118D105F42069D9DB704 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/nanovg/src/nanovg_impl.c */,
+				3050A4DE5B644704BEC2EED7 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol.c */,
+				EE0C64F0826B43B2BD5E8522 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr_wrapper.cpp */,
+				21441E374D544F5D8103C70A /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/util/fileutil_osx.m */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		73B5E314DF3A4F8A86F803B3 = {
+			isa = PBXGroup;
+			children = (
+				842A44D896634474B55808D2 /* sokol */,
+				55835C8BF30A4F4FB40C08FF /* ALL_BUILD */,
+				16514A3DE51545588D482A80 /* Products */,
+				61A075A3EA6340078F0BB9D7 /* Frameworks */,
+				12E3206B6B5D4670BD848DA0 /* Resources */,
+			);
+			sourceTree = "<group>";
+		};
+		842A44D896634474B55808D2 /* sokol */ = {
+			isa = PBXGroup;
+			children = (
+				73ACDC251A3F493AB4C341BA /* Source Files */,
+				F9AC17B57B734F0F853BF497 /* Resources */,
+				16F18E7D48024524BCDD2FA6 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/CMakeLists.txt */,
+			);
+			name = sokol;
+			sourceTree = "<group>";
+		};
+		8690BB7279184F318275612F /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+		F9AC17B57B734F0F853BF497 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8452FE62C46D4002A9FFB775 /* /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		29479C7461EF422993D7FD31 /* sokol */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 081B24A07354446498EDFF83 /* Build configuration list for PBXNativeTarget "sokol" */;
+			buildPhases = (
+				B8E42BA17BBE48688D22CE49 /* Sources */,
+				54661CBD45374E2EB1A7ECD6 /* Frameworks */,
+				8D890275A7DB7FE462176EEB /* CMake PostBuild Rules */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				64F2150560314C35A1F42B44 /* PBXTargetDependency */,
+			);
+			name = sokol;
+			productName = sokol;
+			productReference = 71313DEB0C8746ED9826C422 /* sokol */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D37536893DC5432483790C2A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2620;
+			};
+			buildConfigurationList = AC52E38167824EA09E29E043 /* Build configuration list for PBXProject "sokol" */;
+			buildSettings = {
+			};
+			buildStyles = (
+				8BB0D5B7A18647FE98E941F3 /* Debug */,
+				5A9A220131BE4FAC804083EC /* Release */,
+				04ACD2986E8E4DE39F9D9E06 /* MinSizeRel */,
+				17D136D705164ED7ADB39DD0 /* RelWithDebInfo */,
+			);
+			compatibilityVersion = "Xcode 3.2";
+			hasScannedForEncodings = 0;
+			mainGroup = 73B5E314DF3A4F8A86F803B3;
+			projectDirPath = /Users/elialoni/Development/Graphics/Sokol.NET/ext;
+			projectRoot = "";
+			targets = (
+				4092F84CD1434AC7AD7D0F20 /* ALL_BUILD */,
+				5B97A4F2BC604993AD4CAC0C /* ZERO_CHECK */,
+				29479C7461EF422993D7FD31 /* sokol */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		3C0110FC8322DE7E50886E21 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		868B601735593D0E033BB93F /* Generate CMakeFiles/ZERO_CHECK */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ZERO_CHECK";
+			outputPaths = (
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/ZERO_CHECK"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  make -f /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeScripts/ReRunCMake.make
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		8D890275A7DB7FE462176EEB /* CMake PostBuild Rules */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "CMake PostBuild Rules";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  /Applications/CMake.app/Contents/bin/cmake -E copy /Users/elialoni/Development/Graphics/Sokol.NET/ext/Info.plist /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/Debug${EFFECTIVE_PLATFORM_NAME}/sokol.framework/Info.plist
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  /Applications/CMake.app/Contents/bin/cmake -E copy /Users/elialoni/Development/Graphics/Sokol.NET/ext/Info.plist /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/Release${EFFECTIVE_PLATFORM_NAME}/sokol.framework/Info.plist
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  /Applications/CMake.app/Contents/bin/cmake -E copy /Users/elialoni/Development/Graphics/Sokol.NET/ext/Info.plist /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/MinSizeRel${EFFECTIVE_PLATFORM_NAME}/sokol.framework/Info.plist
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  /Applications/CMake.app/Contents/bin/cmake -E copy /Users/elialoni/Development/Graphics/Sokol.NET/ext/Info.plist /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}/sokol.framework/Info.plist
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		9B50530E35CC49C82C2FACCF = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		F6905DF91A993FE895C6F0DA /* Generate CMakeFiles/ALL_BUILD */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ALL_BUILD";
+			outputPaths = (
+"/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/ALL_BUILD"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios
+  echo Build\\ all\\ projects
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B8E42BA17BBE48688D22CE49 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06203885DECA4CE9A62DE0D4 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/basisu/sokol_basisu.cpp */,
+				958C8B4711EF4A639272F818 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/cimgui.cpp */,
+				606E4F87D801424C92FC0CA6 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui.cpp */,
+				F35A74004ADB470F83E2B578 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_demo.cpp */,
+				D927F47B117C4595901D35B5 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_draw.cpp */,
+				1985AC4D41C44420B6449DFC /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_tables.cpp */,
+				24F8BA91A7B54E2AB9EC2B3C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/cimgui/imgui/imgui_widgets.cpp */,
+				48E0FBFDAB024418B5B31684 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/nanovg/src/nanovg_impl.c */,
+				91BB1A3138ED4DC79581AAFE /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol.c */,
+				7971195997BB450FB835A6A8 /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr_wrapper.cpp */,
+				48EDCDAB0EDE4B4C86BEBE6C /* /Users/elialoni/Development/Graphics/Sokol.NET/ext/util/fileutil_osx.m */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		54E227528B8C4BC797476F4E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B97A4F2BC604993AD4CAC0C /* ZERO_CHECK */;
+			targetProxy = 911036F1EEDD48648DBD04C4 /* PBXContainerItemProxy */;
+		};
+		64F2150560314C35A1F42B44 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B97A4F2BC604993AD4CAC0C /* ZERO_CHECK */;
+			targetProxy = 2760004A60EE43A2B844F2B4 /* PBXContainerItemProxy */;
+		};
+		C71611631E0544AAB3620534 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 29479C7461EF422993D7FD31 /* sokol */;
+			targetProxy = 3F09D2DE5E454A5AA6912E23 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0BBFC4CFEC984CF0B830FC2A /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				DYLIB_COMPATIBILITY_VERSION = "";
+				DYLIB_CURRENT_VERSION = "";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",sokol_EXPORTS,SOKOL_METAL,CIMGUI_VARGS0,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = (/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol,/Users/elialoni/Development/Graphics/Sokol.NET/ext,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol/util,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol_gp,/Users/elialoni/Development/Graphics/Sokol.NET/ext/cgltf,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr/deps/nanozlib,/Users/elialoni/Development/Graphics/Sokol.NET/ext/../bindgen/c,"$(inherited)");
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist";
+				INSTALL_PATH = "@rpath";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				LIBRARY_STYLE = DYNAMIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "                    -DNDEBUG '-std=gnu++17' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ";
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib","-framework UIKit","-framework QuartzCore","-framework Metal","-framework MetalKit","-framework AudioToolbox","-framework AVFoundation","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = sokol;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build/sokol.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		213DEDEEFA234F0199DAF921 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build";
+			};
+			name = Release;
+		};
+		2611BD269C7A470191739CFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		5D43993C1A5A4BB69E74B44B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = iphoneos;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build";
+			};
+			name = Debug;
+		};
+		6568C2F4568E4E58883D1483 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				DYLIB_COMPATIBILITY_VERSION = "";
+				DYLIB_CURRENT_VERSION = "";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",sokol_EXPORTS,SOKOL_METAL,CIMGUI_VARGS0,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = (/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol,/Users/elialoni/Development/Graphics/Sokol.NET/ext,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol/util,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol_gp,/Users/elialoni/Development/Graphics/Sokol.NET/ext/cgltf,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr/deps/nanozlib,/Users/elialoni/Development/Graphics/Sokol.NET/ext/../bindgen/c,"$(inherited)");
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist";
+				INSTALL_PATH = "@rpath";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				LIBRARY_STYLE = DYNAMIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("       -DNDEBUG '-std=gnu11' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "                       -DNDEBUG '-std=gnu++17' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ";
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib","-framework UIKit","-framework QuartzCore","-framework Metal","-framework MetalKit","-framework AudioToolbox","-framework AVFoundation","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = sokol;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build/sokol.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		6F81DA2229AB4078BB0777D5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/Release${EFFECTIVE_PLATFORM_NAME}";
+				DYLIB_COMPATIBILITY_VERSION = "";
+				DYLIB_CURRENT_VERSION = "";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",sokol_EXPORTS,SOKOL_METAL,CIMGUI_VARGS0,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = (/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol,/Users/elialoni/Development/Graphics/Sokol.NET/ext,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol/util,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol_gp,/Users/elialoni/Development/Graphics/Sokol.NET/ext/cgltf,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr/deps/nanozlib,/Users/elialoni/Development/Graphics/Sokol.NET/ext/../bindgen/c,"$(inherited)");
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist";
+				INSTALL_PATH = "@rpath";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				LIBRARY_STYLE = DYNAMIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "                    -DNDEBUG '-std=gnu++17' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ";
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib","-framework UIKit","-framework QuartzCore","-framework Metal","-framework MetalKit","-framework AudioToolbox","-framework AVFoundation","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = sokol;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build/sokol.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		84199BDB39E44EEE9B70A02F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/Debug${EFFECTIVE_PLATFORM_NAME}";
+				DYLIB_COMPATIBILITY_VERSION = "";
+				DYLIB_CURRENT_VERSION = "";
+				EXECUTABLE_PREFIX = "";
+				EXECUTABLE_SUFFIX = "";
+				FRAMEWORK_VERSION = A;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",sokol_EXPORTS,SOKOL_METAL,CIMGUI_VARGS0,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = (/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol,/Users/elialoni/Development/Graphics/Sokol.NET/ext,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol/util,/Users/elialoni/Development/Graphics/Sokol.NET/ext/sokol_gp,/Users/elialoni/Development/Graphics/Sokol.NET/ext/cgltf,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr,/Users/elialoni/Development/Graphics/Sokol.NET/ext/tinyexr/deps/nanozlib,/Users/elialoni/Development/Graphics/Sokol.NET/ext/../bindgen/c,"$(inherited)");
+				INFOPLIST_FILE = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/CMakeFiles/sokol.dir/Info.plist";
+				INSTALL_PATH = "@rpath";
+				LD_RUNPATH_SEARCH_PATHS = ("@executable_path/Frameworks","$(inherited)");
+				LIBRARY_STYLE = DYNAMIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("   '-std=gnu11' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "                   '-std=gnu++17' -fPIC -Wincompatible-pointer-types-discards-qualifiers -x objective-c ";
+				OTHER_LDFLAGS = ("-L/opt/homebrew/opt/tcl-tk/lib","-framework UIKit","-framework QuartzCore","-framework Metal","-framework MetalKit","-framework AudioToolbox","-framework AVFoundation","-framework Foundation","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = sokol;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build/sokol.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		899BA9FEC55041C2945C732E /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build";
+			};
+			name = RelWithDebInfo;
+		};
+		90517119E648412BA7B5FC48 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		9B0848F41D68464CB6E2BDA6 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		9EEB0B508C214D4881333447 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		C1CCFA9490C0497D884C5BA5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		D13C9E2A09C74481ACB17B74 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/ios/sokol-ios/build";
+			};
+			name = MinSizeRel;
+		};
+		D5AA443C00CA46B485A66431 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		F2A537965C8F41079C197C49 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		FCCA77FCE6FB425090563AAA /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		081B24A07354446498EDFF83 /* Build configuration list for PBXNativeTarget "sokol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84199BDB39E44EEE9B70A02F /* Debug */,
+				6F81DA2229AB4078BB0777D5 /* Release */,
+				0BBFC4CFEC984CF0B830FC2A /* MinSizeRel */,
+				6568C2F4568E4E58883D1483 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5110460FD0404180BB5C1BF9 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D5AA443C00CA46B485A66431 /* Debug */,
+				C1CCFA9490C0497D884C5BA5 /* Release */,
+				F2A537965C8F41079C197C49 /* MinSizeRel */,
+				9EEB0B508C214D4881333447 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AC52E38167824EA09E29E043 /* Build configuration list for PBXProject "sokol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D43993C1A5A4BB69E74B44B /* Debug */,
+				213DEDEEFA234F0199DAF921 /* Release */,
+				D13C9E2A09C74481ACB17B74 /* MinSizeRel */,
+				899BA9FEC55041C2945C732E /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EC36E58F86D84BFDB144041A /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90517119E648412BA7B5FC48 /* Debug */,
+				2611BD269C7A470191739CFE /* Release */,
+				9B0848F41D68464CB6E2BDA6 /* MinSizeRel */,
+				FCCA77FCE6FB425090563AAA /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D37536893DC5432483790C2A /* Project object */;
+}

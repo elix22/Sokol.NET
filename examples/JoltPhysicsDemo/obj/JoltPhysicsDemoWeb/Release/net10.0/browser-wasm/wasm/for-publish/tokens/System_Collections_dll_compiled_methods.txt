@@ -1,0 +1,2 @@
+/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/obj/JoltPhysicsDemoWeb/Release/net10.0/browser-wasm/wasm/for-publish/aot-in/System.Collections.dll
+A7FED46D-1887-4EA3-9C63-076E6AC2103E

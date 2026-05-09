@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "Mvh7wB4h4nk=",
+  "success": true,
+  "projectFilePath": "/Users/elialoni/Development/Graphics/Sokol.NET/examples/JoltPhysicsDemo/JoltPhysicsDemoWeb.csproj",
+  "expectedPackageFiles": [
+    "/Users/elialoni/.nuget/packages/microsoft.net.illink.tasks/10.0.0/microsoft.net.illink.tasks.10.0.0.nupkg.sha512",
+    "/Users/elialoni/.nuget/packages/microsoft.netcore.app.ref/10.0.3/microsoft.netcore.app.ref.10.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

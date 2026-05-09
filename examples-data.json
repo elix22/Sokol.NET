@@ -305,6 +305,14 @@
             "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/JoltPhysics"
         },
         {
+            "id": "JoltPhysicsDemo",
+            "name": "JoltPhysics Demo Browser",
+            "category": "Physics",
+            "description": "Interactive browser with 100+ runnable Jolt Physics demos: rigid bodies, constraints, vehicles, soft bodies, ragdolls, and water/buoyancy with a custom water shader featuring Fresnel shading and transparency",
+            "thumbnail": "thumbnails/JoltPhysicsDemo.png",
+            "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/JoltPhysicsDemo"
+        },
+        {
             "id": "Chess",
             "name": "Chess",
             "category": "Games",
