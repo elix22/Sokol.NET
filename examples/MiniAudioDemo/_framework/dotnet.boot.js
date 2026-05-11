@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
   "mainAssemblyName": "MiniAudioDemoWeb.dll",
   "resources": {
-    "hash": "sha256-S1I8gIpGZ0hIpd2edk7ECGXhWsWipO+9XNNKZx0s5IA=",
+    "hash": "sha256-kaQqVJmGbLySRLmgMXguIOtkXW1TwmChWumyH0I6XBw=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,14 +15,14 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-prRx0cGrlfzpjXoTK3VQWlLn0iwECTefVy43tp1JbmY="
+        "integrity": "sha256-qYJFeijSBKmtpLVqCgYJxdRo3RvbflWeyQiOct2zm5c="
       }
     ],
     "coreAssembly": [
       {
         "virtualPath": "MiniAudioDemoWeb.wasm",
         "name": "MiniAudioDemoWeb.wasm",
-        "integrity": "sha256-tmHjJ6Di7ACyOEzcm96btBsTHOQQksW737CrmjLdvKI="
+        "integrity": "sha256-YcZF2K3fr3M8l/UGlfMkaW3c3klbnRvEMOC0AInBKhI="
       },
       {
         "virtualPath": "System.Collections.Concurrent.wasm",
@@ -77,7 +77,7 @@ export const config = /*json-start*/{
       {
         "virtualPath": "System.Private.CoreLib.wasm",
         "name": "System.Private.CoreLib.wasm",
-        "integrity": "sha256-bzSxaIWAyM4FPv12glDX+wduWjDFpdmCGRRj3a+YZpg="
+        "integrity": "sha256-FiPK6kZJV5vycY7R+t84iO7QiORqY7paN3KRlNQ9ZJ8="
       },
       {
         "virtualPath": "System.Private.Uri.wasm",
