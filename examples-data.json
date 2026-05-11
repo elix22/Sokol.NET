@@ -471,6 +471,14 @@
             "description": "Cross-platform file system access demo",
             "thumbnail": "thumbnails/FileSystemTest.png",
             "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/FileSystemTest"
+        },
+        {
+            "id": "MiniAudioDemo",
+            "name": "MiniAudio Demo",
+            "category": "Audio",
+            "description": "Real-time audio demo: sound effects, music, spatial audio, EQ, spectrum analyzer, goniometer, spectrogram, and interactive piano keyboard — powered by miniaudio",
+            "thumbnail": "thumbnails/MiniAudioDemo400x300.png",
+            "source": "https://github.com/elix22/Sokol.NET/tree/main/examples/MiniAudioDemo"
         }
     ],
     "categories": [
@@ -483,6 +491,7 @@
         "UI & Integration",
         "Physics",
         "Games",
-        "Advanced"
+        "Advanced",
+        "Audio"
     ]
 }
