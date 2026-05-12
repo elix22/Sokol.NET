@@ -10662,8 +10662,8 @@ var ___cxa_decrement_exception_refcount = createExportWrapper('__cxa_decrement_e
 var ___cxa_increment_exception_refcount = createExportWrapper('__cxa_increment_exception_refcount');
 var ___thrown_object_from_unwind_exception = createExportWrapper('__thrown_object_from_unwind_exception');
 var ___get_exception_message = createExportWrapper('__get_exception_message');
-var ___start_em_js = Module['___start_em_js'] = 1889339;
-var ___stop_em_js = Module['___stop_em_js'] = 1903698;
+var ___start_em_js = Module['___start_em_js'] = 1889499;
+var ___stop_em_js = Module['___stop_em_js'] = 1903858;
 
 // include: postamble.js
 // === Auto-generated postamble setup entry stuff ===

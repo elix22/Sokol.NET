@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
   "mainAssemblyName": "FileSystemTestWeb.dll",
   "resources": {
-    "hash": "sha256-xi9HrkGkVmdH9hEKqCYBK4xXtp+pGpZqMtOaPtmUpbY=",
+    "hash": "sha256-2+LCmQW8RyGUE2A+3dtawyzl+MnCo4Q+TP0UtM0GAvY=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,14 +15,14 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-d/gOhFEfZLhSQCmcIMbBdV3BjfxQFHmPHqiahrbVaY0="
+        "integrity": "sha256-7s8XBOq/iKOjtOY1bAFq/EFjYadYImLnLfz8fgqMg8w="
       }
     ],
     "coreAssembly": [
       {
         "virtualPath": "FileSystemTestWeb.wasm",
         "name": "FileSystemTestWeb.wasm",
-        "integrity": "sha256-tceG/KQurnS/QF5dxvp/fIMy71vZ3bTfhhhwA3nGTHY="
+        "integrity": "sha256-Ck7K8IOyz4rydYXsv9b/Vw6PHzbpsNeIJjgrhlyO5JI="
       },
       {
         "virtualPath": "System.Collections.wasm",

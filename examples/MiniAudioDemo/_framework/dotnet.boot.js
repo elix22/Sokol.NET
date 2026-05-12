@@ -1,7 +1,7 @@
 export const config = /*json-start*/{
   "mainAssemblyName": "MiniAudioDemoWeb.dll",
   "resources": {
-    "hash": "sha256-kaQqVJmGbLySRLmgMXguIOtkXW1TwmChWumyH0I6XBw=",
+    "hash": "sha256-QK1C2xIAnXr2nF24rEvcKSHonP12+meBEY0Z7lnnqv8=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.js"
@@ -15,14 +15,14 @@ export const config = /*json-start*/{
     "wasmNative": [
       {
         "name": "dotnet.native.wasm",
-        "integrity": "sha256-qYJFeijSBKmtpLVqCgYJxdRo3RvbflWeyQiOct2zm5c="
+        "integrity": "sha256-Sz7hkEFvuxuhpisSyn4DSRrgfWqkh+4cBBjbyH0sF6M="
       }
     ],
     "coreAssembly": [
       {
         "virtualPath": "MiniAudioDemoWeb.wasm",
         "name": "MiniAudioDemoWeb.wasm",
-        "integrity": "sha256-YcZF2K3fr3M8l/UGlfMkaW3c3klbnRvEMOC0AInBKhI="
+        "integrity": "sha256-G/lQQWM5U5cdSVc/hpKcrC3KpPGS+cD+WXCRH2OZa0o="
       },
       {
         "virtualPath": "System.Collections.Concurrent.wasm",
