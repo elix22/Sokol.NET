@@ -951,6 +951,12 @@ public class TreeView : Widget
     public override DragDropData? OnDragBegin(Vector2 localPos)
     {
         if (!_allowDragDrop) return null;
+        // Don't start a node drag when the press is on the scrollbar gutter — otherwise
+        // dragging the scrollbar reparents whatever row sits at that Y. Mirrors the
+        // scrollbar hit-test in OnMouseDown.
+        float sb = ThemeManager.Current.ScrollBarWidth;
+        if (_flatRows.Count * ItemHeight > Bounds.Height && localPos.X >= Bounds.Width - sb)
+            return null;
         var node = NodeAtLocalY(localPos.Y);
         if (node == null || node == _root) return null;
         return new DragDropData
