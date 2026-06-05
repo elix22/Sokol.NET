@@ -248,6 +248,9 @@ public sealed class Screen : Widget
         // Check tooltip hover-delay each frame.
         Input.UpdateTooltip();
 
+        // Advance inertial (fling) scrolling each frame.
+        Input.UpdateFling();
+
         // Screen root children fill the window — bypass CanvasLayout measurement.
         // CanvasLayout would measure TabView as (0,0) because tabs live in _tabs not _children.
         // Instead, set each root child's Bounds to the full window then run its internal layout.

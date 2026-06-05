@@ -31,6 +31,14 @@ public sealed class InputRouter
     // Touch ownership: maps touch id → widget that received TOUCHES_BEGAN for that touch
     private readonly Dictionary<int, Widget> _touchOwners = new();
 
+    // ── Drag-to-scroll (finger-flick / drag-anywhere panning over a ScrollView) ──
+    private ScrollView? _scrollDrag;                 // scroll candidate for the active press
+    private bool        _scrolling;                  // past the slop threshold → actively panning
+    private Vector2     _scrollDownPos, _scrollLastPos, _scrollVel;
+    private ScrollView? _fling;                      // active inertial target (after release)
+    private Vector2     _flingVel;
+    private const float ScrollSlop = 8f;             // px before a press becomes a pan
+
     public InputRouter(Screen screen, FocusManager focus)
     {
         _screen = screen;
@@ -61,7 +69,15 @@ public sealed class InputRouter
                 var me    = new MouseEvent { Position = pos, Delta = delta, Modifiers = Mods(ev) };
                 UpdateHovered(pos, me);
                 var moveTarget = _captured ?? _hovered;
-                moveTarget?.OnMouseMove(Localize(moveTarget, me));
+                if (_scrolling)
+                {
+                    ScrollDragMove(pos, widgetConsumedMove: false);   // panning: don't feed the widget
+                }
+                else
+                {
+                    bool consumed = moveTarget?.OnMouseMove(Localize(moveTarget, me)) ?? false;
+                    ScrollDragMove(pos, consumed);
+                }
                 // Drag-and-drop tracking runs after the widget's own move handler
                 // so widgets can observe state before drag callbacks fire.
                 _screen.Drag.OnMouseMove(_hovered, pos);
@@ -91,7 +107,10 @@ public sealed class InputRouter
                     target.OnMouseDown(Localize(target, me));
                 }
                 if (btn == MouseButton.Left)
+                {
+                    ScrollDragBegin(target, pos);
                     _screen.Drag.OnMouseDown(target, pos);
+                }
                 break;
             }
             case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
@@ -100,7 +119,8 @@ public sealed class InputRouter
                 var btn = MapButton(ev->mouse_button);
                 var me  = new MouseEvent { Position = pos, Button = btn, Clicks = _clickCount, Modifiers = Mods(ev) };
                 var upTarget = _captured ?? _hovered;
-                upTarget?.OnMouseUp(Localize(upTarget, me));
+                if (!ScrollDragEnd())                             // if we were panning, swallow the up (no click)
+                    upTarget?.OnMouseUp(Localize(upTarget, me));
                 _captured = null;
                 if (btn == MouseButton.Left)
                     _screen.Drag.OnMouseUp(_hovered, pos);
@@ -395,6 +415,7 @@ public sealed class InputRouter
                     target.OnMouseMove(Localize(target, me));
                     target.OnMouseDown(Localize(target, me));
                 }
+                ScrollDragBegin(target, pos);
                 _screen.Drag.OnMouseDown(target, pos);
                 break;
             }
@@ -403,8 +424,15 @@ public sealed class InputRouter
                 var me = new MouseEvent { Position = pos };
                 UpdateHovered(pos, me);
                 var moveTarget = _captured ?? _hovered;
-                if (moveTarget != null)
-                    moveTarget.OnMouseMove(Localize(moveTarget, me));
+                if (_scrolling)
+                {
+                    ScrollDragMove(pos, widgetConsumedMove: false);
+                }
+                else
+                {
+                    bool consumed = moveTarget?.OnMouseMove(Localize(moveTarget, me)) ?? false;
+                    ScrollDragMove(pos, consumed);
+                }
                 _screen.Drag.OnMouseMove(_hovered, pos);
                 break;
             }
@@ -413,7 +441,7 @@ public sealed class InputRouter
             {
                 var me = new MouseEvent { Position = pos, Button = MouseButton.Left, Clicks = 1 };
                 var upTarget = _captured ?? _hovered;
-                if (upTarget != null)
+                if (!ScrollDragEnd() && upTarget != null)         // swallow up if we were panning (no click)
                     upTarget.OnMouseUp(Localize(upTarget, me));
                 // Drag.OnMouseUp must be called before clearing _hovered.
                 _screen.Drag.OnMouseUp(_hovered, pos);
@@ -424,5 +452,78 @@ public sealed class InputRouter
                 break;
             }
         }
+    }
+
+    // ─── Drag-to-scroll (finger-flick / drag-anywhere panning) ────────────────
+
+    private static ScrollView? FindScrollAncestor(Widget? w)
+    {
+        for (var c = w; c != null; c = c.Parent)
+            if (c is ScrollView sv && (sv.CanDragScrollV || sv.CanDragScrollH))
+                return sv;
+        return null;
+    }
+
+    private void ScrollDragBegin(Widget? target, Vector2 pos)
+    {
+        _fling      = null;                 // a new press cancels any momentum
+        _scrolling  = false;
+        _scrollDrag = FindScrollAncestor(target);
+        _scrollDownPos = _scrollLastPos = pos;
+        _scrollVel  = new Vector2(0f, 0f);
+    }
+
+    /// <summary>Handle a pointer move for the active press. Returns true if it was
+    /// consumed as a pan (caller should not deliver the move to the widget).</summary>
+    private bool ScrollDragMove(Vector2 pos, bool widgetConsumedMove)
+    {
+        if (_scrollDrag == null) return false;
+        // A real drag-and-drop owns the gesture — never hijack it to scroll.
+        if (_screen.Drag.IsActive) { _scrollDrag = null; _scrolling = false; return false; }
+
+        if (!_scrolling)
+        {
+            // The widget itself handled the drag (slider, number-drag, tree-reorder) → leave it alone.
+            if (widgetConsumedMove) { _scrollDrag = null; return false; }
+            float ddx = pos.X - _scrollDownPos.X, ddy = pos.Y - _scrollDownPos.Y;
+            bool pastV = _scrollDrag.CanDragScrollV && MathF.Abs(ddy) > ScrollSlop;
+            bool pastH = _scrollDrag.CanDragScrollH && MathF.Abs(ddx) > ScrollSlop;
+            if (!pastV && !pastH) return false;
+            _scrolling = true;
+            _captured?.OnMouseLeave(new MouseEvent { Position = pos });   // un-press the widget; no click
+            _scrollLastPos = pos;
+        }
+
+        float mdx = _scrollLastPos.X - pos.X;
+        float mdy = _scrollLastPos.Y - pos.Y;
+        _scrollDrag.DragScrollBy(mdx, mdy);
+        _scrollVel = new Vector2(0.6f * _scrollVel.X + 0.4f * mdx, 0.6f * _scrollVel.Y + 0.4f * mdy);
+        _scrollLastPos = pos;
+        return true;
+    }
+
+    /// <summary>End the active press. Returns true if a pan was in progress (the caller
+    /// should swallow the mouse-up so it doesn't become a click).</summary>
+    private bool ScrollDragEnd()
+    {
+        bool was = _scrolling;
+        if (was && (MathF.Abs(_scrollVel.X) > 0.5f || MathF.Abs(_scrollVel.Y) > 0.5f))
+        {
+            _fling    = _scrollDrag;
+            _flingVel = _scrollVel;
+        }
+        _scrolling  = false;
+        _scrollDrag = null;
+        return was;
+    }
+
+    /// <summary>Advance inertial scrolling. Called once per frame by Screen.Update.</summary>
+    internal void UpdateFling()
+    {
+        if (_fling == null) return;
+        bool moved = _fling.DragScrollBy(_flingVel.X, _flingVel.Y);
+        _flingVel  = new Vector2(_flingVel.X * 0.88f, _flingVel.Y * 0.88f);
+        if (!moved || (MathF.Abs(_flingVel.X) < 0.5f && MathF.Abs(_flingVel.Y) < 0.5f))
+            _fling = null;
     }
 }

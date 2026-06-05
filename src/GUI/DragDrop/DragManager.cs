@@ -36,6 +36,10 @@ public sealed class DragManager
     /// <summary>True iff a drag is currently animating the cursor.</summary>
     public bool IsDragging => State == DragState.Dragging;
 
+    /// <summary>True iff a drag-and-drop is pending or active (not idle). Used by the
+    /// drag-to-scroll gesture to avoid stealing a potential drag-and-drop.</summary>
+    public bool IsActive => State != DragState.Idle;
+
     // ─── InputRouter hooks ───────────────────────────────────────────────────
 
     /// <summary>Called on mouse-down. Start pending-drag if the hit widget is a drag source.</summary>

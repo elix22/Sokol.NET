@@ -112,6 +112,30 @@ public class ScrollView : Panel
     private float ContentHeight => Content?.PreferredSize(Screen.Instance.Renderer).Y ?? Bounds.Height;
     private float ContentWidth  => Content?.PreferredSize(Screen.Instance.Renderer).X ?? Bounds.Width;
 
+    /// <summary>True when there is overflow to pan in that axis (used by drag-to-scroll).</summary>
+    public bool CanDragScrollV => CanScrollVertical   && ContentHeight > Bounds.Height;
+    public bool CanDragScrollH => CanScrollHorizontal && ContentWidth  > Bounds.Width;
+
+    /// <summary>Pan the view by a pixel delta (touch/mouse drag-to-scroll and fling),
+    /// clamped to the content extent. Returns true if it actually moved.</summary>
+    public bool DragScrollBy(float dx, float dy)
+    {
+        bool moved = false;
+        if (CanScrollVertical && ContentHeight > Bounds.Height)
+        {
+            float max = MathF.Max(0f, ContentHeight - Bounds.Height);
+            float ny  = MathF.Min(max, MathF.Max(0f, _scrollY + dy));
+            if (ny != _scrollY) { _scrollY = ny; moved = true; }
+        }
+        if (CanScrollHorizontal && ContentWidth > Bounds.Width)
+        {
+            float max = MathF.Max(0f, ContentWidth - Bounds.Width);
+            float nx  = MathF.Min(max, MathF.Max(0f, _scrollX + dx));
+            if (nx != _scrollX) { _scrollX = nx; moved = true; }
+        }
+        return moved;
+    }
+
     // ScrollOffset tells ScreenPosition to subtract our scroll from children's positions.
     public override Vector2 ScrollOffset => new Vector2(_scrollX, _scrollY);
 
