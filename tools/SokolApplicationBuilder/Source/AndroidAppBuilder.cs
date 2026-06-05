@@ -2528,7 +2528,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             var permissions = GetAndroidPermissions(androidProperties);
             foreach (var permission in permissions)
             {
-                manifest.AppendLine($"  <uses-permission android:name=\"{permission}\"/>");
+                manifest.AppendLine(PermissionLine(permission, "  "));
             }
 
             // Features (optional)
@@ -2665,6 +2665,20 @@ KeyAlias={keystoreInfo.KeyAlias}
             manifest.AppendLine("<!-- END_INCLUDE(manifest) -->");
 
             return manifest.ToString();
+        }
+
+        /// <summary>
+        /// Emit a &lt;uses-permission&gt; line. BLUETOOTH_SCAN gets
+        /// android:usesPermissionFlags="neverForLocation" so Android 12+ (API 31+) delivers
+        /// BLE scan results WITHOUT the app also holding ACCESS_FINE_LOCATION. Without the flag
+        /// the OS treats the scan as location-deriving and silently withholds every scan result
+        /// when location permission is absent. NearNet never derives physical location from scans.
+        /// </summary>
+        static string PermissionLine(string permission, string indent)
+        {
+            if (permission == "android.permission.BLUETOOTH_SCAN")
+                return $"{indent}<uses-permission android:name=\"{permission}\" android:usesPermissionFlags=\"neverForLocation\"/>";
+            return $"{indent}<uses-permission android:name=\"{permission}\"/>";
         }
 
         List<string> GetAndroidPermissions(Dictionary<string, string> properties)
@@ -3288,7 +3302,7 @@ KeyAlias={keystoreInfo.KeyAlias}
 
             foreach (var i in permissions)
             {
-                AndroidManifest.AppendTextLine($"   <uses-permission android:name=\"{i}\"/>");
+                AndroidManifest.AppendTextLine(PermissionLine(i, "   "));
             }
 
 
