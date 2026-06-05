@@ -441,6 +441,9 @@ namespace SokolApplicationBuilder
                 // Copy additional native libraries before Gradle build
                 CopyNativeLibraries(buildType);
 
+                // Copy additional Java sources (e.g. JNI bridge classes) into the APK
+                CopyJavaSources();
+
                 // Build Android app (APK or AAB)
                 if (buildAAB)
                     BuildAndroidAAB(appName, buildType);
@@ -1398,6 +1401,55 @@ namespace SokolApplicationBuilder
             {
                 Log.LogMessage(MessageImportance.Normal, "ℹ️  No native library configurations found (AndroidNativeLibrary_*Path properties)");
             }
+        }
+
+        // Copies extra Java/Kotlin source trees into the app's src/main/java so they
+        // are compiled into the APK. Driven by AndroidJavaSource_<name>Path properties
+        // (mirrors AndroidNativeLibrary_*Path). Used e.g. for the NearNet JNI bridge
+        // class (com.sokol.nearnet.NearNetBle), which the native .so calls via JNI.
+        void CopyJavaSources()
+        {
+            string javaDestDir = Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "java");
+            int sourcesProcessed = 0;
+
+            foreach (var property in androidProperties)
+            {
+                if (!property.Key.StartsWith("AndroidJavaSource_", StringComparison.OrdinalIgnoreCase) ||
+                    !property.Key.EndsWith("Path", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string name = property.Key.Substring("AndroidJavaSource_".Length);
+                name = name.Substring(0, name.Length - "Path".Length);
+
+                // Resolve the path the same way native library paths are resolved.
+                string basePath = property.Value;
+                basePath = basePath.Replace("$(SokolNetHome)", Utils.GetSokolNetHome(), StringComparison.OrdinalIgnoreCase);
+                basePath = basePath.Replace("$(HomeDir)", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), StringComparison.OrdinalIgnoreCase);
+                if (!Path.IsPathRooted(basePath))
+                    basePath = Path.GetFullPath(Path.Combine(opts.ProjectPath, basePath));
+
+                if (!Directory.Exists(basePath))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"ℹ️  Java source path for '{name}' not found: {basePath}");
+                    continue;
+                }
+
+                Log.LogMessage(MessageImportance.High, $"☕ Copying Java sources '{name}' from: {basePath}");
+                int copied = 0;
+                foreach (string srcFile in Directory.GetFiles(basePath, "*.java", SearchOption.AllDirectories))
+                {
+                    string relative = Path.GetRelativePath(basePath, srcFile);   // preserves package dirs
+                    string destFile = Path.Combine(javaDestDir, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                    File.Copy(srcFile, destFile, true);
+                    copied++;
+                }
+                Log.LogMessage(MessageImportance.Normal, $"✅ Copied {copied} Java file(s) for '{name}' into app/src/main/java");
+                sourcesProcessed++;
+            }
+
+            if (sourcesProcessed == 0)
+                Log.LogMessage(MessageImportance.Normal, "ℹ️  No extra Java source configurations found (AndroidJavaSource_*Path properties)");
         }
 
         void UpdateCMakeListsForNativeLibraries()
