@@ -1716,6 +1716,7 @@ link_directories(${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}})
             { "android.permission.ACTIVITY_RECOGNITION",      "android.Manifest.permission.ACTIVITY_RECOGNITION" },
             { "android.permission.BLUETOOTH_SCAN",            "android.Manifest.permission.BLUETOOTH_SCAN" },
             { "android.permission.BLUETOOTH_CONNECT",         "android.Manifest.permission.BLUETOOTH_CONNECT" },
+            { "android.permission.BLUETOOTH_ADVERTISE",       "android.Manifest.permission.BLUETOOTH_ADVERTISE" },
             { "android.permission.NEARBY_WIFI_DEVICES",       "android.Manifest.permission.NEARBY_WIFI_DEVICES" },
             { "android.permission.POST_NOTIFICATIONS",        "android.Manifest.permission.POST_NOTIFICATIONS" },
             { "android.permission.UWB_RANGING",               "android.Manifest.permission.UWB_RANGING" },
