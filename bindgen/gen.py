@@ -24,6 +24,7 @@ tasks = [
     [ '../ext/tinyexr/tinyexr.h',            'EXR',      [] ],
     [ '../ext/box2d/include/box2d/box2d.h',  'b2',      [] ],
     [ '../ext/camerac/include/camerac.h',    'cam',      [] ],
+    [ '../ext/nearnet/include/nearnet.h',    'nn_',      [] ],
     [ '../ext/manifold/bindings/c/include/manifold/manifoldc.h', 'manifold_', [] ],
     [ '../ext/sokol/sokol_filesystem.h',     'sfs_',     [] ],
     [ '../ext/nanovg/src/sokol_nanovg.h',    'nvg',      ['sg_'] ],

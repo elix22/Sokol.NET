@@ -36,6 +36,7 @@ module_names = {
     'b2':       'Box2D',
     'cam_':     'CameraC',
     'cam':      'CameraC',
+    'nn_':      'NN',
     'manifold_': 'Manifoldc',
     'sfs_':      'SFilesystem',
     'nvg':       'NanoVG',
@@ -49,6 +50,7 @@ module_names = {
 namespace_names = {
     'cam_':     'System.Hardware',
     'cam':      'System.Hardware',
+    'nn_':      'Sokol.NearNet',
     'manifold_': 'Manifold',
     'ma_':       'MiniAudioNS',
     'tsf_':      'TinySoundFont',
@@ -60,6 +62,7 @@ default_namespace = 'Sokol'
 output_dirs = {
     'cam_':     '../src/System.Hardware',
     'cam':      '../src/System.Hardware',
+    'nn_':      '../ext/nearnet/bindings/csharp',
     'manifold_': '../ext/manifold/bindings/csharp',
     'ma_':       '../ext/miniaudio/bindings/csharp',
     'tsf_':      '../ext/TinySoundFont/bindings/csharp',
@@ -112,6 +115,7 @@ library_names = {
     'b2':       'box2d',  # Box2D uses separate library
     'cam_':     'camerac',  # CameraC uses separate library
     'cam':      'camerac',  # CameraC uses separate library (no-underscore prefix)
+    'nn_':      'nearnet',  # NearNet uses separate library
     'manifold_': 'manifoldc',  # manifoldc uses separate library
     'sfs_':      'sokol',
     'nvg':       'sokol',
@@ -148,6 +152,7 @@ c_source_paths = {
     'b2':       'c/box2d.c',
     'cam_':     'c/camerac.c',
     'cam':      'c/camerac.c',
+    'nn_':      'c/nearnet.c',
     'manifold_': 'c/manifoldc.c',  # manifoldc has its own CMake build — no single .c source
     'sfs_':      'c/sokol_filesystem.c',
     'nvg':       'c/nanovg.c',
@@ -338,6 +343,14 @@ prim_types = {
     'const char ***': 'IntPtr',
     'const EXRImage *': 'IntPtr',
     'const char **': 'IntPtr',
+    # NearNet opaque handles + peer-id scalar (nn_-prefixed: no collision with other libs)
+    'nn_context':              'IntPtr',
+    'nn_context *':            'IntPtr*',
+    'nn_context*':             'IntPtr*',
+    'nn_session':              'IntPtr',
+    'nn_session *':            'IntPtr*',
+    'nn_session*':             'IntPtr*',
+    'nn_peer_id':              'uint',
     # CameraC opaque handle and callback types
     'camDevice':               'IntPtr',
     'camFrameCallback':        'delegate* unmanaged<IntPtr, camFrame*, void*, void>',
