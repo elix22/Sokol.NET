@@ -2945,6 +2945,11 @@ KeyAlias={keystoreInfo.KeyAlias}
             
             manifest.AppendLine($"    <activity android:name=\"{activityName}\"");
             manifest.AppendLine($"              android:label=\"{appName}\"");
+            // singleTask: ONE instance of the activity. With the default (standard), a launch whose intent differs from the
+            // task's root intent (e.g. `am start -n`, another launcher) stacks a SECOND NativeActivity in the live process:
+            // ANativeActivity_onCreate resets sokol_app and runs init again while sokol_gfx is still set up → sg_setup
+            // asserts "!_sg.valid" (SIGABRT). singleTask hands such a launch to the running instance instead.
+            manifest.AppendLine("              android:launchMode=\"singleTask\"");
             manifest.AppendLine("              android:configChanges=\"orientation|keyboardHidden|screenSize|screenLayout\"");
             // stateAlwaysHidden: the app opens the IME ONLY through SokolNativeActivity.showKeyboard(true).
             // The hidden capture EditText is the sole focusable view in the hierarchy, and a device whose
