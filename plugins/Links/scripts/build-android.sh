@@ -53,7 +53,10 @@ for ABI in "${ANDROID_ABIS[@]}"; do
         -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
         -DANDROID_ABI="$ABI" \
         -DANDROID_PLATFORM=android-26 \
+        -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
         -DCMAKE_BUILD_TYPE=Release
+    # ^ 16 KB ELF alignment (Google Play, Android 15+ devices): NDK r27 — the CI's — still defaults to 4 KB;
+    #   r28+ default to 16 KB. Same flag as the builder's app template (build.gradle).
 
     cmake --build "$BUILD_DIR"
 

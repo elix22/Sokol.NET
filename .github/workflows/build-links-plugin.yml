@@ -85,6 +85,14 @@ jobs:
         echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
     - name: Build
       run: ./plugins/Links/scripts/build-android.sh
+    - name: Check 16 KB page alignment (Google Play, Android 15+)
+      run: |
+        READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        for so in plugins/Links/libs/android/*/release/libsokol_links.so; do
+          align=$("$READELF" -l "$so" | awk '/LOAD/ {print $NF; exit}')
+          echo "$so: LOAD align $align"
+          [ "$align" = "0x4000" ] || { echo "::error::$so is not 16 KB aligned ($align)"; exit 1; }
+        done
     - uses: actions/upload-artifact@v4
       with:
         name: links-android
