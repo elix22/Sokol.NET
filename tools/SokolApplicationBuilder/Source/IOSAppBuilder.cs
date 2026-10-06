@@ -212,6 +212,11 @@ namespace SokolApplicationBuilder
                 if (!CreateAppFramework(iosDir, projectDir, projectName))
                     return false;
 
+                // Every embedded framework is now in ios/frameworks — give each the Info.plist keys
+                // App Store validation requires
+                if (!CompleteFrameworkInfoPlists(Path.Combine(iosDir, "frameworks")))
+                    return false;
+
                 // Copy iOS templates
                 if (!CopyIOSTemplates(iosDir, projectName))
                     return false;
@@ -503,6 +508,57 @@ namespace SokolApplicationBuilder
                 Log.LogError($"Failed to create app framework: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// App Store upload validation rejects an app whose embedded frameworks lack
+        /// CFBundleShortVersionString, CFBundleVersion or MinimumOSVersion (2026-10-06: 19 errors
+        /// across the app, sokol, miniaudio, plugin and native-library frameworks — each comes from a
+        /// different build, none set all three). A device install does not check
+        /// them, so only an upload finds out. Adds the missing keys only — the app version and the
+        /// project's minimum iOS version — and never overwrites a value a framework already sets.
+        /// </summary>
+        private bool CompleteFrameworkInfoPlists(string frameworksDir)
+        {
+            var required = new (string Key, string Value)[]
+            {
+                ("CFBundleShortVersionString", appVersion),
+                ("CFBundleVersion", appVersion),
+                ("MinimumOSVersion", iOSMinVersion),
+            };
+
+            foreach (string frameworkDir in Directory.GetDirectories(frameworksDir, "*.framework"))
+            {
+                string plist = Path.Combine(frameworkDir, "Info.plist");
+                if (!File.Exists(plist))
+                {
+                    Log.LogError($"❌ {Path.GetFileName(frameworkDir)} has no Info.plist — App Store validation would reject it");
+                    return false;
+                }
+
+                foreach (var (key, value) in required)
+                {
+                    // PlistBuddy reads binary and XML plists alike; Print fails when the key is absent
+                    var print = Cli.Wrap("/usr/libexec/PlistBuddy")
+                        .WithArguments(new[] { "-c", $"Print :{key}", plist })
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync().GetAwaiter().GetResult();
+                    if (print.ExitCode == 0)
+                        continue;
+
+                    var add = Cli.Wrap("/usr/libexec/PlistBuddy")
+                        .WithArguments(new[] { "-c", $"Add :{key} string {value}", plist })
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteBufferedAsync().GetAwaiter().GetResult();
+                    if (add.ExitCode != 0)
+                    {
+                        Log.LogError($"❌ Could not add {key} to {plist}: {add.StandardError}{add.StandardOutput}");
+                        return false;
+                    }
+                    Log.LogMessage(MessageImportance.High, $"   ✅ {Path.GetFileName(frameworkDir)}: added {key} = {value}");
+                }
+            }
+            return true;
         }
 
         private bool CopyIOSTemplates(string iosDir, string projectName)
