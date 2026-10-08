@@ -1,0 +1,31 @@
+Expose WebSocketConfiguration::caCertificatePemFile through the C API.
+
+With the Mbed TLS backend libdatachannel has no default CA roots, so a C API user cannot open a
+verified wss:// connection: rtcWsConfiguration has no CA field. The new field takes either a path to
+a PEM file or PEM content (as WebSocketConfiguration::caCertificatePemFile already does); NULL keeps
+today's behaviour. Appended at the end of the struct, so zero-initialised callers are unaffected.
+
+diff --git a/include/rtc/rtc.h b/include/rtc/rtc.h
+--- a/include/rtc/rtc.h
++++ b/include/rtc/rtc.h
+@@ -481,6 +481,7 @@ typedef struct {
+ 	int pingIntervalMs;      // in milliseconds, 0 means default, < 0 means disabled
+ 	int maxOutstandingPings; // 0 means default, < 0 means disabled
+ 	int maxMessageSize;      // <= 0 means default
++	const char *caCertificatePemFile; // CA bundle: PEM file path or PEM content, NULL means none
+ } rtcWsConfiguration;
+ 
+ RTC_C_EXPORT int rtcCreateWebSocket(const char *url); // returns ws id
+diff --git a/src/capi.cpp b/src/capi.cpp
+--- a/src/capi.cpp
++++ b/src/capi.cpp
+@@ -1595,6 +1595,9 @@ int rtcCreateWebSocketEx(const char *url, const rtcWsConfiguration *config) {
+ 		if(config->maxMessageSize > 0)
+ 			c.maxMessageSize = size_t(config->maxMessageSize);
+ 
++		if (config->caCertificatePemFile)
++			c.caCertificatePemFile.emplace(config->caCertificatePemFile);
++
+ 		auto webSocket = std::make_shared<WebSocket>(std::move(c));
+ 		webSocket->open(url);
+ 		return emplaceWebSocket(webSocket);

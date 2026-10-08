@@ -1,0 +1,4 @@
+{
+  global: rtc*; sokolnet_*;
+  local: *;
+};

@@ -1,0 +1,178 @@
+name: Build Net Plugin
+
+# Builds plugins/Net (sokol_net: libdatachannel + Mbed TLS) for Android, iOS and macOS on every change to the
+# plugin or its two submodules, and commits the prebuilt outputs back to plugins/Net/libs/ on main — every shipped
+# library is a CI build, never a local one. A change is not done until every job is green.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/Net/**'
+      - '!plugins/Net/libs/**'
+      - 'ext/libdatachannel'
+      - 'ext/mbedtls'
+      - '.github/workflows/build-net-plugin.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'plugins/Net/**'
+      - '!plugins/Net/libs/**'
+      - 'ext/libdatachannel'
+      - 'ext/mbedtls'
+      - '.github/workflows/build-net-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS (arm64 + X64)
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch the two submodules (not the whole tree)
+      run: git submodule update --init --recursive --depth 1 ext/libdatachannel ext/mbedtls
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    - name: Build
+      run: ./plugins/Net/scripts/build-macos.sh all
+    - uses: actions/upload-artifact@v4
+      with:
+        name: net-macos
+        path: plugins/Net/libs/macos/**/*
+        retention-days: 30
+
+  build-ios:
+    name: Build iOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [device, simulator-arm64, simulator-x64]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch the two submodules (not the whole tree)
+      run: git submodule update --init --recursive --depth 1 ext/libdatachannel ext/mbedtls
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    - name: Build
+      run: ./plugins/Net/scripts/build-ios.sh ${{ matrix.target }}
+    - name: Determine upload path
+      id: upload_path
+      run: |
+        case "${{ matrix.target }}" in
+          device)          echo "path=plugins/Net/libs/ios/arm64" >> $GITHUB_OUTPUT ;;
+          simulator-arm64) echo "path=plugins/Net/libs/ios/simulator-arm64" >> $GITHUB_OUTPUT ;;
+          simulator-x64)   echo "path=plugins/Net/libs/ios/simulator-x64" >> $GITHUB_OUTPUT ;;
+        esac
+    - uses: actions/upload-artifact@v4
+      with:
+        name: net-ios-${{ matrix.target }}
+        path: ${{ steps.upload_path.outputs.path }}/**/*
+        retention-days: 30
+
+  build-android:
+    name: Build Android (armeabi-v7a, arm64-v8a, x86_64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch the two submodules (not the whole tree)
+      run: git submodule update --init --recursive --depth 1 ext/libdatachannel ext/mbedtls
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: ''
+    - name: Install Android NDK
+      run: |
+        sdkmanager --install "ndk;27.2.12479018"
+        echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+    - name: Build (the script also fails on a 64-bit library that is not 16 KB aligned)
+      run: ./plugins/Net/scripts/build-android.sh
+    - name: Exports = the C API only
+      run: |
+        NM="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+        for so in plugins/Net/libs/android/*/release/libsokol_net.so; do
+          extra=$("$NM" -D --defined-only "$so" | awk '{print $NF}' | grep -v -E '^(rtc|sokolnet_)' || true)
+          [ -z "$extra" ] || { echo "::error::$so exports more than rtc*/sokolnet_*: $extra"; exit 1; }
+          echo "$so: $("$NM" -D --defined-only "$so" | wc -l) exports, all rtc*/sokolnet_*"
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: net-android
+        path: plugins/Net/libs/android/**/*
+        retention-days: 30
+
+  build-managed:
+    name: Managed layer (every platform symbol set)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Compile the managed layer for every platform symbol set
+      run: |
+        set -e
+        mkdir -p /tmp/net-managed && cd /tmp/net-managed
+        cat > net.csproj <<'PROJ'
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net10.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+            <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            <DefineConstants>$(DefineConstants);$(NetSymbols)</DefineConstants>
+          </PropertyGroup>
+          <ItemGroup>
+            <Compile Include="$(GITHUB_WORKSPACE)/plugins/Net/managed/*.cs" />
+          </ItemGroup>
+        </Project>
+        PROJ
+        for SYMS in "" "__LINUX__" "__WINDOWS__" "__MACOS__" "__ANDROID__" "__IOS__" "WEB"; do
+          echo "=== DefineConstants: '${SYMS:-<none>}'"
+          dotnet build -c Release -p:NetSymbols="$SYMS" --nologo -v q
+        done
+
+  commit-libs:
+    name: Commit the Android, iOS and macOS libraries
+    needs: [build-macos, build-ios, build-android, build-managed]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Download the artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Commit the libraries
+      run: |
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p plugins/Net/libs/android plugins/Net/libs/macos \
+                 plugins/Net/libs/ios/arm64 plugins/Net/libs/ios/simulator-arm64 plugins/Net/libs/ios/simulator-x64
+        cp -r ../artifacts/net-android/*              plugins/Net/libs/android/
+        cp -r ../artifacts/net-macos/*                plugins/Net/libs/macos/
+        cp -r ../artifacts/net-ios-device/*           plugins/Net/libs/ios/arm64/
+        cp -r ../artifacts/net-ios-simulator-arm64/*  plugins/Net/libs/ios/simulator-arm64/
+        cp -r ../artifacts/net-ios-simulator-x64/*    plugins/Net/libs/ios/simulator-x64/
+        LIBS="plugins/Net/libs"
+        if [ -z "$(git status --porcelain $LIBS)" ]; then
+          echo "No sokol_net library change to commit"
+          exit 0
+        fi
+        git add $LIBS
+        git commit -m "Auto-update built sokol_net libraries (Android, iOS, macOS) [skip ci]" \
+                   -m "Generated from commit: ${{ github.sha }}" \
+                   -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        git pull --rebase origin main
+        git push origin main
+        echo "✓ Committed sokol_net libraries"

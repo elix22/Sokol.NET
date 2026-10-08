@@ -61,3 +61,9 @@
 [submodule "ext/Frent"]
 	path = ext/Frent
 	url = https://github.com/elix22/Frent.git
+[submodule "ext/libdatachannel"]
+	path = ext/libdatachannel
+	url = https://github.com/paullouisageneau/libdatachannel
+[submodule "ext/mbedtls"]
+	path = ext/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls
