@@ -70,7 +70,9 @@ elseif(APPLE)
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
             MACOSX_FRAMEWORK_BUNDLE_VERSION       "1"
             INSTALL_NAME_DIR            "@rpath")
-        if(CMAKE_OSX_SYSROOT MATCHES "iphonesimulator")
+        # CMake resolves "iphonesimulator" to the SDK path (…/iPhoneSimulator.sdk) with the Makefile generator → compare lower-case.
+        string(TOLOWER "${CMAKE_OSX_SYSROOT}" SYSROOT_LC)
+        if(SYSROOT_LC MATCHES "iphonesimulator")
             if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
                 set(ARCH_DIR "simulator-x64")
             else()
