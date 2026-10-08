@@ -2967,6 +2967,22 @@ KeyAlias={keystoreInfo.KeyAlias}
             manifest.AppendLine("        <action android:name=\"android.intent.action.MAIN\" />");
             manifest.AppendLine("        <category android:name=\"android.intent.category.LAUNCHER\" />");
             manifest.AppendLine("      </intent-filter>");
+
+            // Extra <intent-filter>s (App Links, a custom URL scheme …) are children of <activity>, so they go
+            // here: the project's own platform/android/manifest/ActivityIntentFilters.xml first, then EVERY active
+            // plugin's. Same token substitution as Queries.xml / Providers.xml. The link that opens the app reaches
+            // native code through SokolNativeActivity.takeIncomingUri() (plugins/IncomingLinks).
+            var intentFilterFragments = new List<string>();
+            string projectIntentFilters = Path.Combine(opts.ProjectPath, "platform/android/manifest/ActivityIntentFilters.xml");
+            if (File.Exists(projectIntentFilters)) intentFilterFragments.Add(projectIntentFilters);
+            foreach (string pluginAndroid in activePluginAndroidPaths)
+            {
+                string pluginIntentFilters = Path.Combine(pluginAndroid, "manifest", "ActivityIntentFilters.xml");
+                if (File.Exists(pluginIntentFilters)) intentFilterFragments.Add(pluginIntentFilters);
+            }
+            foreach (string fragmentPath in intentFilterFragments)
+                manifest.AppendLine(SubstituteManifestTokens(File.ReadAllText(fragmentPath), androidProperties));
+
             manifest.AppendLine("    </activity>");
 
             // Inject manifest fragments (FileProvider, ad SDK meta-data, …) before </application>:

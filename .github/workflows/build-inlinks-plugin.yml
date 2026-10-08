@@ -1,0 +1,124 @@
+name: Build IncomingLinks Plugin
+
+# Builds plugins/IncomingLinks (sokol_inlinks) on every change to the plugin and commits the prebuilt Android
+# libraries back to plugins/IncomingLinks/libs/ on main — every shipped library is a CI build, never a local one.
+# Only Android has a native backend so far; the managed layer is compiled for every platform symbol set
+# (the others are stubs: Supported == false). A change is not done until every job is green.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/IncomingLinks/**'
+      - '!plugins/IncomingLinks/libs/**'
+      - '.github/workflows/build-inlinks-plugin.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'plugins/IncomingLinks/**'
+      - '!plugins/IncomingLinks/libs/**'
+      - '.github/workflows/build-inlinks-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android (arm64-v8a, armeabi-v7a, x86_64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: ''
+    - name: Install Android NDK
+      run: |
+        sdkmanager --install "ndk;27.2.12479018"
+        echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+    - name: Build
+      run: ./plugins/IncomingLinks/scripts/build-android.sh
+    - name: Check 16 KB page alignment (Google Play, Android 15+ — 64-bit ABIs only, as the NDK flag)
+      run: |
+        READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        for so in plugins/IncomingLinks/libs/android/{arm64-v8a,x86_64}/release/libsokol_inlinks.so; do
+          align=$("$READELF" -l "$so" | awk '/LOAD/ {print $NF; exit}')
+          echo "$so: LOAD align $align"
+          [ "$align" = "0x4000" ] || { echo "::error::$so is not 16 KB aligned ($align)"; exit 1; }
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: inlinks-android
+        path: plugins/IncomingLinks/libs/android/**/*
+        retention-days: 30
+
+  build-managed:
+    name: Managed layer (every platform symbol set)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Compile the managed layer for every platform symbol set
+      run: |
+        set -e
+        mkdir -p /tmp/inlinks-managed && cd /tmp/inlinks-managed
+        for NULLABLE in enable disable; do
+        cat > inlinks.csproj <<PROJ
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net10.0</TargetFramework>
+            <Nullable>$NULLABLE</Nullable>
+            <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            <DefineConstants>\$(DefineConstants);\$(InLinksSymbols)</DefineConstants>
+          </PropertyGroup>
+          <ItemGroup>
+            <Compile Include="\$(GITHUB_WORKSPACE)/plugins/IncomingLinks/managed/*.cs" />
+          </ItemGroup>
+        </Project>
+        PROJ
+          for SYMS in "" "__LINUX__" "__WINDOWS__" "__MACOS__" "__ANDROID__" "__IOS__" "WEB"; do
+            echo "=== Nullable $NULLABLE, DefineConstants: '${SYMS:-<none>}'"
+            dotnet build -c Release -p:InLinksSymbols="$SYMS" --nologo -v q
+          done
+        done
+
+  commit-libs:
+    name: Commit the Android libraries
+    needs: [build-android, build-managed]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Download the artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Commit the libraries
+      run: |
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p plugins/IncomingLinks/libs/android
+        cp -r ../artifacts/inlinks-android/* plugins/IncomingLinks/libs/android/
+        LIBS="plugins/IncomingLinks/libs"
+        if [ -z "$(git status --porcelain $LIBS)" ]; then
+          echo "No sokol_inlinks library change to commit"
+          exit 0
+        fi
+        git add $LIBS
+        git commit -m "Auto-update built sokol_inlinks libraries (Android) [skip ci]" \
+                   -m "Generated from commit: ${{ github.sha }}" \
+                   -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        git pull --rebase origin main
+        git push origin main
+        echo "✓ Committed sokol_inlinks libraries"

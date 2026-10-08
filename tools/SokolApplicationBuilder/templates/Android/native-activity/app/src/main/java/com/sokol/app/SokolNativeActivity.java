@@ -2,6 +2,7 @@ package com.sokol.app;
 
 import android.app.NativeActivity;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -36,9 +37,35 @@ public class SokolNativeActivity extends NativeActivity {
     // is forwarded as one KEYCODE_DEL; the GUI field holds the real text and removes one character
     // per event (deletes past the real text are harmless no-ops).
     private static final int KB_PAD = 64;
-    
+
+    // The ACTION_VIEW link (App Link / custom-scheme URL) that started or resumed the app, kept until native
+    // code takes it (plugins/IncomingLinks). singleTask hands a link that arrives while the app runs to
+    // onNewIntent; a newer link replaces one not taken yet.
+    private static String incomingUri;
+
+    public static synchronized String takeIncomingUri() {
+        String uri = incomingUri;
+        incomingUri = null;
+        return uri;
+    }
+
+    private static synchronized void recordIncomingUri(Intent intent) {
+        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null)
+            incomingUri = intent.getData().toString();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        recordIncomingUri(intent);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Before super.onCreate, which starts the native thread. A recreate (savedInstanceState != null)
+        // carries the old intent again — it was taken already.
+        if (savedInstanceState == null) recordIncomingUri(getIntent());
         super.onCreate(savedInstanceState);
 
         // @TEMPLATE_RUNTIME_PERMISSIONS_REQUEST@
