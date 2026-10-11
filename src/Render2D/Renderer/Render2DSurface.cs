@@ -512,7 +512,7 @@ public sealed unsafe class Render2DSurface : IDisposable
         Rec(center.X - radius, center.Y - radius, center.X + radius, center.Y + radius, "circle");
         int seg = Math.Clamp((int)(radius * 0.8f) + 12, 16, 128);   // tessellation (roundness); the feather below does the edge AA
         float step = MathF.Tau / seg;
-        float aa = MathF.Min(1f, radius);
+        float aa = MathF.Min(1f / _tScale, radius);   // ~1 PHYSICAL px: under a content scale (retina) 1 unit is 2-3 px of blur
         float rs = radius - aa;                       // solid-core radius; [rs, radius] is the feather
         UIColor edge = col.WithAlpha(0f);
         Vector2 dPrev = new(1f, 0f);
@@ -533,7 +533,7 @@ public sealed unsafe class Render2DSurface : IDisposable
         float ro0 = radius + MathF.Min(thickness * 0.5f, radius);
         Rec(center.X - ro0, center.Y - ro0, center.X + ro0, center.Y + ro0, "circle-stroke");
         float half = MathF.Min(thickness * 0.5f, radius);
-        float aa = MathF.Min(1f, half);
+        float aa = MathF.Min(1f / _tScale, half);    // ~1 PHYSICAL px, as FillCircle
         float roT = radius + half, roS = roT - aa;            // outer: transparent rim → solid
         float riT = MathF.Max(0f, radius - half), riS = riT + aa;   // inner: transparent rim → solid
         if (riS > roS) riS = roS = (riT + roT) * 0.5f;        // very thin ring → collapse the solid band
