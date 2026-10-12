@@ -27,7 +27,9 @@
         iOS      UIWindow.safeAreaInsets -- notch/Dynamic Island, home indicator,
                  AND the rounded-corner allowance.
         Android  WindowInsets.getDisplayCutout() safe insets (API 28+), widened by
-                 DisplayCutout.getWaterfallInsets() (API 31+) for curved screens.
+                 DisplayCutout.getWaterfallInsets() (API 31+) for curved screens and
+                 by WindowInsets.getRoundedCorner() (API 31+) on the SHORT sides
+                 (left/right in landscape) -- the rounded-corner allowance iOS has.
         others   zero (desktop and web have no cutouts).
 
     HOW TO USE
@@ -207,6 +209,9 @@ static void _ssafe_defer(bool enable) {
 #include <jni.h>
 #include <android/native_activity.h>
 
+static void _ssafe_android_cutout(JNIEnv* env, jclass cls_ins, jobject insets, float* o);
+static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, jclass cls_view, jobject decor, float* o);
+
 /* Best-effort: any failure leaves the caller's zeros in place. */
 static void _ssafe_get(float* o) {
     const ANativeActivity* act = (const ANativeActivity*) sapp_android_get_native_activity();
@@ -232,7 +237,7 @@ static void _ssafe_get(float* o) {
     /* sokol's app thread never returns to Java, so a local reference is only freed
        when this frame is popped -- without it every query pins ~11 references (and
        the Java objects behind them) until the table overflows and ART aborts. */
-    if ((*env)->PushLocalFrame(env, 16) != 0) {
+    if ((*env)->PushLocalFrame(env, 32) != 0) {
         (*env)->ExceptionClear(env);
         return;
     }
@@ -258,11 +263,26 @@ static void _ssafe_get(float* o) {
     if (NULL == insets) { goto cleanup; }
 
     jclass cls_ins = (*env)->GetObjectClass(env, insets);
+    _ssafe_android_cutout(env, cls_ins, insets, o);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); }
+    _ssafe_android_corners(env, cls_ins, insets, cls_view, decor, o);
+
+cleanup:
+    /* A missing method on an older API level raises NoSuchMethodError; that is an
+       expected outcome here, not a failure worth propagating into the app. */
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+    }
+    (*env)->PopLocalFrame(env, NULL);
+}
+
+/* Cutout safe insets (API 28+), widened by the waterfall insets (API 31+). No cutout = no change. */
+static void _ssafe_android_cutout(JNIEnv* env, jclass cls_ins, jobject insets, float* o) {
     /* getDisplayCutout(): API 28+ -- absent (or null) means "no cutout", i.e. zeros. */
     jmethodID m_getCutout = (*env)->GetMethodID(env, cls_ins, "getDisplayCutout", "()Landroid/view/DisplayCutout;");
-    if (NULL == m_getCutout) { goto cleanup; }
+    if (NULL == m_getCutout) { return; }
     jobject cutout = (*env)->CallObjectMethod(env, insets, m_getCutout);
-    if (NULL == cutout) { goto cleanup; }
+    if (NULL == cutout) { return; }
 
     jclass cls_cut = (*env)->GetObjectClass(env, cutout);
     jmethodID m_l = (*env)->GetMethodID(env, cls_cut, "getSafeInsetLeft",   "()I");
@@ -293,14 +313,57 @@ static void _ssafe_get(float* o) {
             }
         }
     }
+}
 
-cleanup:
-    /* A missing method on an older API level raises NoSuchMethodError; that is an
-       expected outcome here, not a failure worth propagating into the app. */
-    if ((*env)->ExceptionCheck(env)) {
-        (*env)->ExceptionClear(env);
+/* Rounded display corners (API 31+), which the cutout insets above never include. An edge-to-edge window
+   (targetSdk 35+ on Android 15+) covers the corners, and a button placed in one is clipped by the arc (Pixel 10a
+   landscape, 2026-10-12). Cleared on the SHORT sides only -- left/right in landscape, top/bottom in portrait --
+   the way iOS's landscape safe area does, so the long axis (a landscape board's height) is never given up. A
+   corner's center is in WINDOW coordinates, so a window that does not reach the corner (letterboxed away from a
+   cutout) gets only what the arc really covers, and a corner outside the window is not reported at all. */
+static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, jclass cls_view, jobject decor, float* o) {
+    jmethodID m_rc = (*env)->GetMethodID(env, cls_ins, "getRoundedCorner", "(I)Landroid/view/RoundedCorner;");
+    if (NULL == m_rc) { return; }   /* < API 31: NoSuchMethodError, cleared by the caller */
+    jmethodID m_w = (*env)->GetMethodID(env, cls_view, "getWidth",  "()I");
+    jmethodID m_h = (*env)->GetMethodID(env, cls_view, "getHeight", "()I");
+    if ((NULL == m_w) || (NULL == m_h)) { return; }
+    const float w = (float)(*env)->CallIntMethod(env, decor, m_w);
+    const float h = (float)(*env)->CallIntMethod(env, decor, m_h);
+    if ((w <= 0.0f) || (h <= 0.0f)) { return; }
+    const bool landscape = (w >= h);
+    /* RoundedCorner.POSITION_TOP_LEFT 0, TOP_RIGHT 1, BOTTOM_RIGHT 2, BOTTOM_LEFT 3 */
+    for (int pos = 0; pos < 4; pos++) {
+        jobject rc = (*env)->CallObjectMethod(env, insets, m_rc, pos);
+        if ((*env)->ExceptionCheck(env)) { return; }
+        if (NULL == rc) { continue; }
+        jclass cls_rc = (*env)->GetObjectClass(env, rc);
+        jmethodID m_rad = (*env)->GetMethodID(env, cls_rc, "getRadius", "()I");
+        jmethodID m_ctr = (*env)->GetMethodID(env, cls_rc, "getCenter", "()Landroid/graphics/Point;");
+        if ((NULL == m_rad) || (NULL == m_ctr)) { return; }
+        const float r = (float)(*env)->CallIntMethod(env, rc, m_rad);
+        jobject pt = (*env)->CallObjectMethod(env, rc, m_ctr);
+        if ((r > 0.0f) && (NULL != pt)) {
+            jclass cls_pt = (*env)->GetObjectClass(env, pt);
+            jfieldID f_x = (*env)->GetFieldID(env, cls_pt, "x", "I");
+            jfieldID f_y = (*env)->GetFieldID(env, cls_pt, "y", "I");
+            if ((NULL == f_x) || (NULL == f_y)) { return; }
+            const float cx = (float)(*env)->GetIntField(env, pt, f_x);
+            const float cy = (float)(*env)->GetIntField(env, pt, f_y);
+            const bool on_left = (pos == 0) || (pos == 3);
+            const bool on_top  = (pos == 0) || (pos == 1);
+            const int  side    = landscape ? (on_left ? 0 : 2) : (on_top ? 1 : 3);
+            float need = landscape ? (on_left ? cx : (w - cx)) : (on_top ? cy : (h - cy));
+            if (need > r) { need = r; }   /* the arc never reaches further in than its radius */
+            /* Window px -> sapp framebuffer px (the documented unit): they differ when sokol renders below
+               the window size (high_dpi off: framebuffer = window / 2). */
+            need *= landscape ? (sapp_widthf() / w) : (sapp_heightf() / h);
+            if (need > o[side]) { o[side] = need; }
+            (*env)->DeleteLocalRef(env, cls_pt);
+        }
+        if (NULL != pt) { (*env)->DeleteLocalRef(env, pt); }
+        (*env)->DeleteLocalRef(env, cls_rc);
+        (*env)->DeleteLocalRef(env, rc);
     }
-    (*env)->PopLocalFrame(env, NULL);
 }
 
 static void _ssafe_defer(bool enable) {
