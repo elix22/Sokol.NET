@@ -2883,7 +2883,11 @@ KeyAlias={keystoreInfo.KeyAlias}
                 manifest.AppendLine($"      android:roundIcon=\"@mipmap/ic_launcher_round\"");
             manifest.AppendLine($"      android:label=\"{appName}\"");
             manifest.AppendLine($"      android:hasCode=\"{hasCode.ToString().ToLower()}\"");
-            
+            // AndroidAppCategory (e.g. "game"): targetSdk 36 ignores screenOrientation on large screens
+            // (sw600dp+) for every app EXCEPT games, so a landscape-locked game must declare it.
+            if (androidProperties.TryGetValue("AndroidAppCategory", out string? appCategory) && !string.IsNullOrWhiteSpace(appCategory))
+                manifest.AppendLine($"      android:appCategory=\"{appCategory.Trim()}\"");
+
             // Add fullscreen theme if enabled - use custom immersive theme
             if (fullscreen)
             {
