@@ -210,7 +210,7 @@ static void _ssafe_defer(bool enable) {
 #include <android/native_activity.h>
 
 static void _ssafe_android_cutout(JNIEnv* env, jclass cls_ins, jobject insets, float* o);
-static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, jclass cls_view, jobject decor, float* o);
+static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, float w, float h, float* o);
 
 /* Best-effort: any failure leaves the caller's zeros in place. */
 static void _ssafe_get(float* o) {
@@ -265,7 +265,19 @@ static void _ssafe_get(float* o) {
     jclass cls_ins = (*env)->GetObjectClass(env, insets);
     _ssafe_android_cutout(env, cls_ins, insets, o);
     if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); }
-    _ssafe_android_corners(env, cls_ins, insets, cls_view, decor, o);
+
+    /* The insets are in WINDOW px; the documented unit is sapp framebuffer px, and the two differ when sokol
+       renders below the window size (high_dpi off: framebuffer = window / 2). Size unknown (not laid out yet):
+       the cutout stays in window px and the corners are skipped. */
+    jmethodID m_w = (*env)->GetMethodID(env, cls_view, "getWidth",  "()I");
+    jmethodID m_h = (*env)->GetMethodID(env, cls_view, "getHeight", "()I");
+    if ((NULL == m_w) || (NULL == m_h)) { goto cleanup; }
+    const float w = (float)(*env)->CallIntMethod(env, decor, m_w);
+    const float h = (float)(*env)->CallIntMethod(env, decor, m_h);
+    if ((w <= 0.0f) || (h <= 0.0f)) { goto cleanup; }
+    o[0] *= sapp_widthf() / w;  o[2] *= sapp_widthf() / w;
+    o[1] *= sapp_heightf() / h; o[3] *= sapp_heightf() / h;
+    _ssafe_android_corners(env, cls_ins, insets, w, h, o);
 
 cleanup:
     /* A missing method on an older API level raises NoSuchMethodError; that is an
@@ -276,7 +288,7 @@ cleanup:
     (*env)->PopLocalFrame(env, NULL);
 }
 
-/* Cutout safe insets (API 28+), widened by the waterfall insets (API 31+). No cutout = no change. */
+/* Cutout safe insets (API 28+), widened by the waterfall insets (API 31+), in window px. No cutout = no change. */
 static void _ssafe_android_cutout(JNIEnv* env, jclass cls_ins, jobject insets, float* o) {
     /* getDisplayCutout(): API 28+ -- absent (or null) means "no cutout", i.e. zeros. */
     jmethodID m_getCutout = (*env)->GetMethodID(env, cls_ins, "getDisplayCutout", "()Landroid/view/DisplayCutout;");
@@ -321,15 +333,9 @@ static void _ssafe_android_cutout(JNIEnv* env, jclass cls_ins, jobject insets, f
    the way iOS's landscape safe area does, so the long axis (a landscape board's height) is never given up. A
    corner's center is in WINDOW coordinates, so a window that does not reach the corner (letterboxed away from a
    cutout) gets only what the arc really covers, and a corner outside the window is not reported at all. */
-static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, jclass cls_view, jobject decor, float* o) {
+static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, float w, float h, float* o) {
     jmethodID m_rc = (*env)->GetMethodID(env, cls_ins, "getRoundedCorner", "(I)Landroid/view/RoundedCorner;");
     if (NULL == m_rc) { return; }   /* < API 31: NoSuchMethodError, cleared by the caller */
-    jmethodID m_w = (*env)->GetMethodID(env, cls_view, "getWidth",  "()I");
-    jmethodID m_h = (*env)->GetMethodID(env, cls_view, "getHeight", "()I");
-    if ((NULL == m_w) || (NULL == m_h)) { return; }
-    const float w = (float)(*env)->CallIntMethod(env, decor, m_w);
-    const float h = (float)(*env)->CallIntMethod(env, decor, m_h);
-    if ((w <= 0.0f) || (h <= 0.0f)) { return; }
     const bool landscape = (w >= h);
     /* RoundedCorner.POSITION_TOP_LEFT 0, TOP_RIGHT 1, BOTTOM_RIGHT 2, BOTTOM_LEFT 3 */
     for (int pos = 0; pos < 4; pos++) {
@@ -354,8 +360,7 @@ static void _ssafe_android_corners(JNIEnv* env, jclass cls_ins, jobject insets, 
             const int  side    = landscape ? (on_left ? 0 : 2) : (on_top ? 1 : 3);
             float need = landscape ? (on_left ? cx : (w - cx)) : (on_top ? cy : (h - cy));
             if (need > r) { need = r; }   /* the arc never reaches further in than its radius */
-            /* Window px -> sapp framebuffer px (the documented unit): they differ when sokol renders below
-               the window size (high_dpi off: framebuffer = window / 2). */
+            /* Window px -> sapp framebuffer px, as for the cutout above. */
             need *= landscape ? (sapp_widthf() / w) : (sapp_heightf() / h);
             if (need > o[side]) { o[side] = need; }
             (*env)->DeleteLocalRef(env, cls_pt);
