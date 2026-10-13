@@ -12,6 +12,7 @@ Optional, self-contained add-ons that extend Sokol.NET applications.
 | [Billing](Billing/README.md) | Android, iOS | One-time in-app purchases (Play Billing 7 / StoreKit 2), with the store's signed proof handed to the app for its own verification |
 | [Links](Links/README.md) | Android, iOS, macOS, Windows, Linux, Web | Open a link with the system handler (`Links.Open(url)`): web URLs in the default browser, `mailto:` in the mail app |
 | [IncomingLinks](IncomingLinks/README.md) | Android | Receive the link that opened the app (`IncomingLinks.TakePending()`): Android App Links and custom URL schemes, cold start and while running |
+| [AppUpdate](AppUpdate/README.md) | Android | Google Play In-App Updates, FLEXIBLE flow (`AppUpdate.Check()` / `StartFlexible()` / `Complete()`), with Play's `FakeAppUpdateManager` for testing |
 
 `Ads` and `Billing` have no desktop or web backend. Rather than requiring `#if` at every call site,
 their managed layer stubs each call and completes it through the normal event path (queries fail,

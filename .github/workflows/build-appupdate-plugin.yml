@@ -1,0 +1,122 @@
+name: Build AppUpdate Plugin
+
+# Builds plugins/AppUpdate (sokol_appupdate, Google Play In-App Updates) on every change to the plugin, and commits the
+# prebuilt Android libraries back to plugins/AppUpdate/libs/ on main — every shipped library is a CI build, never a local
+# one. Android is the only native backend; the managed layer (a no-op stub elsewhere) is compiled for every platform
+# symbol set. A change is not done until every job is green.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/AppUpdate/**'
+      - '!plugins/AppUpdate/libs/**'
+      - '.github/workflows/build-appupdate-plugin.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'plugins/AppUpdate/**'
+      - '!plugins/AppUpdate/libs/**'
+      - '.github/workflows/build-appupdate-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android (arm64-v8a, armeabi-v7a, x86_64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: ''
+    - name: Install Android NDK
+      run: |
+        sdkmanager --install "ndk;27.2.12479018"
+        echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+    - name: Build
+      run: ./plugins/AppUpdate/scripts/build-android.sh
+    - name: Check 16 KB page alignment (Google Play, Android 15+ — 64-bit ABIs only, as the NDK flag)
+      run: |
+        READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        for so in plugins/AppUpdate/libs/android/{arm64-v8a,x86_64}/release/libsokol_appupdate.so; do
+          align=$("$READELF" -l "$so" | awk '/LOAD/ {print $NF; exit}')
+          echo "$so: LOAD align $align"
+          [ "$align" = "0x4000" ] || { echo "::error::$so is not 16 KB aligned ($align)"; exit 1; }
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: appupdate-android
+        path: plugins/AppUpdate/libs/android/**/*
+        retention-days: 30
+
+  build-managed:
+    name: Managed layer (every platform symbol set)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Compile the managed layer for every platform symbol set
+      run: |
+        set -e
+        mkdir -p /tmp/appupdate-managed && cd /tmp/appupdate-managed
+        cat > appupdate.csproj <<'PROJ'
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net10.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            <DefineConstants>$(DefineConstants);$(AppUpdateSymbols)</DefineConstants>
+          </PropertyGroup>
+          <ItemGroup>
+            <Compile Include="$(GITHUB_WORKSPACE)/plugins/AppUpdate/managed/*.cs" />
+          </ItemGroup>
+        </Project>
+        PROJ
+        for SYMS in "" "__LINUX__" "__WINDOWS__" "__MACOS__" "__ANDROID__" "__IOS__" "WEB"; do
+          echo "=== DefineConstants: '${SYMS:-<none>}'"
+          dotnet build -c Release -p:AppUpdateSymbols="$SYMS" --nologo -v q
+        done
+
+  commit-libs:
+    name: Commit the Android libraries
+    needs: [build-android, build-managed]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Download the artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Commit the libraries
+      run: |
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p plugins/AppUpdate/libs/android
+        cp -r ../artifacts/appupdate-android/* plugins/AppUpdate/libs/android/
+        LIBS="plugins/AppUpdate/libs"
+        if [ -z "$(git status --porcelain $LIBS)" ]; then
+          echo "No sokol_appupdate library change to commit"
+          exit 0
+        fi
+        git add $LIBS
+        git commit -m "Auto-update built sokol_appupdate libraries (Android) [skip ci]" \
+                   -m "Generated from commit: ${{ github.sha }}" \
+                   -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        git pull --rebase origin main
+        git push origin main
+        echo "✓ Committed sokol_appupdate libraries"

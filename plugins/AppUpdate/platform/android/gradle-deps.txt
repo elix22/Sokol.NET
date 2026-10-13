@@ -1,0 +1,2 @@
+# Google Play In-App Updates (Play Core app-update). FakeAppUpdateManager (testing) ships in the same AAR.
+com.google.android.play:app-update:2.1.0
