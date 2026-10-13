@@ -182,7 +182,7 @@ public sealed class Screen : Widget
     /// Close and dismiss the active popup, if any.
     /// Returns true when a popup was closed.
     /// </summary>
-    internal static bool CloseActivePopup()
+    public static bool CloseActivePopup()
     {
         if (_activePopup == null) return false;
         _activePopup.OnPopupDismiss();

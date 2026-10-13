@@ -38,6 +38,14 @@ public class SokolNativeActivity extends NativeActivity {
     // per event (deletes past the real text are harmless no-ops).
     private static final int KB_PAD = 64;
 
+    // Back on API 33+ (an android.window.OnBackInvokedCallback, typed Object so this class never names
+    // android.window on older devices — see BackApi33). Android 16+ with targetSdk 36 no longer
+    // dispatches KEYCODE_BACK or onBackPressed: the callback is the only way Back reaches the app.
+    // sokol_app turns it into SAPP_EVENTTYPE_QUIT_REQUESTED (cancellable with sapp_cancel_quit()).
+    // On API < 33, or while the system ignores the callback, the KEYCODE_BACK path in sokol_app does
+    // the same.
+    private Object backCallback;
+
     // The ACTION_VIEW link (App Link / custom-scheme URL) that started or resumed the app, kept until native
     // code takes it (plugins/IncomingLinks). singleTask hands a link that arrives while the app runs to
     // onNewIntent; a newer link replaces one not taken yet.
@@ -78,6 +86,38 @@ public class SokolNativeActivity extends NativeActivity {
         
         // Enable immersive fullscreen mode if the theme is set to fullscreen
         enableImmersiveMode();
+
+        if (Build.VERSION.SDK_INT >= 33) backCallback = BackApi33.register(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Before super.onDestroy: NativeActivity's onDestroy closes sokol's message pipe.
+        if (backCallback != null) {
+            BackApi33.unregister(this, backCallback);
+            backCallback = null;
+        }
+        super.onDestroy();
+    }
+
+    // Loaded only on API 33+ (android.window.OnBackInvoked* do not exist before).
+    private static final class BackApi33 {
+        static Object register(SokolNativeActivity activity) {
+            android.window.OnBackInvokedCallback cb = new android.window.OnBackInvokedCallback() {
+                @Override
+                public void onBackInvoked() {
+                    activity.nativeOnBackInvoked();
+                }
+            };
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
+            return cb;
+        }
+
+        static void unregister(SokolNativeActivity activity, Object cb) {
+            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                (android.window.OnBackInvokedCallback) cb);
+        }
     }
     
     private void createHiddenEditText() {
@@ -240,6 +280,8 @@ public class SokolNativeActivity extends NativeActivity {
     // Native methods to forward keyboard events
     private native void nativeOnKeyboardChar(int codepoint);
     private native void nativeOnKeyboardKey(int keycode, boolean down);
+    // Back (OnBackInvokedCallback) → sokol_app's message pipe, see BackApi33
+    private native void nativeOnBackInvoked();
 
     // @TEMPLATE_RUNTIME_PERMISSIONS_CALLBACK@
 }
