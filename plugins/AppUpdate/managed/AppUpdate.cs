@@ -51,7 +51,9 @@ public static class AppUpdate
     public static AppUpdateState State { get; private set; } = new() { StalenessDays = -1 };
 
     /// <summary>Raised from within <see cref="Poll"/>, on the polling thread.</summary>
+#pragma warning disable CS0067   // never raised where there is no backend
     public static event Action<AppUpdateState>? Changed;
+#pragma warning restore CS0067
 
 #if __ANDROID__
     static bool _inited;
