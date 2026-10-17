@@ -8,13 +8,13 @@ Sokol.NET is a comprehensive C# binding and application framework built on top o
 
 ## 🎲 Jambolaya — 140 games, made with Sokol.NET
 
-**[🌐 jambolaya.games](https://jambolaya.games)** · **[📲 Get it on Google Play](https://play.google.com/store/apps/details?id=com.elialoni.Jambolaya&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme)** · **🍎 App Store — coming soon** · **[▶️ Watch the video](https://www.youtube.com/watch?v=weHqHk0sxnQ)**
+**[🌐 jambolaya.games](https://jambolaya.games)** · **[📲 Get it on Google Play](https://play.google.com/store/apps/details?id=com.elialoni.Jambolaya&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme)** · **[🍎 Download on the App Store](https://apps.apple.com/app/id6799744915)** · **[▶️ Watch the video](https://www.youtube.com/watch?v=weHqHk0sxnQ)**
 
 **Jambolaya** is 140 board, card, brain, puzzle and arcade games in one app. Play on your own, take on the computer, or play together with family and friends nearby — everyone on their own phone, in the same room, the same car or the same tent. No Wi-Fi, no internet, no accounts.
 
 - 🆓 Play on your own and against the computer for free, in 10 languages
 - 💻 On a computer? Play free right in your browser at [jambolaya.games](https://jambolaya.games)
-- 📱 Android today on Google Play; the iPhone and iPad version is on its way to the App Store
+- 📱 On Android from Google Play, and on iPhone and iPad from the App Store
 
 Built with Sokol.NET and .NET NativeAOT — one C# codebase running on Android, iOS and the web.
 
