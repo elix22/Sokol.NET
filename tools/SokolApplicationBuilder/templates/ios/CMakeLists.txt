@@ -88,6 +88,15 @@ if(EXISTS ${ASSETS_XCASSETS_DIR})
     )
 endif()
 
+# Privacy manifest at the bundle root, if the project has one (IOSAppBuilder.CopyPrivacyManifest)
+set(PRIVACY_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/PrivacyInfo.xcprivacy")
+if(EXISTS ${PRIVACY_MANIFEST})
+    target_sources(TEMPLATE_PROJECT_NAME-ios-app PRIVATE "${PRIVACY_MANIFEST}")
+    set_source_files_properties("${PRIVACY_MANIFEST}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+endif()
+
 # Set development team if provided
 if(DEFINED DEVELOPMENT_TEAM)
     set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES

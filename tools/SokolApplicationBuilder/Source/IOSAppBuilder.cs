@@ -217,6 +217,8 @@ namespace SokolApplicationBuilder
                 if (!CompleteFrameworkInfoPlists(Path.Combine(iosDir, "frameworks")))
                     return false;
 
+                CopyPrivacyManifest(iosDir, projectDir);
+
                 // Copy iOS templates
                 if (!CopyIOSTemplates(iosDir, projectName))
                     return false;
@@ -559,6 +561,31 @@ namespace SokolApplicationBuilder
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// A project's <c>PrivacyInfo.xcprivacy</c> (next to its .csproj) goes to the app bundle root
+        /// (ios/CMakeLists.txt adds it) and into every embedded framework: Apple requires a privacy
+        /// manifest in each bundle whose executable calls a required-reason API, and the .NET runtime,
+        /// sokol and miniaudio live in frameworks, not in the app executable. Without the file nothing
+        /// is copied and a stale ios/ copy is removed.
+        /// </summary>
+        private void CopyPrivacyManifest(string iosDir, string projectDir)
+        {
+            const string name = "PrivacyInfo.xcprivacy";
+            string source = Path.Combine(projectDir, name);
+            string appCopy = Path.Combine(iosDir, name);
+            if (!File.Exists(source))
+            {
+                if (File.Exists(appCopy))
+                    File.Delete(appCopy);
+                return;
+            }
+
+            File.Copy(source, appCopy, true);
+            foreach (string frameworkDir in Directory.GetDirectories(Path.Combine(iosDir, "frameworks"), "*.framework"))
+                File.Copy(source, Path.Combine(frameworkDir, name), true);
+            Log.LogMessage(MessageImportance.High, $"🔒 {name} → app bundle + every embedded framework");
         }
 
         private bool CopyIOSTemplates(string iosDir, string projectName)
