@@ -97,6 +97,15 @@ if(EXISTS ${PRIVACY_MANIFEST})
     )
 endif()
 
+# <lang>.lproj folders at the bundle root, if the project has them (IOSAppBuilder.CopyLocalizations)
+file(GLOB LOCALIZATION_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Localizations/*.lproj")
+foreach(LPROJ ${LOCALIZATION_DIRS})
+    target_sources(TEMPLATE_PROJECT_NAME-ios-app PRIVATE "${LPROJ}")
+    set_source_files_properties("${LPROJ}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+endforeach()
+
 # Set development team if provided
 if(DEFINED DEVELOPMENT_TEAM)
     set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES

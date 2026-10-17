@@ -179,7 +179,22 @@ static void _ssafe_get(float* o) {
     }
     /* safeAreaInsets is in POINTS and already accounts for the rounded corners,
        so a notchless-but-round phone still reports a non-zero landscape inset. */
-    const UIEdgeInsets ins = win.safeAreaInsets;
+    UIEdgeInsets ins = win.safeAreaInsets;
+#if defined(__IPHONE_26_0)
+    /* iPadOS 26+ windowed apps draw the window controls in the top-left corner, inside
+       the plain safe area. The vertically corner-adapted safe area moves the top edge
+       below them. iPad only, and only its top: on an iPhone it also counts the rounded
+       display corners (14 pt more on a 15 Pro Max), where there are no window controls. */
+    if (@available(iOS 26.0, *)) {
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            const UIEdgeInsets adapted = [win edgeInsetsForLayoutRegion:
+                [UIViewLayoutRegion safeAreaLayoutRegionWithCornerAdaptation:UIViewLayoutRegionAdaptivityAxisVertical]];
+            if (adapted.top > ins.top) {
+                ins.top = adapted.top;
+            }
+        }
+    }
+#endif
     const float s = sapp_dpi_scale();
     o[0] = (float)ins.left   * s;
     o[1] = (float)ins.top    * s;

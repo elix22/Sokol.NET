@@ -87,6 +87,10 @@ namespace SokolApplicationBuilder
         private string iOSScreenOrientation = "both";
         private bool iOSRequiresFullScreen = false;
         private bool iOSStatusBarHidden = false;
+        // Launch screen background (#RRGGBB) from <IOSLaunchScreenColor>; empty = the system background
+        private string iOSLaunchScreenColor = string.Empty;
+        // Folder (relative to the project) holding <lang>.lproj folders, from <IOSLocalizationsPath>
+        private string iOSLocalizationsPath = string.Empty;
         private string iOSDevelopmentTeam = string.Empty;
         private string iOSIcon = string.Empty;
         private string appVersion = "1.0"; // Application version (common across all platforms)
@@ -225,6 +229,9 @@ namespace SokolApplicationBuilder
 
                 // Process iOS icon if specified
                 ProcessIOSIcon(iosDir, projectDir);
+
+                if (!WriteLaunchScreenColor(iosDir) || !CopyLocalizations(iosDir, projectDir))
+                    return false;
 
                 // Generate Xcode project
                 if (!GenerateXcodeProject(iosDir, projectName))
@@ -588,6 +595,78 @@ namespace SokolApplicationBuilder
             Log.LogMessage(MessageImportance.High, $"🔒 {name} → app bundle + every embedded framework");
         }
 
+        const string LaunchScreenColorName = "LaunchScreenBackground";
+
+        /// <summary>
+        /// <c>&lt;IOSLaunchScreenColor&gt;#RRGGBB&lt;/IOSLaunchScreenColor&gt;</c> becomes a colour set in
+        /// Assets.xcassets that the Info.plist's UILaunchScreen names, so the launch screen matches the
+        /// app's first frame instead of the system background (white or black with the appearance).
+        /// Without the property a stale colour set is removed.
+        /// </summary>
+        private bool WriteLaunchScreenColor(string iosDir)
+        {
+            string assetsDir = Path.Combine(iosDir, "Assets.xcassets");
+            string setDir = Path.Combine(assetsDir, LaunchScreenColorName + ".colorset");
+            if (string.IsNullOrEmpty(iOSLaunchScreenColor))
+            {
+                if (Directory.Exists(setDir))
+                    Directory.Delete(setDir, recursive: true);
+                return true;
+            }
+
+            string hex = iOSLaunchScreenColor.TrimStart('#');
+            if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out _))
+            {
+                Log.LogError($"❌ IOSLaunchScreenColor must be #RRGGBB, got '{iOSLaunchScreenColor}'");
+                return false;
+            }
+
+            Directory.CreateDirectory(setDir);
+            string assetsContents = Path.Combine(assetsDir, "Contents.json");
+            if (!File.Exists(assetsContents))
+                File.WriteAllText(assetsContents, "{\n  \"info\" : {\n    \"author\" : \"xcode\",\n    \"version\" : 1\n  }\n}\n");
+            File.WriteAllText(Path.Combine(setDir, "Contents.json"),
+                "{\n  \"colors\" : [\n    {\n      \"color\" : {\n        \"color-space\" : \"srgb\",\n        \"components\" : {\n" +
+                $"          \"alpha\" : \"1.000\",\n          \"blue\" : \"0x{hex.Substring(4, 2)}\",\n" +
+                $"          \"green\" : \"0x{hex.Substring(2, 2)}\",\n          \"red\" : \"0x{hex.Substring(0, 2)}\"\n" +
+                "        }\n      },\n      \"idiom\" : \"universal\"\n    }\n  ],\n  \"info\" : {\n    \"author\" : \"xcode\",\n    \"version\" : 1\n  }\n}\n");
+            Log.LogMessage(MessageImportance.High, $"🎨 Launch screen colour #{hex}");
+            return true;
+        }
+
+        /// <summary>
+        /// Every <c>&lt;lang&gt;.lproj</c> folder in <c>&lt;IOSLocalizationsPath&gt;</c> is copied to
+        /// ios/Localizations (ios/CMakeLists.txt puts each at the bundle root). The App Store lists an
+        /// app's languages from these folders, and iOS reads a localized InfoPlist.strings from them
+        /// (e.g. a permission purpose string). ios/Localizations is rebuilt on every build.
+        /// </summary>
+        private bool CopyLocalizations(string iosDir, string projectDir)
+        {
+            string dest = Path.Combine(iosDir, "Localizations");
+            if (Directory.Exists(dest))
+                Directory.Delete(dest, recursive: true);
+            if (string.IsNullOrEmpty(iOSLocalizationsPath))
+                return true;
+
+            string source = Path.GetFullPath(Path.Combine(projectDir, iOSLocalizationsPath));
+            string[] lprojs = Directory.Exists(source) ? Directory.GetDirectories(source, "*.lproj") : Array.Empty<string>();
+            if (lprojs.Length == 0)
+            {
+                Log.LogError($"❌ IOSLocalizationsPath '{source}' has no <lang>.lproj folders");
+                return false;
+            }
+
+            foreach (string lproj in lprojs)
+            {
+                string target = Path.Combine(dest, Path.GetFileName(lproj));
+                Directory.CreateDirectory(target);
+                foreach (string file in Directory.GetFiles(lproj))
+                    File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true);
+            }
+            Log.LogMessage(MessageImportance.High, $"🌐 {lprojs.Length} localization(s): {string.Join(", ", lprojs.Select(Path.GetFileName).OrderBy(n => n))}");
+            return true;
+        }
+
         private bool CopyIOSTemplates(string iosDir, string projectName)
         {
             try
@@ -736,6 +815,8 @@ namespace SokolApplicationBuilder
                         ? "\n    <key>UIRequiresFullScreen</key>\n    <true/>"
                         : "";
                     plistContent = plistContent.Replace("@TEMPLATE_REQUIRES_FULLSCREEN@", requiresFullScreenPlist);
+                    plistContent = plistContent.Replace("@TEMPLATE_LAUNCH_SCREEN_COLOR@",
+                        string.IsNullOrEmpty(iOSLaunchScreenColor) ? "" : LaunchScreenColorName);
 
                     // Inject arbitrary Info.plist key/value pairs from IOSInfoPlistKey_* properties.
                     // Each entry becomes:  <key>KeyName</key>\n    <string>value</string>
@@ -1489,6 +1570,20 @@ namespace SokolApplicationBuilder
                         propertyCount++;
                     }
 
+                    var launchColorElement = propertyGroup.Element("IOSLaunchScreenColor");
+                    if (launchColorElement != null && !string.IsNullOrEmpty(launchColorElement.Value))
+                    {
+                        iOSLaunchScreenColor = launchColorElement.Value.Trim();
+                        propertyCount++;
+                    }
+
+                    var localizationsElement = propertyGroup.Element("IOSLocalizationsPath");
+                    if (localizationsElement != null && !string.IsNullOrEmpty(localizationsElement.Value))
+                    {
+                        iOSLocalizationsPath = localizationsElement.Value.Trim();
+                        propertyCount++;
+                    }
+
                     // iOS Status Bar Hidden
                     var statusBarElement = propertyGroup.Element("IOSStatusBarHidden");
                     if (statusBarElement != null && !string.IsNullOrEmpty(statusBarElement.Value))
@@ -1611,6 +1706,10 @@ namespace SokolApplicationBuilder
                         Log.LogMessage(MessageImportance.High, $"   - IOSScreenOrientation: {iOSScreenOrientation}");
                     Log.LogMessage(MessageImportance.High, $"   - IOSRequiresFullScreen: {iOSRequiresFullScreen}");
                     Log.LogMessage(MessageImportance.High, $"   - IOSStatusBarHidden: {iOSStatusBarHidden}");
+                    if (!string.IsNullOrEmpty(iOSLaunchScreenColor))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSLaunchScreenColor: {iOSLaunchScreenColor}");
+                    if (!string.IsNullOrEmpty(iOSLocalizationsPath))
+                        Log.LogMessage(MessageImportance.High, $"   - IOSLocalizationsPath: {iOSLocalizationsPath}");
                     if (!string.IsNullOrEmpty(iOSDevelopmentTeam))
                         Log.LogMessage(MessageImportance.High, $"   - IOSDevelopmentTeam: {iOSDevelopmentTeam}");
                     if (!string.IsNullOrEmpty(iOSIcon))

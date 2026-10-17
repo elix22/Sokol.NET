@@ -63,7 +63,7 @@
     <key>UILaunchScreen</key>
     <dict>
         <key>UIColorName</key>
-        <string></string>
+        <string>@TEMPLATE_LAUNCH_SCREEN_COLOR@</string>
         <key>UIImageName</key>
         <string></string>
     </dict>
