@@ -81,11 +81,11 @@ public class SpinBox : Widget
             MathF.Max(cr - 0.5f, 0f), 1f,
             IsFocused ? theme.AccentColor : UIColor.Black.WithAlpha(0.188f));
 
-        // Left button [−] or [+] depending on RTL
-        DrawArrowButton(renderer, theme, minusBtnR, minusBtnLabel, _leftHovered, _leftPressed, !rtl, cr);
+        // Left button [−] or [+] depending on RTL. Hover/press flags are by physical side, so in RTL the [−] (right) uses the right flags.
+        DrawArrowButton(renderer, theme, minusBtnR, minusBtnLabel, rtl ? _rightHovered : _leftHovered, rtl ? _rightPressed : _leftPressed, !rtl, cr);
 
         // Right button [+] or [−] depending on RTL
-        DrawArrowButton(renderer, theme, plusBtnR, plusBtnLabel, _rightHovered, _rightPressed, rtl, cr);
+        DrawArrowButton(renderer, theme, plusBtnR, plusBtnLabel, rtl ? _leftHovered : _rightHovered, rtl ? _leftPressed : _rightPressed, rtl, cr);
 
         // Divider lines
         renderer.DrawLine(btnW, 3f, btnW, h - 3f, 1f, theme.BorderColor);
@@ -190,17 +190,19 @@ public class SpinBox : Widget
         if (e.Button != MouseButton.Left) return false;
         float btnW   = Bounds.Height;
         float localX = e.LocalPosition.X;
+        // RTL draws [+] on the left and [−] on the right (see Draw), so the left button steps up there.
+        float leftDir = ResolvedFlowDirection == FlowDirection.RightToLeft ? +1f : -1f;
         if (localX < btnW)
         {
             _leftPressed  = true;
-            ChangeValue(-1f);
-            StartHold(-1f);
+            ChangeValue(leftDir);
+            StartHold(leftDir);
         }
         else if (localX >= Bounds.Width - btnW)
         {
             _rightPressed = true;
-            ChangeValue(+1f);
-            StartHold(+1f);
+            ChangeValue(-leftDir);
+            StartHold(-leftDir);
         }
         return true;
     }
