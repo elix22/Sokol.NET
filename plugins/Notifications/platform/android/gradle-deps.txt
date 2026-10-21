@@ -1,0 +1,3 @@
+# WorkManager: one-time work posts each scheduled notification; it survives reboots and app
+# updates by itself (no boot receiver, no exact-alarm permission).
+androidx.work:work-runtime:2.10.5

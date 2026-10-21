@@ -95,6 +95,19 @@ Each request is bounded by the permission's own API window:
 > app sees a plain denial. Any UI that waits for the user's answer then waits for an answer that can
 > never arrive.
 
+#### Asking later instead of at launch (`AndroidPermissionsNoAutoRequest`)
+
+A permission the app requests itself, at a moment that makes sense to the user, is listed here too.
+It stays in the manifest but is left out of the launch-time prompt:
+
+```xml
+<AndroidPermissions>android.permission.BLUETOOTH_SCAN;android.permission.POST_NOTIFICATIONS</AndroidPermissions>
+<AndroidPermissionsNoAutoRequest>android.permission.POST_NOTIFICATIONS</AndroidPermissionsNoAutoRequest>
+```
+
+Typical use: notifications (`plugins/Notifications` asks for `POST_NOTIFICATIONS` when the app calls
+`Notifications.RequestPermission()`).
+
 ### Bluetooth / BLE permissions
 
 Android 12 (API 31) replaced the Bluetooth permission model outright, so an app supporting anything
