@@ -96,7 +96,8 @@ public final class SokolNotifications {
 
     private static final int PERM_POLL_MS  = 250;
     private static final int PERM_SHOWN_MS = 1500;  // slow phones take a moment to raise it
-    private static final int PERM_POLL_MAX = 240;   // 60 s, for a dialog left open in the background
+    // No time limit while the dialog is up: a player may take minutes to answer. A 60 s cap read a late
+    // "Allow" as refused (the app stayed off while Android had granted it).
 
     /**
      * Raise the POST_NOTIFICATIONS dialog (API 33+) and report the outcome as EV_PERMISSION.
@@ -126,10 +127,12 @@ public final class SokolNotifications {
                 @Override public void run() {
                     tries++;
                     if (status() == ST_GRANTED) { nativeOnEvent(EV_PERMISSION, ST_GRANTED, 0); return; }
+                    // The activity went away under the dialog: its focus will never come back to answer.
+                    if (act.isFinishing() || act.isDestroyed()) { nativeOnEvent(EV_PERMISSION, ST_DENIED, 0); return; }
                     boolean focused = act.hasWindowFocus();
                     if (!focused) focusLost = true;
                     boolean answered = focused && (focusLost || tries * PERM_POLL_MS >= PERM_SHOWN_MS);
-                    if (answered || tries >= PERM_POLL_MAX) { nativeOnEvent(EV_PERMISSION, ST_DENIED, 0); return; }
+                    if (answered) { nativeOnEvent(EV_PERMISSION, ST_DENIED, 0); return; }
                     main.postDelayed(this, PERM_POLL_MS);
                 }
             }, PERM_POLL_MS);
