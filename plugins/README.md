@@ -13,6 +13,7 @@ Optional, self-contained add-ons that extend Sokol.NET applications.
 | [Links](Links/README.md) | Android, iOS, macOS, Windows, Linux, Web | Open a link with the system handler (`Links.Open(url)`): web URLs in the default browser, `mailto:` in the mail app |
 | [IncomingLinks](IncomingLinks/README.md) | Android | Receive the link that opened the app (`IncomingLinks.TakePending()`): Android App Links and custom URL schemes, cold start and while running |
 | [AppUpdate](AppUpdate/README.md) | Android | Google Play In-App Updates, FLEXIBLE flow (`AppUpdate.Check()` / `StartFlexible()` / `Complete()`), with Play's `FakeAppUpdateManager` for testing |
+| [Notifications](Notifications/README.md) | Android, iOS | Local scheduled notifications (`Notifications.Schedule(id, at, …)`): WorkManager / `UNUserNotificationCenter`, no push or server; permission asked when the app chooses |
 
 `Ads` and `Billing` have no desktop or web backend. Rather than requiring `#if` at every call site,
 their managed layer stubs each call and completes it through the normal event path (queries fail,

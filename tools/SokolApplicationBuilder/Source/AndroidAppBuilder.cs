@@ -2010,11 +2010,23 @@ link_directories(${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}})
             }
 
             // Determine which declared permissions are dangerous (need runtime request)
+            // AndroidPermissionsNoAutoRequest: dangerous permissions the app asks for ITSELF, at a moment
+            // of its choosing (e.g. POST_NOTIFICATIONS after the player opted in). They stay in the
+            // manifest but are left out of the launch-time prompt.
+            var noAutoRequest = new HashSet<string>(
+                androidProperties.GetValueOrDefault("AndroidPermissionsNoAutoRequest", "")
+                    .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => p.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
             var declaredPermissions = GetAndroidPermissions(androidProperties);
             var runtimePermissions = declaredPermissions
                 .Select(ParsePermission)
-                .Where(p => DangerousPermissions.ContainsKey(p.Name))
+                .Where(p => DangerousPermissions.ContainsKey(p.Name) && !noAutoRequest.Contains(p.Name))
                 .ToList();
+
+            if (noAutoRequest.Count > 0)
+                Log.LogMessage(MessageImportance.High, $"ℹ️  Not requested at launch (AndroidPermissionsNoAutoRequest): {string.Join(", ", noAutoRequest)}");
 
             if (runtimePermissions.Count == 0)
             {
