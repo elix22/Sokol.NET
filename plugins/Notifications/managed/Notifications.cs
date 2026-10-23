@@ -153,13 +153,18 @@ public static class Notifications
 #endif
     }
 
+    /// <summary>Most events one <see cref="Poll"/> raises (the native queue's capacity). A handler that
+    /// emits a new event each time (e.g. RequestPermission once the answer is known) can then never
+    /// keep Poll looping: the rest waits for the next frame.</summary>
+    const int MaxEventsPerPoll = 80;
+
     /// <summary>Drain pending events; call once per frame from the game loop.</summary>
     public static void Poll()
     {
-        while (_stubQueue.Count > 0)
+        for (int n = _stubQueue.Count; n > 0; n--)   // only what was queued before this call
             OnEvent?.Invoke(_stubQueue.Dequeue());
 #if __ANDROID__ || __IOS__
-        while (SokolNotifications.PollEvent(out SokolNotifications.Event e))
+        for (int n = 0; n < MaxEventsPerPoll && SokolNotifications.PollEvent(out SokolNotifications.Event e); n++)
             OnEvent?.Invoke(new NotificationEvent {
                 Type = (NotificationEventType)e.type, Value = e.value, Time = e.time });
 #endif
