@@ -30,7 +30,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         // ── public API ───────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Load an OBJ file from raw bytes and upload to GPU.
+        /// Load an OBJ (or, by a ".stl" path, STL) file from raw bytes and upload to GPU.
         /// Returns the 16-bit MeshId. Ref-counted: safe to call multiple times for the same path.
         /// Returns 0 on failure.
         /// </summary>
@@ -42,8 +42,9 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 return existing.Id;
             }
 
-            string text = System.Text.Encoding.UTF8.GetString(data);
-            ObjMesh obj = ObjLoader.Load(text.AsSpan(), path);
+            ObjMesh obj = path.EndsWith(".stl", StringComparison.OrdinalIgnoreCase)
+                ? StlLoader.Load(data, path)
+                : ObjLoader.Load(System.Text.Encoding.UTF8.GetString(data).AsSpan(), path);
 
             if (obj.SubMeshes.Length == 0) return 0;
 
