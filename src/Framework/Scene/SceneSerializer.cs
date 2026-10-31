@@ -34,11 +34,12 @@ namespace GameEditor.Framework.Scene
         /// Adds a component block outside the built-in set (e.g. a plugin's components). Register at
         /// startup, before any scene loads.
         /// <paramref name="write"/> returns the block's JSON value for an entity, or null when the entity
-        /// has none. <paramref name="read"/> runs after every entity of the scene exists; its resolver maps
-        /// a saved entity id (written as <c>entity.GetHashCode()</c>, like the built-in references) to the
-        /// loaded entity, or <see cref="Entity.Null"/>.
-        /// In a build without the extension the block is kept verbatim (<see cref="PreservedComponents"/>),
-        /// but saved entity ids inside it are not remapped on the next save.
+        /// has none; it writes entity references as <see cref="ECSWorld.GetSceneId"/>, like the built-in ones.
+        /// <paramref name="read"/> runs after every entity of the scene exists; its resolver maps a saved
+        /// entity id to the loaded entity, or <see cref="Entity.Null"/> when no entity has that id (deleted,
+        /// or never existed) — the reader skips such a reference.
+        /// In a build without the extension the block is kept verbatim (<see cref="PreservedComponents"/>).
+        /// Entities keep their scene ids through load and save, so references inside it stay valid.
         /// </summary>
         public static void RegisterComponentExtension(string key,
             Func<ECSWorld, Entity, string?> write,
@@ -64,7 +65,7 @@ namespace GameEditor.Framework.Scene
                 if (!firstEntity) sb.Append(',');
                 firstEntity = false;
 
-                sb.Append("{\"id\":").Append(id.GetHashCode()).Append(",\"c\":{");
+                sb.Append("{\"id\":").Append(world.GetSceneId(id)).Append(",\"c\":{");
                 bool fc = true;
 
                 if (world.TryGetComponent<NameTag>(id, out var nt))
@@ -85,7 +86,7 @@ namespace GameEditor.Framework.Scene
                     sb.Append("\"Transform\":{\"P\":").Append(V3(tr.Position))
                       .Append(",\"E\":").Append(V3(tr.EulerAngles))
                       .Append(",\"S\":").Append(V3(tr.Scale));
-                    if (tr.Parent.HasValue) sb.Append(",\"Par\":").Append(tr.Parent.Value.GetHashCode());
+                    if (tr.Parent.HasValue) sb.Append(",\"Par\":").Append(world.GetSceneId(tr.Parent.Value));
                     sb.Append('}');
                 }
 
@@ -228,8 +229,8 @@ namespace GameEditor.Framework.Scene
                 {
                     Comma(sb, ref fc);
                     sb.Append("\"Constraint\":{\"T\":\"").Append(con.Type.ToString()).Append('"')
-                      .Append(",\"A\":").Append(!con.BodyA.IsNull ? con.BodyA.GetHashCode() : -1)
-                      .Append(",\"B\":").Append(!con.BodyB.IsNull ? con.BodyB.GetHashCode() : -1)
+                      .Append(",\"A\":").Append(!con.BodyA.IsNull ? world.GetSceneId(con.BodyA) : -1)
+                      .Append(",\"B\":").Append(!con.BodyB.IsNull ? world.GetSceneId(con.BodyB) : -1)
                       .Append(",\"AA\":").Append(V3(con.LocalAnchorA))
                       .Append(",\"AB\":").Append(V3(con.LocalAnchorB))
                       .Append(",\"XA\":").Append(V3(con.LocalAxisA))
@@ -300,7 +301,7 @@ namespace GameEditor.Framework.Scene
                 {
                     Comma(sb, ref fc);
                     sb.Append("\"WheelFollow\":{\"V\":")
-                      .Append(!wf.VehicleEntity.IsNull ? wf.VehicleEntity.GetHashCode() : -1)
+                      .Append(!wf.VehicleEntity.IsNull ? world.GetSceneId(wf.VehicleEntity) : -1)
                       .Append(",\"WI\":").Append(wf.WheelIndex)
                       .Append('}');
                 }
@@ -326,7 +327,10 @@ namespace GameEditor.Framework.Scene
                 sb.Append("}}"); // close components + entity
             }
 
-            sb.Append("]}"); // close entities + root
+            sb.Append(']'); // close entities
+            // Ids are never reused within a scene: the counter travels with it (absent = 1, an empty new scene).
+            if (world.NextSceneId > 1) sb.Append(",\"nextId\":").Append(world.NextSceneId);
+            sb.Append('}'); // close root
             return sb.ToString();
         }
 
@@ -343,10 +347,13 @@ namespace GameEditor.Framework.Scene
                 scene.Name = nameProp.GetString() ?? scene.Name;
             scene.PhysicsBackend = root.TryGetProperty("physics", out var physicsProp) ? physicsProp.GetString() : null;
 
+            var world = ECSWorld.Instance;
+            if (root.TryGetProperty("nextId", out var nextIdEl) && nextIdEl.TryGetInt32(out int nextId))
+                world.NextSceneId = nextId;
+
             if (!root.TryGetProperty("entities", out var entitiesEl))
                 return;
 
-            var world = ECSWorld.Instance;
             // Map from saved-ID (int) → new runtime Entity (for parent fixup)
             var idMap = new Dictionary<int, Entity>();
             // Entities that have a saved parent int needing fixup
@@ -363,7 +370,8 @@ namespace GameEditor.Framework.Scene
             {
                 int savedId = eEl.TryGetProperty("id", out var idEl) ? idEl.GetInt32() : 0;
                 Entity newId = world.CreateEntity(); // auto-adds NameTag/ActiveFlag/Transform
-                idMap[savedId] = newId;
+                idMap.TryAdd(savedId, newId);
+                world.SetSceneId(newId, savedId);    // keeps the saved id (a duplicate or missing one gets a fresh id)
 
                 if (!eEl.TryGetProperty("c", out var c)) continue;
 

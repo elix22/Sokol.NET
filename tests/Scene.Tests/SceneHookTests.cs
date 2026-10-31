@@ -25,7 +25,7 @@ namespace Scene.Tests
         {
             SceneSerializer.RegisterComponentExtension("TestLink",
                 (w, e) => w.TryGetComponent<TestLink>(e, out var l)
-                    ? $"{{\"T\":{l.Target.GetHashCode()},\"G\":{l.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}"
+                    ? $"{{\"T\":{(l.Target.IsNull ? -1 : w.GetSceneId(l.Target))},\"G\":{l.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}"
                     : null,
                 (w, e, el, resolve) => w.AddComponent(e, new TestLink
                 {
@@ -102,6 +102,116 @@ namespace Scene.Tests
             Assert.False(World.TryGetComponent<TestLink>(joint2, out _));
         }
 
+        static int IdOf(string sceneJson, string entityName)
+        {
+            foreach (var e in JsonDocument.Parse(sceneJson).RootElement.GetProperty("entities").EnumerateArray())
+                if (e.GetProperty("c").GetProperty("NameTag").GetProperty("Name").GetString() == entityName)
+                    return e.GetProperty("id").GetInt32();
+            throw new Xunit.Sdk.XunitException($"entity '{entityName}' not found");
+        }
+
+        static string Ent(int id, string name, string extra = "") =>
+            $"{{\"id\":{id},\"c\":{{\"NameTag\":{{\"Name\":\"{name}\"}},\"ActiveFlag\":{{\"Active\":true}}{extra}}}}}";
+
+        [Fact]
+        public void SceneIds_SurviveLoadAndSave_IncludingBuiltInReferences()
+        {
+            string json = "{\"name\":\"S\",\"entities\":[" + Ent(10, "Root") + ","
+                        + Ent(20, "Child", ",\"Transform\":{\"P\":[0,0,0],\"E\":[0,0,0],\"S\":[1,1,1],\"Par\":10}") + "],\"nextId\":25}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+
+            SceneSerializer.Deserialize(json, scene);
+            string saved = SceneSerializer.Serialize(scene);
+
+            Assert.Equal(10, IdOf(saved, "Root"));
+            Assert.Equal(20, IdOf(saved, "Child"));
+            Assert.Equal(10, Components(saved, "Child").GetProperty("Transform").GetProperty("Par").GetInt32());
+            Assert.Equal(25, JsonDocument.Parse(saved).RootElement.GetProperty("nextId").GetInt32());
+            Assert.True(World.TryGetEntityBySceneId(20, out var child) && World.GetComponent<NameTag>(child).Name == "Child");
+        }
+
+        [Fact]
+        public void PreservedBlockReference_StaysValid_ThroughARoundTripWithoutTheExtension()
+        {
+            // "MjActuatorX" is not registered here (a build without robotics): its block is opaque and
+            // names entity 3. The round trip must keep entity 3 as 3 so the reference still means "Joint".
+            string json = "{\"name\":\"R\",\"entities\":[" + Ent(5, "Motor", ",\"MjActuatorX\":{\"Joint\":3}") + ","
+                        + Ent(3, "Joint") + "]}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+
+            SceneSerializer.Deserialize(json, scene);
+            World.CreateEntity("Added");                      // edits in that editor allocate fresh ids
+            string saved = SceneSerializer.Serialize(scene);
+            SceneSerializer.Deserialize(saved, scene);        // the Play snapshot → Stop path, too
+            saved = SceneSerializer.Serialize(scene);
+
+            Assert.Equal("{\"Joint\":3}", Components(saved, "Motor").GetProperty("MjActuatorX").GetRawText());
+            Assert.Equal(3, IdOf(saved, "Joint"));
+            Assert.Equal(6, IdOf(saved, "Added"));
+        }
+
+        [Fact]
+        public void ExtensionReference_ToAnUnknownId_IsSkipped()
+        {
+            string json = "{\"name\":\"R\",\"entities\":[" + Ent(1, "Motor", ",\"TestLink\":{\"T\":99,\"G\":1}") + "]}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+
+            SceneSerializer.Deserialize(json, scene);
+
+            Assert.True(World.TryGetComponent<TestLink>(Find("Motor"), out var link));
+            Assert.True(link.Target.IsNull);
+        }
+
+        [Fact]
+        public void DeletedEntitysId_IsNeverReused_SoItsReferencesStayUnresolved()
+        {
+            string json = "{\"name\":\"R\",\"entities\":[" + Ent(1, "Motor", ",\"TestLink\":{\"T\":2,\"G\":1}") + ","
+                        + Ent(2, "Joint") + "]}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+            SceneSerializer.Deserialize(json, scene);
+            Assert.Equal(Find("Joint"), World.GetComponent<TestLink>(Find("Motor")).Target);
+
+            // Delete the joint in an editor that keeps the motor's block opaque, then add an entity and save.
+            string opaque = json.Replace("TestLink", "TestLinkX");
+            SceneSerializer.Deserialize(opaque, scene);
+            World.DestroyEntity(Find("Joint"));
+            World.CreateEntity("Newcomer");
+            string saved = SceneSerializer.Serialize(scene);
+            Assert.Equal(3, IdOf(saved, "Newcomer"));
+
+            // Reload the saved file with the extension: the newcomer is saved, reloaded, then a second
+            // newcomer is created — neither may take id 2.
+            SceneSerializer.Deserialize(saved.Replace("TestLinkX", "TestLink"), scene);
+            Entity second = World.CreateEntity("Second");
+            Assert.Equal(4, World.GetSceneId(second));
+            Assert.True(World.GetComponent<TestLink>(Find("Motor")).Target.IsNull);
+        }
+
+        [Fact]
+        public void NewScene_CountsIdsFromOne_AndAnEmptySceneWritesNoCounter()
+        {
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+            World.CreateEntity("A");
+            World.CreateEntity("B");
+            string saved = SceneSerializer.Serialize(scene);
+
+            Assert.Equal((1, 2), (IdOf(saved, "A"), IdOf(saved, "B")));
+            Assert.Equal(3, JsonDocument.Parse(saved).RootElement.GetProperty("nextId").GetInt32());
+        }
+
+        [Fact]
+        public void DuplicateIdsInAFile_SecondEntityGetsAFreshId()
+        {
+            string json = "{\"name\":\"D\",\"entities\":[" + Ent(4, "First") + "," + Ent(4, "Second") + "]}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+
+            SceneSerializer.Deserialize(json, scene);
+            string saved = SceneSerializer.Serialize(scene);
+
+            Assert.Equal(4, IdOf(saved, "First"));
+            Assert.Equal(5, IdOf(saved, "Second"));
+        }
+
         [Fact]
         public void RegisteringABuiltInKey_Throws()
         {
@@ -127,6 +237,7 @@ namespace Scene.Tests
             {
                 SceneManager.NewScene("Sim");
                 SceneManager.ActiveScene!.PhysicsBackend = "fake";
+                int bodyId = World.GetSceneId(SceneManager.ActiveScene.CreateEntity("Body"));
 
                 SceneManager.Play();
                 SceneManager.UpdatePhysics(1f / 60f);
@@ -139,6 +250,8 @@ namespace Scene.Tests
                 Assert.Equal("fake", asked);
                 Assert.Equal((1, 2, 1), (sim.Starts, sim.Steps, sim.Stops));
                 Assert.Equal("fake", SceneManager.ActiveScene!.PhysicsBackend); // restored from the Play snapshot
+                Assert.True(World.TryGetEntityBySceneId(bodyId, out var body));   // same id after Stop's reload
+                Assert.Equal("Body", World.GetComponent<NameTag>(body).Name);
             }
             finally { SceneManager.SimulatorFactory = null; }
         }
