@@ -74,6 +74,36 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void UnknownRootBlock_SurvivesLoadAndSave_Verbatim()
+        {
+            const string block = "{\"env\":\"Hopper\",\"training\":{\"seed\":3,\"lr\":3E-4,\"list\":[1,null,\"x\"]}}";
+            string json = "{\"name\":\"R\",\"physics\":\"mujoco\",\"entities\":[],\"nextId\":5,\"robotics\":" + block + "}";
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+
+            SceneSerializer.Deserialize(json, scene);
+            Assert.Equal(block, scene.Blocks["robotics"]);
+            Assert.Equal(json, SceneSerializer.Serialize(scene));
+
+            // A second load/save round (e.g. Play snapshot → Stop) keeps it too; Clear drops it.
+            SceneSerializer.Deserialize(SceneSerializer.Serialize(scene), scene);
+            Assert.Equal(json, SceneSerializer.Serialize(scene));
+            scene.Clear();
+            Assert.Empty(scene.Blocks);
+        }
+
+        [Fact]
+        public void RootBlocks_WrittenFromCode_AndReservedKeysSkipped()
+        {
+            var scene = new GameEditor.Framework.Scene.Scene("B");
+            SceneSerializer.Deserialize("{\"name\":\"B\",\"entities\":[]}", scene);
+            Assert.Empty(scene.Blocks);
+
+            scene.Blocks["plugin"] = "{\"a\":1}";
+            scene.Blocks["entities"] = "{}";   // reserved: never written
+            Assert.Equal("{\"name\":\"B\",\"entities\":[],\"plugin\":{\"a\":1}}", SceneSerializer.Serialize(scene));
+        }
+
+        [Fact]
         public void PhysicsKey_AbsentMeansJoltAndIsNotWritten()
         {
             var scene = new GameEditor.Framework.Scene.Scene("x") { PhysicsBackend = "mujoco" };
