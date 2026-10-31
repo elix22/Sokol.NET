@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text.Json;
 using Frent;
 using GameEditor.Framework.ECS;
@@ -142,6 +143,41 @@ namespace Scene.Tests
 
         static string Ent(int id, string name, string extra = "") =>
             $"{{\"id\":{id},\"c\":{{\"NameTag\":{{\"Name\":\"{name}\"}},\"ActiveFlag\":{{\"Active\":true}}{extra}}}}}";
+
+        [Fact]
+        public void Rotation_SurvivesSaveAndLoad_Exactly_AndOldFilesLoadFromEuler()
+        {
+            var rng = new Random(5);
+            var rotations = new List<Quaternion>
+            {
+                new(0f, -0.70710677f, 0f, 0.70710677f),   // an imported MJCF geom's 90° turn
+                Quaternion.CreateFromYawPitchRoll(0.3f, 1.5707963f, -0.2f),
+            };
+            for (int i = 0; i < 50; i++)
+                rotations.Add(Quaternion.Normalize(new Quaternion((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f,
+                                                                  (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f)));
+            for (int i = 0; i < rotations.Count; i++)
+            {
+                Entity e = World.CreateEntity($"R{i}");
+                World.AddComponent(e, new Transform { Position = Vector3.Zero, Rotation = rotations[i], Scale = Vector3.One });
+            }
+            var scene = new GameEditor.Framework.Scene.Scene("x");
+            string json = SceneSerializer.Serialize(scene);
+            for (int round = 0; round < 3; round++)   // like save/load and Play → Stop, repeatedly
+            {
+                scene.Clear();
+                SceneSerializer.Deserialize(json, scene);
+                json = SceneSerializer.Serialize(scene);
+            }
+            for (int i = 0; i < rotations.Count; i++)
+                Assert.Equal(rotations[i], World.GetComponent<Transform>(Find($"R{i}")).Rotation);
+
+            // A file written before "Q" existed: the rotation comes from the Euler degrees, as before.
+            scene.Clear();
+            SceneSerializer.Deserialize("{\"name\":\"S\",\"entities\":[" + Ent(1, "Old", ",\"Transform\":{\"P\":[0,0,0],\"E\":[0,90,0],\"S\":[1,1,1]}") + "]}", scene);
+            var q = World.GetComponent<Transform>(Find("Old")).Rotation;
+            Assert.True(Quaternion.Dot(q, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2)) > 0.9999999f, $"{q}");
+        }
 
         [Fact]
         public void SceneIds_SurviveLoadAndSave_IncludingBuiltInReferences()
