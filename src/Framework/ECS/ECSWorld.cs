@@ -89,25 +89,7 @@ namespace GameEditor.Framework.ECS
             // its GPU state. Walks the parent→children index, so it is O(subtree) — not a per-node
             // scan of the whole world. `deleting` doubles as the visited set (guards cycles/dupes) and
             // the membership test for the single batched _entities removal below.
-            var toDelete = new List<Entity> { e };
-            var deleting = new HashSet<Entity> { e };
-            for (int i = 0; i < toDelete.Count; i++)
-            {
-                if (!_children.TryGetValue(toDelete[i], out var kids)) continue;
-                foreach (var c in kids)
-                {
-                    if (deleting.Contains(c)) continue;   // already queued (also breaks any parent cycle)
-                    // Trust the index but verify the live link, so a (hypothetical) stale entry can
-                    // never delete a non-child — at worst it is skipped. Appended → its own children
-                    // are visited in a later iteration of this same loop.
-                    if (c.IsAlive && TryGetComponent<Transform>(c, out var ct)
-                        && ct.Parent.HasValue && ct.Parent.Value.Equals(toDelete[i]))
-                    {
-                        deleting.Add(c);
-                        toDelete.Add(c);
-                    }
-                }
-            }
+            var toDelete = Subtree(e, out var deleting);
 
             foreach (var d in toDelete)
             {
@@ -119,6 +101,107 @@ namespace GameEditor.Framework.ECS
             // One batched O(n) pass — a per-entity List.Remove is O(n) each, i.e. O(subtree·n) for a
             // big subtree (the very stutter this index is meant to avoid).
             _entities.RemoveAll(deleting.Contains);
+        }
+
+        // e and its descendants, parents before children; `set` doubles as the visited set (guards cycles/dupes).
+        private List<Entity> Subtree(Entity e, out HashSet<Entity> set)
+        {
+            var list = new List<Entity> { e };
+            set = new HashSet<Entity> { e };
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!_children.TryGetValue(list[i], out var kids)) continue;
+                foreach (var c in kids)
+                {
+                    if (set.Contains(c)) continue;   // already queued (also breaks any parent cycle)
+                    // Trust the index but verify the live link, so a (hypothetical) stale entry can
+                    // never include a non-child — at worst it is skipped. Appended → its own children
+                    // are visited in a later iteration of this same loop.
+                    if (c.IsAlive && TryGetComponent<Transform>(c, out var ct)
+                        && ct.Parent.HasValue && ct.Parent.Value.Equals(list[i]))
+                    {
+                        set.Add(c);
+                        list.Add(c);
+                    }
+                }
+            }
+            return list;
+        }
+
+        // ── Detach / reattach (editor undo of entity creation) ───────────────────────────────
+        // A detached entity stays ALIVE with no components: it is out of Entities, the child index and the
+        // scene-id maps, so no query, the hierarchy or the serializer sees it, yet every Entity handle that
+        // refers to it (undo commands, other components' references) is still valid when it comes back.
+
+        /// <summary>An entity subtree taken out of the scene by <see cref="Detach"/>.</summary>
+        public sealed class DetachedSubtree
+        {
+            internal Entity Root;
+            internal (Entity E, int Index, int SceneId, ComponentID[] Ids, object[] Values)[] Items = [];
+            /// <summary>The scene id the subtree's root had (and gets back).</summary>
+            public int RootSceneId => Items[0].SceneId;
+        }
+
+        /// <summary>
+        /// Takes <paramref name="root"/> and its descendants out of the scene, keeping the entities alive and
+        /// their components, order and scene ids in the returned value for <see cref="Reattach"/>. Raises
+        /// EntityDestroyed for each (the renderer drops its GPU state, the editor its selection).
+        /// </summary>
+        public DetachedSubtree? Detach(Entity root)
+        {
+            if (root.IsNull || !root.IsAlive || !_entities.Contains(root)) return null;
+            var list = Subtree(root, out var set);
+            var items = new (Entity, int, int, ComponentID[], object[])[list.Count];
+            for (int i = 0; i < list.Count; i++)
+            {
+                var d = list[i];
+                var ids = d.ComponentTypes.ToArray();
+                var values = new object[ids.Length];
+                for (int k = 0; k < ids.Length; k++) values[k] = d.Get(ids[k]);
+                items[i] = (d, _entities.IndexOf(d), GetSceneId(d), ids, values);   // reserves an id not handed out yet, so redo brings back the same one
+            }
+            if (TryGetComponent<Transform>(root, out var rootTr) && rootTr.Parent.HasValue)
+                RemoveChildLink(rootTr.Parent.Value, root);
+            foreach (var (d, _, sid, ids, _) in items)
+            {
+                _children.Remove(d);
+                _sceneIds.Remove(d); _bySceneId.Remove(sid);   // the id stays reserved: _nextSceneId never goes back
+                EventBus.RaiseEntityDestroyed(d);
+                foreach (var id in ids) d.Remove(id);
+            }
+            _entities.RemoveAll(set.Contains);
+            return new DetachedSubtree { Root = root, Items = items };
+        }
+
+        /// <summary>
+        /// Puts a <see cref="Detach"/>ed subtree back: same entities, components, list positions and scene ids.
+        /// False (nothing done) when the world was cleared since, or the subtree's parent is gone.
+        /// </summary>
+        public bool Reattach(DetachedSubtree s)
+        {
+            if (!s.Root.IsAlive) return false;   // world cleared since (Frent never reuses a world id) or deleted
+            var root = s.Items[0];
+            for (int k = 0; k < root.Ids.Length; k++)
+                if (root.Values[k] is Transform t && t.Parent.HasValue && !_entities.Contains(t.Parent.Value)) return false;
+            foreach (var (d, _, _, ids, values) in s.Items)
+                for (int k = 0; k < ids.Length; k++) d.AddAs(ids[k], values[k]);
+            // Ascending positions: each insert lands where the entity was, as the ones before it are back already.
+            foreach (var it in s.Items.OrderBy(it => it.Index))
+                _entities.Insert(Math.Clamp(it.Index, 0, _entities.Count), it.E);
+            foreach (var (d, _, sid, _, _) in s.Items)
+            {
+                SetSceneId(d, sid);
+                if (TryGetComponent<Transform>(d, out var tr) && tr.Parent.HasValue) AddChildLink(tr.Parent.Value, d);   // raw AddAs bypassed the index
+                EventBus.RaiseEntityCreated(d);
+            }
+            return true;
+        }
+
+        /// <summary>Deletes a <see cref="Detach"/>ed subtree for good (its undo entry is gone); no-op after a world clear.</summary>
+        public void Discard(DetachedSubtree s)
+        {
+            foreach (var (d, _, _, _, _) in s.Items)
+                if (d.IsAlive) d.Delete();
         }
 
         // ── Parent→children index maintenance ────────────────────────────────────────────────
