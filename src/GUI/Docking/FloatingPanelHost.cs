@@ -98,6 +98,8 @@ public sealed class FloatingPanelHost : Widget
             p.Content.PerformLayout(renderer, force: true);
             p.Content.Draw(renderer);
             renderer.Restore();
+            // Back to the body's place (as HitTestDeep sets it) for events between frames.
+            p.Content.Bounds = new Rect(b.X, b.Y + TitleBarH, body.Width, body.Height);
 
             renderer.Restore();
         }
