@@ -139,9 +139,17 @@ public sealed class DockSpace : Widget
 
     // ─── Draw ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// The tab headers drawn in the last frame (Path = panel title, screen rect, Enabled = active tab), in draw
+    /// order. Read-only, for UI automation: tab headers are drawn, not widgets.
+    /// </summary>
+    public IReadOnlyList<DrawnMenuItem> DrawnTabs => _drawnTabs;
+    private readonly List<DrawnMenuItem> _drawnTabs = [];
+
     public override void Draw(Renderer renderer)
     {
         if (!Visible) return;
+        _drawnTabs.Clear();
         ArrangeTree();
         var theme = ThemeManager.Current;
 
@@ -256,6 +264,8 @@ public sealed class DockSpace : Widget
 
             var labelColor = isActive ? theme.TabText : theme.TextMutedColor;
             renderer.DrawText(tabRect.X + TabPaddingH, tabRect.Y + tabRect.Height * 0.5f, p.Title, labelColor);
+            var sp = ScreenPosition;
+            _drawnTabs.Add(new DrawnMenuItem(p.Title, new Rect(sp.X + tabRect.X, sp.Y + tabRect.Y, tabRect.Width, tabRect.Height), isActive, false));
             x += tabW + 2f;
         }
 

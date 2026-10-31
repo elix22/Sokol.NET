@@ -40,6 +40,15 @@ public class ToolBar : Widget
     public const float DefaultItemSize = 28f;
 
     public IReadOnlyList<ToolBarItem> Items => _items;
+
+    /// <summary>Screen rect of <see cref="Items"/>[index] as last drawn (empty for separators or before the first draw).</summary>
+    public Rect ItemScreenRect(int index)
+    {
+        if (index < 0 || index >= _itemRects.Length) return default;
+        var r = _itemRects[index];
+        var sp = ScreenPosition;
+        return new Rect(sp.X + r.X, sp.Y + r.Y, r.Width, r.Height);
+    }
     public float ItemSize { get; set; } = DefaultItemSize;
     public SliderOrientation Orientation { get; set; } = SliderOrientation.Horizontal;
 
