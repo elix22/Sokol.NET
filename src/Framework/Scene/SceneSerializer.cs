@@ -18,11 +18,45 @@ namespace GameEditor.Framework.Scene
     /// </summary>
     public static class SceneSerializer
     {
+        // Component keys written/read by this file. Keep in sync when adding a built-in component:
+        // any other key is handed to a registered extension or kept as a PreservedComponents block.
+        private static readonly HashSet<string> BuiltInKeys = new(StringComparer.Ordinal)
+        {
+            "NameTag", "ActiveFlag", "Transform", "MeshRenderer", "SkinnedMeshRenderer", "Camera", "Light",
+            "Rigidbody", "Script", "Scripts", "Constraint", "Character", "Vehicle", "WheelFollow",
+        };
+
+        private static readonly Dictionary<string, (Func<ECSWorld, Entity, string?> Write,
+                                                    Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> Read)>
+            _extensions = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Adds a component block outside the built-in set (e.g. a plugin's components). Register at
+        /// startup, before any scene loads.
+        /// <paramref name="write"/> returns the block's JSON value for an entity, or null when the entity
+        /// has none. <paramref name="read"/> runs after every entity of the scene exists; its resolver maps
+        /// a saved entity id (written as <c>entity.GetHashCode()</c>, like the built-in references) to the
+        /// loaded entity, or <see cref="Entity.Null"/>.
+        /// In a build without the extension the block is kept verbatim (<see cref="PreservedComponents"/>),
+        /// but saved entity ids inside it are not remapped on the next save.
+        /// </summary>
+        public static void RegisterComponentExtension(string key,
+            Func<ECSWorld, Entity, string?> write,
+            Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> read)
+        {
+            if (BuiltInKeys.Contains(key))
+                throw new ArgumentException($"'{key}' is a built-in component key.", nameof(key));
+            _extensions[key] = (write, read);
+        }
+
         public static string Serialize(Scene scene)
         {
             var world = ECSWorld.Instance;
             var sb = new StringBuilder();
-            sb.Append("{\"name\":\"").Append(Esc(scene.Name)).Append("\",\"entities\":[");
+            sb.Append("{\"name\":\"").Append(Esc(scene.Name)).Append('"');
+            if (scene.PhysicsBackend != null)
+                sb.Append(",\"physics\":\"").Append(Esc(scene.PhysicsBackend)).Append('"');
+            sb.Append(",\"entities\":[");
 
             bool firstEntity = true;
             foreach (Entity id in world.Entities)
@@ -271,6 +305,24 @@ namespace GameEditor.Framework.Scene
                       .Append('}');
                 }
 
+                foreach (var (key, ext) in _extensions)
+                {
+                    string? block = ext.Write(world, id);
+                    if (block == null) continue;
+                    Comma(sb, ref fc);
+                    sb.Append('"').Append(Esc(key)).Append("\":").Append(block);
+                }
+
+                if (world.TryGetComponent<PreservedComponents>(id, out var pres) && pres.Blocks != null)
+                {
+                    foreach (var kvp in pres.Blocks)
+                    {
+                        if (_extensions.ContainsKey(kvp.Key)) continue; // the extension owns this key now
+                        Comma(sb, ref fc);
+                        sb.Append('"').Append(Esc(kvp.Key)).Append("\":").Append(kvp.Value);
+                    }
+                }
+
                 sb.Append("}}"); // close components + entity
             }
 
@@ -289,6 +341,7 @@ namespace GameEditor.Framework.Scene
             var root = doc.RootElement;
             if (root.TryGetProperty("name", out var nameProp))
                 scene.Name = nameProp.GetString() ?? scene.Name;
+            scene.PhysicsBackend = root.TryGetProperty("physics", out var physicsProp) ? physicsProp.GetString() : null;
 
             if (!root.TryGetProperty("entities", out var entitiesEl))
                 return;
@@ -302,6 +355,8 @@ namespace GameEditor.Framework.Scene
             var constraintFixups = new Dictionary<Entity, (int, int)>();
             // Entities with a WheelFollowerComponent whose VehicleEntity ID needs remapping
             var wheelFollowFixups = new Dictionary<Entity, int>();
+            // Registered extension blocks, read once every entity exists (they may reference others)
+            var extensionReads = new List<(Entity, string, JsonElement)>();
 
             // First pass — create entities and load all components
             foreach (var eEl in entitiesEl.EnumerateArray())
@@ -569,6 +624,18 @@ namespace GameEditor.Framework.Scene
                     world.AddComponent(newId, new WheelFollowerComponent { WheelIndex = wi });
                     if (savedV >= 0) wheelFollowFixups[newId] = savedV;
                 }
+
+                Dictionary<string, string>? preserved = null;
+                foreach (var prop in c.EnumerateObject())
+                {
+                    if (BuiltInKeys.Contains(prop.Name)) continue;
+                    if (_extensions.ContainsKey(prop.Name))
+                        extensionReads.Add((newId, prop.Name, prop.Value));
+                    else
+                        (preserved ??= new Dictionary<string, string>())[prop.Name] = prop.Value.GetRawText();
+                }
+                if (preserved != null)
+                    world.AddComponent(newId, new PreservedComponents { Blocks = preserved });
             }
 
             // Second pass — remap parent IDs from saved ints to live Entities
@@ -601,6 +668,11 @@ namespace GameEditor.Framework.Scene
                     wfc.VehicleEntity = ve;
                 world.AddComponent(entity, wfc);
             }
+
+            // Fifth pass — registered extensions, with saved IDs resolvable to live Entities
+            Entity Resolve(int savedId) => idMap.TryGetValue(savedId, out Entity e) ? e : Entity.Null;
+            foreach (var (entity, key, value) in extensionReads)
+                _extensions[key].Read(world, entity, value, Resolve);
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────

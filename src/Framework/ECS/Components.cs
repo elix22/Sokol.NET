@@ -403,4 +403,14 @@ namespace GameEditor.Framework.ECS.Components
         public Entity VehicleEntity;
         public int    WheelIndex;
     }
+
+    /// <summary>
+    /// Scene-file component blocks this build neither knows nor has a registered extension for
+    /// (e.g. plugin data opened without the plugin). SceneSerializer writes them back verbatim.
+    /// </summary>
+    public struct PreservedComponents
+    {
+        /// <summary>Component key → raw JSON value, in file order.</summary>
+        public Dictionary<string, string> Blocks;
+    }
 }

@@ -30,6 +30,14 @@ namespace GameEditor.Framework.Scene
 
         // ---- Physics -------------------------------------------------------
         private static IPhysicsWorld? _physics;
+        // Replaces Jolt for the Play session when the scene names a backend the factory can create.
+        private static ISceneSimulator? _simulator;
+
+        /// <summary>
+        /// Creates the simulator for a non-Jolt <see cref="Scene.PhysicsBackend"/> (the argument).
+        /// Returns null for a backend it does not provide. When unset or null-returning, Play uses Jolt.
+        /// </summary>
+        public static Func<string, ISceneSimulator?>? SimulatorFactory { get; set; }
         private static readonly Dictionary<Entity, PhysicsBodyHandle>      _entityToHandle    = new();
         private static readonly Dictionary<int, Entity>                     _handleToEntity    = new();
         private static readonly Dictionary<Entity, CharacterHandle>         _entityToCharHandle = new();
@@ -772,6 +780,12 @@ namespace GameEditor.Framework.Scene
 
         public static void UpdatePhysics(float deltaTime)
         {
+            if (_simulator != null)
+            {
+                if (PlayMode == PlayModeState.Playing) _simulator.Step(deltaTime);
+                return;
+            }
+
             if (_physics == null || PlayMode != PlayModeState.Playing) return;
 
             var world = ECSWorld.Instance;
@@ -959,6 +973,26 @@ namespace GameEditor.Framework.Scene
 
         static void InitializePhysics()
         {
+            string? backend = ActiveScene?.PhysicsBackend;
+            if (backend != null && !backend.Equals("jolt", StringComparison.OrdinalIgnoreCase))
+            {
+                if (SimulatorFactory?.Invoke(backend) is { } simulator)
+                {
+                    try
+                    {
+                        simulator.Start(ECSWorld.Instance);
+                        _simulator = simulator;
+                        Logger.Info($"[SceneManager] Physics backend '{backend}' started.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"[SceneManager] Physics backend '{backend}' failed to start: {ex.Message}");
+                    }
+                    return;
+                }
+                Logger.Warning($"[SceneManager] Physics backend '{backend}' is not available in this build; using Jolt.");
+            }
+
             _physics = new JoltPhysicsWorld();
             _physics.Initialize(new Vector3(0f, -9.81f, 0f));
             _physics.SetCollisionListener(new PhysicsCollisionDispatcher());
@@ -1194,6 +1228,14 @@ namespace GameEditor.Framework.Scene
 
         static void ShutdownPhysics()
         {
+            if (_simulator != null)
+            {
+                _simulator.Stop();
+                _simulator = null;
+                Logger.Info("[SceneManager] Physics backend stopped.");
+                return;
+            }
+
             // Destroy constraints before bodies.
             var world = ECSWorld.Instance;
             foreach (Entity entity in world.Entities)
