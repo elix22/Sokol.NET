@@ -9,6 +9,9 @@ namespace GameEditor.Framework.Scene
         public string Name { get; set; }
         public string? FilePath { get; set; }
         public bool IsDirty { get; set; }
+        /// <summary>Physics backend for Play: null (or "jolt") = the built-in Jolt world, anything else is
+        /// handed to <see cref="SceneManager.SimulatorFactory"/>. Saved as the scene JSON's "physics" key.</summary>
+        public string? PhysicsBackend { get; set; }
 
         public Scene(string name)
         {
