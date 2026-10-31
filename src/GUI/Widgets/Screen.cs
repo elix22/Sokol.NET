@@ -173,6 +173,15 @@ public sealed class Screen : Widget
 
     public static bool HasActivePopup => _activePopup != null;
 
+    /// <summary>The popup that currently owns input (open menu, context menu, combo drop-down), or null.</summary>
+    public static Widget? ActivePopup => _activePopup;
+
+    /// <summary>Frame overlays as of the last <see cref="Draw"/> (widget + screen bounds), for inspection tools.</summary>
+    public System.Collections.Generic.IReadOnlyList<(Widget Widget, Rect Bounds)> FrameOverlays => _hitTestOverlays;
+
+    /// <summary>Top overlays (modal dialogs) as of the last <see cref="Draw"/>, for inspection tools.</summary>
+    public System.Collections.Generic.IReadOnlyList<(Widget Widget, Rect Bounds)> TopOverlays => _topOverlaysToDraw;
+
     public static void SetActivePopup(Widget? popup)
     {
         _activePopup = popup;

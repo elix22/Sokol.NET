@@ -21,6 +21,12 @@ public sealed class MenuItem
 }
 
 /// <summary>
+/// A menu row (or menu-bar header) as it was last drawn, in screen space. Lets UI automation find a
+/// menu item by its label path ("File/New Scene", "3D Object/Box") and click it with real input.
+/// </summary>
+public readonly record struct DrawnMenuItem(string Path, Rect ScreenRect, bool Enabled, bool HasSubItems);
+
+/// <summary>
 /// Horizontal menu bar with drop-down menus.
 /// Each top-level entry is a string that opens a list of <see cref="MenuItem"/>s.
 /// </summary>
@@ -41,6 +47,12 @@ public class MenuBar : Widget
     public const float DefaultHeight = 26f;
 
     public IReadOnlyList<MenuEntry> Menus => _menus;
+
+    // Headers (rebuilt by Draw) followed by the open drop-down's rows (appended by DrawPopupOverlay).
+    private readonly List<DrawnMenuItem> _drawn = [];
+    private int _drawnHeaders;   // DrawPopupOverlay may run more than once per frame: rows restart after the headers
+    /// <summary>Headers and open drop-down rows as last drawn (see <see cref="DrawnMenuItem"/>).</summary>
+    public IReadOnlyList<DrawnMenuItem> DrawnItems => _drawn;
 
     public Font?  Font     { get; set; }
     public float  FontSize { get; set; } = 0f;
@@ -77,12 +89,17 @@ public class MenuBar : Widget
             totalMenuW += renderer.MeasureText(_menus[i].Header) + 16f + 2f;
 
         float x = rtl ? (w - 4f - totalMenuW) : 4f;
+        _drawn.Clear();
+        _drawnHeaders = 0;
+        var sp = ScreenPosition;
         for (int i = 0; i < _menus.Count; i++)
         {
             string header = _menus[i].Header;
             float  tw     = renderer.MeasureText(header);
             float  iw     = tw + 16f;
             var    itemR  = new Rect(x, 2f, iw, h - 4f);
+            _drawn.Add(new DrawnMenuItem(header, new Rect(sp.X + x, sp.Y, iw, h), true, true));
+            _drawnHeaders = _drawn.Count;
 
             bool open = i == _openIdx;
             bool hov  = i == _hoveredIdx;
@@ -114,6 +131,8 @@ public class MenuBar : Widget
         float ddY    = Bounds.Height;
 
         var ddRect = new Rect(ddX, ddY, ddW, ddH);
+        var sp     = ScreenPosition;
+        _drawn.RemoveRange(_drawnHeaders, _drawn.Count - _drawnHeaders);
         renderer.DrawDropShadow(ddRect, 4f, new Vector2(2f, 3f), 8f,
             new UIColor(0f, 0f, 0f, 0.25f));
         renderer.FillRoundedRect(ddRect, 4f, theme.SurfaceVariant);
@@ -132,6 +151,8 @@ public class MenuBar : Widget
                 continue;
             }
             var  rowR       = new Rect(ddX, y, ddW, itemH);
+            _drawn.Add(new DrawnMenuItem(_menus[_openIdx].Header + "/" + item.Label,
+                new Rect(sp.X + ddX, sp.Y + y, ddW, itemH), item.Enabled, item.SubItems != null));
             bool isSubOpen  = i == _openSubItemIdx;
             bool isHov      = isSubOpen || rowR.Contains(new Vector2(_lastMousePos.X, _lastMousePos.Y));
             if (isHov && item.Enabled)
@@ -192,6 +213,9 @@ public class MenuBar : Widget
                         continue;
                     }
                     var  sRowR = new Rect(sr.X, sy, subW, itemH);
+                    _drawn.Add(new DrawnMenuItem(
+                        _menus[_openIdx].Header + "/" + items[_openSubItemIdx].Label + "/" + sit.Label,
+                        new Rect(sp.X + sr.X, sp.Y + sy, subW, itemH), sit.Enabled, false));
                     bool sHov  = j == _subHoveredIdx || sRowR.Contains(new Vector2(_lastMousePos.X, _lastMousePos.Y));
                     if (sHov && sit.Enabled)
                         renderer.FillRoundedRect(new Rect(sr.X + 2, sy, subW - 4, itemH), 3f,
