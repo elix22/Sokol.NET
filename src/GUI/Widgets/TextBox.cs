@@ -602,8 +602,15 @@ public class TextBox : Widget
             _charXCache[i] = renderer.MeasureText(display[..i]);
     }
 
+    /// <summary>
+    /// While unfocused, show the start of a text wider than the box instead of keeping the (end) caret in view —
+    /// a number like "-0.14" in a narrow field then reads "-0.1", not ".14". Set by <see cref="NumberInput"/>.
+    /// </summary>
+    protected bool ShowStartWhenUnfocused { get; init; }
+
     private void UpdateScroll()
     {
+        if (!IsFocused && ShowStartWhenUnfocused) { _scrollX = 0; return; }
         if (_charXCache.Length == 0 || _innerWidth <= 0) return;
         float cx = _cursor < _charXCache.Length ? _charXCache[_cursor] : 0f;
 
