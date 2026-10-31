@@ -19,6 +19,14 @@ namespace GameEditor.Framework.ECS
         // O(subtree) instead of rescanning the whole world per node. Empty lists are not retained.
         private readonly Dictionary<Entity, List<Entity>> _children = new();
 
+        // Persistent scene ids: the id an entity has in the scene file. A loaded entity keeps the id it was
+        // saved with, so every reference to it — built-in ones and opaque extension blocks alike — stays valid
+        // through any number of load/save rounds. Ids are never reused within a scene (NextSceneId is saved
+        // with it), so a reference to a deleted entity stays unresolvable instead of hitting a newcomer.
+        private readonly Dictionary<Entity, int> _sceneIds = new();
+        private readonly Dictionary<int, Entity> _bySceneId = new();
+        private int _nextSceneId = 1;
+
         public static ECSWorld Instance { get; private set; } = new ECSWorld();
 
         private ECSWorld() { _world = new World(); }
@@ -32,6 +40,40 @@ namespace GameEditor.Framework.ECS
             _entities.Add(e);
             EventBus.RaiseEntityCreated(e);
             return e;
+        }
+
+        /// <summary>The entity's persistent scene id (see <see cref="SetSceneId"/>); a new entity gets the next free one.</summary>
+        public int GetSceneId(Entity e)
+        {
+            if (_sceneIds.TryGetValue(e, out int id)) return id;
+            id = _nextSceneId++;
+            _sceneIds[e] = id;
+            _bySceneId[id] = e;
+            return id;
+        }
+
+        /// <summary>
+        /// Gives a loaded entity the id it was saved with. An id that is not positive or already held by another
+        /// entity (a malformed file) is ignored and the entity gets a fresh id on first use; returns false then.
+        /// </summary>
+        public bool SetSceneId(Entity e, int id)
+        {
+            if (id <= 0 || _bySceneId.ContainsKey(id)) return false;
+            if (_sceneIds.Remove(e, out int old)) _bySceneId.Remove(old);
+            _sceneIds[e] = id;
+            _bySceneId[id] = e;
+            if (id >= _nextSceneId) _nextSceneId = id + 1;
+            return true;
+        }
+
+        /// <summary>The live entity holding scene id <paramref name="id"/>, if any.</summary>
+        public bool TryGetEntityBySceneId(int id, out Entity e) => _bySceneId.TryGetValue(id, out e) && e.IsAlive;
+
+        /// <summary>The id the next new entity gets. Saved with the scene; loading only ever raises it.</summary>
+        public int NextSceneId
+        {
+            get => _nextSceneId;
+            set { if (value > _nextSceneId) _nextSceneId = value; }
         }
 
         public void DestroyEntity(Entity e)
@@ -70,6 +112,7 @@ namespace GameEditor.Framework.ECS
             foreach (var d in toDelete)
             {
                 _children.Remove(d);   // its children (if any) are also in the delete set
+                if (_sceneIds.Remove(d, out int sid)) _bySceneId.Remove(sid);   // the id itself is not reused
                 EventBus.RaiseEntityDestroyed(d);
                 if (d.IsAlive) d.Delete();
             }
@@ -276,6 +319,9 @@ namespace GameEditor.Framework.ECS
             }
             _entities.Clear();
             _children.Clear();
+            _sceneIds.Clear();
+            _bySceneId.Clear();
+            _nextSceneId = 1;
             _world.Dispose();
             _world = new World();
         }
