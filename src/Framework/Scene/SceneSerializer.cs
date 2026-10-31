@@ -26,6 +26,9 @@ namespace GameEditor.Framework.Scene
             "Rigidbody", "Script", "Scripts", "Constraint", "Character", "Vehicle", "WheelFollow",
         };
 
+        // Root keys written/read by this file; any other root key is a Scene.Blocks entry.
+        private static readonly HashSet<string> RootKeys = new(StringComparer.Ordinal) { "name", "physics", "entities", "nextId" };
+
         private static readonly Dictionary<string, (Func<ECSWorld, Entity, string?> Write,
                                                     Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> Read)>
             _extensions = new(StringComparer.Ordinal);
@@ -330,6 +333,11 @@ namespace GameEditor.Framework.Scene
             sb.Append(']'); // close entities
             // Ids are never reused within a scene: the counter travels with it (absent = 1, an empty new scene).
             if (world.NextSceneId > 1) sb.Append(",\"nextId\":").Append(world.NextSceneId);
+            foreach (var kvp in scene.Blocks)
+            {
+                if (RootKeys.Contains(kvp.Key)) continue;
+                sb.Append(",\"").Append(Esc(kvp.Key)).Append("\":").Append(kvp.Value);
+            }
             sb.Append('}'); // close root
             return sb.ToString();
         }
@@ -350,6 +358,8 @@ namespace GameEditor.Framework.Scene
             var world = ECSWorld.Instance;
             if (root.TryGetProperty("nextId", out var nextIdEl) && nextIdEl.TryGetInt32(out int nextId))
                 world.NextSceneId = nextId;
+            foreach (var prop in root.EnumerateObject())
+                if (!RootKeys.Contains(prop.Name)) scene.Blocks[prop.Name] = prop.Value.GetRawText();
 
             if (!root.TryGetProperty("entities", out var entitiesEl))
                 return;
