@@ -48,6 +48,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         public Matrix4x4 Rotation  { get; set; } = Matrix4x4.Identity;
         public string    Name      { get; private set; } = "";
 
+        /// <summary>Diffuse ambient (irradiance / π) of this sky in its own frame, for materials without IBL.</summary>
+        public AmbientSH? Ambient { get; private set; }
+
         public bool IsLoaded => DiffuseCube.id != 0 && SpecularCube.id != 0 && GgxLut.id != 0;
 
         // ── Factory ──────────────────────────────────────────────────────────────────
@@ -64,6 +67,10 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             // (the shader multiplies sampled radiance/irradiance by EnvIntensity).
             env.Intensity = 2.2f;
             env.DiffuseCube  = BakeDiffuseCube(name);
+            // From the sharp sky (blur 0), like a cubemap's faces: the SH projection does the cosine
+            // convolution itself; the pre-blurred diffuse cube would flatten the up/down contrast twice.
+            env.Ambient      = AmbientSH.FromCube(DiffuseSize, (f, x, y) =>
+                SampleSky(CubeDirection(f, (x + 0.5f) / DiffuseSize, (y + 0.5f) / DiffuseSize), 0f));
             (env.SpecularCube, env.MipCount) = BakeSpecularCube(name);
             env.GgxLut       = BakeGgxLut(name);
             env.CreateViewsAndSamplers();
@@ -86,6 +93,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         {
             var env = new EnvironmentMap { Name = name, Intensity = 1.0f };
             env.DiffuseCube  = BuildCubeFromFaces(faces, faceSize, $"ibl-{name}-diffuse");
+            env.Ambient      = AmbientSH.FromRgba8Faces(faces, faceSize);
             (env.SpecularCube, env.MipCount) = BuildMippedCubeFromFaces(faces, faceSize, $"ibl-{name}-specular");
             env.GgxLut       = BakeGgxLut(name);
             env.CreateViewsAndSamplers();
@@ -422,7 +430,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
         // Maps a cube face + face-local UV to a world-space direction
         // (sokol cube convention; ported from the CGltfViewer reference).
-        private static Vector3 CubeDirection(int face, float u, float v)
+        internal static Vector3 CubeDirection(int face, float u, float v)
         {
             float uc = 2f * u - 1f;
             float vc = 2f * v - 1f;

@@ -23,5 +23,8 @@ namespace GameEditor.Framework.Core
         public bool   EnvironmentShowSkybox{ get; set; } = true;
         public float  EnvironmentShadowAmbient { get; set; } = 0.4f;           // 0=physical, 1=shadows fully darken IBL ambient
         public bool   EnvironmentCsm4       { get; set; } = false;            // 4-cascade directional shadows (else single-fit CSM1)
+        public string EnvironmentAmbientSource { get; set; } = "sky";         // "sky" | "color" | "disabled"
+        public string EnvironmentAmbientColor  { get; set; } = "0.1 0.1 0.1"; // "r g b", used by "color"
+        public float  EnvironmentAmbientEnergy { get; set; } = 1f;
     }
 }

@@ -132,7 +132,10 @@ namespace GameEditor.Framework.Core
                 sb.Append($"  \"environmentRotation\": {config.EnvironmentRotation.ToString(CultureInfo.InvariantCulture)},\n");
                 sb.Append($"  \"environmentShowSkybox\": {(config.EnvironmentShowSkybox ? "true" : "false")},\n");
                 sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
-                sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")}\n");
+                sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")},\n");
+                sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
+                sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
+                sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)}\n");
                 sb.Append('}');
 
                 string json = sb.ToString();
@@ -185,6 +188,9 @@ namespace GameEditor.Framework.Core
             if (root.TryGetProperty("environmentShadowAmbient", out var esa) && esa.TryGetSingle(out var sav)) cfg.EnvironmentShadowAmbient = sav;
             if (root.TryGetProperty("environmentCsm4", out var c4) && (c4.ValueKind == JsonValueKind.True || c4.ValueKind == JsonValueKind.False))
                 cfg.EnvironmentCsm4 = c4.GetBoolean();
+            if (root.TryGetProperty("environmentAmbientSource", out var eas)) cfg.EnvironmentAmbientSource = eas.GetString() ?? cfg.EnvironmentAmbientSource;
+            if (root.TryGetProperty("environmentAmbientColor", out var eac))  cfg.EnvironmentAmbientColor  = eac.GetString() ?? cfg.EnvironmentAmbientColor;
+            if (root.TryGetProperty("environmentAmbientEnergy", out var eae) && eae.TryGetSingle(out var aev)) cfg.EnvironmentAmbientEnergy = aev;
         }
 
         private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");

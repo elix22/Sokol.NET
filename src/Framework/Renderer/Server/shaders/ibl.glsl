@@ -48,7 +48,7 @@ vec3 getDiffuseLight(vec3 n)
     vec3 rotatedNormal = mat3(u_EnvRotation) * n;
     vec4 textureSample = texture(u_LambertianEnvSampler, rotatedNormal);
     textureSample.rgb *= u_EnvIntensity;
-    return textureSample.rgb;
+    return textureSample.rgb * u_AmbientParams.x + u_AmbientParams.yzw;
 }
 
 

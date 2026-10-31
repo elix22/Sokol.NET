@@ -91,6 +91,7 @@ layout(binding=1) uniform blinn_phong_fs_params {
     vec4 lights_data[128];    // 32 lights × 4 vec4s
     vec4 spot_shadow_vp[32];  // 8 spot matrices × 4 rows (slices 4..11)
     vec4 point_shadow_vp[96]; // 4 point lights × 6 faces × 4 rows
+    vec4 ambient_sky[9];      // Environment sky ambient, per channel 3 vec4 (AmbientSH.Pack); zero unless source = Sky
 };
 
 // Textures + separate samplers (sokol-shdc's cross-compilation model).
@@ -299,6 +300,15 @@ float sample_point_shadow(int point_slot, vec3 light_pos, float bias, vec3 recei
     }
 }
 
+// Sky ambient (irradiance / π) for unit normal n: per channel c + v·n + nᵀQn, see AmbientSH.cs.
+float sky_ambient_channel(int i, vec3 n) {
+    vec4 a = ambient_sky[i];
+    vec4 b = ambient_sky[i + 1];
+    vec4 c = ambient_sky[i + 2];
+    return a.x + dot(a.yzw, n) + dot(b.xyz, n * n)
+         + 2.0 * (b.w * n.x * n.y + c.x * n.x * n.z + c.y * n.y * n.z);
+}
+
 void main() {
     // --- material fetch ---
     vec4  diff_tex  = texture(sampler2D(diffuse_map,  diffuse_smp),  fs_uv);
@@ -318,7 +328,8 @@ void main() {
     vec3 V = normalize(cam_pos_pad.xyz - fs_world_pos);
 
     // --- lighting accumulation ---
-    vec3 ambient = ambient_num.xyz * Kd;
+    vec3 sky     = max(vec3(sky_ambient_channel(0, N), sky_ambient_channel(3, N), sky_ambient_channel(6, N)), vec3(0.0));
+    vec3 ambient = (ambient_num.xyz + sky) * Kd;
     vec3 accum   = ambient;
     int  count   = min(int(ambient_num.w), 32);
 
