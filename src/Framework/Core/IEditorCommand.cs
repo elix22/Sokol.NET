@@ -9,6 +9,15 @@ namespace GameEditor.Framework.Core
     }
 
     /// <summary>
+    /// A command holding something that must be released when the command leaves the history for good
+    /// (redo stack cleared by a new action, history trimmed or cleared) — e.g. a detached entity subtree.
+    /// </summary>
+    public interface IDiscardableCommand : IEditorCommand
+    {
+        void Discard();
+    }
+
+    /// <summary>
     /// AOT-safe command backed by two delegates: one to apply the action, one to reverse it.
     /// Captures old/new values as closures — no reflection required.
     /// </summary>

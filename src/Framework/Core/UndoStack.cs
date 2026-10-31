@@ -23,7 +23,7 @@ namespace GameEditor.Framework.Core
         {
             cmd.Execute();
             Push(cmd);
-            _redo.Clear();
+            ClearRedo();
         }
 
         /// <summary>
@@ -32,7 +32,7 @@ namespace GameEditor.Framework.Core
         public static void RecordAlreadyExecuted(IEditorCommand cmd)
         {
             Push(cmd);
-            _redo.Clear();
+            ClearRedo();
         }
 
         private static void Push(IEditorCommand cmd)
@@ -46,6 +46,7 @@ namespace GameEditor.Framework.Core
                 _undo.Clear();
                 for (int i = 0; i < tmp.Length - 1; i++)
                     _undo.Push(tmp[i]);
+                (tmp[^1] as IDiscardableCommand)?.Discard();
             }
         }
 
@@ -70,7 +71,14 @@ namespace GameEditor.Framework.Core
         /// <summary>Discard all history — call on scene load / new scene.</summary>
         public static void Clear()
         {
+            foreach (var cmd in _undo) (cmd as IDiscardableCommand)?.Discard();
             _undo.Clear();
+            ClearRedo();
+        }
+
+        private static void ClearRedo()
+        {
+            foreach (var cmd in _redo) (cmd as IDiscardableCommand)?.Discard();
             _redo.Clear();
         }
     }
