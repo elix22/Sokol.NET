@@ -54,9 +54,11 @@ namespace GameEditor.Framework.ECS.Components
         {
             // Extract rotation matrix entries for M = Ry * Rx * Rz (row-vector convention)
             Matrix4x4 m = Matrix4x4.CreateFromQuaternion(q);
-            float pitch = MathF.Asin(Math.Clamp(-m.M32, -1f, 1f));
+            // atan2, not asin(-M32): asin turns float rounding near ±1 into ~0.03° (-90 read back as -89.98).
+            float cosPitch = MathF.Sqrt(m.M12 * m.M12 + m.M22 * m.M22);
+            float pitch = MathF.Atan2(-m.M32, cosPitch);
             float yaw, roll;
-            if (MathF.Abs(m.M32) < 0.9999f)
+            if (cosPitch > 1e-5f)   // only true gimbal lock merges yaw and roll (a 0.9999 threshold dropped roll within 0.8° of ±90°)
             {
                 yaw  = MathF.Atan2(m.M31, m.M33);
                 roll = MathF.Atan2(m.M12, m.M22);
