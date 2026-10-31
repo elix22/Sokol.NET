@@ -102,6 +102,23 @@ namespace GameEditor.Framework.Renderer.Server
         // Bumped on every ApplyEnvironment so a slow async cubemap load can't clobber a newer env.
         private static int _envGeneration;
 
+        // Environment ambient (EnvironmentSettings.Ambient*), recomputed by UpdateAmbient whenever the
+        // settings or the environment change. Blinn-Phong: constant colour + sky SH (AmbientSH.Pack);
+        // PBR: u_AmbientParams (diffuse IBL × x + yzw). Before any ApplyEnvironment: the old fixed 0.1.
+        private static readonly Vector4[] _ambientSky = new Vector4[9];
+        private static Vector3 _ambientConst     = new(0.1f, 0.1f, 0.1f);
+        private static Vector4 _pbrAmbientParams = new(1f, 0f, 0f, 0f);
+        // Blinn-Phong output is not tonemapped (PBR's is): at full sky irradiance a face lit by a
+        // unit-intensity light clips to white. Half keeps lit faces shaded and unlit faces readable.
+        private const float BlinnSkyAmbientScale = 0.5f;
+
+        /// <summary>
+        /// Editor preview sun (Godot's "Preview Sun"): when set, a white directional light travelling
+        /// along this direction lights (and shadows) the view while the scene has no enabled
+        /// directional light. Collected per view — set it only around the views that should get it.
+        /// </summary>
+        public static Vector3? PreviewSunDirection { get; set; }
+
         // One-shot IBL diagnostics: logs the first few PBR draws (use_ibl state, material
         // metallic/roughness, bound env view ids) so a "no reflections" report is debuggable.
         private static int _pbrIblLogCount;
@@ -528,6 +545,7 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 _environment.Intensity = settings.Intensity;
                 _environment.Rotation  = Matrix4x4.CreateRotationY(rotRad);
+                UpdateAmbient();
                 return;
             }
 
@@ -561,6 +579,7 @@ namespace GameEditor.Framework.Renderer.Server
                 _pbrIblLogCount = 0;
                 Logger.Info("[IBL] environment set to skybox cubemap");
             });
+            UpdateAmbient();
         }
 
         private static void SwapEnvironment(EnvironmentMap env)
@@ -568,6 +587,35 @@ namespace GameEditor.Framework.Renderer.Server
             var old = _environment;
             _environment = env;
             old?.Dispose();
+            UpdateAmbient();
+        }
+
+        private static void UpdateAmbient()
+        {
+            Array.Clear(_ambientSky);
+            var s = _envSettings;
+            if (s == null) return;
+            float e = s.AmbientEnergy;
+            switch (s.Ambient)
+            {
+                case AmbientSource.Color:
+                    _ambientConst     = s.AmbientColor * e;
+                    _pbrAmbientParams = new Vector4(0f, _ambientConst.X, _ambientConst.Y, _ambientConst.Z);
+                    break;
+                case AmbientSource.Disabled:
+                    _ambientConst     = Vector3.Zero;
+                    _pbrAmbientParams = Vector4.Zero;
+                    break;
+                default:
+                    _pbrAmbientParams = new Vector4(e, 0f, 0f, 0f);
+                    if (_environment?.Ambient is { } sky)
+                    {
+                        _ambientConst = Vector3.Zero;
+                        sky.Rotated(_environment.Rotation).Pack(_ambientSky, _environment.Intensity * e * BlinnSkyAmbientScale);
+                    }
+                    else _ambientConst = new Vector3(0.1f, 0.1f, 0.1f);
+                    break;
+            }
         }
 
         public static void SubmitView(
@@ -981,6 +1029,7 @@ namespace GameEditor.Framework.Renderer.Server
             Light bestDirectionalShadowLight = default;
             float bestDirectionalShadowScore = float.NegativeInfinity;
             bool hasDirectionalShadowLight = false;
+            bool anyDirectionalLight = false;
 
             foreach (var row in world.Query<ActiveFlag, LightComponent, Transform>()
                                      .EnumerateWithEntities<ActiveFlag, LightComponent, Transform>())
@@ -988,6 +1037,7 @@ namespace GameEditor.Framework.Renderer.Server
                 if (!row.Item1.Value.Active) continue;
                 ref readonly var lc = ref row.Item2.Value;
                 if (!lc.Enabled) continue;
+                if (lc.Type == GameEditor.Framework.ECS.Components.LightType.Directional) anyDirectionalLight = true;
                 ref readonly var lt = ref row.Item3.Value;
 
                 Matrix4x4 lightWorld = Transform.GetWorldMatrix(world, lt);
@@ -1031,6 +1081,15 @@ namespace GameEditor.Framework.Renderer.Server
                 {
                     TryInsertTopPointShadow(row.Entity, importance);
                 }
+            }
+
+            if (!anyDirectionalLight && PreviewSunDirection is { } sunDir)
+            {
+                var sun = new Light(Lighting.LightType.Directional, Vector3.Zero, Vector3.Normalize(sunDir),
+                                    Vector3.One, 1f, 0f);
+                TryInsertTopLight(in sun, float.MaxValue);
+                bestDirectionalShadowLight = sun;
+                hasDirectionalShadowLight  = true;
             }
 
             for (int li = 0; li < _topLightCount; li++)
@@ -1195,7 +1254,8 @@ namespace GameEditor.Framework.Renderer.Server
                 fs.material_ks_shin  = new Vector4(0f, 0f, 0f, 1f);
             }
 
-            fs.ambient_num = new Vector4(0.1f, 0.1f, 0.1f, _lightBuf.Count);
+            fs.ambient_num = new Vector4(_ambientConst, _lightBuf.Count);
+            for (int k = 0; k < _ambientSky.Length; k++) fs.ambient_sky[k] = _ambientSky[k];
             fs.cam_pos_pad = new Vector4(cameraPos, (float)ShadowQuality);
 
             int n      = _lightBuf.Count;
@@ -1296,6 +1356,7 @@ namespace GameEditor.Framework.Renderer.Server
             ibl = new pbr_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -1649,6 +1710,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrTx.pbr_transmission_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -1979,6 +2041,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkin.Shaders.pbr_skinning_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -2177,6 +2240,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -2379,6 +2443,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -2599,6 +2664,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -2790,6 +2856,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -2994,6 +3061,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -3187,6 +3255,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new Csm1.Shaders.pbr_csm1_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,
@@ -3397,6 +3466,7 @@ namespace GameEditor.Framework.Renderer.Server
             var ibl = new Csm4.Shaders.pbr_csm4_pbr_ibl_params_t
             {
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
+                u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = iblActive ? _environment!.MipCount : 1,
                 u_EnvRotation       = iblActive ? _environment!.Rotation : Matrix4x4.Identity,

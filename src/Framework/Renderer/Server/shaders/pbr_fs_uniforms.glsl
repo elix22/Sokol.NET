@@ -101,6 +101,7 @@ layout(binding=3) uniform pbr_ibl_params {
     mat4  u_ViewMatrix;
     mat4  u_ProjectionMatrix;
     mat4  u_ModelMatrix;   // per-instance model; C# sets to current draw's model
+    vec4  u_AmbientParams; // Environment ambient: diffuse IBL × x + yzw (Sky: x = energy; Color: yzw = colour × energy)
 };
 
 // ─── Camera (binding=4) ──────────────────────────────────────────────────────
