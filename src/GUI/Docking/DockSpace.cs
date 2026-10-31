@@ -44,6 +44,7 @@ public sealed class DockSpace : Widget
     // Hover state for tab highlighting (no drag in progress).
     private DockNode? _hoveredTabLeaf;
     private int       _hoveredTabIdx = -1;
+    private DockNode? _hoveredOverflowLeaf;
 
     /// <summary>The DockManager that owns this DockSpace (set by the DockManager constructor).</summary>
     internal DockManager? Manager { get; set; }
@@ -227,6 +228,10 @@ public sealed class DockSpace : Widget
         var cachedWidths = new float[leaf.Panels.Count];
         for (int i = 0; i < leaf.Panels.Count; i++)
             cachedWidths[i] = renderer.MeasureText(leaf.Panels[i].Title) + TabPaddingH * 2f;
+        if (LayoutTabs(cachedWidths, leaf.ActivePanelIndex, b.Width - 8f))
+            _tabOverflowButtons[leaf] = new Rect(b.Right - OverflowButtonWidth - 4f, b.Y + 2f, OverflowButtonWidth, TabBarHeight - 4f);
+        else
+            _tabOverflowButtons.Remove(leaf);
         _tabWidthCache[leaf] = cachedWidths;
         float x = b.X + 4f;
         float cr = 4f;
@@ -234,6 +239,7 @@ public sealed class DockSpace : Widget
         {
             var p = leaf.Panels[i];
             float tabW = cachedWidths[i];
+            if (tabW <= 0f) continue;   // hidden behind the "»" button
             var isActive = i == leaf.ActivePanelIndex;
             float tabH = isActive ? (TabBarHeight - 2f) : (TabBarHeight - 4f);
             var tabRect = new Rect(x, b.Y + 2f, tabW, tabH);
@@ -263,10 +269,23 @@ public sealed class DockSpace : Widget
             }
 
             var labelColor = isActive ? theme.TabText : theme.TextMutedColor;
-            renderer.DrawText(tabRect.X + TabPaddingH, tabRect.Y + tabRect.Height * 0.5f, p.Title, labelColor);
+            renderer.DrawText(tabRect.X + TabPaddingH, tabRect.Y + tabRect.Height * 0.5f,
+                FitLabel(renderer, p.Title, tabW - TabPaddingH * 2f), labelColor);
             var sp = ScreenPosition;
             _drawnTabs.Add(new DrawnMenuItem(p.Title, new Rect(sp.X + tabRect.X, sp.Y + tabRect.Y, tabRect.Width, tabRect.Height), isActive, false));
             x += tabW + 2f;
+        }
+
+        // Overflow button: lists the tabs that did not fit.
+        if (_tabOverflowButtons.TryGetValue(leaf, out var more))
+        {
+            bool hot = _hoveredOverflowLeaf == leaf;
+            renderer.FillRoundedRect(more, 3f, hot ? theme.TabBarColor.Lighten(0.12f) : theme.TabBarColor);
+            renderer.SetTextAlign(TextHAlign.Center);
+            renderer.DrawText(more.X + more.Width * 0.5f, more.Y + more.Height * 0.5f, "\u00BB", theme.TabText);
+            renderer.SetTextAlign(TextHAlign.Left);
+            var sp = ScreenPosition;
+            _drawnTabs.Add(new DrawnMenuItem("\u00BB", new Rect(sp.X + more.X, sp.Y + more.Y, more.Width, more.Height), false, true));
         }
 
         // Tab-reorder insertion caret.
@@ -289,6 +308,51 @@ public sealed class DockSpace : Widget
             // with no move since the down — localize against the content's real place, not (0,0).
             active.Content.Bounds = body;
         }
+    }
+
+    private const float OverflowButtonWidth = 22f;
+    private readonly Dictionary<DockNode, Rect> _tabOverflowButtons = new();   // leaf → "»" rect (local), only while tabs overflow
+
+    /// <summary>
+    /// Fits a leaf's tab strip into <paramref name="available"/>: tabs keep their natural width in order while they
+    /// fit next to a "»" button; the rest get width 0 (hidden, listed by the button). The active tab is always shown,
+    /// replacing tabs from the end, and is narrowed (title ellipsised) only if it alone is wider than the bar.
+    /// Returns true when some tabs are hidden. Before this, tabs past the leaf's edge were drawn outside it and
+    /// could not be clicked.
+    /// </summary>
+    private static bool LayoutTabs(float[] widths, int active, float available)
+    {
+        int n = widths.Length;
+        float total = 2f * Math.Max(0, n - 1);
+        foreach (var w in widths) total += w;
+        if (total <= available) return false;
+
+        float room = available - OverflowButtonWidth - 2f;
+        var shown = new bool[n];
+        float used = 0f;
+        for (int i = 0; i < n && used + widths[i] <= room; i++) { shown[i] = true; used += widths[i] + 2f; }
+        if (active >= 0 && active < n && !shown[active])
+        {
+            widths[active] = MathF.Min(widths[active], room);
+            shown[active] = true;
+            used += widths[active] + 2f;
+            for (int i = n - 1; i >= 0 && used - 2f > room; i--)
+                if (shown[i] && i != active) { shown[i] = false; used -= widths[i] + 2f; }
+        }
+        for (int i = 0; i < n; i++) if (!shown[i]) widths[i] = 0f;
+        return true;
+    }
+
+    /// <summary>The title, shortened with an ellipsis when it is wider than <paramref name="maxWidth"/>.</summary>
+    private static string FitLabel(Renderer renderer, string title, float maxWidth)
+    {
+        if (renderer.MeasureText(title) <= maxWidth) return title;
+        for (int len = title.Length - 1; len > 0; len--)
+        {
+            string s = title[..len].TrimEnd() + "\u2026";
+            if (renderer.MeasureText(s) <= maxWidth) return s;
+        }
+        return "\u2026";
     }
 
     private void DrawDividers(Renderer renderer, DockNode node, Theme theme)
@@ -340,6 +404,23 @@ public sealed class DockSpace : Widget
             _draggingDivider = divider;
             _dragStartPos    = divider.Type == DockNodeType.SplitHorizontal ? e.Position.X : e.Position.Y;
             _dragStartRatio  = divider.SplitRatio;
+            return true;
+        }
+
+        // Overflow "»" button: a menu of the hidden tabs of that leaf.
+        foreach (var (oLeaf, oRect) in _tabOverflowButtons)
+        {
+            if (!oRect.Contains(local)) continue;
+            _tabWidthCache.TryGetValue(oLeaf, out var ws);
+            var items = new List<MenuItem>();
+            for (int i = 0; i < oLeaf.Panels.Count; i++)
+            {
+                if (ws != null && i < ws.Length && ws[i] > 0f) continue;
+                int idx = i; var owner = oLeaf;
+                items.Add(new MenuItem { Label = oLeaf.Panels[i].Title, OnClick = () => owner.ActivePanelIndex = idx });
+            }
+            var sp = ScreenPosition;
+            ContextMenu.Show(items, new Vector2(sp.X + oRect.X, sp.Y + oRect.Bottom));
             return true;
         }
 
@@ -439,6 +520,9 @@ public sealed class DockSpace : Widget
         var (hLeaf, hIdx, _) = HitTabInternal(ToLocal(e.Position));
         _hoveredTabLeaf = hLeaf;
         _hoveredTabIdx  = hIdx;
+        _hoveredOverflowLeaf = null;
+        foreach (var (oLeaf, oRect) in _tabOverflowButtons)
+            if (oRect.Contains(ToLocal(e.Position))) _hoveredOverflowLeaf = oLeaf;
 
         // Update cursor for divider hover.
         var hoverDiv = FindDividerAt(Root, ToLocal(e.Position));
@@ -526,6 +610,7 @@ public sealed class DockSpace : Widget
             float tabW = (widths != null && i < widths.Length)
                 ? widths[i]
                 : (leaf.Panels[i].Title.Length * 7f + TabPaddingH * 2f);
+            if (tabW <= 0f) continue;   // hidden behind the "»" button
             if (localX < x + tabW * 0.5f)
             {
                 // Left edge of this tab — sits right on the border with the previous tab.
@@ -580,6 +665,7 @@ public sealed class DockSpace : Widget
             for (int i = 0; i < cachedWidths.Length && i < leaf.Panels.Count; i++)
             {
                 float tabW = cachedWidths[i];
+                if (tabW <= 0f) continue;   // hidden behind the "»" button
                 // Use full tab-bar height for hit-testing so clicks anywhere in the
                 // bar row (top, bottom, small gaps) register on the right tab.
                 var tabRect = new Rect(x, b.Y, tabW, TabBarHeight);
