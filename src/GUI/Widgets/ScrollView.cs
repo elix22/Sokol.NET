@@ -42,6 +42,14 @@ public class ScrollView : Panel
         }
     }
 
+    /// <summary>
+    /// The content is laid out only by <see cref="Draw"/>, in the viewport it is drawn in. A parent's layout pass
+    /// used to arrange it first at its own preferred width; a wrapped <see cref="Label"/> measures at its last
+    /// width, so every frame it was sized for that width and then drawn at the narrower viewport width — one or
+    /// more lines short, its tail drawn over the next widget (an RL Env help text, robotics plan 3f.2).
+    /// </summary>
+    public override void PerformLayout(Renderer renderer, bool force = false) { }
+
     public override void Draw(Renderer renderer)
     {
         if (!Visible) return;
