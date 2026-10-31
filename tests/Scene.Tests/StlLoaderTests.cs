@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Scene.Tests
 {
-    /// <summary>StlLoader: binary + ASCII parsing, outward facet normals, bounds.</summary>
+    /// <summary>StlLoader: binary + ASCII parsing, outward facet normals, tangents, bounds.</summary>
     public sealed class StlLoaderTests
     {
         // Unit tetrahedron, every face CCW seen from outside.
@@ -51,6 +51,9 @@ namespace Scene.Tests
                 Assert.Equal(n, b.Normal);
                 Assert.Equal(n, c.Normal);
                 Assert.Equal(1f, n.Length(), 5);
+                var tan = new Vector3(a.Tangent.X, a.Tangent.Y, a.Tangent.Z);   // usable tangent frame (the −X face too)
+                Assert.Equal(1f, tan.Length(), 5);
+                Assert.Equal(0f, Vector3.Dot(tan, n), 5);
                 Assert.True(Vector3.Dot(n, (a.Position + b.Position + c.Position) / 3f - centroid) > 0f);
                 Assert.True(Vector3.Dot(n, Vector3.Cross(b.Position - a.Position, c.Position - a.Position)) > 0f);
             }
