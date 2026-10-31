@@ -45,6 +45,7 @@ public class NumberInput : TextBox
 
     public NumberInput()
     {
+        ShowStartWhenUnfocused = true;   // a narrow field shows "-0.1" of -0.14, never ".14"
         Text = "0";
         TextChanged += _ => _exactText = null;   // any edit drops the exact value; SetExact re-arms it
     }
