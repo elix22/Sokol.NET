@@ -33,6 +33,10 @@ public class ComboBox : Widget
 
     public IReadOnlyList<string> Items => _items;
 
+    private readonly List<DrawnMenuItem> _drawn = [];
+    /// <summary>The open drop-down's visible rows as last drawn, in screen space (for UI automation).</summary>
+    public IReadOnlyList<DrawnMenuItem> DrawnItems => _drawn;
+
     public int SelectedIndex
     {
         get => _selectedIndex;
@@ -147,7 +151,7 @@ public class ComboBox : Widget
         return (visibleH, totalH > visibleH, ddY);
     }
 
-    private void DrawDropdown(Renderer renderer, Theme theme, Rect bounds)
+    private void DrawDropdown(Renderer renderer, Theme theme, Rect bounds, Vector2 screenOrigin)
     {
         float itemH   = RowHeight;
         float totalH  = _items.Count * itemH;
@@ -176,6 +180,7 @@ public class ComboBox : Widget
         renderer.SetTextAlign(TextHAlign.Left);
 
         float textAreaW = needsScroll ? bounds.Width - sbW : bounds.Width;
+        _drawn.Clear();
 
         for (int i = 0; i < _items.Count; i++)
         {
@@ -188,6 +193,12 @@ public class ComboBox : Widget
                 renderer.FillRect(rowR, theme.AccentColor.WithAlpha(0.12f));
 
             renderer.DrawText(rowR.X + 6, rowR.Y + rowR.Height * 0.5f, _items[i], theme.TextColor);
+
+            // Record the visible part of the row (scrolled rows are clipped by the drop-down).
+            float y0 = MathF.Max(rowTop, ddY), y1 = MathF.Min(rowTop + itemH, ddY + visibleH);
+            if (y1 - y0 >= itemH * 0.5f)
+                _drawn.Add(new DrawnMenuItem(_items[i],
+                    new Rect(screenOrigin.X, screenOrigin.Y + y0, textAreaW, y1 - y0), Enabled, false));
         }
 
         renderer.Restore();
@@ -237,9 +248,10 @@ public class ComboBox : Widget
         var theme  = ThemeManager.Current;
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         var off = PopupOffsetFromCurrentScreenPosition();
+        var sp  = ScreenPosition;
         renderer.Save();
         renderer.Translate(off.X, off.Y);
-        DrawDropdown(renderer, theme, bounds);
+        DrawDropdown(renderer, theme, bounds, new Vector2(sp.X + off.X, sp.Y + off.Y));
         renderer.Restore();
     }
 
