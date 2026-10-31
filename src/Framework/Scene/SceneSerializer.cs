@@ -86,8 +86,11 @@ namespace GameEditor.Framework.Scene
                 if (world.TryGetComponent<Transform>(id, out var tr))
                 {
                     Comma(sb, ref fc);
+                    // "E" (degrees) is for people and older readers; "Q" is the exact rotation, read first —
+                    // Euler degrees in float drift a rotation by ~1e-7 per save/load (and per Play → Stop).
                     sb.Append("\"Transform\":{\"P\":").Append(V3(tr.Position))
                       .Append(",\"E\":").Append(V3(tr.EulerAngles))
+                      .Append(",\"Q\":").Append(Q4(tr.Rotation))
                       .Append(",\"S\":").Append(V3(tr.Scale));
                     if (tr.Parent.HasValue) sb.Append(",\"Par\":").Append(world.GetSceneId(tr.Parent.Value));
                     sb.Append('}');
@@ -395,13 +398,16 @@ namespace GameEditor.Framework.Scene
                 {
                     if (tEl.TryGetProperty("Par", out var pEl))
                         parentFixups[newId] = pEl.GetInt32();
-                    world.AddComponent(newId, new Transform
+                    var tr = new Transform
                     {
                         Position    = RV3(tEl, "P"),
                         EulerAngles = RV3(tEl, "E"),
                         Scale       = RV3(tEl, "S"),
                         Parent      = null  // fixed up in second pass
-                    });
+                    };
+                    if (tEl.TryGetProperty("Q", out var qEl) && qEl.GetArrayLength() == 4)
+                        tr.Rotation = new Quaternion(qEl[0].GetSingle(), qEl[1].GetSingle(), qEl[2].GetSingle(), qEl[3].GetSingle());
+                    world.AddComponent(newId, tr);
                 }
 
                 if (c.TryGetProperty("MeshRenderer", out var mrEl))
@@ -704,6 +710,7 @@ namespace GameEditor.Framework.Scene
         private static string F(float v) => v.ToString("G", CultureInfo.InvariantCulture);
 
         private static string V3(Vector3 v) => $"[{F(v.X)},{F(v.Y)},{F(v.Z)}]";
+        private static string Q4(Quaternion q) => $"[{F(q.X)},{F(q.Y)},{F(q.Z)},{F(q.W)}]";
 
         private static Vector3 RV3(JsonElement parent, string prop)
         {
