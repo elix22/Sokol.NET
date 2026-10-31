@@ -67,3 +67,11 @@
 [submodule "ext/mbedtls"]
 	path = ext/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls
+[submodule "ext/mujoco"]
+	path = ext/mujoco
+	url = https://github.com/elix22/mujoco.git
+	branch = mujoco-dotnet
+[submodule "ext/TorchSharp"]
+	path = ext/TorchSharp
+	url = https://github.com/elix22/TorchSharp.git
+	branch = dev-gpu
