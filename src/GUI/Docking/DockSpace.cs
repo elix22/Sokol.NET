@@ -275,6 +275,9 @@ public sealed class DockSpace : Widget
             active.Content.PerformLayout(renderer, force: true);
             active.Content.Draw(renderer);
             renderer.Restore();
+            // Back to the body rect (as HitTestDeep sets it): events between frames — e.g. a mouse-up
+            // with no move since the down — localize against the content's real place, not (0,0).
+            active.Content.Bounds = body;
         }
     }
 
