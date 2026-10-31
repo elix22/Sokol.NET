@@ -42,11 +42,14 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 // The winding is the authority (CCW = front); a stored normal pointing the other
                 // way means the file's winding is reversed, so flip the triangle to match it.
                 if (Vector3.Dot(stored, n) < 0f) { (b, c) = (c, b); n = -n; }
+                // No UVs, so any tangent perpendicular to n works; a fixed (1,0,0) would be parallel to
+                // ±X facets and give the shaders a zero bitangent (NaN normal → black facet).
+                var t = new Vector4(Vector3.Normalize(Vector3.Cross(MathF.Abs(n.X) < 0.9f ? Vector3.UnitX : Vector3.UnitY, n)), 1f);
 
                 foreach (var p in (ReadOnlySpan<Vector3>)[a, b, c])
                 {
                     indices.Add((uint)verts.Count);
-                    verts.Add(new ObjVertex { Position = p, Normal = n, Tangent = new Vector4(1, 0, 0, 1) });
+                    verts.Add(new ObjVertex { Position = p, Normal = n, Tangent = t });
                     bmin = Vector3.Min(bmin, p);
                     bmax = Vector3.Max(bmax, p);
                 }
