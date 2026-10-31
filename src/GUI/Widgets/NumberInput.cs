@@ -12,12 +12,20 @@ namespace Sokol.GUI;
 public class NumberInput : TextBox
 {
     private bool _isInvalid;
+    // The exact value last set or committed, and the text it was shown as: while the text is
+    // unchanged, Value returns it instead of the rounded display (an untouched 2.1256592 shown
+    // as "2.13" must not read back as 2.13).
+    private float   _exact;
+    private string? _exactText = "0";
+    // Text as of the last commit or programmatic set: focus loss commits only when it differs.
+    private string _committedText = "0";
 
     // ─── Properties ────────────────────────────────────────────────────────────
     public float Value
     {
-        get => float.TryParse(Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : 0f;
-        set { Text = FormatValue(value); Validate(); }
+        get => Text == _exactText ? _exact
+             : float.TryParse(Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : 0f;
+        set { SetExact(value); _committedText = Text; Validate(); }
     }
 
     public float Min           { get; set; } = float.NegativeInfinity;
@@ -35,7 +43,11 @@ public class NumberInput : TextBox
     public event Action<float>? ValueChanged;
     public event Action<float>? ValueCommitted; // fired on Enter / focus loss
 
-    public NumberInput() { Text = "0"; }
+    public NumberInput()
+    {
+        Text = "0";
+        TextChanged += _ => _exactText = null;   // any edit drops the exact value; SetExact re-arms it
+    }
 
     // ─── Preferred size ──────────────────────────────────────────────────────
     public override Vector2 PreferredSize(Renderer renderer)
@@ -66,7 +78,8 @@ public class NumberInput : TextBox
     public override void OnFocusLost()
     {
         base.OnFocusLost();
-        Commit();
+        // Enter has already committed (and moved focus here); only an edit since then commits again.
+        if (Text != _committedText) Commit();
     }
 
     // ─── Input ────────────────────────────────────────────────────────────────
@@ -133,7 +146,7 @@ public class NumberInput : TextBox
     public void SetValueFromDrag(float value)
     {
         value = Math.Clamp(value, Min, Max);
-        Text = FormatValue(value);
+        SetExact(value);
         Validate();
         ValueChanged?.Invoke(value);
     }
@@ -149,7 +162,8 @@ public class NumberInput : TextBox
         if (float.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out float v))
         {
             v    = Math.Clamp(v, Min, Max);
-            Text = FormatValue(v);
+            SetExact(v);
+            _committedText = Text;
             Validate();
             ValueCommitted?.Invoke(v);
         }
@@ -163,9 +177,16 @@ public class NumberInput : TextBox
     private void StepBy(float direction)
     {
         float next = Math.Clamp(Value + direction * Step, Min, Max);
-        Text = FormatValue(next);
+        SetExact(next);
         Validate();
         ValueChanged?.Invoke(next);
+    }
+
+    private void SetExact(float v)
+    {
+        _exact     = v;
+        Text       = FormatValue(v);
+        _exactText = Text;
     }
 
     private string FormatValue(float v)
