@@ -32,8 +32,14 @@ public sealed class ContextMenu : Widget
         Screen.SetActivePopup(_instance);
     }
 
+    /// <summary>The context menu currently shown, or null when none is open.</summary>
+    public static ContextMenu? Open => _instance != null && Screen.ActivePopup == _instance ? _instance : null;
+
     // ─── Instance state ───────────────────────────────────────────────────────
     private readonly List<MenuItem> _items = [];
+    private readonly List<DrawnMenuItem> _drawn = [];
+    /// <summary>Rows as last drawn, root then open sub-menu (see <see cref="DrawnMenuItem"/>).</summary>
+    public IReadOnlyList<DrawnMenuItem> DrawnItems => _drawn;
     private Vector2 _screenPos;
     private int _hoveredIdx = -1;
     private int _submenuHoveredIdx = -1;
@@ -84,7 +90,8 @@ public sealed class ContextMenu : Widget
         renderer.StrokeRoundedRect(popR, 2f, 1f, theme.BorderColor.WithAlpha(0.9f));
 
         ApplyFont(renderer, theme);
-        DrawMenu(renderer, _items, new Rect(0, 0, w, h), _hoveredIdx, theme, drawSubmenuArrows: true);
+        _drawn.Clear();
+        DrawMenu(renderer, _items, new Rect(0, 0, w, h), _hoveredIdx, theme, drawSubmenuArrows: true, parentPath: null);
         DrawSubmenuIfNeeded(renderer, theme);
     }
 
@@ -200,9 +207,11 @@ public sealed class ContextMenu : Widget
         return -1;
     }
 
-    private void DrawMenu(Renderer renderer, List<MenuItem> items, Rect rect, int hoveredIdx, Theme theme, bool drawSubmenuArrows)
+    private void DrawMenu(Renderer renderer, List<MenuItem> items, Rect rect, int hoveredIdx, Theme theme, bool drawSubmenuArrows,
+                          string? parentPath)
     {
         float y = rect.Y + Pad;
+        var sp = ScreenPosition;
         for (int i = 0; i < items.Count; i++)
         {
             var item = items[i];
@@ -213,6 +222,9 @@ public sealed class ContextMenu : Widget
                 y += SepH;
                 continue;
             }
+
+            _drawn.Add(new DrawnMenuItem(parentPath == null ? item.Label : parentPath + "/" + item.Label,
+                new Rect(sp.X + rect.X, sp.Y + y, rect.Width, ItemH), item.Enabled, item.SubItems is { Count: > 0 }));
 
             if (i == hoveredIdx && item.Enabled)
                 renderer.FillRoundedRect(new Rect(rect.X + 1, y, rect.Width - 2, ItemH), 2f, theme.SelectionColor);
@@ -309,7 +321,8 @@ public sealed class ContextMenu : Widget
         renderer.FillRoundedRect(_submenuRect, 2f, theme.SurfaceVariant.Darken(0.03f));
         renderer.StrokeRoundedRect(_submenuRect, 2f, 1f, theme.BorderColor.WithAlpha(0.9f));
 
-        DrawMenu(renderer, _openSubmenuItems, _submenuRect, _submenuHoveredIdx, theme, drawSubmenuArrows: false);
+        DrawMenu(renderer, _openSubmenuItems, _submenuRect, _submenuHoveredIdx, theme, drawSubmenuArrows: false,
+                 parentPath: _items[_openSubmenuFromIdx].Label);
     }
 
     private void ApplyFont(Renderer renderer, Theme theme)
