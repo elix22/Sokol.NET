@@ -340,7 +340,7 @@ public class TextBox : Widget
 
         char ch = (char)e.CharCode;
         if (Uppercase) ch = char.ToUpperInvariant(ch);
-        if (!IsCharAllowed(ch)) return false;
+        if (!IsCharAllowedReplacingSelection(ch)) return false;
         SaveUndo();
         DeleteSelection();
         _sb.Insert(_cursor, ch);
@@ -475,6 +475,22 @@ public class TextBox : Widget
     }
 
     // ─── Helpers – editing ────────────────────────────────────────────────────
+    // A typed char replaces the selection, so IsCharAllowed must judge the text (and cursor) it
+    // lands in — e.g. NumberInput's leading '-' after select-all. The text is restored either way.
+    private bool IsCharAllowedReplacingSelection(char ch)
+    {
+        if (_selStart < 0 || _selStart == _cursor) return IsCharAllowed(ch);
+        string text = _sb.ToString();
+        int cursor = _cursor;
+        int s = Math.Min(_selStart, _cursor), e = Math.Max(_selStart, _cursor);
+        _sb.Remove(s, e - s);
+        _cursor = s;
+        bool ok = IsCharAllowed(ch);
+        _sb.Clear().Append(text);
+        _cursor = cursor;
+        return ok;
+    }
+
     private void DeleteSelection()
     {
         if (_selStart < 0) return;
