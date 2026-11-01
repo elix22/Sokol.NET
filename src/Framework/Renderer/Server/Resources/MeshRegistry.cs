@@ -17,6 +17,9 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 {
     public sealed unsafe class MeshRegistry : IDisposable
     {
+        /// <summary>Key prefix of meshes their owner builds and registers in memory (<see cref="RegisterMesh"/>): never a file.</summary>
+        public const string InMemoryPrefix = "mem:";
+
         private readonly Dictionary<string, MeshResource> _byPath = new(StringComparer.Ordinal);
         private readonly MeshResource?[] _byId;    // sparse id → resource
         private ushort   _nextId = 1;              // 0 = invalid

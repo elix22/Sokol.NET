@@ -405,6 +405,7 @@ namespace GameEditor.Framework.Scene
                 if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) continue;
                 if (string.IsNullOrEmpty(mr.MeshPath)) continue;
                 if (mr.MeshPath.StartsWith("prim:", StringComparison.Ordinal)) continue;
+                if (mr.MeshPath.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal)) continue;
 
                 // Normalize to Assets-relative so the stored path is portable.
                 string? relPath = ToAssetsRelativePath(mr.MeshPath);
