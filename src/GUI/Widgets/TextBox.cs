@@ -222,7 +222,8 @@ public class TextBox : Widget
             renderer.DrawText(inner.X + phOffset - _alignOffset, cy, Placeholder, PlaceholderColor ?? theme.PlaceholderColor);
         }
         else
-            renderer.DrawText(inner.X, cy, display, ForeColor ?? theme.TextColor);
+            renderer.DrawText(inner.X, cy, IsFocused ? display : UnfocusedDisplay(renderer, display, inner.Width),
+                              ForeColor ?? theme.TextColor);
 
         // Blinking caret (only when focused, blinks at ~1 Hz)
         if (IsFocused && CaretVisible())
@@ -607,6 +608,12 @@ public class TextBox : Widget
     /// a number like "-0.14" in a narrow field then reads "-0.1", not ".14". Set by <see cref="NumberInput"/>.
     /// </summary>
     protected bool ShowStartWhenUnfocused { get; init; }
+
+    /// <summary>
+    /// The text drawn while unfocused, given the text and the room for it (font set); default: the text itself. Editing,
+    /// the caret and hit-testing always use the real text.
+    /// </summary>
+    protected virtual string UnfocusedDisplay(Renderer renderer, string text, float width) => text;
 
     private void UpdateScroll()
     {
