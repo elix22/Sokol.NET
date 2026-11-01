@@ -31,6 +31,12 @@ public class NumberInput : TextBox
     public float Min           { get; set; } = float.NegativeInfinity;
     public float Max           { get; set; } = float.PositiveInfinity;
     public int   DecimalPlaces { get; set; } = 2;
+    /// <summary>
+    /// When &gt; 0, a non-zero value that <see cref="DecimalPlaces"/> would round to zero (2.4e-6 at 4 places shows
+    /// "0.0000") is shown in short scientific form with this many significant digits instead ("2.4e-6"), and 'e' can be
+    /// typed. Every other value shows as before. 0 (default) = off.
+    /// </summary>
+    public int   SignificantDigits { get; set; }
     public float Step          { get; set; } = 0.1f;
 
     /// <summary>When true, forces <see cref="DecimalPlaces"/>=0 and <see cref="Step"/>=1 so only integers are accepted.</summary>
@@ -63,6 +69,11 @@ public class NumberInput : TextBox
         if (char.IsDigit(c)) return true;
         if (c == '.' || c == ',')
             return DecimalPlaces > 0 && !Text.Contains('.') && !Text.Contains(',');
+        if (SignificantDigits > 0 && DecimalPlaces > 0)
+        {
+            if (c == 'e' || c == 'E') return Cursor > 0 && Text.IndexOfAny(['e', 'E']) < 0;
+            if (c == '-' && Cursor > 0 && Text[Cursor - 1] is 'e' or 'E') return true;   // the exponent's sign
+        }
         if (c == '-')
             return Cursor == 0 && !Text.Contains('-');
         return false;
@@ -192,7 +203,31 @@ public class NumberInput : TextBox
 
     private string FormatValue(float v)
     {
+        if (SignificantDigits > 0 && DecimalPlaces > 0 && v != 0 && MathF.Abs(v) < 0.5f * MathF.Pow(10, -DecimalPlaces))
+            return Scientific(v);
         string fmt = DecimalPlaces > 0 ? $"F{DecimalPlaces}" : "F0";
-        return v.ToString(fmt, CultureInfo.InvariantCulture);
+        string text = v.ToString(fmt, CultureInfo.InvariantCulture);
+        // −0 and a small negative value both round to "-0.00": no sign on a shown zero (the exact value is kept).
+        return text[0] == '-' && text.AsSpan(1).IndexOfAnyExcept("0.") < 0 ? text[1..] : text;
+    }
+
+    /// <summary>
+    /// v in <see cref="SignificantDigits"/> digits, short: "2.38e-6", "4e-5". Rounds the float's shortest round-trip digits
+    /// (2.375e-6f is 2.37499989e-6, printed "2.375E-06") half away from zero, so a value typed as 2.375e-6 shows 2.38e-6.
+    /// </summary>
+    private string Scientific(float v)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        string r = v.ToString("R", inv);   // "2.375E-06", or "0.0125" for values .NET prints without an exponent
+        int e = r.IndexOf('E');
+        decimal m = decimal.Parse(e < 0 ? r : r[..e], NumberStyles.Float, inv);
+        int exp = e < 0 ? 0 : int.Parse(r[(e + 1)..], NumberStyles.Integer, inv);
+        while (Math.Abs(m) >= 10) { m /= 10; exp++; }
+        while (Math.Abs(m) < 1)   { m *= 10; exp--; }
+        m = Math.Round(m, SignificantDigits - 1, MidpointRounding.AwayFromZero);
+        if (Math.Abs(m) >= 10) { m /= 10; exp++; }
+        string mantissa = m.ToString(inv);
+        if (mantissa.Contains('.')) mantissa = mantissa.TrimEnd('0').TrimEnd('.');
+        return mantissa + "e" + exp.ToString(inv);
     }
 }
