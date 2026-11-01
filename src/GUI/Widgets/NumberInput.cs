@@ -86,6 +86,31 @@ public class NumberInput : TextBox
     protected override float GetBorderWidth(Theme theme) =>
         _isInvalid ? 2f : base.GetBorderWidth(theme);
 
+    /// <summary>
+    /// A scientific value (<see cref="SignificantDigits"/>) wider than the field drops mantissa digits, never its exponent
+    /// ("1.25e-14" → "1.3e-14" → "1e-14"): cut at the end like a decimal, it would read as another number ("1.25e-1").
+    /// </summary>
+    protected override string UnfocusedDisplay(Renderer renderer, string text, float width)
+    {
+        int e = text.IndexOf('e');
+        if (SignificantDigits <= 0 || e < 0 || renderer.MeasureText(text) <= width) return text;
+        var inv = CultureInfo.InvariantCulture;
+        if (!decimal.TryParse(text[..e], NumberStyles.Float, inv, out decimal m)
+            || !int.TryParse(text[(e + 1)..], NumberStyles.Integer, inv, out int exp)) return text;
+        string shorter = text;
+        for (int digits = SignificantDigits - 1; digits >= 1; digits--)
+        {
+            decimal r = Math.Round(m, digits - 1, MidpointRounding.AwayFromZero);
+            int x = exp;
+            if (Math.Abs(r) >= 10) { r /= 10; x++; }   // 9.96e-14 at 2 digits = 1e-13
+            string mantissa = r.ToString(inv);
+            if (mantissa.Contains('.')) mantissa = mantissa.TrimEnd('0').TrimEnd('.');
+            shorter = mantissa + "e" + x.ToString(inv);
+            if (renderer.MeasureText(shorter) <= width) break;
+        }
+        return shorter;
+    }
+
     // ─── Focus ────────────────────────────────────────────────────────────────
     public override void OnFocusLost()
     {
