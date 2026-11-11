@@ -62,8 +62,110 @@ namespace GameEditor.Framework.Scene
                 sb.Append(",\"physics\":\"").Append(Esc(scene.PhysicsBackend)).Append('"');
             sb.Append(",\"entities\":[");
 
+            WriteEntities(sb, world, world.Entities);
+
+            sb.Append(']'); // close entities
+            // Ids are never reused within a scene: the counter travels with it (absent = 1, an empty new scene).
+            if (world.NextSceneId > 1) sb.Append(",\"nextId\":").Append(world.NextSceneId);
+            foreach (var kvp in scene.Blocks)
+            {
+                if (RootKeys.Contains(kvp.Key)) continue;
+                sb.Append(",\"").Append(Esc(kvp.Key)).Append("\":").Append(kvp.Value);
+            }
+            sb.Append('}'); // close root
+            return sb.ToString();
+        }
+
+        public static void Deserialize(string json, Scene scene)
+        {
+            scene.Clear();
+
+            JsonDocument doc;
+            try { doc = JsonDocument.Parse(json); }
+            catch { return; }
+
+            var root = doc.RootElement;
+            if (root.TryGetProperty("name", out var nameProp))
+                scene.Name = nameProp.GetString() ?? scene.Name;
+            scene.PhysicsBackend = root.TryGetProperty("physics", out var physicsProp) ? physicsProp.GetString() : null;
+
+            var world = ECSWorld.Instance;
+            if (root.TryGetProperty("nextId", out var nextIdEl) && nextIdEl.TryGetInt32(out int nextId))
+                world.NextSceneId = nextId;
+            foreach (var prop in root.EnumerateObject())
+                if (!RootKeys.Contains(prop.Name)) scene.Blocks[prop.Name] = prop.Value.GetRawText();
+
+            if (!root.TryGetProperty("entities", out var entitiesEl))
+                return;
+
+            // Map from saved-ID (int) → new runtime Entity (for parent fixup)
+            var idMap = new Dictionary<int, Entity>();
+            // References to other entities are saved ids: resolved once every entity exists
+            var fx = new Fixups();
+
+            // First pass — create entities and load all components
+            foreach (var eEl in entitiesEl.EnumerateArray())
+            {
+                int savedId = eEl.TryGetProperty("id", out var idEl) ? idEl.GetInt32() : 0;
+                Entity newId = world.CreateEntity(); // auto-adds NameTag/ActiveFlag/Transform
+                idMap.TryAdd(savedId, newId);
+                world.SetSceneId(newId, savedId);    // keeps the saved id (a duplicate or missing one gets a fresh id)
+
+                if (!eEl.TryGetProperty("c", out var c)) continue;
+
+                ReadBuiltIns(world, newId, c, fx);
+
+                Dictionary<string, string>? preserved = null;
+                foreach (var prop in c.EnumerateObject())
+                {
+                    if (BuiltInKeys.Contains(prop.Name)) continue;
+                    if (_extensions.ContainsKey(prop.Name))
+                        fx.Extensions.Add((newId, prop.Name, prop.Value));
+                    else
+                        (preserved ??= new Dictionary<string, string>())[prop.Name] = prop.Value.GetRawText();
+                }
+                if (preserved != null)
+                    world.AddComponent(newId, new PreservedComponents { Blocks = preserved });
+            }
+
+            ApplyFixups(world, fx, savedId => idMap.TryGetValue(savedId, out Entity e) ? e : Entity.Null);
+        }
+
+        /// <summary>One entity as the scene file writes it: <c>{"id":n,"c":{…}}</c>.</summary>
+        public static string SerializeEntity(Entity entity)
+        {
+            var sb = new StringBuilder();
+            WriteEntities(sb, ECSWorld.Instance, new List<Entity> { entity });
+            return sb.ToString();
+        }
+
+        /// <summary>True for a component key this build reads: a built-in one or a registered extension's.</summary>
+        public static bool IsComponentKey(string key) => BuiltInKeys.Contains(key) || _extensions.ContainsKey(key);
+
+        /// <summary>
+        /// Reads component blocks in the scene-file format (the value of an entity's "c") onto an existing
+        /// entity of the open scene. Each block given replaces that component whole; components whose key is
+        /// absent are left alone. References to other entities are scene ids (<see cref="ECSWorld.GetSceneId"/>);
+        /// one that names no live entity is skipped, as on load.
+        /// Throws on a key that is not a component (<see cref="IsComponentKey"/>) and on a malformed block —
+        /// the entity may then be half-written, so capture it first (<see cref="ECSWorld.Capture"/>).
+        /// </summary>
+        public static void ReadComponents(Entity entity, JsonElement components)
+        {
+            foreach (var prop in components.EnumerateObject())
+                if (!IsComponentKey(prop.Name)) throw new ArgumentException($"unknown component '{prop.Name}'");
+            var world = ECSWorld.Instance;
+            var fx = new Fixups();
+            ReadBuiltIns(world, entity, components, fx);
+            foreach (var prop in components.EnumerateObject())
+                if (_extensions.ContainsKey(prop.Name)) fx.Extensions.Add((entity, prop.Name, prop.Value));
+            ApplyFixups(world, fx, id => world.TryGetEntityBySceneId(id, out Entity e) ? e : Entity.Null);
+        }
+
+        private static void WriteEntities(StringBuilder sb, ECSWorld world, List<Entity> entities)
+        {
             bool firstEntity = true;
-            foreach (Entity id in world.Entities)
+            foreach (Entity id in entities)
             {
                 if (!firstEntity) sb.Append(',');
                 firstEntity = false;
@@ -332,340 +434,292 @@ namespace GameEditor.Framework.Scene
 
                 sb.Append("}}"); // close components + entity
             }
-
-            sb.Append(']'); // close entities
-            // Ids are never reused within a scene: the counter travels with it (absent = 1, an empty new scene).
-            if (world.NextSceneId > 1) sb.Append(",\"nextId\":").Append(world.NextSceneId);
-            foreach (var kvp in scene.Blocks)
-            {
-                if (RootKeys.Contains(kvp.Key)) continue;
-                sb.Append(",\"").Append(Esc(kvp.Key)).Append("\":").Append(kvp.Value);
-            }
-            sb.Append('}'); // close root
-            return sb.ToString();
         }
 
-        public static void Deserialize(string json, Scene scene)
+        // Saved entity ids found while reading components, resolved by ApplyFixups.
+        private sealed class Fixups
         {
-            scene.Clear();
-
-            JsonDocument doc;
-            try { doc = JsonDocument.Parse(json); }
-            catch { return; }
-
-            var root = doc.RootElement;
-            if (root.TryGetProperty("name", out var nameProp))
-                scene.Name = nameProp.GetString() ?? scene.Name;
-            scene.PhysicsBackend = root.TryGetProperty("physics", out var physicsProp) ? physicsProp.GetString() : null;
-
-            var world = ECSWorld.Instance;
-            if (root.TryGetProperty("nextId", out var nextIdEl) && nextIdEl.TryGetInt32(out int nextId))
-                world.NextSceneId = nextId;
-            foreach (var prop in root.EnumerateObject())
-                if (!RootKeys.Contains(prop.Name)) scene.Blocks[prop.Name] = prop.Value.GetRawText();
-
-            if (!root.TryGetProperty("entities", out var entitiesEl))
-                return;
-
-            // Map from saved-ID (int) → new runtime Entity (for parent fixup)
-            var idMap = new Dictionary<int, Entity>();
-            // Entities that have a saved parent int needing fixup
-            var parentFixups = new Dictionary<Entity, int>();
-            // Entities with a ConstraintComponent whose BodyA/BodyB IDs need remapping
-            var constraintFixups = new Dictionary<Entity, (int, int)>();
-            // Entities with a WheelFollowerComponent whose VehicleEntity ID needs remapping
-            var wheelFollowFixups = new Dictionary<Entity, int>();
+            public readonly Dictionary<Entity, int> Parent = new();
+            public readonly Dictionary<Entity, (int, int)> Constraint = new();
+            public readonly Dictionary<Entity, int> WheelFollow = new();
             // Registered extension blocks, read once every entity exists (they may reference others)
-            var extensionReads = new List<(Entity, string, JsonElement)>();
+            public readonly List<(Entity, string, JsonElement)> Extensions = new();
+        }
 
-            // First pass — create entities and load all components
-            foreach (var eEl in entitiesEl.EnumerateArray())
+        // Reads the built-in component blocks present in c onto newId (a new entity, or an existing one being edited).
+        private static void ReadBuiltIns(ECSWorld world, Entity newId, JsonElement c, Fixups fx)
+        {
+            if (c.TryGetProperty("NameTag", out var nEl))
+                world.AddComponent(newId, new NameTag { Name = nEl.GetProperty("Name").GetString() ?? "Entity" });
+
+            if (c.TryGetProperty("ActiveFlag", out var aEl))
+                world.AddComponent(newId, new ActiveFlag { Active = aEl.GetProperty("Active").GetBoolean() });
+
+            if (c.TryGetProperty("Transform", out var tEl))
             {
-                int savedId = eEl.TryGetProperty("id", out var idEl) ? idEl.GetInt32() : 0;
-                Entity newId = world.CreateEntity(); // auto-adds NameTag/ActiveFlag/Transform
-                idMap.TryAdd(savedId, newId);
-                world.SetSceneId(newId, savedId);    // keeps the saved id (a duplicate or missing one gets a fresh id)
-
-                if (!eEl.TryGetProperty("c", out var c)) continue;
-
-                if (c.TryGetProperty("NameTag", out var nEl))
-                    world.AddComponent(newId, new NameTag { Name = nEl.GetProperty("Name").GetString() ?? "Entity" });
-
-                if (c.TryGetProperty("ActiveFlag", out var aEl))
-                    world.AddComponent(newId, new ActiveFlag { Active = aEl.GetProperty("Active").GetBoolean() });
-
-                if (c.TryGetProperty("Transform", out var tEl))
+                if (tEl.TryGetProperty("Par", out var pEl))
+                    fx.Parent[newId] = pEl.GetInt32();
+                var tr = new Transform
                 {
-                    if (tEl.TryGetProperty("Par", out var pEl))
-                        parentFixups[newId] = pEl.GetInt32();
-                    var tr = new Transform
-                    {
-                        Position    = RV3(tEl, "P"),
-                        EulerAngles = RV3(tEl, "E"),
-                        Scale       = RV3(tEl, "S"),
-                        Parent      = null  // fixed up in second pass
-                    };
-                    if (tEl.TryGetProperty("Q", out var qEl) && qEl.GetArrayLength() == 4)
-                        tr.Rotation = new Quaternion(qEl[0].GetSingle(), qEl[1].GetSingle(), qEl[2].GetSingle(), qEl[3].GetSingle());
-                    world.AddComponent(newId, tr);
-                }
+                    Position    = RV3(tEl, "P"),
+                    EulerAngles = RV3(tEl, "E"),
+                    Scale       = RV3(tEl, "S"),
+                    Parent      = null  // fixed up in second pass
+                };
+                if (tEl.TryGetProperty("Q", out var qEl) && qEl.GetArrayLength() == 4)
+                    tr.Rotation = new Quaternion(qEl[0].GetSingle(), qEl[1].GetSingle(), qEl[2].GetSingle(), qEl[3].GetSingle());
+                world.AddComponent(newId, tr);
+            }
 
-                if (c.TryGetProperty("MeshRenderer", out var mrEl))
-                    world.AddComponent(newId, new MeshRenderer
-                    {
-                        MeshPath     = mrEl.GetProperty("Path").GetString() ?? "",
-                        MaterialPath = mrEl.TryGetProperty("Mat", out var matEl) ? (matEl.GetString() ?? "") : "",
-                        Visible      = mrEl.GetProperty("Vis").GetBoolean(),
-                        ReceivesShadows = !mrEl.TryGetProperty("RecvSh", out var recvShEl) || recvShEl.GetBoolean(),
-                        CastsShadows = !mrEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
-                    });
-
-                if (c.TryGetProperty("SkinnedMeshRenderer", out var skEl))
-                    world.AddComponent(newId, new SkinnedMeshRenderer
-                    {
-                        CharacterKey    = skEl.GetProperty("Key").GetString() ?? "",
-                        PrimIndex       = skEl.TryGetProperty("Prim", out var primEl) ? primEl.GetInt32() : 0,
-                        MaterialKey     = skEl.TryGetProperty("Mat", out var smatEl) ? (smatEl.GetString() ?? "") : "",
-                        Visible         = !skEl.TryGetProperty("Vis", out var svisEl) || svisEl.GetBoolean(),
-                        ReceivesShadows = !skEl.TryGetProperty("RecvSh", out var srecvEl) || srecvEl.GetBoolean(),
-                        CastsShadows    = !skEl.TryGetProperty("CastSh", out var scastEl) || scastEl.GetBoolean(),
-                    });
-
-                if (c.TryGetProperty("Camera", out var camEl))
-                    world.AddComponent(newId, new CameraComponent
-                    {
-                        Fov            = camEl.GetProperty("Fov").GetSingle(),
-                        NearZ          = camEl.GetProperty("Near").GetSingle(),
-                        FarZ           = camEl.GetProperty("Far").GetSingle(),
-                        IsMain         = camEl.GetProperty("Main").GetBoolean(),
-                        IsOrthographic = camEl.TryGetProperty("Ortho", out var orthoEl) && orthoEl.GetBoolean(),
-                        OrthoSize      = camEl.TryGetProperty("OrthoSize", out var osEl) ? osEl.GetSingle() : 5f,
-                        Enabled        = !camEl.TryGetProperty("Enabled", out var camEnEl) || camEnEl.GetBoolean(),
-                    });
-
-                if (c.TryGetProperty("Light", out var ltEl))
-                    world.AddComponent(newId, new LightComponent
-                    {
-                        Type       = Enum.Parse<LightType>(ltEl.GetProperty("Type").GetString()!),
-                        Color      = RV3(ltEl, "Color"),
-                        Intensity  = ltEl.GetProperty("Int").GetSingle(),
-                        Range      = ltEl.GetProperty("Range").GetSingle(),
-                        InnerAngle = ltEl.TryGetProperty("Inner", out var innerEl) ? innerEl.GetSingle() : 25f,
-                        OuterAngle = ltEl.TryGetProperty("Outer", out var outerEl) ? outerEl.GetSingle() : 35f,
-                        CastsShadows = !ltEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
-                        Enabled      = !ltEl.TryGetProperty("Enabled", out var ltEnEl) || ltEnEl.GetBoolean(),
-                    });
-
-                if (c.TryGetProperty("Rigidbody", out var rbEl))
+            if (c.TryGetProperty("MeshRenderer", out var mrEl))
+                world.AddComponent(newId, new MeshRenderer
                 {
-                    List<ShapeEntry> loadedShapes;
-                    if (rbEl.TryGetProperty("Shapes", out var shapesEl) && shapesEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    MeshPath     = mrEl.GetProperty("Path").GetString() ?? "",
+                    MaterialPath = mrEl.TryGetProperty("Mat", out var matEl) ? (matEl.GetString() ?? "") : "",
+                    Visible      = mrEl.GetProperty("Vis").GetBoolean(),
+                    ReceivesShadows = !mrEl.TryGetProperty("RecvSh", out var recvShEl) || recvShEl.GetBoolean(),
+                    CastsShadows = !mrEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
+                });
+
+            if (c.TryGetProperty("SkinnedMeshRenderer", out var skEl))
+                world.AddComponent(newId, new SkinnedMeshRenderer
+                {
+                    CharacterKey    = skEl.GetProperty("Key").GetString() ?? "",
+                    PrimIndex       = skEl.TryGetProperty("Prim", out var primEl) ? primEl.GetInt32() : 0,
+                    MaterialKey     = skEl.TryGetProperty("Mat", out var smatEl) ? (smatEl.GetString() ?? "") : "",
+                    Visible         = !skEl.TryGetProperty("Vis", out var svisEl) || svisEl.GetBoolean(),
+                    ReceivesShadows = !skEl.TryGetProperty("RecvSh", out var srecvEl) || srecvEl.GetBoolean(),
+                    CastsShadows    = !skEl.TryGetProperty("CastSh", out var scastEl) || scastEl.GetBoolean(),
+                });
+
+            if (c.TryGetProperty("Camera", out var camEl))
+                world.AddComponent(newId, new CameraComponent
+                {
+                    Fov            = camEl.GetProperty("Fov").GetSingle(),
+                    NearZ          = camEl.GetProperty("Near").GetSingle(),
+                    FarZ           = camEl.GetProperty("Far").GetSingle(),
+                    IsMain         = camEl.GetProperty("Main").GetBoolean(),
+                    IsOrthographic = camEl.TryGetProperty("Ortho", out var orthoEl) && orthoEl.GetBoolean(),
+                    OrthoSize      = camEl.TryGetProperty("OrthoSize", out var osEl) ? osEl.GetSingle() : 5f,
+                    Enabled        = !camEl.TryGetProperty("Enabled", out var camEnEl) || camEnEl.GetBoolean(),
+                });
+
+            if (c.TryGetProperty("Light", out var ltEl))
+                world.AddComponent(newId, new LightComponent
+                {
+                    Type       = Enum.Parse<LightType>(ltEl.GetProperty("Type").GetString()!),
+                    Color      = RV3(ltEl, "Color"),
+                    Intensity  = ltEl.GetProperty("Int").GetSingle(),
+                    Range      = ltEl.GetProperty("Range").GetSingle(),
+                    InnerAngle = ltEl.TryGetProperty("Inner", out var innerEl) ? innerEl.GetSingle() : 25f,
+                    OuterAngle = ltEl.TryGetProperty("Outer", out var outerEl) ? outerEl.GetSingle() : 35f,
+                    CastsShadows = !ltEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
+                    Enabled      = !ltEl.TryGetProperty("Enabled", out var ltEnEl) || ltEnEl.GetBoolean(),
+                });
+
+            if (c.TryGetProperty("Rigidbody", out var rbEl))
+            {
+                List<ShapeEntry> loadedShapes;
+                if (rbEl.TryGetProperty("Shapes", out var shapesEl) && shapesEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    loadedShapes = new List<ShapeEntry>();
+                    foreach (var seEl in shapesEl.EnumerateArray())
                     {
-                        loadedShapes = new List<ShapeEntry>();
-                        foreach (var seEl in shapesEl.EnumerateArray())
+                        var se = new ShapeEntry
                         {
-                            var se = new ShapeEntry
-                            {
-                                Shape      = seEl.TryGetProperty("S", out var sEl2) ? Enum.Parse<GameEditor.Framework.Physics.ColliderShape>(sEl2.GetString() ?? "Box") : GameEditor.Framework.Physics.ColliderShape.Box,
-                                HalfExtent = new System.Numerics.Vector3(
-                                    seEl.TryGetProperty("HX", out var hxEl) ? hxEl.GetSingle() : 0.5f,
-                                    seEl.TryGetProperty("HY", out var hyEl) ? hyEl.GetSingle() : 0.5f,
-                                    seEl.TryGetProperty("HZ", out var hzEl) ? hzEl.GetSingle() : 0.5f),
-                                Radius     = seEl.TryGetProperty("R", out var rEl) ? rEl.GetSingle() : 0.5f,
-                                HalfHeight = seEl.TryGetProperty("H", out var hEl) ? hEl.GetSingle() : 0.5f,
-                                Offset     = new System.Numerics.Vector3(
-                                    seEl.TryGetProperty("OX", out var oxEl) ? oxEl.GetSingle() : 0f,
-                                    seEl.TryGetProperty("OY", out var oyEl) ? oyEl.GetSingle() : 0f,
-                                    seEl.TryGetProperty("OZ", out var ozEl) ? ozEl.GetSingle() : 0f),
-                                OffsetRotation = System.Numerics.Quaternion.Identity,
-                            };
-                            loadedShapes.Add(se);
-                        }
-                        if (loadedShapes.Count == 0)
-                            loadedShapes.Add(ShapeEntry.Default());
+                            Shape      = seEl.TryGetProperty("S", out var sEl2) ? Enum.Parse<GameEditor.Framework.Physics.ColliderShape>(sEl2.GetString() ?? "Box") : GameEditor.Framework.Physics.ColliderShape.Box,
+                            HalfExtent = new System.Numerics.Vector3(
+                                seEl.TryGetProperty("HX", out var hxEl) ? hxEl.GetSingle() : 0.5f,
+                                seEl.TryGetProperty("HY", out var hyEl) ? hyEl.GetSingle() : 0.5f,
+                                seEl.TryGetProperty("HZ", out var hzEl) ? hzEl.GetSingle() : 0.5f),
+                            Radius     = seEl.TryGetProperty("R", out var rEl) ? rEl.GetSingle() : 0.5f,
+                            HalfHeight = seEl.TryGetProperty("H", out var hEl) ? hEl.GetSingle() : 0.5f,
+                            Offset     = new System.Numerics.Vector3(
+                                seEl.TryGetProperty("OX", out var oxEl) ? oxEl.GetSingle() : 0f,
+                                seEl.TryGetProperty("OY", out var oyEl) ? oyEl.GetSingle() : 0f,
+                                seEl.TryGetProperty("OZ", out var ozEl) ? ozEl.GetSingle() : 0f),
+                            OffsetRotation = System.Numerics.Quaternion.Identity,
+                        };
+                        loadedShapes.Add(se);
                     }
-                    else
-                    {
-                        // Backward compat: old format had a single "Shape" string field
-                        var legacyShape = rbEl.TryGetProperty("Shape", out var shapeEl)
-                            ? Enum.Parse<GameEditor.Framework.Physics.ColliderShape>(shapeEl.GetString() ?? "Box")
-                            : GameEditor.Framework.Physics.ColliderShape.Box;
-                        loadedShapes = new List<ShapeEntry> { ShapeEntry.Default(legacyShape) };
-                    }
-                    world.AddComponent(newId, new RigidbodyComponent
-                    {
-                        MotionType = ReadMotionType(rbEl),
-                        Mass       = rbEl.GetProperty("Mass").GetSingle(),
-                        UseGravity = rbEl.GetProperty("Gravity").GetBoolean(),
-                        Friction   = rbEl.TryGetProperty("Friction", out var frictionEl) ? frictionEl.GetSingle() : 0.5f,
-                        Restitution = rbEl.TryGetProperty("Restitution", out var restitutionEl) ? restitutionEl.GetSingle() : 0f,
-                        LinearDamping = rbEl.TryGetProperty("LinearDamping", out var linearDampingEl) ? linearDampingEl.GetSingle() : 0f,
-                        AngularDamping = rbEl.TryGetProperty("AngularDamping", out var angularDampingEl) ? angularDampingEl.GetSingle() : 0.05f,
-                        Shapes     = loadedShapes,
-                        IsTrigger  = rbEl.TryGetProperty("Trigger", out var triggerEl) && triggerEl.GetBoolean(),
-                        Layer      = rbEl.TryGetProperty("Layer", out var layerEl) ? (ushort)layerEl.GetInt32() : (ushort)1,
-                        LayerMask  = rbEl.TryGetProperty("LayerMask", out var maskEl) ? (ushort)maskEl.GetInt32() : (ushort)0xFFFF
-                    });
+                    if (loadedShapes.Count == 0)
+                        loadedShapes.Add(ShapeEntry.Default());
                 }
+                else
+                {
+                    // Backward compat: old format had a single "Shape" string field
+                    var legacyShape = rbEl.TryGetProperty("Shape", out var shapeEl)
+                        ? Enum.Parse<GameEditor.Framework.Physics.ColliderShape>(shapeEl.GetString() ?? "Box")
+                        : GameEditor.Framework.Physics.ColliderShape.Box;
+                    loadedShapes = new List<ShapeEntry> { ShapeEntry.Default(legacyShape) };
+                }
+                world.AddComponent(newId, new RigidbodyComponent
+                {
+                    MotionType = ReadMotionType(rbEl),
+                    Mass       = rbEl.GetProperty("Mass").GetSingle(),
+                    UseGravity = rbEl.GetProperty("Gravity").GetBoolean(),
+                    Friction   = rbEl.TryGetProperty("Friction", out var frictionEl) ? frictionEl.GetSingle() : 0.5f,
+                    Restitution = rbEl.TryGetProperty("Restitution", out var restitutionEl) ? restitutionEl.GetSingle() : 0f,
+                    LinearDamping = rbEl.TryGetProperty("LinearDamping", out var linearDampingEl) ? linearDampingEl.GetSingle() : 0f,
+                    AngularDamping = rbEl.TryGetProperty("AngularDamping", out var angularDampingEl) ? angularDampingEl.GetSingle() : 0.05f,
+                    Shapes     = loadedShapes,
+                    IsTrigger  = rbEl.TryGetProperty("Trigger", out var triggerEl) && triggerEl.GetBoolean(),
+                    Layer      = rbEl.TryGetProperty("Layer", out var layerEl) ? (ushort)layerEl.GetInt32() : (ushort)1,
+                    LayerMask  = rbEl.TryGetProperty("LayerMask", out var maskEl) ? (ushort)maskEl.GetInt32() : (ushort)0xFFFF
+                });
+            }
 
-                if (c.TryGetProperty("Script", out var sEl))
+            if (c.TryGetProperty("Script", out var sEl))
+            {
+                var sc = new ScriptComponent
+                {
+                    TypeName = sEl.GetProperty("Type").GetString() ?? ""
+                };
+                if (sEl.TryGetProperty("Props", out var propsEl))
+                {
+                    sc.Properties = new Dictionary<string, string>();
+                    foreach (var p in propsEl.EnumerateObject())
+                        sc.Properties[p.Name] = p.Value.GetString() ?? "";
+                }
+                world.AddComponent(newId, sc);
+            }
+
+            if (c.TryGetProperty("Scripts", out var saEl) && saEl.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<ScriptComponent>();
+                foreach (var sxEl in saEl.EnumerateArray())
                 {
                     var sc = new ScriptComponent
                     {
-                        TypeName = sEl.GetProperty("Type").GetString() ?? ""
+                        TypeName = sxEl.TryGetProperty("Type", out var txEl) ? (txEl.GetString() ?? "") : ""
                     };
-                    if (sEl.TryGetProperty("Props", out var propsEl))
+                    if (sxEl.TryGetProperty("Props", out var propsEl) && propsEl.ValueKind == JsonValueKind.Object)
                     {
                         sc.Properties = new Dictionary<string, string>();
                         foreach (var p in propsEl.EnumerateObject())
                             sc.Properties[p.Name] = p.Value.GetString() ?? "";
                     }
-                    world.AddComponent(newId, sc);
+                    list.Add(sc);
                 }
-
-                if (c.TryGetProperty("Scripts", out var saEl) && saEl.ValueKind == JsonValueKind.Array)
-                {
-                    var list = new List<ScriptComponent>();
-                    foreach (var sxEl in saEl.EnumerateArray())
-                    {
-                        var sc = new ScriptComponent
-                        {
-                            TypeName = sxEl.TryGetProperty("Type", out var txEl) ? (txEl.GetString() ?? "") : ""
-                        };
-                        if (sxEl.TryGetProperty("Props", out var propsEl) && propsEl.ValueKind == JsonValueKind.Object)
-                        {
-                            sc.Properties = new Dictionary<string, string>();
-                            foreach (var p in propsEl.EnumerateObject())
-                                sc.Properties[p.Name] = p.Value.GetString() ?? "";
-                        }
-                        list.Add(sc);
-                    }
-                    if (list.Count > 0)
-                        world.AddComponent(newId, new ScriptCollectionComponent { Scripts = list });
-                }
-
-                if (c.TryGetProperty("Constraint", out var conEl))
-                {
-                    int savedA = conEl.TryGetProperty("A", out var conAEl) ? conAEl.GetInt32() : -1;
-                    int savedB = conEl.TryGetProperty("B", out var conBEl) ? conBEl.GetInt32() : -1;
-                    world.AddComponent(newId, new ConstraintComponent
-                    {
-                        Type         = conEl.TryGetProperty("T", out var tEl2) &&
-                                       Enum.TryParse(tEl2.GetString(), out GameEditor.Framework.Physics.ConstraintType ct)
-                                       ? ct : GameEditor.Framework.Physics.ConstraintType.Fixed,
-                        LocalAnchorA = RV3(conEl, "AA"),
-                        LocalAnchorB = RV3(conEl, "AB"),
-                        LocalAxisA   = RV3(conEl, "XA"),
-                        LocalAxisB   = RV3(conEl, "XB"),
-                        MinLimit     = conEl.TryGetProperty("Min", out var minEl) ? minEl.GetSingle() : 0f,
-                        MaxLimit     = conEl.TryGetProperty("Max", out var maxEl) ? maxEl.GetSingle() : 0f,
-                    });
-                    if (savedA >= 0 || savedB >= 0)
-                        constraintFixups[newId] = (savedA, savedB);
-                }
-
-                if (c.TryGetProperty("Character", out var charEl))
-                {
-                    world.AddComponent(newId, new CharacterComponent
-                    {
-                        Mode               = charEl.TryGetProperty("Mode",     out var modeEl) ? (CharacterMode)modeEl.GetInt32() : CharacterComponent.Default.Mode,
-                        Height             = charEl.TryGetProperty("Height",   out var hEl)    ? hEl.GetSingle()                  : CharacterComponent.Default.Height,
-                        Radius             = charEl.TryGetProperty("Radius",   out var rEl)    ? rEl.GetSingle()                  : CharacterComponent.Default.Radius,
-                        MaxSlopeAngle      = charEl.TryGetProperty("Slope",    out var slEl2)  ? slEl2.GetSingle()                : CharacterComponent.Default.MaxSlopeAngle,
-                        MaxStrength        = charEl.TryGetProperty("Strength", out var stEl)   ? stEl.GetSingle()                 : CharacterComponent.Default.MaxStrength,
-                        Mass               = charEl.TryGetProperty("Mass",     out var mEl)    ? mEl.GetSingle()                  : CharacterComponent.Default.Mass,
-                        Friction           = charEl.TryGetProperty("Friction", out var frEl)   ? frEl.GetSingle()                 : CharacterComponent.Default.Friction,
-                        GravityFactor      = charEl.TryGetProperty("Gravity",  out var gfEl)   ? gfEl.GetSingle()                 : CharacterComponent.Default.GravityFactor,
-                        CollisionTolerance = charEl.TryGetProperty("CtTol",    out var ctEl)   ? ctEl.GetSingle()                 : CharacterComponent.Default.CollisionTolerance,
-                        ShapeOffset        = new System.Numerics.Vector3(
-                            charEl.TryGetProperty("OfsX", out var oxEl) ? oxEl.GetSingle() : 0f,
-                            charEl.TryGetProperty("OfsY", out var oyEl) ? oyEl.GetSingle() : 0f,
-                            charEl.TryGetProperty("OfsZ", out var ozEl) ? ozEl.GetSingle() : 0f),
-                        Layer              = charEl.TryGetProperty("Layer",    out var lEl)    ? (ushort)lEl.GetInt32()           : CharacterComponent.Default.Layer,
-                        LayerMask          = charEl.TryGetProperty("Mask",     out var mkEl)   ? (ushort)mkEl.GetInt32()          : CharacterComponent.Default.LayerMask,
-                    });
-                }
-
-                if (c.TryGetProperty("Vehicle", out var vehEl))
-                {
-                    var def = VehicleComponent.DefaultCar;
-                    var vType = vehEl.TryGetProperty("Type", out var vtEl) ? (VehicleType)vtEl.GetInt32() : def.Type;
-                    VehicleWheelSettings[] wheels;
-                    if (vehEl.TryGetProperty("Wheels", out var wheelsEl) && wheelsEl.ValueKind == JsonValueKind.Array)
-                    {
-                        var wList = new List<VehicleWheelSettings>();
-                        var dw = def.Wheels.Length > 0 ? def.Wheels[0] : default;
-                        foreach (var we in wheelsEl.EnumerateArray())
-                        {
-                            wList.Add(new VehicleWheelSettings
-                            {
-                                Position          = new System.Numerics.Vector3(
-                                    we.TryGetProperty("PX", out var px) ? px.GetSingle() : 0f,
-                                    we.TryGetProperty("PY", out var py) ? py.GetSingle() : 0f,
-                                    we.TryGetProperty("PZ", out var pz) ? pz.GetSingle() : 0f),
-                                Radius            = we.TryGetProperty("R",     out var wr)   ? wr.GetSingle()   : dw.Radius,
-                                Width             = we.TryGetProperty("W",     out var ww)   ? ww.GetSingle()   : dw.Width,
-                                SuspMinLength     = we.TryGetProperty("SMin",  out var sm)   ? sm.GetSingle()   : dw.SuspMinLength,
-                                SuspMaxLength     = we.TryGetProperty("SMax",  out var sx)   ? sx.GetSingle()   : dw.SuspMaxLength,
-                                SuspFrequency     = we.TryGetProperty("SFreq", out var sf)   ? sf.GetSingle()   : dw.SuspFrequency,
-                                SuspDamping       = we.TryGetProperty("SDamp", out var sd)   ? sd.GetSingle()   : dw.SuspDamping,
-                                MaxSteerAngle     = we.TryGetProperty("Steer", out var st)   ? st.GetSingle()   : dw.MaxSteerAngle,
-                                MaxHandBrakeTorque= we.TryGetProperty("HBrake",out var hb)   ? hb.GetSingle()   : dw.MaxHandBrakeTorque,
-                                IsDriven          = we.TryGetProperty("Driven",out var dr) && dr.GetBoolean(),
-                            });
-                        }
-                        wheels = wList.ToArray();
-                    }
-                    else
-                    {
-                        wheels = vType == VehicleType.Motorcycle ? VehicleComponent.DefaultMotorcycle.Wheels :
-                                 vType == VehicleType.Tracked    ? VehicleComponent.DefaultTank.Wheels :
-                                                                    VehicleComponent.DefaultCar.Wheels;
-                    }
-                    world.AddComponent(newId, new VehicleComponent
-                    {
-                        Type              = vType,
-                        ChassisHalfExtent = new System.Numerics.Vector3(
-                            vehEl.TryGetProperty("HX", out var hxEl) ? hxEl.GetSingle() : def.ChassisHalfExtent.X,
-                            vehEl.TryGetProperty("HY", out var hyEl) ? hyEl.GetSingle() : def.ChassisHalfExtent.Y,
-                            vehEl.TryGetProperty("HZ", out var hzEl) ? hzEl.GetSingle() : def.ChassisHalfExtent.Z),
-                        Mass              = vehEl.TryGetProperty("Mass",    out var vmEl)  ? vmEl.GetSingle()  : def.Mass,
-                        COMOffsetY        = vehEl.TryGetProperty("COM",     out var comEl) ? comEl.GetSingle() : def.COMOffsetY,
-                        MaxEngineTorque   = vehEl.TryGetProperty("Torque",  out var tqEl)  ? tqEl.GetSingle()  : def.MaxEngineTorque,
-                        ClutchStrength    = vehEl.TryGetProperty("Clutch",  out var clEl)  ? clEl.GetSingle()  : def.ClutchStrength,
-                        MaxRollAngle      = vehEl.TryGetProperty("Roll",    out var rlEl)  ? rlEl.GetSingle()  : def.MaxRollAngle,
-                        Friction          = vehEl.TryGetProperty("Friction", out var vfEl) ? vfEl.GetSingle()  : def.Friction,
-                        Layer             = vehEl.TryGetProperty("Layer",   out var vlEl)  ? (ushort)vlEl.GetInt32() : def.Layer,
-                        LayerMask         = vehEl.TryGetProperty("Mask",    out var vmkEl) ? (ushort)vmkEl.GetInt32(): def.LayerMask,
-                        Wheels            = wheels,
-                    });
-                }
-
-                if (c.TryGetProperty("WheelFollow", out var wfEl))
-                {
-                    int savedV = wfEl.TryGetProperty("V",  out var vEl)  ? vEl.GetInt32()  : -1;
-                    int wi     = wfEl.TryGetProperty("WI", out var wiEl) ? wiEl.GetInt32() : 0;
-                    world.AddComponent(newId, new WheelFollowerComponent { WheelIndex = wi });
-                    if (savedV >= 0) wheelFollowFixups[newId] = savedV;
-                }
-
-                Dictionary<string, string>? preserved = null;
-                foreach (var prop in c.EnumerateObject())
-                {
-                    if (BuiltInKeys.Contains(prop.Name)) continue;
-                    if (_extensions.ContainsKey(prop.Name))
-                        extensionReads.Add((newId, prop.Name, prop.Value));
-                    else
-                        (preserved ??= new Dictionary<string, string>())[prop.Name] = prop.Value.GetRawText();
-                }
-                if (preserved != null)
-                    world.AddComponent(newId, new PreservedComponents { Blocks = preserved });
+                if (list.Count > 0)
+                    world.AddComponent(newId, new ScriptCollectionComponent { Scripts = list });
+                else
+                    world.RemoveComponent<ScriptCollectionComponent>(newId);   // an existing entity whose list is emptied
             }
 
-            // Second pass — remap parent IDs from saved ints to live Entities
-            foreach (var (entity, savedParentId) in parentFixups)
+            if (c.TryGetProperty("Constraint", out var conEl))
             {
-                if (!idMap.TryGetValue(savedParentId, out Entity parentEntity)) continue;
+                int savedA = conEl.TryGetProperty("A", out var conAEl) ? conAEl.GetInt32() : -1;
+                int savedB = conEl.TryGetProperty("B", out var conBEl) ? conBEl.GetInt32() : -1;
+                world.AddComponent(newId, new ConstraintComponent
+                {
+                    Type         = conEl.TryGetProperty("T", out var tEl2) &&
+                                   Enum.TryParse(tEl2.GetString(), out GameEditor.Framework.Physics.ConstraintType ct)
+                                   ? ct : GameEditor.Framework.Physics.ConstraintType.Fixed,
+                    LocalAnchorA = RV3(conEl, "AA"),
+                    LocalAnchorB = RV3(conEl, "AB"),
+                    LocalAxisA   = RV3(conEl, "XA"),
+                    LocalAxisB   = RV3(conEl, "XB"),
+                    MinLimit     = conEl.TryGetProperty("Min", out var minEl) ? minEl.GetSingle() : 0f,
+                    MaxLimit     = conEl.TryGetProperty("Max", out var maxEl) ? maxEl.GetSingle() : 0f,
+                });
+                if (savedA >= 0 || savedB >= 0)
+                    fx.Constraint[newId] = (savedA, savedB);
+            }
+
+            if (c.TryGetProperty("Character", out var charEl))
+            {
+                world.AddComponent(newId, new CharacterComponent
+                {
+                    Mode               = charEl.TryGetProperty("Mode",     out var modeEl) ? (CharacterMode)modeEl.GetInt32() : CharacterComponent.Default.Mode,
+                    Height             = charEl.TryGetProperty("Height",   out var hEl)    ? hEl.GetSingle()                  : CharacterComponent.Default.Height,
+                    Radius             = charEl.TryGetProperty("Radius",   out var rEl)    ? rEl.GetSingle()                  : CharacterComponent.Default.Radius,
+                    MaxSlopeAngle      = charEl.TryGetProperty("Slope",    out var slEl2)  ? slEl2.GetSingle()                : CharacterComponent.Default.MaxSlopeAngle,
+                    MaxStrength        = charEl.TryGetProperty("Strength", out var stEl)   ? stEl.GetSingle()                 : CharacterComponent.Default.MaxStrength,
+                    Mass               = charEl.TryGetProperty("Mass",     out var mEl)    ? mEl.GetSingle()                  : CharacterComponent.Default.Mass,
+                    Friction           = charEl.TryGetProperty("Friction", out var frEl)   ? frEl.GetSingle()                 : CharacterComponent.Default.Friction,
+                    GravityFactor      = charEl.TryGetProperty("Gravity",  out var gfEl)   ? gfEl.GetSingle()                 : CharacterComponent.Default.GravityFactor,
+                    CollisionTolerance = charEl.TryGetProperty("CtTol",    out var ctEl)   ? ctEl.GetSingle()                 : CharacterComponent.Default.CollisionTolerance,
+                    ShapeOffset        = new System.Numerics.Vector3(
+                        charEl.TryGetProperty("OfsX", out var oxEl) ? oxEl.GetSingle() : 0f,
+                        charEl.TryGetProperty("OfsY", out var oyEl) ? oyEl.GetSingle() : 0f,
+                        charEl.TryGetProperty("OfsZ", out var ozEl) ? ozEl.GetSingle() : 0f),
+                    Layer              = charEl.TryGetProperty("Layer",    out var lEl)    ? (ushort)lEl.GetInt32()           : CharacterComponent.Default.Layer,
+                    LayerMask          = charEl.TryGetProperty("Mask",     out var mkEl)   ? (ushort)mkEl.GetInt32()          : CharacterComponent.Default.LayerMask,
+                });
+            }
+
+            if (c.TryGetProperty("Vehicle", out var vehEl))
+            {
+                var def = VehicleComponent.DefaultCar;
+                var vType = vehEl.TryGetProperty("Type", out var vtEl) ? (VehicleType)vtEl.GetInt32() : def.Type;
+                VehicleWheelSettings[] wheels;
+                if (vehEl.TryGetProperty("Wheels", out var wheelsEl) && wheelsEl.ValueKind == JsonValueKind.Array)
+                {
+                    var wList = new List<VehicleWheelSettings>();
+                    var dw = def.Wheels.Length > 0 ? def.Wheels[0] : default;
+                    foreach (var we in wheelsEl.EnumerateArray())
+                    {
+                        wList.Add(new VehicleWheelSettings
+                        {
+                            Position          = new System.Numerics.Vector3(
+                                we.TryGetProperty("PX", out var px) ? px.GetSingle() : 0f,
+                                we.TryGetProperty("PY", out var py) ? py.GetSingle() : 0f,
+                                we.TryGetProperty("PZ", out var pz) ? pz.GetSingle() : 0f),
+                            Radius            = we.TryGetProperty("R",     out var wr)   ? wr.GetSingle()   : dw.Radius,
+                            Width             = we.TryGetProperty("W",     out var ww)   ? ww.GetSingle()   : dw.Width,
+                            SuspMinLength     = we.TryGetProperty("SMin",  out var sm)   ? sm.GetSingle()   : dw.SuspMinLength,
+                            SuspMaxLength     = we.TryGetProperty("SMax",  out var sx)   ? sx.GetSingle()   : dw.SuspMaxLength,
+                            SuspFrequency     = we.TryGetProperty("SFreq", out var sf)   ? sf.GetSingle()   : dw.SuspFrequency,
+                            SuspDamping       = we.TryGetProperty("SDamp", out var sd)   ? sd.GetSingle()   : dw.SuspDamping,
+                            MaxSteerAngle     = we.TryGetProperty("Steer", out var st)   ? st.GetSingle()   : dw.MaxSteerAngle,
+                            MaxHandBrakeTorque= we.TryGetProperty("HBrake",out var hb)   ? hb.GetSingle()   : dw.MaxHandBrakeTorque,
+                            IsDriven          = we.TryGetProperty("Driven",out var dr) && dr.GetBoolean(),
+                        });
+                    }
+                    wheels = wList.ToArray();
+                }
+                else
+                {
+                    wheels = vType == VehicleType.Motorcycle ? VehicleComponent.DefaultMotorcycle.Wheels :
+                             vType == VehicleType.Tracked    ? VehicleComponent.DefaultTank.Wheels :
+                                                                VehicleComponent.DefaultCar.Wheels;
+                }
+                world.AddComponent(newId, new VehicleComponent
+                {
+                    Type              = vType,
+                    ChassisHalfExtent = new System.Numerics.Vector3(
+                        vehEl.TryGetProperty("HX", out var hxEl) ? hxEl.GetSingle() : def.ChassisHalfExtent.X,
+                        vehEl.TryGetProperty("HY", out var hyEl) ? hyEl.GetSingle() : def.ChassisHalfExtent.Y,
+                        vehEl.TryGetProperty("HZ", out var hzEl) ? hzEl.GetSingle() : def.ChassisHalfExtent.Z),
+                    Mass              = vehEl.TryGetProperty("Mass",    out var vmEl)  ? vmEl.GetSingle()  : def.Mass,
+                    COMOffsetY        = vehEl.TryGetProperty("COM",     out var comEl) ? comEl.GetSingle() : def.COMOffsetY,
+                    MaxEngineTorque   = vehEl.TryGetProperty("Torque",  out var tqEl)  ? tqEl.GetSingle()  : def.MaxEngineTorque,
+                    ClutchStrength    = vehEl.TryGetProperty("Clutch",  out var clEl)  ? clEl.GetSingle()  : def.ClutchStrength,
+                    MaxRollAngle      = vehEl.TryGetProperty("Roll",    out var rlEl)  ? rlEl.GetSingle()  : def.MaxRollAngle,
+                    Friction          = vehEl.TryGetProperty("Friction", out var vfEl) ? vfEl.GetSingle()  : def.Friction,
+                    Layer             = vehEl.TryGetProperty("Layer",   out var vlEl)  ? (ushort)vlEl.GetInt32() : def.Layer,
+                    LayerMask         = vehEl.TryGetProperty("Mask",    out var vmkEl) ? (ushort)vmkEl.GetInt32(): def.LayerMask,
+                    Wheels            = wheels,
+                });
+            }
+
+            if (c.TryGetProperty("WheelFollow", out var wfEl))
+            {
+                int savedV = wfEl.TryGetProperty("V",  out var vEl)  ? vEl.GetInt32()  : -1;
+                int wi     = wfEl.TryGetProperty("WI", out var wiEl) ? wiEl.GetInt32() : 0;
+                world.AddComponent(newId, new WheelFollowerComponent { WheelIndex = wi });
+                if (savedV >= 0) fx.WheelFollow[newId] = savedV;
+            }
+        }
+
+        private static void ApplyFixups(ECSWorld world, Fixups fx, Func<int, Entity> resolve)
+        {
+            // Parent ids → live Entities
+            foreach (var (entity, savedParentId) in fx.Parent)
+            {
+                Entity parentEntity = resolve(savedParentId);
+                if (parentEntity.IsNull) continue;
                 if (world.TryGetComponent<Transform>(entity, out var tr))
                 {
                     tr.Parent = parentEntity;
@@ -673,30 +727,29 @@ namespace GameEditor.Framework.Scene
                 }
             }
 
-            // Third pass — remap constraint BodyA/BodyB saved IDs to live Entities
-            foreach (var (entity, savedIds) in constraintFixups)
+            // Constraint BodyA/BodyB ids → live Entities
+            foreach (var (entity, savedIds) in fx.Constraint)
             {
                 if (!world.TryGetComponent<ConstraintComponent>(entity, out var cc)) continue;
-                if (savedIds.Item1 >= 0 && idMap.TryGetValue(savedIds.Item1, out Entity ea))
+                if (savedIds.Item1 >= 0 && resolve(savedIds.Item1) is { IsNull: false } ea)
                     cc.BodyA = ea;
-                if (savedIds.Item2 >= 0 && idMap.TryGetValue(savedIds.Item2, out Entity eb))
+                if (savedIds.Item2 >= 0 && resolve(savedIds.Item2) is { IsNull: false } eb)
                     cc.BodyB = eb;
                 world.AddComponent(entity, cc);
             }
 
-            // Fourth pass — remap WheelFollowerComponent.VehicleEntity IDs to live Entities
-            foreach (var (entity, savedVId) in wheelFollowFixups)
+            // WheelFollowerComponent.VehicleEntity ids → live Entities
+            foreach (var (entity, savedVId) in fx.WheelFollow)
             {
                 if (!world.TryGetComponent<WheelFollowerComponent>(entity, out var wfc)) continue;
-                if (idMap.TryGetValue(savedVId, out Entity ve))
+                if (resolve(savedVId) is { IsNull: false } ve)
                     wfc.VehicleEntity = ve;
                 world.AddComponent(entity, wfc);
             }
 
-            // Fifth pass — registered extensions, with saved IDs resolvable to live Entities
-            Entity Resolve(int savedId) => idMap.TryGetValue(savedId, out Entity e) ? e : Entity.Null;
-            foreach (var (entity, key, value) in extensionReads)
-                _extensions[key].Read(world, entity, value, Resolve);
+            // Registered extensions, with saved ids resolvable to live Entities
+            foreach (var (entity, key, value) in fx.Extensions)
+                _extensions[key].Read(world, entity, value, resolve);
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────

@@ -18,6 +18,11 @@ namespace GameEditor.Framework.Core
         public static bool CanUndo => _undo.Count > 0;
         public static bool CanRedo => _redo.Count > 0;
 
+        /// <summary>What <see cref="Undo"/> would undo, or null when there is nothing to undo.</summary>
+        public static string? UndoDescription => _undo.Count > 0 ? _undo.Peek().Description : null;
+        /// <summary>What <see cref="Redo"/> would redo, or null when there is nothing to redo.</summary>
+        public static string? RedoDescription => _redo.Count > 0 ? _redo.Peek().Description : null;
+
         /// <summary>Execute the command now and push it onto the undo stack.</summary>
         public static void Record(IEditorCommand cmd)
         {

@@ -204,6 +204,48 @@ namespace GameEditor.Framework.ECS
                 if (d.IsAlive) d.Delete();
         }
 
+        // ── Component snapshot (editor undo of component edits) ───────────────────────────────
+
+        /// <summary>The components an entity had when <see cref="Capture"/> was called.</summary>
+        public sealed class ComponentSnapshot
+        {
+            internal ComponentID[] Ids = [];
+            internal object[] Values = [];
+        }
+
+        /// <summary>Copies the entity's components (struct copies: a list or dictionary inside one is shared, not cloned).</summary>
+        public ComponentSnapshot Capture(Entity e)
+        {
+            var ids = e.ComponentTypes.ToArray();
+            var values = new object[ids.Length];
+            for (int k = 0; k < ids.Length; k++) values[k] = e.Get(ids[k]);
+            return new ComponentSnapshot { Ids = ids, Values = values };
+        }
+
+        /// <summary>
+        /// Makes the entity's components exactly the <see cref="Capture"/>d ones: components added since are
+        /// removed, removed ones come back, changed ones get their captured value. Keeps the parent→children
+        /// index right when the Transform's parent differs.
+        /// </summary>
+        public void Restore(Entity e, ComponentSnapshot s)
+        {
+            if (!e.IsAlive) return;
+            Entity? oldParent = TryGetComponent<Transform>(e, out var before) ? before.Parent : null;
+            foreach (var id in e.ComponentTypes.ToArray())
+                if (Array.IndexOf(s.Ids, id) < 0) e.Remove(id);
+            for (int k = 0; k < s.Ids.Length; k++)
+            {
+                if (e.Has(s.Ids[k])) e.Set(s.Ids[k], s.Values[k]);
+                else e.AddAs(s.Ids[k], s.Values[k]);
+            }
+            Entity? newParent = TryGetComponent<Transform>(e, out var after) ? after.Parent : null;
+            if (!Nullable.Equals(oldParent, newParent))
+            {
+                if (oldParent.HasValue) RemoveChildLink(oldParent.Value, e);
+                if (newParent.HasValue) AddChildLink(newParent.Value, e);
+            }
+        }
+
         // ── Parent→children index maintenance ────────────────────────────────────────────────
         private void AddChildLink(Entity parent, Entity child)
         {
