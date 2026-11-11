@@ -81,6 +81,11 @@ namespace GameEditor.Framework.Input
     /// ── Host-app wiring ────────────────────────────────────────────────────
     ///   Frame()  → call <see cref="BeginFrame"/> at the very beginning
     ///   Event()  → call <see cref="ProcessEvent"/> for every sapp_event
+    ///
+    /// sokol_app delivers events between frame callbacks. They are kept until the next
+    /// <see cref="BeginFrame"/> and applied there, so what an event sets for one frame only
+    /// (GetKeyDown / GetKeyUp, mouse-button down / up, mouse and scroll deltas, a touch's
+    /// Began / Moved / Ended phase) is what the scripts of that frame read.
     /// </summary>
     public static unsafe class InputManager
     {
@@ -98,6 +103,16 @@ namespace GameEditor.Framework.Input
         private static readonly bool[] _vHeld             = new bool[KeySlots];
         private static readonly bool[] _vPressed          = new bool[KeySlots];
         private static readonly bool[] _vReleased         = new bool[KeySlots];
+        // Virtual transitions since the last BeginFrame; they become _vPressed / _vReleased for the next frame.
+        private static readonly bool[] _vPressedNext      = new bool[KeySlots];
+        private static readonly bool[] _vReleasedNext     = new bool[KeySlots];
+
+        // Events received since the last BeginFrame, applied by it.
+        private static readonly List<sapp_event> _pendingEvents = new();
+
+        // Where the game is drawn inside the window (SetPointerViewport).
+        private static Vector2 _pointerOrigin;
+        private static float   _pointerScale = 1f;
 
         // ── Mouse state ───────────────────────────────────────────────────────
 
@@ -146,16 +161,18 @@ namespace GameEditor.Framework.Input
 
         /// <summary>
         /// Call once at the very start of each frame callback (before scripts run).
-        /// Clears per-frame pressed/released states so GetKeyDown/GetKeyUp are single-frame.
-        /// Also retires finished touches and clears per-frame mouse and scroll deltas.
+        /// Clears the previous frame's pressed/released states, deltas and finished touches, then applies
+        /// the events received since the last call: GetKeyDown/GetKeyUp are true for exactly this frame.
         /// </summary>
         public static void BeginFrame()
         {
-            // Clear per-frame key flash arrays
+            // Clear per-frame key flash arrays; virtual transitions since the last frame take their turn
             Array.Clear(_pressedThisFrame,  0, KeySlots);
             Array.Clear(_releasedThisFrame, 0, KeySlots);
-            Array.Clear(_vPressed,          0, KeySlots);
-            Array.Clear(_vReleased,         0, KeySlots);
+            Array.Copy(_vPressedNext,  _vPressed,  KeySlots);
+            Array.Copy(_vReleasedNext, _vReleased, KeySlots);
+            Array.Clear(_vPressedNext,  0, KeySlots);
+            Array.Clear(_vReleasedNext, 0, KeySlots);
 
             // Clear per-frame mouse flash arrays
             Array.Clear(_mousePressed,  0, 3);
@@ -193,6 +210,14 @@ namespace GameEditor.Framework.Input
             // Clear single-frame axis / button overrides
             _axisOverride.Clear();
             _buttonOverride.Clear();
+
+            // This frame's events
+            for (int i = 0; i < _pendingEvents.Count; i++)
+            {
+                sapp_event e = _pendingEvents[i];
+                ApplyEvent(&e);
+            }
+            _pendingEvents.Clear();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -201,8 +226,41 @@ namespace GameEditor.Framework.Input
 
         /// <summary>
         /// Feed a raw Sokol event. Call from the host app's Event() callback.
+        /// The event takes effect at the next <see cref="BeginFrame"/>.
         /// </summary>
         public static void ProcessEvent(sapp_event* e)
+        {
+            switch (e->type)
+            {
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
+                case sapp_event_type.SAPP_EVENTTYPE_KEY_UP:
+                case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
+                case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
+                case sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE:
+                case sapp_event_type.SAPP_EVENTTYPE_MOUSE_SCROLL:
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN:
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_MOVED:
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED:
+                case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_CANCELLED:
+                    _pendingEvents.Add(*e);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// For a host that shows the game in a part of its window (the editor's Game view): the window pixel
+        /// where the game's picture starts and the game pixels per window pixel. Mouse and touch positions
+        /// are then reported in the game's own pixels, as in the game running alone. Default: 0, 0, 1.
+        /// </summary>
+        public static void SetPointerViewport(float originX, float originY, float scale = 1f)
+        {
+            _pointerOrigin = new Vector2(originX, originY);
+            _pointerScale  = scale;
+        }
+
+        private static Vector2 ToGame(float x, float y) => (new Vector2(x, y) - _pointerOrigin) * _pointerScale;
+
+        private static void ApplyEvent(sapp_event* e)
         {
             switch (e->type)
             {
@@ -244,8 +302,8 @@ namespace GameEditor.Framework.Input
                 }
 
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE:
-                    _mousePosition = new Vector2(e->mouse_x, e->mouse_y);
-                    _mouseDelta   += new Vector2(e->mouse_dx, e->mouse_dy);
+                    _mousePosition = ToGame(e->mouse_x, e->mouse_y);
+                    _mouseDelta   += new Vector2(e->mouse_dx, e->mouse_dy) * _pointerScale;
                     break;
 
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_SCROLL:
@@ -277,7 +335,7 @@ namespace GameEditor.Framework.Input
             {
                 ref sapp_touchpoint tp = ref e->touches[i];
                 int    id     = (int)tp.identifier;
-                Vector2 pos   = new Vector2(tp.pos_x, tp.pos_y);
+                Vector2 pos   = ToGame(tp.pos_x, tp.pos_y);
 
                 int slot = FindTouchSlot(id);
 
@@ -506,15 +564,15 @@ namespace GameEditor.Framework.Input
 
         /// <summary>
         /// Inject a virtual key event (e.g. from an on-screen button or gamepad mapping).
-        /// Transitions are tracked so GetKeyDown / GetKeyUp fire for one frame on change.
+        /// GetKey follows at once; GetKeyDown / GetKeyUp fire for the one frame after the change.
         /// </summary>
         public static void SetVirtualKey(Key key, bool down)
         {
             int k = (int)key;
             if ((uint)k >= KeySlots) return;
 
-            if (down  && !_vHeld[k]) _vPressed[k]  = true;
-            if (!down &&  _vHeld[k]) _vReleased[k] = true;
+            if (down  && !_vHeld[k]) _vPressedNext[k]  = true;
+            if (!down &&  _vHeld[k]) _vReleasedNext[k] = true;
             _vHeld[k] = down;
         }
 
