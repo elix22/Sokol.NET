@@ -86,6 +86,9 @@ namespace SokolApplicationBuilder
         [Option("development-team", Required = false, HelpText = "iOS development team ID")]
         public string DevelopmentTeam { get; set; } = "";
 
+        [Option("export-method", Required = false, HelpText = "iOS, with --subtask ipa: how the .ipa is signed - app-store-connect (default: for the App Store and TestFlight), release-testing (ad hoc), debugging (development) or enterprise")]
+        public string ExportMethod { get; set; } = "";
+
         [Option("compile", Required = false, HelpText = "Compile the Xcode project after generation")]
         public bool Compile { get; set; } = false;
 

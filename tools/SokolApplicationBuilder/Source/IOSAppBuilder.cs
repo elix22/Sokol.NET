@@ -94,6 +94,9 @@ namespace SokolApplicationBuilder
         private string iOSDevelopmentTeam = string.Empty;
         private string iOSIcon = string.Empty;
         private string appVersion = "1.0"; // Application version (common across all platforms)
+        // Optional <IOSBuildNumber>: CFBundleVersion, the number App Store Connect tells two uploads of the same
+        // version apart by (it refuses one it has seen). Empty = the app version, as before.
+        private string iOSBuildNumber = string.Empty;
         private Dictionary<string, string> iOSNativeLibraries = new Dictionary<string, string>(); // iOS native library paths
         private Dictionary<string, string> iOSStaticFrameworks = new Dictionary<string, string>(); // dirs of .xcframework bundles linked into the app EXECUTABLE
         // Arbitrary Info.plist key/value pairs from IOSInfoPlistKey_* properties in Directory.Build.props
@@ -254,6 +257,12 @@ namespace SokolApplicationBuilder
                     if (!InstallOnDevice(iosDir, projectName, true))
                         return false;
                 }
+
+                // --subtask ipa: the package for the App Store, TestFlight or ad hoc installs. Last: archiving
+                // takes the built app out of the build folder, where the install above looks for it.
+                if (string.Equals(opts.SubTask, "ipa", StringComparison.OrdinalIgnoreCase)
+                    && !ExportIpa(iosDir, projectName, buildType))
+                    return false;
 
                 Log.LogMessage(MessageImportance.High, "iOS build completed successfully!");
                 return true;
@@ -706,6 +715,7 @@ namespace SokolApplicationBuilder
                 content = content.Replace("TEMPLATE_BUNDLE_ID", cmakeBundleId);
                 content = content.Replace("TEMPLATE_PROJECT_NAME", sanitizedProjectName);
                 content = content.Replace("TEMPLATE_BUNDLE_PREFIX", iOSBundlePrefix);
+                content = content.Replace("TEMPLATE_BUILD_NUMBER", string.IsNullOrEmpty(iOSBuildNumber) ? appVersion : iOSBuildNumber);
                 content = content.Replace("TEMPLATE_APP_VERSION", appVersion);
                 content = content.Replace("TEMPLATE_IOS_MIN_VERSION", iOSMinVersion);
 
@@ -943,6 +953,106 @@ namespace SokolApplicationBuilder
                 Log.LogError($"Failed to compile Xcode project: {ex.Message}");
                 return false;
             }
+        }
+
+        static readonly string[] IpaExportMethods = { "app-store-connect", "release-testing", "debugging", "enterprise" };
+
+        /// <summary>
+        /// Archives the Xcode project the build generated and exports a signed .ipa to
+        /// <c>{output}/iOS/{type}/{project}-{type}.ipa</c>. Signing is automatic, by the development team: Xcode
+        /// makes or fetches the certificate and the provisioning profile the method needs
+        /// (<c>-allowProvisioningUpdates</c>). The app's code was compiled before this step and is not compiled again.
+        /// </summary>
+        private bool ExportIpa(string iosDir, string projectName, string buildType)
+        {
+            string method = string.IsNullOrWhiteSpace(opts.ExportMethod) ? "app-store-connect" : opts.ExportMethod.Trim().ToLowerInvariant();
+            if (Array.IndexOf(IpaExportMethods, method) < 0)
+            {
+                Log.LogError($"Unknown --export-method '{opts.ExportMethod}' (methods: {string.Join(", ", IpaExportMethods)})");
+                return false;
+            }
+
+            string sanitizedProjectName = projectName.Replace("_", "-");
+            string buildDir = Path.Combine(iosDir, "build-xcode-ios-app");
+            string configuration = buildType == "debug" ? "Debug" : "Release";
+            string workDir = Path.Combine(iosDir, "ipa");
+            string archivePath = Path.Combine(workDir, $"{sanitizedProjectName}.xcarchive");
+            string exportDir = Path.Combine(workDir, "export");
+            if (Directory.Exists(workDir)) Directory.Delete(workDir, true);
+            Directory.CreateDirectory(workDir);
+
+            // The log of each step goes to a file; its end is shown when the step fails.
+            bool Xcodebuild(string step, string arguments)
+            {
+                string logFile = Path.Combine(workDir, step + ".log");
+                using (var log = File.Create(logFile))
+                {
+                    var result = Cli.Wrap("xcodebuild")
+                        .WithArguments(arguments)
+                        .WithWorkingDirectory(buildDir)
+                        .WithStandardOutputPipe(PipeTarget.ToStream(log))
+                        .WithStandardErrorPipe(PipeTarget.ToStream(log))
+                        .WithValidation(CommandResultValidation.None)
+                        .ExecuteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    if (result.ExitCode == 0) return true;
+                }
+                Log.LogError($"xcodebuild {step} failed. The end of {logFile}:");
+                string[] lines = File.ReadAllLines(logFile);
+                for (int i = Math.Max(0, lines.Length - 40); i < lines.Length; i++) Log.LogError(lines[i]);
+                return false;
+            }
+
+            Log.LogMessage(MessageImportance.High, $"📦 Archiving for an .ipa ({method})...");
+            // The generated target has INSTALL_PATH = "": without these two settings the archive succeeds and holds no app.
+            if (!Xcodebuild("archive", $"-project \"{sanitizedProjectName}-ios-app.xcodeproj\" -scheme \"{sanitizedProjectName}-ios-app\" -configuration {configuration} -sdk iphoneos -destination \"generic/platform=iOS\" -archivePath \"{archivePath}\" INSTALL_PATH=/Applications SKIP_INSTALL=NO archive"))
+                return false;
+
+            // `archive` leaves bin/{configuration}/{name}-ios-app.app as a symbolic link into Xcode's DerivedData.
+            // Once Xcode cleans that folder the link dangles, and the next plain build fails on it.
+            string builtApp = Path.Combine(buildDir, "bin", configuration, $"{sanitizedProjectName}-ios-app.app");
+            if (new FileInfo(builtApp).LinkTarget != null) File.Delete(builtApp);
+
+            string archivedApps = Path.Combine(archivePath, "Products", "Applications");
+            if (!Directory.Exists(archivedApps) || Directory.GetDirectories(archivedApps, "*.app").Length == 0)
+            {
+                Log.LogError($"The archive holds no app: {archivePath}");
+                return false;
+            }
+
+            string exportOptions = Path.Combine(workDir, "ExportOptions.plist");
+            File.WriteAllText(exportOptions, $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+    <key>method</key><string>{method}</string>
+    <key>teamID</key><string>{DEVELOPMENT_TEAM}</string>
+    <key>signingStyle</key><string>automatic</string>
+    <key>destination</key><string>export</string>
+    <key>uploadSymbols</key><true/>
+    <key>manageAppVersionAndBuildNumber</key><false/>
+</dict>
+</plist>
+");
+            Log.LogMessage(MessageImportance.High, "📦 Exporting the .ipa...");
+            if (!Xcodebuild("export", $"-exportArchive -archivePath \"{archivePath}\" -exportOptionsPlist \"{exportOptions}\" -exportPath \"{exportDir}\" -allowProvisioningUpdates"))
+                return false;
+
+            string[] ipas = Directory.Exists(exportDir) ? Directory.GetFiles(exportDir, "*.ipa") : Array.Empty<string>();
+            if (ipas.Length == 0)
+            {
+                Log.LogError($"The export wrote no .ipa in {exportDir}");
+                return false;
+            }
+
+            string outputBasePath = string.IsNullOrEmpty(opts.OutputPath) ? Path.Combine(opts.ProjectPath, "output") : opts.OutputPath;
+            string outputDir = Path.Combine(outputBasePath, "iOS", buildType);
+            Directory.CreateDirectory(outputDir);
+            string outputIpa = Path.Combine(outputDir, $"{projectName}-{buildType}.ipa");
+            File.Copy(ipas[0], outputIpa, true);
+            Log.LogMessage(MessageImportance.High, $"✅ iOS package ({method}) copied to: {outputIpa}");
+            return true;
         }
 
         private bool InstallOnDevice(string iosDir, string projectName, bool runAfterInstall = false)
@@ -1613,6 +1723,13 @@ namespace SokolApplicationBuilder
                     if (versionElement != null && !string.IsNullOrEmpty(versionElement.Value))
                     {
                         appVersion = versionElement.Value;
+                        propertyCount++;
+                    }
+
+                    var buildNumberElement = propertyGroup.Element("IOSBuildNumber");
+                    if (buildNumberElement != null && !string.IsNullOrWhiteSpace(buildNumberElement.Value))
+                    {
+                        iOSBuildNumber = buildNumberElement.Value.Trim();
                         propertyCount++;
                     }
 

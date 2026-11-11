@@ -467,10 +467,9 @@ namespace SokolApplicationBuilder
                 // Sign if release
                 if (buildType == "release")
                 {
-                    if (buildAAB)
-                        SignReleaseAAB();
-                    else
-                        SignReleaseApp();
+                    // A release that could not be signed is not a release: stop, do not hand out an unsigned package.
+                    if (!(buildAAB ? SignReleaseAAB() : SignReleaseApp()))
+                        return false;
                 }
 
                 // Always copy to output folder (project's output folder or custom path)
@@ -617,8 +616,7 @@ namespace SokolApplicationBuilder
             string buildGradlePath = Path.Combine(androidPath, "app", "build.gradle");
             if (File.Exists(buildGradlePath))
             {
-                string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
-                string packageName = $"{packagePrefix}.{appName}";
+                string packageName = AndroidApplicationId(androidProperties, appName);
                 string content = File.ReadAllText(buildGradlePath);
                 content = content.Replace("applicationId = 'com.example.native_activity'", $"applicationId = '{packageName}'");
                 content = content.Replace("namespace 'com.example.native_activity'", $"namespace '{packageName}'");
@@ -2215,10 +2213,79 @@ link_directories(${{PREBUILT_LIB_PATH}}/${{ANDROID_ABI}})
             public string StorePassword { get; set; }
             public string KeyPassword { get; set; }
             public string KeyAlias { get; set; }
+            /// <summary>The project's own keystore (AndroidKeystore), not the machine-wide one.</summary>
+            public bool FromProject { get; set; }
+        }
+
+        // The signing tools read the passwords from these variables of their own environment
+        // (apksigner "env:NAME", jarsigner "-storepass:env NAME"): a password on the command line is visible
+        // to every process on the machine, breaks on a space, and is printed with the command when the tool fails.
+        const string SignStorePassEnv = "SOKOL_SIGN_STORE_PASS";
+        const string SignKeyPassEnv = "SOKOL_SIGN_KEY_PASS";
+
+        static Dictionary<string, string?> SigningEnvironment(KeystoreInfo keystore) => new()
+        {
+            [SignStorePassEnv] = keystore.StorePassword,
+            [SignKeyPassEnv] = keystore.KeyPassword,
+        };
+
+        // The environment variables that carry the passwords of a project's own keystore (<AndroidKeystore>).
+        // They are never written to a file by the builder and never appear in its log.
+        const string KeystorePasswordEnv = "ANDROID_KEYSTORE_PASSWORD";
+        const string KeyPasswordEnv = "ANDROID_KEY_PASSWORD";
+
+        /// <summary>
+        /// The project's own release keystore, when Directory.Build.props names one:
+        /// &lt;AndroidKeystore&gt; (a path, relative to the project folder or absolute, "~" allowed) and
+        /// &lt;AndroidKeyAlias&gt;. The passwords come from the environment (ANDROID_KEYSTORE_PASSWORD, and
+        /// ANDROID_KEY_PASSWORD when the key's differs). Nothing is asked on the console: a keystore that is
+        /// missing, or a password that is not set, is an error. <paramref name="configured"/> is false when
+        /// the project names no keystore; the machine-wide one is used then, as before.
+        /// </summary>
+        KeystoreInfo ProjectReleaseKeystore(out bool configured)
+        {
+            var props = ReadAndroidPropertiesFromDirectoryBuildProps();
+            string path = props.GetValueOrDefault("AndroidKeystore", "").Trim();
+            configured = path.Length > 0;
+            if (!configured) return null;
+
+            if (path == "~" || path.StartsWith("~/"))
+                path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), path.Substring(1).TrimStart('/'));
+            path = Path.GetFullPath(Path.Combine(opts.ProjectPath, path));
+            if (!File.Exists(path))
+            {
+                Log.LogError($"The project's keystore (AndroidKeystore in Directory.Build.props) was not found: {path}");
+                return null;
+            }
+            string alias = props.GetValueOrDefault("AndroidKeyAlias", "").Trim();
+            if (alias.Length == 0)
+            {
+                Log.LogError("The project names a keystore (AndroidKeystore) but no key in it: set AndroidKeyAlias in Directory.Build.props.");
+                return null;
+            }
+            string storePassword = Environment.GetEnvironmentVariable(KeystorePasswordEnv) ?? "";
+            if (storePassword.Length == 0)
+            {
+                Log.LogError($"The password of the project's keystore is not set: put it in the environment variable {KeystorePasswordEnv} ({KeyPasswordEnv} for the key, when it differs).");
+                return null;
+            }
+            string keyPassword = Environment.GetEnvironmentVariable(KeyPasswordEnv) ?? "";
+            Log.LogMessage(MessageImportance.High, $"✅ Using the project's release keystore: {path} (key '{alias}')");
+            return new KeystoreInfo
+            {
+                KeystorePath = path,
+                StorePassword = storePassword,
+                KeyPassword = keyPassword.Length > 0 ? keyPassword : storePassword,
+                KeyAlias = alias,
+                FromProject = true
+            };
         }
 
         KeystoreInfo EnsureReleaseKeystore()
         {
+            var projectKeystore = ProjectReleaseKeystore(out bool projectHasKeystore);
+            if (projectHasKeystore) return projectKeystore;
+
             string configDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sokolnet_config");
             string configFile = Path.Combine(configDir, "release_keystore.config");
             
@@ -2574,7 +2641,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             return debugKeystore;
         }
 
-        void SignReleaseApp()
+        bool SignReleaseApp()
         {
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
             string unsignedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
@@ -2594,7 +2661,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             if (!File.Exists(unsignedApkPath))
             {
                 Log.LogError("Unsigned release APK not found!");
-                return;
+                return false;
             }
 
             Log.LogMessage(MessageImportance.High, "Signing release APK...");
@@ -2604,7 +2671,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             if (keystoreInfo == null)
             {
                 Log.LogError("Failed to obtain release keystore information!");
-                return;
+                return false;
             }
 
             string debugKeystore = keystoreInfo.KeystorePath;
@@ -2642,7 +2709,10 @@ KeyAlias={keystoreInfo.KeyAlias}
                         Log.LogMessage(MessageImportance.High, $"Using apksigner: {apksignerPath}");
                         
                         var apksignerResult = Cli.Wrap(apksignerPath.Split('\n')[0]) // Use first line if multiple
-                            .WithArguments($"sign --ks \"{debugKeystore}\" --ks-pass pass:{keystoreInfo.StorePassword} --key-pass pass:{keystoreInfo.KeyPassword} --out \"{signedApkPath}\" \"{unsignedApkPath}\"")
+                            // A project's keystore may hold several keys: name the one to use. (The machine-wide
+                            // keystore is signed with as before, by its only key.)
+                            .WithArguments($"sign --ks \"{debugKeystore}\"{(keystoreInfo.FromProject ? $" --ks-key-alias \"{keystoreInfo.KeyAlias}\"" : "")} --ks-pass env:{SignStorePassEnv} --key-pass env:{SignKeyPassEnv} --out \"{signedApkPath}\" \"{unsignedApkPath}\"")
+                            .WithEnvironmentVariables(SigningEnvironment(keystoreInfo))
                             .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                             .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                             .ExecuteAsync()
@@ -2671,7 +2741,9 @@ KeyAlias={keystoreInfo.KeyAlias}
                 File.Copy(unsignedApkPath, signedApkPath, true);
                 
                 var jarsignerResult = Cli.Wrap("jarsigner")
-                    .WithArguments($"-keystore \"{debugKeystore}\" -storepass {keystoreInfo.StorePassword} -keypass {keystoreInfo.KeyPassword} -digestalg SHA-256 -sigalg SHA256withRSA \"{signedApkPath}\" {keystoreInfo.KeyAlias}")
+                    .WithArguments($"-keystore \"{debugKeystore}\" -storepass:env {SignStorePassEnv} -keypass:env {SignKeyPassEnv} -digestalg SHA-256 -sigalg SHA256withRSA \"{signedApkPath}\" \"{keystoreInfo.KeyAlias}\"")
+                    .WithEnvironmentVariables(SigningEnvironment(keystoreInfo))
+                    .WithValidation(CommandResultValidation.None)
                     .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                     .ExecuteAsync()
@@ -2695,9 +2767,10 @@ KeyAlias={keystoreInfo.KeyAlias}
             {
                 Log.LogError("Failed to sign APK with both apksigner and jarsigner!");
             }
+            return signingSuccess;
         }
 
-        void SignReleaseAAB()
+        bool SignReleaseAAB()
         {
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
             string aabPath = Path.Combine(androidPath, "app", "build", "outputs", "bundle", "release", "app-release.aab");
@@ -2705,7 +2778,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             if (!File.Exists(aabPath))
             {
                 Log.LogError("Release AAB not found!");
-                return;
+                return false;
             }
 
             Log.LogMessage(MessageImportance.High, "Signing release AAB...");
@@ -2715,12 +2788,14 @@ KeyAlias={keystoreInfo.KeyAlias}
             if (keystoreInfo == null)
             {
                 Log.LogError("Failed to obtain release keystore information!");
-                return;
+                return false;
             }
 
             // Sign the AAB with jarsigner (AAB files use JAR signing)
             var jarsignerResult = Cli.Wrap("jarsigner")
-                .WithArguments($"-keystore \"{keystoreInfo.KeystorePath}\" -storepass {keystoreInfo.StorePassword} -keypass {keystoreInfo.KeyPassword} -digestalg SHA-256 -sigalg SHA256withRSA \"{aabPath}\" {keystoreInfo.KeyAlias}")
+                .WithArguments($"-keystore \"{keystoreInfo.KeystorePath}\" -storepass:env {SignStorePassEnv} -keypass:env {SignKeyPassEnv} -digestalg SHA-256 -sigalg SHA256withRSA \"{aabPath}\" \"{keystoreInfo.KeyAlias}\"")
+                .WithEnvironmentVariables(SigningEnvironment(keystoreInfo))
+                .WithValidation(CommandResultValidation.None)
                 .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
                 .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
                 .ExecuteAsync()
@@ -2730,11 +2805,32 @@ KeyAlias={keystoreInfo.KeyAlias}
             if (jarsignerResult.ExitCode == 0)
             {
                 Log.LogMessage(MessageImportance.High, "✅ AAB signed successfully with jarsigner!");
+                return true;
             }
-            else
-            {
-                Log.LogError("❌ Warning: Failed to sign AAB. Using unsigned AAB.");
-            }
+            Log.LogError("❌ Failed to sign the AAB (wrong keystore password or key alias?). An unsigned bundle is not a release: the build stops here.");
+            return false;
+        }
+
+        /// <summary>
+        /// The app's id on the device and in the Play Store: "{AndroidPackagePrefix}.{project name}". The optional
+        /// &lt;AndroidPackageName&gt; replaces the project name, so the id can be chosen freely (a published id can
+        /// never change, a project can be renamed). Without the tag the id is what it always was.
+        /// </summary>
+        static string AndroidApplicationId(Dictionary<string, string> androidProperties, string appName)
+        {
+            string prefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
+            string name = androidProperties.GetValueOrDefault("AndroidPackageName", "");
+            return $"{prefix}.{(string.IsNullOrWhiteSpace(name) ? appName : name.Trim())}";
+        }
+
+        /// <summary>
+        /// The name under the icon: the optional &lt;AndroidDisplayName&gt; (it may hold spaces and any characters),
+        /// else the project name as before.
+        /// </summary>
+        static string AndroidLabel(Dictionary<string, string> androidProperties, string appName)
+        {
+            string label = androidProperties.GetValueOrDefault("AndroidDisplayName", "");
+            return string.IsNullOrWhiteSpace(label) ? appName : System.Security.SecurityElement.Escape(label.Trim());
         }
 
         // Helper method to get connected devices and select one interactively or automatically
@@ -2906,7 +3002,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             // conditional, not unconditional.
             if (ConfiguredAndroidIconHasRound(androidProperties))
                 manifest.AppendLine($"      android:roundIcon=\"@mipmap/ic_launcher_round\"");
-            manifest.AppendLine($"      android:label=\"{appName}\"");
+            manifest.AppendLine($"      android:label=\"{AndroidLabel(androidProperties, appName)}\"");
             manifest.AppendLine($"      android:hasCode=\"{hasCode.ToString().ToLower()}\"");
             // AndroidAppCategory (e.g. "game"): targetSdk 36 ignores screenOrientation on large screens
             // (sw600dp+) for every app EXCEPT games, so a landscape-locked game must declare it.
@@ -2973,7 +3069,7 @@ KeyAlias={keystoreInfo.KeyAlias}
             string activityName = fullscreen ? "com.sokol.app.SokolNativeActivity" : "android.app.NativeActivity";
             
             manifest.AppendLine($"    <activity android:name=\"{activityName}\"");
-            manifest.AppendLine($"              android:label=\"{appName}\"");
+            manifest.AppendLine($"              android:label=\"{AndroidLabel(androidProperties, appName)}\"");
             // singleTask: ONE instance of the activity. With the default (standard), a launch whose intent differs from the
             // task's root intent (e.g. `am start -n`, another launcher) stacks a SECOND NativeActivity in the live process:
             // ANativeActivity_onCreate resets sokol_app and runs init again while sokol_gfx is still set up → sg_setup
@@ -3290,7 +3386,6 @@ KeyAlias={keystoreInfo.KeyAlias}
 
             // Read Android properties to get package prefix
             var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
-            string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
 
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
@@ -3325,7 +3420,7 @@ KeyAlias={keystoreInfo.KeyAlias}
                 }
                 
                 // Uninstall existing app to avoid signature mismatch errors
-                string packageName = $"{packagePrefix}.{appName}";
+                string packageName = AndroidApplicationId(androidProperties, appName);
                 Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
                 try
                 {
@@ -3412,7 +3507,6 @@ KeyAlias={keystoreInfo.KeyAlias}
 
             // Read Android properties to get package prefix
             var androidProperties = ReadAndroidPropertiesFromDirectoryBuildProps();
-            string packagePrefix = androidProperties.GetValueOrDefault("AndroidPackagePrefix", "com.elix22");
 
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
 
@@ -3524,7 +3618,7 @@ KeyAlias={keystoreInfo.KeyAlias}
                     // Install APKs directly from the .apks file using bundletool
                     Log.LogMessage(MessageImportance.High, "Installing device-specific AAB splits onto device...");
 
-                    string packageName = $"{packagePrefix}.{appName}";
+                    string packageName = AndroidApplicationId(androidProperties, appName);
 
                     // Runs `bundletool install-apks`, capturing stderr so we can detect a
                     // signature-mismatch failure. Validation is suppressed so a non-zero exit

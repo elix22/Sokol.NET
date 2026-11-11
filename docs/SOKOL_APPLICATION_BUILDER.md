@@ -233,6 +233,8 @@ dotnet run --project tools/dotnet-serve/src/dotnet-serve/dotnet-serve.csproj -- 
 - APK: `--subtask` not specified
 - AAB: `--subtask aab`
 
+A project's own release keystore, application id and name: [STORE_PACKAGING.md](STORE_PACKAGING.md).
+
 **Device Installation:**
 ```bash
 # Interactive device selection
@@ -253,6 +255,11 @@ dotnet run --project tools/SokolApplicationBuilder -- \
 ### iOS
 
 **Architecture:** `ios`
+
+**Output Formats:**
+- App bundle (`.app`): `--subtask` not specified
+- IPA: `--subtask ipa`, with `--export-method app-store-connect | release-testing | debugging | enterprise`
+  ([STORE_PACKAGING.md](STORE_PACKAGING.md))
 
 **Device Installation:**
 ```bash
