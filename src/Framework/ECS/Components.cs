@@ -415,4 +415,29 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>Component key → raw JSON value, in file order.</summary>
         public Dictionary<string, string> Blocks;
     }
+
+    /// <summary>
+    /// On every entity that belongs to an instance of a prefab: which instance, and which entity of the
+    /// prefab it stands for. The scene file stores such an entity as that address plus the values that
+    /// differ from the prefab (see <c>SceneSerializer</c> and <c>PrefabLibrary</c>).
+    /// </summary>
+    public struct PrefabLink
+    {
+        /// <summary>The instance's root entity; the entity itself on the root.</summary>
+        public Entity Root;
+        /// <summary>On the root only: the prefab's key, its path below Assets ("Prefabs/Enemy.prefab").</summary>
+        public string? Asset;
+        /// <summary>The entity's address inside the prefab: empty for the root, else the prefab's entity id,
+        /// preceded by the id of each nested instance's root on the way down.</summary>
+        public int[] Path;
+        /// <summary>The prefab could not be loaded: the entity holds only a name and a place, and
+        /// <see cref="Raw"/> is written back as it is, so nothing is lost when the file returns.</summary>
+        public bool Missing;
+        /// <summary>The scene file's entry of a <see cref="Missing"/> entity.</summary>
+        public string? Raw;
+        /// <summary>Members of the entry's "src" object this build does not know (<c>"key":value,…</c>), written back.</summary>
+        public string? Extra;
+
+        public readonly bool IsRoot => Asset != null;
+    }
 }

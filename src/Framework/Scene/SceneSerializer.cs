@@ -16,7 +16,7 @@ namespace GameEditor.Framework.Scene
     /// Serializes/deserializes scenes to/from a simple JSON format.
     /// Uses manual StringBuilder for writing (AOT-safe) and JsonDocument for reading.
     /// </summary>
-    public static class SceneSerializer
+    public static partial class SceneSerializer
     {
         // Component keys written/read by this file. Keep in sync when adding a built-in component:
         // any other key is handed to a registered extension or kept as a PreservedComponents block.
@@ -62,7 +62,7 @@ namespace GameEditor.Framework.Scene
                 sb.Append(",\"physics\":\"").Append(Esc(scene.PhysicsBackend)).Append('"');
             sb.Append(",\"entities\":[");
 
-            WriteEntities(sb, world, world.Entities);
+            WriteEntities(sb, world, world.Entities, prefabLinks: true);
 
             sb.Append(']'); // close entities
             // Ids are never reused within a scene: the counter travels with it (absent = 1, an empty new scene).
@@ -98,6 +98,13 @@ namespace GameEditor.Framework.Scene
             if (!root.TryGetProperty("entities", out var entitiesEl))
                 return;
 
+            // A scene that holds prefab instances: their entities come from the prefab files (SceneSerializer.Prefabs.cs).
+            if (HasPrefabInstances(entitiesEl))
+            {
+                ReadEntitiesWithPrefabs(world, entitiesEl);
+                return;
+            }
+
             // Map from saved-ID (int) → new runtime Entity (for parent fixup)
             var idMap = new Dictionary<int, Entity>();
             // References to other entities are saved ids: resolved once every entity exists
@@ -113,29 +120,39 @@ namespace GameEditor.Framework.Scene
 
                 if (!eEl.TryGetProperty("c", out var c)) continue;
 
-                ReadBuiltIns(world, newId, c, fx);
-
-                Dictionary<string, string>? preserved = null;
-                foreach (var prop in c.EnumerateObject())
-                {
-                    if (BuiltInKeys.Contains(prop.Name)) continue;
-                    if (_extensions.ContainsKey(prop.Name))
-                        fx.Extensions.Add((newId, prop.Name, prop.Value));
-                    else
-                        (preserved ??= new Dictionary<string, string>())[prop.Name] = prop.Value.GetRawText();
-                }
-                if (preserved != null)
-                    world.AddComponent(newId, new PreservedComponents { Blocks = preserved });
+                ReadEntityComponents(world, newId, c, fx);
             }
 
             ApplyFixups(world, fx, savedId => idMap.TryGetValue(savedId, out Entity e) ? e : Entity.Null);
         }
 
-        /// <summary>One entity as the scene file writes it: <c>{"id":n,"c":{…}}</c>.</summary>
+        // Reads a new entity's "c" object: the built-in blocks, registered extensions' (after every entity
+        // exists), and the blocks nobody knows, kept as they are.
+        private static void ReadEntityComponents(ECSWorld world, Entity newId, JsonElement c, Fixups fx)
+        {
+            ReadBuiltIns(world, newId, c, fx);
+
+            Dictionary<string, string>? preserved = null;
+            foreach (var prop in c.EnumerateObject())
+            {
+                if (BuiltInKeys.Contains(prop.Name)) continue;
+                if (_extensions.ContainsKey(prop.Name))
+                    fx.Extensions.Add((newId, prop.Name, prop.Value));
+                else
+                    (preserved ??= new Dictionary<string, string>())[prop.Name] = prop.Value.GetRawText();
+            }
+            if (preserved != null)
+                world.AddComponent(newId, new PreservedComponents { Blocks = preserved });
+        }
+
+        /// <summary>
+        /// One entity with all its values: <c>{"id":n,"c":{…}}</c>, its entry in the scene file. (An entity
+        /// of a prefab instance is stored in the file as its differences from the prefab; this is still all of it.)
+        /// </summary>
         public static string SerializeEntity(Entity entity)
         {
             var sb = new StringBuilder();
-            WriteEntities(sb, ECSWorld.Instance, new List<Entity> { entity });
+            WriteEntities(sb, ECSWorld.Instance, new List<Entity> { entity }, prefabLinks: false);
             return sb.ToString();
         }
 
@@ -162,13 +179,17 @@ namespace GameEditor.Framework.Scene
             ApplyFixups(world, fx, id => world.TryGetEntityBySceneId(id, out Entity e) ? e : Entity.Null);
         }
 
-        private static void WriteEntities(StringBuilder sb, ECSWorld world, List<Entity> entities)
+        private static void WriteEntities(StringBuilder sb, ECSWorld world, List<Entity> entities, bool prefabLinks)
         {
+            // Entities of prefab instances are written as their differences from the prefab (SceneSerializer.Prefabs.cs).
+            PrefabWriteContext? instances = prefabLinks ? PrefabWriteContext.Create(world) : null;
             bool firstEntity = true;
             foreach (Entity id in entities)
             {
                 if (!firstEntity) sb.Append(',');
                 firstEntity = false;
+
+                if (instances != null && WritePrefabInstanceEntity(sb, world, id, instances)) continue;
 
                 sb.Append("{\"id\":").Append(world.GetSceneId(id)).Append(",\"c\":{");
                 bool fc = true;
@@ -713,12 +734,12 @@ namespace GameEditor.Framework.Scene
             }
         }
 
-        private static void ApplyFixups(ECSWorld world, Fixups fx, Func<int, Entity> resolve)
+        private static void ApplyFixups(ECSWorld world, Fixups fx, Func<int, Entity> resolve, Func<int, Entity>? resolveParent = null)
         {
             // Parent ids → live Entities
             foreach (var (entity, savedParentId) in fx.Parent)
             {
-                Entity parentEntity = resolve(savedParentId);
+                Entity parentEntity = (resolveParent ?? resolve)(savedParentId);
                 if (parentEntity.IsNull) continue;
                 if (world.TryGetComponent<Transform>(entity, out var tr))
                 {
