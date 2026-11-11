@@ -214,6 +214,46 @@ namespace GameEditor.Framework.Assets
             }
         }
 
+        // ── For a built game ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The index a built game needs (<see cref="AssetDatabase.LoadIndex"/>), from the texts of the project's
+        /// files that carry tables: for every id that one of them names by a key the file no longer has — and
+        /// every script id by a class it no longer has — where the file, and what the class, is now. Null when no
+        /// text names anything by an older name: the game then needs no index.
+        /// </summary>
+        public static string? Index(IEnumerable<string> texts)
+        {
+            var assets = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            var scripts = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (string text in texts)
+            {
+                if (ReadTable(text) is { } table)
+                    foreach (var line in table)
+                        if (AssetDatabase.KeyOfId(line.Value) is { } now && now != line.Key) assets[line.Value] = now;
+                if (ReadTable(text, ScriptsMember) is { } named)
+                    foreach (var line in named)
+                        if (AssetDatabase.ScriptOfId(line.Value) is { } now && now != line.Key) scripts[line.Value] = now;
+            }
+            if (assets.Count == 0 && scripts.Count == 0) return null;
+
+            var sb = new StringBuilder("{\n  \"index\": 1");
+            foreach (var (name, lines) in new[] { (Member, assets), (ScriptsMember, scripts) })
+            {
+                if (lines.Count == 0) continue;
+                sb.Append(",\n  \"").Append(name).Append("\": {");
+                bool first = true;
+                foreach (var line in lines)
+                {
+                    sb.Append(first ? "\n    \"" : ",\n    \"").Append(JsonEncodedText.Encode(line.Key).ToString()).Append("\": \"")
+                      .Append(JsonEncodedText.Encode(line.Value).ToString()).Append('"');
+                    first = false;
+                }
+                sb.Append("\n  }");
+            }
+            return sb.Append("\n}\n").ToString();
+        }
+
         // ── Writing ─────────────────────────────────────────────────────────────────────
 
         /// <summary>

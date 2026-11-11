@@ -32,4 +32,9 @@
     <ProjectReference Include="../../src/Framework/Framework.csproj" />
   </ItemGroup>
 
+  <!-- As a game project embeds its Embedded folder (EmbeddedFiles reads it). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Embedded/**/*" LogicalName="Embedded/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

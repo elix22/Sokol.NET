@@ -36,7 +36,10 @@ namespace GameEditor.Framework.Assets
     public static class AssetDatabase
     {
         public const string MetaExtension = ".meta";
-        /// <summary>Under Assets: for a built game, where the files are that some scene still names by an older path.</summary>
+        /// <summary>
+        /// One of the app's embedded files (<see cref="EmbeddedFiles"/>): for a built game, where the files are that
+        /// some scene still names by an older path.
+        /// </summary>
         public const string IndexFileName = "assets.index.json";
 
         private const string AssetsPrefix = "Assets/";
@@ -248,7 +251,7 @@ namespace GameEditor.Framework.Assets
             foreach (string part in path.Split('/'))
                 if (part.Length > 0 && part[0] == '.') return false;   // inside a hidden folder
             if (path.StartsWith(AssetsPrefix, StringComparison.Ordinal))
-                return path != AssetsPrefix + ConfigManager.ConfigFileName && path != AssetsPrefix + IndexFileName;
+                return path != AssetsPrefix + ConfigManager.ConfigFileName;
             if (path.StartsWith(SourcePrefix, StringComparison.Ordinal))
                 return name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
                     && !name.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)

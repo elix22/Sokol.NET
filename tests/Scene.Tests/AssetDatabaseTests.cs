@@ -589,6 +589,51 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void The_index_lists_what_some_file_still_names_by_an_older_name_and_a_game_reads_it()
+        {
+            AssetDatabase.Set(Id(1), "Source/Cannon.cs");
+            Known(Duck, Yellow, Robot);
+            var s = NewScene();
+            Scripted(s, "Gun", "Cannon");
+            Mesh(s, "Duck", Duck, Yellow);
+            Mesh(s, "Arm", Robot + "#m0p1");
+            string scene = Save(s);
+            string material = AssetRefs.Stamp(PbrMaterialSerializer.Serialize(new PbrMaterial { Name = "M", BaseColorMapPath = Duck }));
+            string duckId = AssetDatabase.IdOfKey(Duck)!;
+
+            Assert.Null(AssetRefs.Index([scene, material, "{}", "not json"]));   // nothing moved: a game needs no index
+
+            MoveKey(Duck, "Props/bird.obj");
+            AssetDatabase.Rename("Source/Cannon.cs", "Source/Turret.cs");
+            string index = AssetRefs.Index([scene, material])!;
+            Assert.Equal("{\n  \"index\": 1,\n  \"assets\": {\n    \"" + duckId + "\": \"Props/bird.obj\"\n  },\n  \"scripts\": {\n    \"" + Id(1) + "\": \"Turret\"\n  }\n}\n", index);
+
+            // A file saved since names the file where it is: it asks for nothing.
+            Assert.Null(AssetRefs.Index([Save(Load(scene))]));
+
+            // The game: no project, the index only.
+            AssetDatabase.Clear();
+            Assert.True(AssetDatabase.LoadIndex(index));
+            Load(scene);
+            Assert.Equal("Props/bird.obj", MeshOf("Duck").MeshPath);
+            Assert.Equal(Yellow, MeshOf("Duck").MaterialPath);
+            Assert.Equal(Robot + "#m0p1", MeshOf("Arm").MeshPath);
+            Assert.Equal("Turret", ScriptOf("Gun"));
+            Assert.Equal("Props/bird.obj", PbrMaterialSerializer.Deserialize(Encoding.UTF8.GetBytes(material), "x").BaseColorMapPath);
+        }
+
+        [Fact]
+        public void A_file_of_the_Embedded_folder_is_read_by_name()
+        {
+            // tests/Scene.Tests/Embedded is embedded as a project's folder is (the line is in Scene.Tests.csproj).
+            Assert.True(EmbeddedFiles.Exists("hello.txt"));
+            Assert.Equal("embedded\n", EmbeddedFiles.ReadText("hello.txt"));
+            Assert.Equal("{ \"level\": 1 }\n", EmbeddedFiles.ReadText("Levels/first.json"));
+            Assert.Null(EmbeddedFiles.ReadText("nothing.txt"));
+            Assert.Contains("Levels/first.json", EmbeddedFiles.Names);
+        }
+
+        [Fact]
         public void A_game_is_told_the_new_names_of_scripts_by_its_index()
         {
             AssetDatabase.Set(Id(1), "Source/Cannon.cs");
@@ -615,7 +660,7 @@ namespace Scene.Tests
         public void Every_asset_and_script_gets_a_meta_file_once()
         {
             string folder = Project("Assets/Models/duck.obj", "Assets/Scenes/Main.scene.json", "Assets/readme", "Source/Player.cs",
-                                    "Assets/config.json", "Assets/assets.index.json", "Assets/.DS_Store", "Assets/.cache/tmp.bin",
+                                    "Assets/config.json", "Assets/.DS_Store", "Assets/.cache/tmp.bin",
                                     "Source/Generated/RegisteredScripts.g.cs", "Source/notes.txt", "Source/obj/Debug/x.cs", "config.json", "Game.csproj");
 
             var report = AssetDatabase.Open(folder);
@@ -628,7 +673,7 @@ namespace Scene.Tests
                 Assert.True(AssetDatabase.IsId(id));
                 Assert.Equal("{ \"meta\": 1, \"id\": \"" + id + "\" }\n", Read(folder, file + ".meta"));
             }
-            foreach (string file in new[] { "Assets/config.json", "Assets/assets.index.json", "Assets/.DS_Store", "Assets/.cache/tmp.bin",
+            foreach (string file in new[] { "Assets/config.json", "Assets/.DS_Store", "Assets/.cache/tmp.bin",
                                             "Source/Generated/RegisteredScripts.g.cs", "Source/notes.txt", "Source/obj/Debug/x.cs", "config.json", "Game.csproj" })
                 Assert.False(Exists(folder, file + ".meta"), file);
             Assert.Equal("Models/duck.obj", AssetDatabase.KeyOfId(AssetDatabase.IdOfKey("Models/duck.obj")!));

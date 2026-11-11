@@ -58,6 +58,16 @@ namespace GameEditor.Framework.Core
         public static string? ProjectFolder { get; set; }
 
 
+        // A project whose files were moved or renamed after its scenes were last saved comes with an index: where
+        // those files are now. It is one of the app's embedded files, so it is there before anything is read.
+        static void LoadAssetIndex()
+        {
+            string? index = EmbeddedFiles.ReadText(Assets.AssetDatabase.IndexFileName);
+            if (index == null) return;
+            if (Assets.AssetDatabase.LoadIndex(index)) Logger.Info("[GameApplication] Asset index loaded: files moved since the scenes were saved are found.");
+            else Logger.Warning("[GameApplication] The asset index is not one this version reads: files are found by the names the scenes have.");
+        }
+
         static void RegisterAvailableGameBehaviours()
         {
 #if !GAME_EDITOR && ! __ANDROID__ && !__IOS__
@@ -94,6 +104,7 @@ namespace GameEditor.Framework.Core
 
             string folder = ProjectFolder ?? AppContext.BaseDirectory;
 
+            LoadAssetIndex();
             var cfg = projectConfig ?? ConfigManager.Load(folder);
             if (cfg == null)
             {
@@ -153,6 +164,7 @@ namespace GameEditor.Framework.Core
             Logger.OnLog -= ConsoleLog;
             Logger.OnLog += ConsoleLog;
 
+            LoadAssetIndex();
             SFilesystem.LoadFileAsync(ConfigManager.ConfigFileName, (_, buffer, status) =>
             {
                 if (status != SFileLoadStatus.Success)
