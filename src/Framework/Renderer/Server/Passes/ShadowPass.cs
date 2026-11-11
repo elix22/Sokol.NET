@@ -560,10 +560,12 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 return created;
             }
 
-            float[] packed = new float[verts.Length * 12];
+            // One ObjVertex (56 bytes = 14 floats) per vertex, position first: the caster pipeline's stride.
+            const int floatsPerVertex = ObjVertex.SizeBytes / sizeof(float);
+            float[] packed = new float[verts.Length * floatsPerVertex];
             for (int i = 0; i < verts.Length; i++)
             {
-                int o = i * 12;
+                int o = i * floatsPerVertex;
                 packed[o + 0] = verts[i].X;
                 packed[o + 1] = verts[i].Y;
                 packed[o + 2] = verts[i].Z;
