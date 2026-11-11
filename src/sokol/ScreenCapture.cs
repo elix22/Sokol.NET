@@ -238,7 +238,7 @@ namespace Sokol
         // ── PNG encoding ────────────────────────────────────────────────────────────────────────────
         // Screenshots are opaque, so the alpha channel is dropped: 8-bit RGB (colour type 2), one
         // filter-0 scanline per row, deflated with the in-box zlib.
-        static byte[] EncodePng(byte[] rgba, int w, int h)
+        public static byte[] EncodePng(byte[] rgba, int w, int h)
         {
             var raw = new MemoryStream((w * 3 + 1) * h);
             for (int y = 0; y < h; y++)
