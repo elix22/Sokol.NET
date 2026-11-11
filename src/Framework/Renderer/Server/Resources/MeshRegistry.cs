@@ -540,8 +540,11 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
         // ── upload helpers ───────────────────────────────────────────────────────────
 
+        // Without sokol_gfx (a tool that runs with no window, e.g. the editor's headless command line) a mesh
+        // is registered with its bounds and sub-meshes but no GPU buffers: nothing draws there.
         private static sg_buffer UploadVertexBuffer(ObjSubMesh sm, string path, int subIdx)
         {
+            if (!sg_isvalid()) return default;
             var span = sm.Vertices.AsSpan();
             return sg_make_buffer(new sg_buffer_desc
             {
@@ -553,6 +556,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
         private static sg_buffer UploadIndexBuffer(ObjSubMesh sm, string path, int subIdx)
         {
+            if (!sg_isvalid()) return default;
             var span = sm.Indices.AsSpan();
             return sg_make_buffer(new sg_buffer_desc
             {

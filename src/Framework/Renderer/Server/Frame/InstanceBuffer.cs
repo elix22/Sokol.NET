@@ -34,7 +34,10 @@ namespace GameEditor.Framework.Renderer.Server
             _stagingPtr = (InstanceData*)NativeMemory.Alloc((nuint)stagingBytes);
 
             // Single buffer large enough for all views in one Sokol frame (MAX_VIEWS × per-view).
+            // Not without sokol_gfx: RenderingServer creates its instance buffers when it is first touched, and a
+            // tool with no window (the editor's headless command line) touches its registries and settings.
             int gpuBytes = RenderingConstants.MAX_VIEWS * stagingBytes;
+            if (!sg_isvalid()) return;
             _buf = sg_make_buffer(new sg_buffer_desc
             {
                 size  = (nuint)gpuBytes,

@@ -79,6 +79,10 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 return existing.View;
             }
 
+            // Without sokol_gfx (a tool that runs with no window) there is nothing to upload to: no view.
+            // The caller still records the texture's path on its material.
+            if (!sg_isvalid()) return default;
+
             int w = 0, h = 0, ch = 0;
             byte* pixels = StbImage.stbi_load_csharp(
                 in data[0], data.Length, ref w, ref h, ref ch, 4);
