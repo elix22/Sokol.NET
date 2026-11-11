@@ -544,6 +544,10 @@ void main()
                 // view_depth = -(u_ViewMatrix * vec4(v_Position,1)).z
                 float vd = -(u_ViewMatrix * vec4(v_Position, 1.0)).z;
                 shadow = sampleCsmShadow(v_Position, vd, clampedDot(n, l));
+                // A surface turned away from the sun is in its own shadow. The map cannot say so
+                // (the receiver lies on its caster: the lookup is noise there), and with
+                // shadow_ambient_weight that noise showed in the ambient as jagged dark patches.
+                g_minShadow = min(g_minShadow, smoothstep(0.0, 0.15, dot(n, l)));
             }
 #endif
 #if !defined(TRANSMISSION)

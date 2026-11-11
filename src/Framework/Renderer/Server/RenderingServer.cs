@@ -61,7 +61,10 @@ namespace GameEditor.Framework.Renderer.Server
         private static readonly InstanceBuffer     _skinnedInstanceBuf = new();
         private static int _animationFrame;
         private static readonly System.Collections.Generic.List<(Animation.SkinnedMeshRenderer smr, Animation.SkinnedCharacterRegistry.Entry entry, Resources.SkinnedMesh mesh, Matrix4x4 model)> _skinnedDraws = new();
-        private static readonly Materials.PbrMaterial _skinnedFallbackMat = new()
+        // What a mesh with no material is drawn with (static and skinned): matte white PBR. The PBR shader
+        // tonemaps, so a white surface in full light keeps its shading; Blinn-Phong, which works in
+        // display space, clipped it to pure white. Blinn-Phong stays for .mtl materials.
+        private static readonly Materials.PbrMaterial _defaultMat = new()
         {
             BaseColorFactor = Vector4.One, MetallicFactor = 0f, RoughnessFactor = 0.8f,
         };
@@ -879,6 +882,8 @@ namespace GameEditor.Framework.Renderer.Server
                     i += groupSize;
                     continue;
                 }
+
+                if (mat == null && !HasSubMeshMaterial(mesh, disableSubMeshMaterial)) mat = _defaultMat;
 
                 // ── PBR path ──────────────────────────────────────────────────────────────
                 // PBR materials are applied whole-group (no per-sub-mesh .mtl override).
@@ -1973,7 +1978,7 @@ namespace GameEditor.Framework.Renderer.Server
                                         Resources.SkinnedMesh mesh, int instanceByteOffset,
                                         PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -2172,7 +2177,7 @@ namespace GameEditor.Framework.Renderer.Server
                                             Resources.SkinnedMesh mesh, int instanceByteOffset,
                                             PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -2378,7 +2383,7 @@ namespace GameEditor.Framework.Renderer.Server
                                             Resources.SkinnedMesh mesh, int instanceByteOffset,
                                             PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -2599,7 +2604,7 @@ namespace GameEditor.Framework.Renderer.Server
                                                 Resources.SkinnedMesh mesh, int instanceByteOffset,
                                                 PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -2790,7 +2795,7 @@ namespace GameEditor.Framework.Renderer.Server
                                                     Resources.SkinnedMesh mesh, int instanceByteOffset,
                                                     PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -2992,7 +2997,7 @@ namespace GameEditor.Framework.Renderer.Server
                                                     Resources.SkinnedMesh mesh, int instanceByteOffset,
                                                     PipelineFlags basePipelineFlags, in Matrix4x4 viewProj, Vector3 cameraPos)
         {
-            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _skinnedFallbackMat;
+            var mat = (_matReg.GetByKey(smr.MaterialKey) as Materials.PbrMaterial) ?? _defaultMat;
 
             bool blend = mat.AlphaMode == 2;
             PipelineFlags pf = basePipelineFlags;
@@ -3597,6 +3602,15 @@ namespace GameEditor.Framework.Renderer.Server
                 sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
+        }
+
+        /// <summary>True when a sub-mesh brings its own (.mtl) material: the mesh is then drawn by the Blinn-Phong path.</summary>
+        private static bool HasSubMeshMaterial(MeshResource mesh, bool disableSubMeshMaterial)
+        {
+            if (disableSubMeshMaterial) return false;
+            foreach (MeshSubResource sub in mesh.SubMeshes)
+                if (sub.MaterialKey.Length > 0 && _matReg.GetByKey(sub.MaterialKey) is BlinnPhongMaterial) return true;
+            return false;
         }
 
         private static BlinnPhongMaterial? ResolveSubMeshMaterial(
