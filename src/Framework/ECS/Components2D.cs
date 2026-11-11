@@ -50,4 +50,22 @@ namespace GameEditor.Framework.ECS.Components
 
         public static SpriteAnimator Default => new() { Clip = "", Speed = 1f, Playing = true };
     }
+
+    /// <summary>
+    /// Draws a tile map (scene block "Tilemap"): the layers of a <c>.tilemap</c> file, each cell a frame of the
+    /// map's sprite sheet. The corner of cell (0, 0) is at the entity's position; a cell is the map's cell size
+    /// times the Transform's scale. A layer is drawn in its turn among the sprites: by <see cref="Layer"/>, then
+    /// <see cref="Order"/> plus the layer's own order, then distance from the camera.
+    /// </summary>
+    public struct TilemapRenderer
+    {
+        /// <summary>The map file's key ("Tilemaps/level1.tilemap").</summary>
+        public string Map;
+        public int Layer, Order;
+        /// <summary>Multiplies the tiles' colours: (1, 1, 1, 1) shows them as they are.</summary>
+        public Vector4 Color;
+        public bool Visible;
+
+        public static TilemapRenderer Default => new() { Map = "", Color = Vector4.One, Visible = true };
+    }
 }

@@ -99,6 +99,7 @@ namespace GameEditor.Framework.Scene
         public static void SaveScene(string path)
         {
             if (ActiveScene == null) return;
+            EventBus.RaiseSceneSaving();
             // In an editor: a file made since the project was opened has its id before the scene that names it is written.
             if (AssetDatabase.Root != null)
                 foreach (string note in AssetDatabase.Sync().Notes) Logger.Warning("[Assets] " + note);
@@ -160,22 +161,12 @@ namespace GameEditor.Framework.Scene
                     // the prefabs those hold. A scene that names none goes on at once.
                     // The sprite sheets the scene and those prefabs name are read next, for the same reason: a
                     // sprite's frame and an animation's clip are there from the first frame.
-                    Prefabs.LoadNamedIn(json, loaded => SpriteLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
+                    // Then the tile maps, and the sheets the maps' tiles come from.
+                    Prefabs.LoadNamedIn(json, loaded => TilemapLibrary.LoadNamedIn(TextsOf(json, loaded), maps =>
                     {
-                        EventBus.RaiseSceneUnloaded();
-                        ActiveScene ??= new Scene("Untitled");
-                        SceneSerializer.Deserialize(json, ActiveScene);
-                        ActiveScene.FilePath = null; // Loaded from assets, not a file path
-                        ActiveScene.IsDirty = false;
-                        PreloadSceneMeshes();
-                        PreloadSceneMaterials();
-                        // A prefab that only a script places has no entity in the scene yet: its meshes and
-                        // materials are asked for now, so Instantiate has them.
-                        foreach (string key in loaded)
-                            if (PrefabLibrary.Get(key) is { } prefab) PreloadPrefabAssets(prefab);
-                        EventBus.RaiseSceneLoaded();
-                        UndoStack.Clear();
-                        Logger.Info($"Scene loaded from assets: {assetPath}");
+                        var texts = TextsOf(json, loaded);
+                        texts.AddRange(maps);
+                        SpriteLibrary.LoadNamedIn(texts, () => Loaded(json, loaded, assetPath));
                     }));
                 }
                 else
@@ -184,6 +175,25 @@ namespace GameEditor.Framework.Scene
                 }
             });
 
+        }
+
+        // The scene's text has arrived, and with it every file it must have read before it.
+        private static void Loaded(string json, List<string> loaded, string assetPath)
+        {
+            EventBus.RaiseSceneUnloaded();
+            ActiveScene ??= new Scene("Untitled");
+            SceneSerializer.Deserialize(json, ActiveScene);
+            ActiveScene.FilePath = null; // Loaded from assets, not a file path
+            ActiveScene.IsDirty = false;
+            PreloadSceneMeshes();
+            PreloadSceneMaterials();
+            // A prefab that only a script places has no entity in the scene yet: its meshes and
+            // materials are asked for now, so Instantiate has them.
+            foreach (string key in loaded)
+                if (PrefabLibrary.Get(key) is { } prefab) PreloadPrefabAssets(prefab);
+            EventBus.RaiseSceneLoaded();
+            UndoStack.Clear();
+            Logger.Info($"Scene loaded from assets: {assetPath}");
         }
 
         // The scene's text and the texts of the prefabs read for it.

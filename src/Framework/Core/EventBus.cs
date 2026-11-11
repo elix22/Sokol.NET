@@ -14,6 +14,8 @@ namespace GameEditor.Framework.Core
         public static event Action<PlayModeState>? PlayModeChanged;
         public static event Action? SceneLoaded;
         public static event Action? SceneUnloaded;
+        /// <summary>A scene is about to be written to its file: what is saved with a scene (an editor's open tile maps) is written now.</summary>
+        public static event Action? SceneSaving;
 
         public static void RaiseEntitySelected(Entity e)             => EntitySelected?.Invoke(e);
         public static void RaiseEntityCreated(Entity e)              => EntityCreated?.Invoke(e);
@@ -22,5 +24,6 @@ namespace GameEditor.Framework.Core
         public static void RaisePlayModeChanged(PlayModeState s)     => PlayModeChanged?.Invoke(s);
         public static void RaiseSceneLoaded()                        => SceneLoaded?.Invoke();
         public static void RaiseSceneUnloaded()                      => SceneUnloaded?.Invoke();
+        public static void RaiseSceneSaving()                        => SceneSaving?.Invoke();
     }
 }

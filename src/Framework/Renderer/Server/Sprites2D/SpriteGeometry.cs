@@ -81,6 +81,49 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
         }
 
         /// <summary>
+        /// The cells of a grid that a view shows. The grid lies in a plane of the world: the corner of cell (0, 0)
+        /// at <paramref name="origin"/>, a cell's edges <paramref name="axisX"/> and <paramref name="axisY"/>;
+        /// cell (x, y) covers origin + [x, x + 1]·axisX + [y, y + 1]·axisY. Given the inverse of the view's
+        /// view-projection matrix, returns the range of cells that the four corners of the picture reach, both
+        /// ends included. False when that cannot be told — the view looks along the plane, or a corner's line of
+        /// sight does not meet it: the caller then takes every cell.
+        /// </summary>
+        public static bool CellsInView(in Matrix4x4 inverseViewProj, Vector3 origin, Vector3 axisX, Vector3 axisY, out int x0, out int y0, out int x1, out int y1)
+        {
+            x0 = y0 = x1 = y1 = 0;
+            Vector3 normal = Vector3.Cross(axisX, axisY);
+            float xx = Vector3.Dot(axisX, axisX), yy = Vector3.Dot(axisY, axisY), xy = Vector3.Dot(axisX, axisY);
+            float det = xx * yy - xy * xy;
+            if (det <= 0f) return false;
+
+            float minU = float.MaxValue, minV = float.MaxValue, maxU = float.MinValue, maxV = float.MinValue;
+            for (int corner = 0; corner < 4; corner++)
+            {
+                float nx = (corner & 1) == 0 ? -1f : 1f, ny = (corner & 2) == 0 ? -1f : 1f;
+                Vector4 near = Vector4.Transform(new Vector4(nx, ny, 0f, 1f), inverseViewProj);
+                Vector4 far  = Vector4.Transform(new Vector4(nx, ny, 1f, 1f), inverseViewProj);
+                if (near.W == 0f || far.W == 0f) return false;
+                Vector3 a = new Vector3(near.X, near.Y, near.Z) / near.W, b = new Vector3(far.X, far.Y, far.Z) / far.W;
+                Vector3 direction = b - a;
+                float facing = Vector3.Dot(normal, direction);
+                if (MathF.Abs(facing) < 1e-12f) return false;
+                float t = Vector3.Dot(normal, origin - a) / facing;
+                if (t < 0f || t > 1f) return false;          // the plane is behind the eye, or beyond what the view shows
+                Vector3 p = a + direction * t - origin;
+                float px = Vector3.Dot(p, axisX), py = Vector3.Dot(p, axisY);
+                float u = (px * yy - py * xy) / det, v = (py * xx - px * xy) / det;
+                minU = MathF.Min(minU, u); maxU = MathF.Max(maxU, u);
+                minV = MathF.Min(minV, v); maxV = MathF.Max(maxV, v);
+            }
+            // Wide enough to be whole numbers of cells, and within what an int holds.
+            const float Limit = 1e9f;
+            if (!(minU > -Limit && maxU < Limit && minV > -Limit && maxV < Limit)) return false;
+            x0 = (int)MathF.Floor(minU); x1 = (int)MathF.Floor(maxU);
+            y0 = (int)MathF.Floor(minV); y1 = (int)MathF.Floor(maxV);
+            return true;
+        }
+
+        /// <summary>
         /// The sprite seen along a ray: of the sprites the ray meets no farther than <paramref name="maxT"/> (the
         /// first mesh it meets: a sprite behind a mesh is hidden by it), the one drawn last. False when there is none.
         /// </summary>

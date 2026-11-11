@@ -41,6 +41,8 @@ namespace GameEditor.Framework.Assets
         private static readonly HashSet<string> _missing = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, SpriteSheet?> _sheets = new(StringComparer.Ordinal);   // null: cannot be read
         private static readonly HashSet<string> _pendingSheets = new(StringComparer.Ordinal);
+        private static readonly Dictionary<string, SpriteFrame[]> _tiles = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> _missingTiles = new(StringComparer.Ordinal);
 
         /// <summary>The frame <paramref name="texture"/> names. Loading: a file is on its way, ask again.</summary>
         public static Answer Find(string? texture, out SpriteFrame frame)
@@ -103,10 +105,16 @@ namespace GameEditor.Framework.Assets
                 return Answer.Missing;
             }
 
+            frame = Cut(sheet, tex, cut);
+            return Answer.Ready;
+        }
+
+        private static SpriteFrame Cut(SpriteSheet sheet, Renderer.Server.Resources.TextureResource tex, SheetFrame cut)
+        {
             // A smoothed frame is sampled half a pixel inside its rectangle, or its edge would take colour from
             // the frame beside it. An unsmoothed one shows its pixels whole.
             float inset = sheet.Nearest ? 0f : 0.5f;
-            frame = new SpriteFrame
+            return new SpriteFrame
             {
                 View    = tex.View,
                 Nearest = sheet.Nearest,
@@ -115,7 +123,35 @@ namespace GameEditor.Framework.Assets
                 Size    = new Vector2(cut.W, cut.H) / sheet.PixelsPerUnit,
                 Pivot   = cut.Pivot,
             };
-            return Answer.Ready;
+        }
+
+        /// <summary>
+        /// Every frame of a sheet in the sheet's order, ready to draw: a tile map's tile n is <c>tiles[n - 1]</c>.
+        /// Loading: the sheet or its image is on its way, ask again.
+        /// </summary>
+        public static Answer FindTiles(string? sheetKey, out SpriteFrame[] tiles)
+        {
+            tiles = Array.Empty<SpriteFrame>();
+            if (string.IsNullOrEmpty(sheetKey)) return Answer.Missing;
+            if (_tiles.TryGetValue(sheetKey, out SpriteFrame[]? known)) { tiles = known; return Answer.Ready; }
+            if (_missingTiles.Contains(sheetKey)) return Answer.Missing;
+
+            Answer found = FindSheet(sheetKey, out SpriteSheet? sheet);
+            if (found == Answer.Ready)
+            {
+                if (sheet!.Image.Length == 0) found = Answer.Missing;
+                else if (AssetLibrary.Texture(sheet.Image) is not { } tex || tex.Width <= 0 || tex.Height <= 0)
+                    found = AssetLibrary.IsTextureMissing(sheet.Image) ? Answer.Missing : Answer.Loading;
+                else
+                {
+                    IReadOnlyList<SheetFrame> frames = sheet.FramesFor(tex.Width, tex.Height);
+                    tiles = new SpriteFrame[frames.Count];
+                    for (int i = 0; i < tiles.Length; i++) tiles[i] = Cut(sheet, tex, frames[i]);
+                    _tiles[sheetKey] = tiles;
+                }
+            }
+            if (found == Answer.Missing) _missingTiles.Add(sheetKey);
+            return found;
         }
 
         // ── Sheets ──────────────────────────────────────────────────────────────────────
@@ -171,6 +207,8 @@ namespace GameEditor.Framework.Assets
             _sheets[key] = sheet;
             _frames.Clear();      // answers made from the sheet this one replaces
             _missing.Clear();
+            _tiles.Clear();
+            _missingTiles.Clear();
             return sheet != null ? Answer.Ready : Answer.Missing;
         }
 
@@ -205,8 +243,7 @@ namespace GameEditor.Framework.Assets
                 switch (e.ValueKind)
                 {
                     case JsonValueKind.Object:
-                        foreach (var p in e.EnumerateObject())
-                            if (!p.NameEquals(AssetRefs.Member)) Collect(p.Value, keys);
+                        foreach (var p in e.EnumerateObject()) Collect(p.Value, keys);
                         break;
                     case JsonValueKind.Array:
                         foreach (var item in e.EnumerateArray()) Collect(item, keys);
@@ -266,6 +303,8 @@ namespace GameEditor.Framework.Assets
         {
             _frames.Clear();
             _missing.Clear();
+            _tiles.Clear();
+            _missingTiles.Clear();
             if (SpriteSheet.IsSheetKey(key)) _sheets.Remove(key);
             else AssetLibrary.ForgetTexture(key);
         }
@@ -276,6 +315,8 @@ namespace GameEditor.Framework.Assets
             _frames.Clear();
             _missing.Clear();
             _sheets.Clear();
+            _tiles.Clear();
+            _missingTiles.Clear();
         }
     }
 }
