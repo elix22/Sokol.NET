@@ -328,6 +328,7 @@ namespace GameEditor.Framework.Renderer.Server
             EventBus.SceneLoaded -= AttachSceneNodeAnimations;
             _initialized = false;
             _instanceBuf.Dispose();
+            Sprites2D.SpriteRenderSystem.Shutdown();
             _transmissionInstanceBuf.Dispose();
             _screenCopyPass.Shutdown();
             DestroyScreenCopy();
@@ -416,6 +417,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             if (!_initialized) return;
             _instanceBuf.BeginFrame();
+            Sprites2D.SpriteRenderSystem.BeginFrame();
             _skinnedInstanceBuf.BeginFrame();
             _transmissionInstanceBuf.BeginFrame();
             _animationFrame++;
@@ -621,6 +623,13 @@ namespace GameEditor.Framework.Renderer.Server
             }
         }
 
+        /// <summary>The sprites drawn for the last view, and the draw calls they took (a run of sprites of one image is one).</summary>
+        public static (int Sprites, int DrawCalls) SpriteStats => (Sprites2D.SpriteRenderSystem.LastSprites, Sprites2D.SpriteRenderSystem.LastDrawCalls);
+
+        /// <summary>
+        /// Draws a view of the world into the pass that is open: the meshes, then the sprites (back to front,
+        /// tested against the meshes' depth).
+        /// </summary>
         public static void SubmitView(
             in Matrix4x4 viewProj,
             PipelineFlags basePipelineFlags = PipelineFlags.OffscreenRt,
@@ -629,6 +638,17 @@ namespace GameEditor.Framework.Renderer.Server
             CsmCamera? csm = null)
         {
             if (!_initialized) return;
+            SubmitMeshes(in viewProj, basePipelineFlags, viewIndex, allowShadowPassRendering, csm);
+            Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
+        }
+
+        private static void SubmitMeshes(
+            in Matrix4x4 viewProj,
+            PipelineFlags basePipelineFlags,
+            int viewIndex,
+            bool allowShadowPassRendering,
+            CsmCamera? csm)
+        {
             var world = ECSWorld.Instance;
 
             // Per-view: deferred transmission (refractive) draws are collected during extraction

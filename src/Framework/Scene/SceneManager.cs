@@ -618,45 +618,78 @@ namespace GameEditor.Framework.Scene
             }
         }
 
-        public static bool GetMainCameraMatrices(int width, int height,out Matrix4x4 viewProj, out Vector3 eyePos)
+        /// <summary>
+        /// The view and projection matrices of a camera entity for a picture of <paramref name="width"/> ×
+        /// <paramref name="height"/> pixels — the one place a camera is read: a game, an editor's Game view and its
+        /// camera preview all ask here. A camera looks along its +Z with its +Y up; an orthographic one shows
+        /// <see cref="CameraComponent.OrthoSize"/> world units above and below its centre. A camera that is a
+        /// child follows its parents.
+        /// </summary>
+        public static void GetCameraMatrices(ECSWorld world, in Transform tr, in CameraComponent cam, int width, int height,
+                                             out Matrix4x4 view, out Matrix4x4 proj, out Vector3 eyePos)
         {
-            viewProj = Matrix4x4.Identity;
+            Vector3 forward, up;
+            if (tr.Parent.HasValue)
+            {
+                Matrix4x4 m = Transform.GetWorldMatrix(world, tr);
+                eyePos  = m.Translation;
+                forward = Vector3.Normalize(new Vector3(m.M31, m.M32, m.M33));
+                up      = Vector3.Normalize(new Vector3(m.M21, m.M22, m.M23));
+            }
+            else
+            {
+                Matrix4x4 rotMat = Matrix4x4.CreateFromQuaternion(tr.Rotation);
+                eyePos  = tr.Position;
+                forward = new Vector3(rotMat.M31, rotMat.M32, rotMat.M33);
+                up      = new Vector3(rotMat.M21, rotMat.M22, rotMat.M23);
+            }
+            view = Matrix4x4.CreateLookAt(eyePos, eyePos + forward, up);
+
+            float aspect = (float)width / height;
+            if (cam.IsOrthographic)
+            {
+                float orthoH = MathF.Max(0.01f, cam.OrthoSize > 0f ? cam.OrthoSize : 5f);
+                float orthoW = orthoH * aspect;
+                proj = Matrix4x4.CreateOrthographicOffCenter(-orthoW, orthoW, -orthoH, orthoH, cam.NearZ, cam.FarZ);
+            }
+            else
+            {
+                float fov = MathF.Max(1f, cam.Fov) * MathF.PI / 180f;
+                proj = Matrix4x4.CreatePerspectiveFieldOfView(fov, aspect, cam.NearZ, cam.FarZ);
+            }
+        }
+
+        /// <summary>
+        /// The scene's main camera — the first active entity, in scene order, whose camera is marked main — and
+        /// its matrices for a picture of the given size. False when there is none.
+        /// </summary>
+        public static bool GetMainCamera(int width, int height, out Matrix4x4 view, out Matrix4x4 proj,
+                                         out CameraComponent camera, out Vector3 eyePos)
+        {
+            view = proj = Matrix4x4.Identity;
+            camera = default;
             eyePos = Vector3.Zero;
             if (width <= 0 || height <= 0) return false;
 
             var world = ECSWorld.Instance;
-            foreach (var row in world.Query<CameraComponent, Transform>()
-                                     .Enumerate<CameraComponent, Transform>())
+            foreach (Entity id in world.Entities)
             {
-                ref readonly var cam = ref row.Item1.Value;
-                if (!cam.IsMain) continue;
+                if (!world.TryGetComponent<CameraComponent>(id, out var cam) || !cam.IsMain) continue;
+                if (world.TryGetComponent<ActiveFlag>(id, out var af) && !af.Active) continue;
                 if (cam.NearZ <= 0f || cam.FarZ <= cam.NearZ) continue; // skip degenerate projection
-                ref readonly var tr = ref row.Item2.Value;
-
-                Matrix4x4 rotMat = Matrix4x4.CreateFromQuaternion(tr.Rotation);
-
-                // Use the rotation matrix's +Z column as forward (matches gizmo convention)
-                Vector3 forward = new Vector3(rotMat.M31, rotMat.M32, rotMat.M33);
-                Vector3 up = new Vector3(rotMat.M21, rotMat.M22, rotMat.M23);
-
-                eyePos = tr.Position;
-                Matrix4x4 view = Matrix4x4.CreateLookAt(eyePos, eyePos + forward, up);
-                Matrix4x4 proj;
-                if (cam.IsOrthographic)
-                {
-                    float orthoH = MathF.Max(0.01f, cam.OrthoSize > 0f ? cam.OrthoSize : 5f);
-                    float orthoW = orthoH * ((float)width / height);
-                    proj = Matrix4x4.CreateOrthographicOffCenter(-orthoW, orthoW, -orthoH, orthoH, cam.NearZ, cam.FarZ);
-                }
-                else
-                {
-                    float fov = MathF.Max(1f, cam.Fov) * MathF.PI / 180f;
-                    proj = Matrix4x4.CreatePerspectiveFieldOfView(fov, (float)width / height, cam.NearZ, cam.FarZ);
-                }
-                viewProj = view * proj;
+                if (!world.TryGetComponent<Transform>(id, out var tr)) continue;
+                GetCameraMatrices(world, tr, cam, width, height, out view, out proj, out eyePos);
+                camera = cam;
                 return true;
             }
             return false;
+        }
+
+        public static bool GetMainCameraMatrices(int width, int height,out Matrix4x4 viewProj, out Vector3 eyePos)
+        {
+            bool found = GetMainCamera(width, height, out var view, out var proj, out _, out eyePos);
+            viewProj = found ? view * proj : Matrix4x4.Identity;
+            return found;
         }
 
         public static void UpdatePhysics(float deltaTime)

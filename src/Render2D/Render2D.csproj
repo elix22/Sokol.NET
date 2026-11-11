@@ -50,6 +50,8 @@
     <_R2DBloomExtractOut>$(_R2DShaderOutDir)bloom_extract_shader.cs</_R2DBloomExtractOut>
     <_R2DBloomBlurGlsl>$(_R2DShaderDir)bloom_blur.glsl</_R2DBloomBlurGlsl>
     <_R2DBloomBlurOut>$(_R2DShaderOutDir)bloom_blur_shader.cs</_R2DBloomBlurOut>
+    <_R2DSpriteGlsl>$(_R2DShaderDir)sprite.glsl</_R2DSpriteGlsl>
+    <_R2DSpriteOut>$(_R2DShaderOutDir)sprite_shader.cs</_R2DSpriteOut>
   </PropertyGroup>
 
   <Target Name="EnsureRender2DShaderOutDir">
@@ -91,9 +93,16 @@
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_R2DBloomBlurGlsl)&quot; --output &quot;$(_R2DBloomBlurOut)&quot; --module r2d --slang &quot;$(_R2DSlang)&quot; --reflection -f sokol_csharp" />
   </Target>
 
+  <Target Name="CompileRender2DSpriteShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureRender2DShaderOutDir"
+          Inputs="$(_R2DSpriteGlsl)" Outputs="$(_R2DSpriteOut)">
+    <Message Text="Compiling Render2D shader: sprite.glsl (all platforms)" Importance="high" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_R2DSpriteGlsl)&quot; --output &quot;$(_R2DSpriteOut)&quot; --module r2d --slang &quot;$(_R2DSlang)&quot; --reflection -f sokol_csharp" />
+  </Target>
+
   <!-- Umbrella so `dotnet build Render2D.csproj -t:CompileShaders` regenerates all shaders
        (project convention; see feedback memory "Shader Compilation Command"). -->
-  <Target Name="CompileShaders" DependsOnTargets="CompileRender2DSceneShader;CompileRender2DBlitShader;CompileRender2DParticleShader;CompileRender2DBloomExtractShader;CompileRender2DBloomBlurShader" />
+  <Target Name="CompileShaders" DependsOnTargets="CompileRender2DSceneShader;CompileRender2DBlitShader;CompileRender2DParticleShader;CompileRender2DBloomExtractShader;CompileRender2DBloomBlurShader;CompileRender2DSpriteShader" />
 
   <!-- Sokol bindings (P/Invoke surface: SG, NanoVG, NanoSVG, STM, SFilesystem). -->
   <ItemGroup>

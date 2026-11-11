@@ -176,6 +176,14 @@
     </Compile>
   </ItemGroup>
 
+  <!-- Sokol.Render2D sources: the sprite batch the renderer draws 2D with, and the 2D surface and particles a
+       game's scripts can use. Compiled as source, as the apps that use Render2D do (it draws with Sokol.GUI's types). -->
+  <ItemGroup>
+    <Compile Include="../Render2D/**/*.cs" Exclude="../Render2D/obj/**;../Render2D/bin/**">
+      <Link>Render2D/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+
   <!-- Sokol.GUI framework sources (used by GameApplication mobile touch UI host) -->
   <ItemGroup>
     <Compile Include="../GUI/**/*.cs">

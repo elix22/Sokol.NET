@@ -119,11 +119,16 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 View     = view,
                 Sampler  = DefaultSampler,
                 RefCount = 1,
-                Key      = key
+                Key      = key,
+                Width    = w,
+                Height   = h
             };
             _map[key] = res;
             return view;
         }
+
+        /// <summary>The texture cached under <paramref name="key"/> (its view and its size), or null.</summary>
+        public TextureResource? Find(string key) => _map.TryGetValue(key, out var r) ? r : null;
 
         /// <summary>Decrement ref-count. Destroys GPU resources when count reaches zero.</summary>
         public void Release(string key)

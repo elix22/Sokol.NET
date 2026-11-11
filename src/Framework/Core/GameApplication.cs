@@ -253,6 +253,72 @@ namespace GameEditor.Framework.Core
             }
         }
 
+        // The 3D scene is drawn here when it has see-through materials: their pass must sample a copy of the
+        // opaque picture, and the swapchain cannot be sampled.
+        private static readonly Renderer.OffscreenTarget _sceneTarget = new();
+
+        /// <summary>
+        /// One whole frame of a game: input, scripts and physics, then the picture — the scene through its main
+        /// camera (perspective or orthographic), meshes and sprites, and the game's UI on top — and the commit.
+        /// A game's Frame callback is this one call, so what the engine learns to draw reaches every game.
+        /// <paramref name="clear"/>: how the picture starts (the background colour).
+        /// </summary>
+        public static unsafe void RunFrame(Sokol.SG.sg_pass_action clear)
+        {
+            Input.InputManager.BeginFrame();
+            Update((float)sapp_frame_duration());
+
+            RenderingServer.BeginFrame();
+
+            int width = sapp_width(), height = sapp_height();
+            System.Numerics.Matrix4x4 viewProj = System.Numerics.Matrix4x4.Identity;
+            RenderingServer.CsmCamera? csm = null;
+            if (SceneManager.GetMainCamera(width, height, out var view, out var proj, out var cam, out _))
+            {
+                viewProj = view * proj;
+                // A perspective camera gets shadow cascades fitted to what it sees; an orthographic one a single fit.
+                if (!cam.IsOrthographic) csm = new RenderingServer.CsmCamera(view, proj, cam.NearZ, cam.FarZ);
+            }
+
+            // Shadow maps go into their atlas BEFORE the scene's pass.
+            RenderingServer.RenderShadowMaps(viewProj, csm);
+
+            // Two paths, chosen per frame for the least cost:
+            //   • nothing see-through → the scene goes STRAIGHT to the swapchain (no offscreen target, no
+            //     full-screen copy): the common case, and the best one for a low-end phone;
+            //   • see-through materials → the scene goes to an offscreen target, the refraction pass runs
+            //     there, and the result is copied to the swapchain.
+            if (RenderingServer.SceneNeedsTransmission)
+            {
+                if (width > 0 && height > 0)
+                {
+                    _sceneTarget.Resize(width, height);
+
+                    Sokol.SG.sg_begin_pass(_sceneTarget.MakePass(clear.colors[0].clear_value));
+                    RenderingServer.RenderSkybox(viewProj, offscreen: true);
+                    RenderingServer.SubmitView(viewProj, PipelineFlags.OffscreenRt, allowShadowPassRendering: false, csm: csm);
+                    Sokol.SG.sg_end_pass();
+
+                    RenderingServer.RenderTransmission(_sceneTarget, viewProj);
+                }
+
+                Sokol.SG.sg_begin_pass(new Sokol.SG.sg_pass { action = clear, swapchain = Sokol.SGlue.sglue_swapchain() });
+                if (_sceneTarget.IsValid)
+                    RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
+                Render();
+                Sokol.SG.sg_end_pass();
+            }
+            else
+            {
+                Sokol.SG.sg_begin_pass(new Sokol.SG.sg_pass { action = clear, swapchain = Sokol.SGlue.sglue_swapchain() });
+                RenderingServer.RenderSkybox(viewProj, offscreen: false);
+                RenderingServer.SubmitView(viewProj, PipelineFlags.None, allowShadowPassRendering: false, csm: csm);
+                Render();
+                Sokol.SG.sg_end_pass();
+            }
+            Sokol.SG.sg_commit();
+        }
+
         public static void Render()
         {
             if (_screen == null)

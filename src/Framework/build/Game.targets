@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    What the engine adds to every game project made with it, whenever the project's own build files were
+    written. A project imports this file from its Directory.Build.targets (the editor adds the line to a project
+    that has none), so that engine parts added later reach it without its files being edited again.
+  -->
+
+  <!-- Web: the Framework is compiled into the game as source (see the project's Directory.Build.props), and the
+       2D renderer's sources go with it. On the desktop and on phones they are inside GameEditor.Framework.dll. -->
+  <ItemGroup Condition="'$(TargetOS)' == 'browser'">
+    <Compile Include="$(MSBuildThisFileDirectory)../../Render2D/**/*.cs"
+             Exclude="$(MSBuildThisFileDirectory)../../Render2D/obj/**;$(MSBuildThisFileDirectory)../../Render2D/bin/**">
+      <Link>Render2D/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+</Project>

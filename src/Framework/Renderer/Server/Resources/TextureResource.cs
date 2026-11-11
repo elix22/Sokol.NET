@@ -16,6 +16,9 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         public int RefCount;
 
         /// <summary>Cache key (usually the file path, or a built-in name like "builtin:white").</summary>
+        /// <summary>The image's size in pixels (0 for a texture made before its size was kept).</summary>
+        public int Width, Height;
+
         public string Key = "";
 
         public bool IsValid => Image.id != 0;
@@ -24,7 +27,8 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         {
             if (Image.id   != 0) { sg_destroy_image(Image);    Image   = default; }
             if (View.id    != 0) { sg_destroy_view(View);      View    = default; }
-            if (Sampler.id != 0) { sg_destroy_sampler(Sampler); Sampler = default; }
+            // The sampler is the cache's shared one (TextureCache.DefaultSampler): it is not this texture's to destroy.
+            Sampler = default;
         }
     }
 }

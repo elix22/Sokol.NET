@@ -382,6 +382,64 @@ namespace GameEditor.Framework.Assets
             catch (Exception ex) { Logger.Warning($"[Assets] Failed to save .pbrmat '{relKey}': {ex.Message}"); }
         }
 
+        // ── Images for sprites ─────────────────────────────────────────────────────────────
+
+        // An image shown as a sprite is cached apart from the same file used as a material's map: a material may
+        // ask for the sRGB form of the image, and a sprite shows the file's colours as they are.
+        private const string SpriteTexturePrefix = "2d:";
+        private static readonly HashSet<string> _pendingTextures = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> _missingTextures = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The texture of an image file, by the file's key ("Textures/hero.png"), with its size in pixels. Null
+        /// while the file is on its way (the web and phones read it when it arrives) and when it cannot be read —
+        /// that is logged once. Asking again costs a lookup.
+        /// </summary>
+        public static Renderer.Server.Resources.TextureResource? Texture(string key)
+        {
+            string cacheKey = SpriteTexturePrefix + key;
+            var found = RenderingServer.Textures.Find(cacheKey);
+            if (found != null) return found;
+            if (!SG.sg_isvalid() || _missingTextures.Contains(key) || _pendingTextures.Contains(key)) return null;
+
+            string? absPath = ToAbsoluteDesktopPath(key);
+            if (absPath != null && System.IO.File.Exists(absPath))
+                return TextureArrived(key, cacheKey, System.IO.File.ReadAllBytes(absPath));
+
+            _pendingTextures.Add(key);
+            SFilesystem.LoadFileAsync(key, (_, buffer, status) =>
+            {
+                _pendingTextures.Remove(key);
+                TextureArrived(key, cacheKey, status == SFileLoadStatus.Success ? buffer : null);
+            });
+            return null;
+        }
+
+        private static Renderer.Server.Resources.TextureResource? TextureArrived(string key, string cacheKey, byte[]? bytes)
+        {
+            if (bytes != null && bytes.Length > 0)
+            {
+                RenderingServer.Textures.LoadFromBytes(cacheKey, bytes);
+                if (RenderingServer.Textures.Find(cacheKey) is { } loaded) return loaded;
+            }
+            _missingTextures.Add(key);
+            Logger.Warning($"[Assets] Failed to load image: '{key}'");
+            return null;
+        }
+
+        /// <summary>The image under <paramref name="key"/> was asked for and could not be read.</summary>
+        public static bool IsTextureMissing(string key) => _missingTextures.Contains(key);
+
+        /// <summary>
+        /// Forgets the image under <paramref name="key"/> (its texture is freed): the next <see cref="Texture"/>
+        /// reads the file again. For an editor, after the file changed, moved or came back.
+        /// </summary>
+        public static void ForgetTexture(string key)
+        {
+            _missingTextures.Remove(key);
+            RenderingServer.Textures.Release(SpriteTexturePrefix + key);
+        }
+
         private static string SanitizeFileName(string name)
         {
             char[] invalid = System.IO.Path.GetInvalidFileNameChars();
