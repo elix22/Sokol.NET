@@ -55,6 +55,9 @@ namespace GameEditor.Framework.Assets
         /// <summary>The project folder the database was opened on; null in a game and in a test that fills it by hand.</summary>
         public static string? Root => _root;
 
+        /// <summary>True when a file was moved since the project was opened: a key from before may still be held somewhere.</summary>
+        public static bool HasMoves => _movedFrom.Count > 0;
+
         /// <summary>True when no id is known: nothing a file names can have moved.</summary>
         public static bool IsEmpty => _pathOfId.Count == 0;
 
@@ -170,7 +173,19 @@ namespace GameEditor.Framework.Assets
         {
             Clear();
             _root = Path.GetFullPath(projectFolder);
+            return Sync();
+        }
+
+        /// <summary>
+        /// Looks at the open project's files again and takes in what changed since: a new file gets its id; a file
+        /// that moved — with its <c>.meta</c>, or without it when it is clear which file it is — keeps its id
+        /// (<see cref="Moved"/> is raised for it); a file that is gone is forgotten. A file that is where it was is
+        /// not read again.
+        /// </summary>
+        public static AssetScanReport Sync()
+        {
             var report = new AssetScanReport();
+            if (_root == null) return report;
 
             var files = new List<string>();
             var metas = new HashSet<string>(StringComparer.Ordinal);   // by the path of the file they belong to
@@ -190,15 +205,31 @@ namespace GameEditor.Framework.Assets
                 }
             }
             files.Sort(StringComparer.Ordinal);
-
-            // Files with a .meta: the first in path order keeps an id two of them have.
-            var without = new List<string>();
             var fileSet = new HashSet<string>(files, StringComparer.Ordinal);
+
+            // Known files that are not where they were: moved, or gone.
+            var vanished = new Dictionary<string, string>(StringComparer.Ordinal);   // id → the path it had
+            foreach (var kv in _pathOfId)
+                if (!fileSet.Contains(kv.Value)) vanished[kv.Key] = kv.Value;
+            var moves = new List<(string, string)>();
+
+            // Files not known yet, with a .meta: the first in path order keeps an id two of them have.
+            var without = new List<string>();
             foreach (string file in files)
             {
+                if (_idOfPath.TryGetValue(file, out string? knownId))
+                {
+                    if (!metas.Contains(file) && !WriteMeta(file, knownId)) report.NotSaved = true;   // its .meta was taken away: written again
+                    continue;
+                }
                 if (!metas.Contains(file)) { without.Add(file); continue; }
                 string? id = ReadMeta(file);
                 if (id == null) { without.Add(file); metas.Remove(file); continue; }   // not a .meta this version reads: written anew
+                if (vanished.Remove(id, out string? was))
+                {
+                    moves.Add((was, file));   // the file, moved with its .meta
+                    continue;
+                }
                 if (_pathOfId.TryGetValue(id, out string? first))
                 {
                     string fresh = NewId();
@@ -218,10 +249,13 @@ namespace GameEditor.Framework.Assets
             foreach (var (orphan, file) in Pair(orphans, without))
             {
                 string? id = ReadMeta(orphan);
-                if (id == null || _pathOfId.ContainsKey(id)) continue;
+                if (id == null) continue;
+                bool known = _pathOfId.TryGetValue(id, out string? at);
+                if (known && (at != orphan || !vanished.ContainsKey(id))) continue;   // the id is another file's
                 try { File.Move(MetaFile(orphan), MetaFile(file)); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { report.NotSaved = true; }
-                Set(id, file);
+                if (known) { vanished.Remove(id); moves.Add((orphan, file)); }
+                else Set(id, file);
                 orphans.Remove(orphan);
                 without.Remove(file);
                 report.Adopted++;
@@ -234,6 +268,11 @@ namespace GameEditor.Framework.Assets
                 report.Orphans++;
                 report.Notes.Add($"{orphan}{MetaExtension} had no file beside it and was removed.");
             }
+            foreach (var gone in vanished)
+            {
+                Forget(gone.Value);
+                _pathOfId.Remove(gone.Key);
+            }
 
             foreach (string file in without)
             {
@@ -244,6 +283,9 @@ namespace GameEditor.Framework.Assets
             }
             if (report.NotSaved)
                 report.Notes.Add("The project folder could not be written: the new asset ids hold until the project is closed.");
+
+            foreach (var (from, to) in moves) Rename(from, to, raise: false);
+            foreach (var (from, to) in moves) Moved?.Invoke(from, to);
             return report;
         }
 

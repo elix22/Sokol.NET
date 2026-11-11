@@ -104,6 +104,9 @@ namespace GameEditor.Framework.Scene
         public static void SaveScene(string path)
         {
             if (ActiveScene == null) return;
+            // In an editor: a file made since the project was opened has its id before the scene that names it is written.
+            if (Assets.AssetDatabase.Root != null)
+                foreach (string note in Assets.AssetDatabase.Sync().Notes) Logger.Warning("[Assets] " + note);
             string compact = Assets.AssetRefs.Stamp(SceneSerializer.Serialize(ActiveScene));   // with the id of each file it names
 
             // Re-format as indented JSON for human readability.

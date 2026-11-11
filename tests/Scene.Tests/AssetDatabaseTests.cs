@@ -587,6 +587,103 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void Files_changed_while_the_project_is_open_are_taken_in()
+        {
+            string folder = Project("Assets/Models/duck.obj", "Assets/Textures/wood.png", "Assets/Textures/gone.png", "Assets/keep.txt");
+            AssetDatabase.Open(folder);
+            string duck = AssetDatabase.IdOfKey("Models/duck.obj")!, wood = AssetDatabase.IdOfKey("Textures/wood.png")!,
+                   keep = AssetDatabase.IdOfKey("keep.txt")!;
+            Assert.Empty(AssetDatabase.Sync().Notes);   // nothing changed: nothing done
+
+            // Outside the editor: a new file; a file moved with its .meta; a file moved without it; a file deleted;
+            // a .meta taken away from a file that stays.
+            Write(folder, "Assets/new.txt", "x");
+            Directory.CreateDirectory(Path.Combine(folder, "Assets/Props"));
+            File.Move(Path.Combine(folder, "Assets/Models/duck.obj"), Path.Combine(folder, "Assets/Props/bird.obj"));
+            File.Move(Path.Combine(folder, "Assets/Models/duck.obj.meta"), Path.Combine(folder, "Assets/Props/bird.obj.meta"));
+            File.Move(Path.Combine(folder, "Assets/Textures/wood.png"), Path.Combine(folder, "Assets/Props/wood.png"));
+            File.Delete(Path.Combine(folder, "Assets/Textures/gone.png"));
+            File.Delete(Path.Combine(folder, "Assets/keep.txt.meta"));
+
+            var told = new List<string>();
+            Action<string, string> onMoved = (from, to) => told.Add(from + " > " + to);
+            AssetDatabase.Moved += onMoved;
+            AssetScanReport report;
+            try { report = AssetDatabase.Sync(); }
+            finally { AssetDatabase.Moved -= onMoved; }
+
+            Assert.Equal(1, report.Created);
+            Assert.True(AssetDatabase.IsId(AssetDatabase.IdOfKey("new.txt")));
+            Assert.Equal(duck, AssetDatabase.IdOfKey("Props/bird.obj"));
+            Assert.Equal(wood, AssetDatabase.IdOfKey("Props/wood.png"));
+            Assert.True(Exists(folder, "Assets/Props/wood.png.meta"));
+            Assert.Null(AssetDatabase.IdOfKey("Models/duck.obj"));
+            Assert.Null(AssetDatabase.IdOfKey("Textures/gone.png"));
+            Assert.False(Exists(folder, "Assets/Textures/gone.png.meta"));
+            Assert.Equal(keep, AssetDatabase.IdOfKey("keep.txt"));
+            Assert.Contains(keep, Read(folder, "Assets/keep.txt.meta"));
+            told.Sort(StringComparer.Ordinal);
+            Assert.Equal(new[] { "Assets/Models/duck.obj > Assets/Props/bird.obj", "Assets/Textures/wood.png > Assets/Props/wood.png" }, told);
+            Assert.True(AssetDatabase.HasMoves);
+            Assert.Equal("Props/bird.obj#m0", AssetDatabase.Current("Models/duck.obj#m0"));
+            Assert.Equal(4, AssetDatabase.Count);
+
+            Assert.Empty(AssetDatabase.Sync().Notes);
+        }
+
+        [Fact]
+        public void A_file_on_disk_is_given_the_lines_it_lacks_and_keeps_the_ones_it_has()
+        {
+            Known(Duck, Yellow);
+            string duckId = AssetDatabase.IdOfKey(Duck)!;
+            var s = NewScene();
+            Mesh(s, "Duck", Duck, Yellow);
+            string plain = SceneSerializer.Indent(SceneSerializer.Serialize(s));   // written before ids
+            string full = AssetRefs.Stamp(plain, keep: true);
+            Assert.Equal(new[] { Yellow, Duck }, TableKeys(full));
+            Assert.Same(full, AssetRefs.Stamp(full, keep: true));
+
+            // A file that has a line for one of the two files it names gets the other.
+            string half = AssetRefs.Stamp(plain.Replace(Yellow, ""), keep: true).Replace("\"Mat\": \"\"", "\"Mat\": \"" + Yellow + "\"");
+            Assert.Equal(new[] { Duck }, TableKeys(half));
+            var table = AssetRefs.ReadTable(AssetRefs.Stamp(half, keep: true))!;
+            Assert.Equal(duckId, table[Duck]);
+            Assert.Equal(AssetDatabase.IdOfKey(Yellow), table[Yellow]);
+
+            // The duck moves and another file takes its old name. The file on disk still says the old name, and
+            // its line still says which file that was: it is not given the newcomer's id.
+            MoveKey(Duck, "Props/bird.obj");
+            AssetDatabase.Set(Id(99), "Assets/" + Duck);
+            Assert.Same(full, AssetRefs.Stamp(full, keep: true));
+            Load(full);
+            Assert.Equal("Props/bird.obj", MeshOf("Duck").MeshPath);
+        }
+
+        [Fact]
+        public void A_key_from_before_a_move_held_in_memory_is_brought_up_to_date()
+        {
+            Known(Duck, Yellow, Robot);
+            var s = NewScene();
+            Entity e = Mesh(s, "Arm", Robot + "#m0p1", Yellow);
+            string text = SceneSerializer.SerializeEntity(e);
+            Assert.Same(text, AssetRefs.Current(text));   // nothing moved
+
+            MoveKey(Robot, "Models/Robots/arm.glb");
+            string now = AssetRefs.Current(text);
+            Assert.Contains("\"Path\":\"Models/Robots/arm.glb#m0p1\"", now);
+            Assert.Contains("\"Mat\":\"" + Yellow + "\"", now);
+            Assert.Same(now, AssetRefs.Current(now));
+
+            // A material saved after its texture moved names the texture where it is.
+            Known("Textures/wood.png");
+            var mat = new PbrMaterial { Name = "Wood", BaseColorMapPath = "Textures/wood.png" };
+            MoveKey("Textures/wood.png", "Textures/oak.png");
+            string saved = AssetRefs.Stamp(PbrMaterialSerializer.Serialize(mat));
+            Assert.Contains("\"baseColorMap\": \"Textures/oak.png\"", saved);
+            Assert.Equal(new[] { "Textures/oak.png" }, TableKeys(saved));
+        }
+
+        [Fact]
         public void A_new_file_is_given_its_meta_and_a_deleted_one_loses_it()
         {
             string folder = Project("Assets/a.png", "Assets/Kit/b.png");

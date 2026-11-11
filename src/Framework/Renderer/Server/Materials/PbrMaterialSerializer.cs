@@ -89,7 +89,7 @@ namespace GameEditor.Framework.Renderer.Server.Materials
         /// <summary>A map path is persistable only when it is a real Assets file (not a glTF
         /// synthetic cache key, which contains '#').</summary>
         private static string PersistablePath(string? p) =>
-            !string.IsNullOrEmpty(p) && !p.Contains('#') ? p : "";
+            !string.IsNullOrEmpty(p) && !p.Contains('#') ? GameEditor.Framework.Assets.AssetDatabase.Current(p) : "";   // where the file is now, if it was moved since the material was loaded
 
         public static string Serialize(PbrMaterial m)
         {

@@ -69,6 +69,46 @@ namespace GameEditor.Framework.Assets
             return null;
         }
 
+        /// <summary>
+        /// The text with every key a file had before it was moved in this session replaced by the key it has now
+        /// (<see cref="AssetDatabase.Current"/>) — for what is held in memory, which no table speaks for. Returns
+        /// the same text when it holds no such key.
+        /// </summary>
+        public static string Current(string json)
+        {
+            if (!AssetDatabase.HasMoves) return json;
+            Dictionary<string, string>? moved = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                Find(doc.RootElement, ref moved);
+            }
+            catch (JsonException) { return json; }
+            return moved == null ? json : Rewrite(json, moved);
+
+            static void Find(JsonElement e, ref Dictionary<string, string>? moved)
+            {
+                switch (e.ValueKind)
+                {
+                    case JsonValueKind.Object:
+                        foreach (var p in e.EnumerateObject()) Find(p.Value, ref moved);
+                        break;
+                    case JsonValueKind.Array:
+                        foreach (var item in e.EnumerateArray()) Find(item, ref moved);
+                        break;
+                    case JsonValueKind.String:
+                        string? value = e.GetString();
+                        if (string.IsNullOrEmpty(value)) break;
+                        int hash = value.IndexOf('#');
+                        string key = hash < 0 ? value : value.Substring(0, hash);
+                        if (key.Length == 0 || (moved != null && moved.ContainsKey(key))) break;
+                        string now = AssetDatabase.Current(key);
+                        if (now != key) (moved ??= new Dictionary<string, string>(StringComparer.Ordinal))[key] = now;
+                        break;
+                }
+            }
+        }
+
         // The text again with the moved keys replaced: in every text value, and in the names of the table's lines.
         private static string Rewrite(string json, Dictionary<string, string> moved)
         {
@@ -136,12 +176,16 @@ namespace GameEditor.Framework.Assets
         /// no asset gets no table. Nothing else in the text changes: the table is the root's last member, laid
         /// out as the text is (on one line, or indented). Returns the same text when the table is right already.
         /// </summary>
-        public static string Stamp(string json)
+        /// <param name="keep">For a file as it lies on disk, which may name files by keys they had before they were
+        /// moved: every line it has stays as it is, and only lines that are missing are added.</param>
+        public static string Stamp(string json, bool keep = false)
         {
             Dictionary<string, string>? old = ReadTable(json);
             if (AssetDatabase.IsEmpty && old == null) return json;
 
             var table = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            if (keep && old != null)
+                foreach (var line in old) table[line.Key] = line.Value;
             try
             {
                 using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });

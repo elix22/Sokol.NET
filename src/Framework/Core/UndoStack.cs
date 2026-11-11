@@ -15,6 +15,9 @@ namespace GameEditor.Framework.Core
         private static readonly Stack<IEditorCommand> _undo = new();
         private static readonly Stack<IEditorCommand> _redo = new();
 
+        /// <summary>Raised after an <see cref="Undo"/> or a <see cref="Redo"/> was applied.</summary>
+        public static event System.Action? Applied;
+
         public static bool CanUndo => _undo.Count > 0;
         public static bool CanRedo => _redo.Count > 0;
 
@@ -62,6 +65,7 @@ namespace GameEditor.Framework.Core
             cmd.Undo();
             _redo.Push(cmd);
             Logger.Info($"Undo: {cmd.Description}");
+            Applied?.Invoke();
         }
 
         public static void Redo()
@@ -71,6 +75,7 @@ namespace GameEditor.Framework.Core
             cmd.Execute();
             _undo.Push(cmd);
             Logger.Info($"Redo: {cmd.Description}");
+            Applied?.Invoke();
         }
 
         /// <summary>Discard all history — call on scene load / new scene.</summary>
