@@ -178,6 +178,10 @@ namespace GameEditor.Framework.Scripting
                                         m31, m32, m33, m34, m41, m42, m43, m44);
             }
 
+            // A prefab, by its key (its path below Assets): "Prefabs/Bullet.prefab"
+            if (t == typeof(Prefab))
+                return s.Length > 0 ? PrefabLibrary.Get(s) : null;
+
             // Enum
             if (t.IsEnum)
                 return Enum.TryParse(t, s, ignoreCase: true, out object? ev) ? ev : null;
@@ -209,6 +213,25 @@ namespace GameEditor.Framework.Scripting
 
         /// <summary>Called when this entity exits a trigger volume.</summary>
         public virtual void OnTriggerExit(Entity other) { }
+
+        // ── Prefabs: entities that come and go while the game runs ───────────
+
+        /// <summary>
+        /// Places an instance of a prefab in the scene — its entities with their bodies and scripts — and returns
+        /// its root. <paramref name="position"/> and <paramref name="rotation"/> are the root's: in the world, or
+        /// under <paramref name="parent"/> when one is given. The instance's scripts start (OnStart) before their
+        /// first OnUpdate, in the next frame, so it can be set up here first.
+        /// A prefab comes from a public <see cref="Prefab"/> field (the Inspector shows a picker for it), or from
+        /// <see cref="Prefabs.Load"/>. Returns <see cref="Entity.Null"/> when there is none.
+        /// </summary>
+        protected Entity Instantiate(Prefab? prefab, Vector3 position, Quaternion rotation, Entity? parent = null)
+            => SceneManager.Instantiate(prefab, position, rotation, parent);
+
+        /// <summary>
+        /// Takes an entity out of the scene at the end of this frame, with everything under it: OnDestroy runs on
+        /// its scripts and its bodies leave the physics world. <c>Destroy(EntityId)</c> removes this script's own entity.
+        /// </summary>
+        protected void Destroy(Entity entity) => SceneManager.Destroy(entity);
 
         // ── Physics helpers (Unity/Godot-style convenience) ────────────────
 

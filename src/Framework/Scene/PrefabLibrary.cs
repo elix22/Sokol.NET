@@ -94,6 +94,15 @@ namespace GameEditor.Framework.Scene
         /// <summary>True when the prefab's text was handed over with <see cref="Put"/>.</summary>
         public static bool HasText(string key) => _texts.ContainsKey(key);
 
+        /// <summary>
+        /// True when <see cref="Get"/> has something to read for the key: it is loaded, its text was handed over,
+        /// or its file is there (<see cref="Reader"/>, the open project's Assets folder). False on a platform that
+        /// reads files asynchronously until the text was handed over — asking <see cref="Get"/> then would only
+        /// record that the prefab is missing.
+        /// </summary>
+        public static bool CanRead(string key)
+            => _loaded.ContainsKey(key) || _texts.ContainsKey(key) || Reader?.Invoke(key) != null || ReadProjectFile(key) != null;
+
         /// <summary>The loaded prefab, or null when its file is missing, is not a prefab, or holds an instance
         /// that cannot be loaded (<see cref="ErrorOf"/> says which).</summary>
         public static Prefab? Get(string key) => Get(key, null);

@@ -157,16 +157,26 @@ namespace GameEditor.Framework.Scene
                 if (status == SFileLoadStatus.Success)
                 {
                     string json = System.Text.Encoding.UTF8.GetString(buffer);
-                    EventBus.RaiseSceneUnloaded();
-                    ActiveScene ??= new Scene("Untitled");
-                    SceneSerializer.Deserialize(json, ActiveScene);
-                    ActiveScene.FilePath = null; // Loaded from assets, not a file path
-                    ActiveScene.IsDirty = false;
-                    PreloadSceneMeshes();
-                    PreloadSceneMaterials();
-                    EventBus.RaiseSceneLoaded();
-                    UndoStack.Clear();
-                    Logger.Info($"Scene loaded from assets: {assetPath}");
+                    // Files are read asynchronously here, and a scene resolves its prefab instances while it is
+                    // read: the prefabs it names — placed in it, or in a script's field — are read first, and
+                    // the prefabs those hold. A scene that names none goes on at once.
+                    Prefabs.LoadNamedIn(json, loaded =>
+                    {
+                        EventBus.RaiseSceneUnloaded();
+                        ActiveScene ??= new Scene("Untitled");
+                        SceneSerializer.Deserialize(json, ActiveScene);
+                        ActiveScene.FilePath = null; // Loaded from assets, not a file path
+                        ActiveScene.IsDirty = false;
+                        PreloadSceneMeshes();
+                        PreloadSceneMaterials();
+                        // A prefab that only a script places has no entity in the scene yet: its meshes and
+                        // materials are asked for now, so Instantiate has them.
+                        foreach (string key in loaded)
+                            if (PrefabLibrary.Get(key) is { } prefab) PreloadPrefabAssets(prefab);
+                        EventBus.RaiseSceneLoaded();
+                        UndoStack.Clear();
+                        Logger.Info($"Scene loaded from assets: {assetPath}");
+                    });
                 }
                 else
                 {
@@ -241,6 +251,7 @@ namespace GameEditor.Framework.Scene
 
             // Destroy all running scripts
             ScriptSystem.StopAll();
+            _destroyQueue.Clear();   // the whole scene goes back to the snapshot
 
             // Shutdown physics
             ShutdownPhysics();
@@ -260,6 +271,139 @@ namespace GameEditor.Framework.Scene
             }
 
             UndoStack.Clear();
+        }
+
+        // ── Entities that come and go while the scene runs ───────────────────────────────
+
+        // Entities handed to Destroy, until the end of the frame.
+        private static readonly List<Entity> _destroyQueue = new();
+
+        /// <summary>
+        /// Places an instance of a prefab in the running scene: its entities, their rigid bodies, character
+        /// controllers and vehicles, and their scripts — whose <see cref="GameBehaviour.OnStart"/> runs before
+        /// their first <see cref="GameBehaviour.OnUpdate"/>, at the top of the next frame's script pass.
+        /// <paramref name="position"/> and <paramref name="rotation"/> are the root's: in the world, or under
+        /// <paramref name="parent"/> when one is given. Returns the root, or <see cref="Entity.Null"/> when the
+        /// prefab cannot be loaded (the log says why).
+        /// With a physics backend other than the built-in one the entities get no body.
+        /// </summary>
+        public static Entity Instantiate(Prefab? prefab, Vector3 position, Quaternion rotation, Entity? parent = null)
+        {
+            if (prefab == null)
+            {
+                Logger.Warning("[SceneManager] Instantiate: no prefab (a script's prefab field is empty, or the prefab was not loaded).");
+                return Entity.Null;
+            }
+            var created = new List<Entity>();
+            Entity root = SceneSerializer.InstantiatePrefab(prefab.Key, out string? error, created);
+            if (root.IsNull)
+            {
+                Logger.Warning($"[SceneManager] Instantiate: {error}");
+                return root;
+            }
+
+            var world = ECSWorld.Instance;
+            world.TryGetComponent<Transform>(root, out var tr);
+            tr.Position = position;
+            tr.Rotation = rotation;
+            tr.Parent = parent is { IsNull: false } p && p.IsAlive ? p : null;
+            world.AddComponent(root, tr);
+
+            foreach (Entity e in created) PreloadEntityAssets(world, e);
+
+            if (PlayMode != PlayModeState.Stopped)
+            {
+                if (_physics != null)
+                {
+                    // In Play's order: every body before the constraints that join them.
+                    foreach (Entity e in created) CreateBody(world, e);
+                    foreach (Entity e in created) CreateConstraint(world, e);
+                    foreach (Entity e in created) CreateCharacter(world, e);
+                    foreach (Entity e in created) CreateVehicle(world, e);
+                }
+                ScriptSystem.AddEntities(world, created);
+            }
+            return root;
+        }
+
+        /// <summary>
+        /// Takes an entity out of the running scene at the end of the frame, with everything under it: its
+        /// scripts get <see cref="GameBehaviour.OnDestroy"/>, its bodies leave the physics world. Until then the
+        /// entity is alive and updates as before. Works on any entity, placed by <see cref="Instantiate"/> or not.
+        /// </summary>
+        public static void Destroy(Entity entity)
+        {
+            if (entity.IsNull || !entity.IsAlive) return;
+            // Searched by hand: List<Entity>.Contains traps in a web build (see ECSWorld.RemoveChildLink).
+            foreach (Entity queued in _destroyQueue)
+                if (queued == entity) return;
+            _destroyQueue.Add(entity);
+        }
+
+        /// <summary>
+        /// Removes the entities handed to <see cref="Destroy"/>. Called by <see cref="ScriptSystem.UpdateAll"/>
+        /// when the frame's script pass is over.
+        /// </summary>
+        public static void FlushDestroyed()
+        {
+            var world = ECSWorld.Instance;
+            // An OnDestroy may hand over more entities: go on until none is left.
+            while (_destroyQueue.Count > 0)
+            {
+                // Each entity with what is under it, a parent before its children.
+                var doomed = new List<Entity>();
+                var seen = new HashSet<Entity>();
+                foreach (Entity root in _destroyQueue)
+                {
+                    if (!root.IsAlive || !seen.Add(root)) continue;
+                    doomed.Add(root);
+                    for (int i = doomed.Count - 1; i < doomed.Count; i++)
+                        foreach (Entity child in world.GetChildren(doomed[i]))
+                            if (child.IsAlive && seen.Add(child)) doomed.Add(child);
+                }
+                _destroyQueue.Clear();
+                if (doomed.Count == 0) continue;
+
+                foreach (Entity e in doomed) ScriptSystem.RemoveEntity(e);   // while their components are still there
+                if (_physics != null) DestroyPhysicsOf(world, doomed, seen);
+                foreach (Entity e in doomed)
+                    if (e.IsAlive) world.DestroyEntity(e);                   // the world takes the children with a parent
+            }
+        }
+
+        // Takes the entities' constraints, character controllers, vehicles and bodies out of the physics world.
+        static void DestroyPhysicsOf(ECSWorld world, List<Entity> entities, HashSet<Entity> set)
+        {
+            // Constraints first: those on the entities, and those of any entity that hold one of their bodies.
+            bool anyBody = false;
+            foreach (Entity e in entities) anyBody |= _entityToHandle.ContainsKey(e);
+            foreach (Entity e in anyBody ? (IEnumerable<Entity>)world.Entities : entities)
+            {
+                if (!world.TryGetComponent<ConstraintComponent>(e, out var cc) || !cc.RuntimeHandle.IsValid) continue;
+                if (!set.Contains(e) && !set.Contains(cc.BodyA) && !set.Contains(cc.BodyB)) continue;
+                _physics!.DestroyConstraint(cc.RuntimeHandle);
+                cc.RuntimeHandle = ConstraintHandle.Invalid;
+                world.AddComponent(e, cc);
+            }
+
+            foreach (Entity e in entities)
+            {
+                if (_entityToCharHandle.Remove(e, out var character))
+                {
+                    _physics!.DestroyCharacter(character);
+                    _charHandleToEntity.Remove(character.Value);
+                }
+                if (_entityToVehicleHandle.Remove(e, out var vehicle))
+                {
+                    _physics!.DestroyVehicle(vehicle);
+                    _vehicleHandleToEntity.Remove(vehicle.Value);
+                }
+                if (_entityToHandle.Remove(e, out var body))
+                {
+                    _physics!.DestroyBody(body);
+                    _handleToEntity.Remove(body.Value);
+                }
+            }
         }
 
         /// <summary>
@@ -342,6 +486,12 @@ namespace GameEditor.Framework.Scene
                 ECSWorld.Instance.AddComponent(id, mr);
             }
 
+            LoadMtlAsset(relPath);
+        }
+
+        /// <summary>Loads a <c>.mtl</c> file by its Assets-relative path: at once on desktop, when it arrives on web and phones.</summary>
+        private static void LoadMtlAsset(string relPath)
+        {
             // The registry key must be just the filename so it matches sub.MaterialKey
             // ("mtllib#materialName" where mtllib is the OBJ's raw mtllib filename).
             string mtlFileName = System.IO.Path.GetFileName(relPath);
@@ -396,15 +546,59 @@ namespace GameEditor.Framework.Scene
         private static void PreloadSceneMaterials()
         {
             var world = ECSWorld.Instance;
-            foreach (Entity id in world.Entities)
-            {
-                if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) continue;
-                if (string.IsNullOrEmpty(mr.MaterialPath)) continue;
-                if (!mr.MaterialPath.EndsWith(".mtl", StringComparison.OrdinalIgnoreCase) &&
-                    !mr.MaterialPath.EndsWith(PbrMaterialSerializer.Extension, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (Entity id in world.Entities) PreloadMaterialOf(world, id);
+        }
 
-                // Reuse the same normalization + load logic as OnComponentChanged.
-                OnComponentChanged(id, nameof(MeshRenderer));
+        private static void PreloadMaterialOf(ECSWorld world, Entity id)
+        {
+            if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) return;
+            if (string.IsNullOrEmpty(mr.MaterialPath)) return;
+            if (!mr.MaterialPath.EndsWith(".mtl", StringComparison.OrdinalIgnoreCase) &&
+                !mr.MaterialPath.EndsWith(PbrMaterialSerializer.Extension, StringComparison.OrdinalIgnoreCase)) return;
+
+            // Reuse the same normalization + load logic as OnComponentChanged.
+            OnComponentChanged(id, nameof(MeshRenderer));
+        }
+
+        /// <summary>
+        /// Asks for the mesh and the material of an entity that came into the scene while it runs (an instance
+        /// placed by <see cref="Instantiate"/>). What is loaded already is not read again, so placing the
+        /// hundredth bullet costs no file.
+        /// </summary>
+        private static void PreloadEntityAssets(ECSWorld world, Entity id)
+        {
+            PreloadMeshOf(world, id);
+            if (world.TryGetComponent<MeshRenderer>(id, out var mr) && !string.IsNullOrEmpty(mr.MaterialPath) &&
+                mr.MaterialPath.EndsWith(".mtl", StringComparison.OrdinalIgnoreCase) &&
+                RenderingServer.Materials.GetFirstIdByMtlFile(mr.MaterialPath) != 0) return;   // that .mtl is loaded
+            PreloadMaterialOf(world, id);
+        }
+
+        /// <summary>
+        /// Asks for the meshes and materials a prefab's entities name, without placing it — so that a later
+        /// <see cref="Instantiate"/> finds them loaded (on the web and on phones files arrive some frames
+        /// after they are asked for).
+        /// </summary>
+        internal static void PreloadPrefabAssets(Prefab prefab)
+        {
+            foreach (PrefabEntity entity in prefab.Entities)
+            {
+                if (entity.Components.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                if (!entity.Components.TryGetProperty("MeshRenderer", out var mr) || mr.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+
+                if (mr.TryGetProperty("Path", out var pathEl) && pathEl.GetString() is { Length: > 0 } mesh &&
+                    !mesh.StartsWith("prim:", StringComparison.Ordinal) &&
+                    !mesh.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal) &&
+                    ToAssetsRelativePath(mesh) is { } meshRel)
+                    PreloadMesh(meshRel);
+
+                if (mr.TryGetProperty("Mat", out var matEl) && matEl.GetString() is { Length: > 0 } material &&
+                    ToAssetsRelativePath(material) is { } materialRel)
+                {
+                    if (materialRel.EndsWith(PbrMaterialSerializer.Extension, StringComparison.OrdinalIgnoreCase)) LoadPbrMaterialAsset(materialRel);
+                    else if (materialRel.EndsWith(".mtl", StringComparison.OrdinalIgnoreCase) &&
+                             RenderingServer.Materials.GetFirstIdByMtlFile(materialRel) == 0) LoadMtlAsset(materialRel);
+                }
             }
         }
 
@@ -413,76 +607,7 @@ namespace GameEditor.Framework.Scene
         private static void PreloadSceneMeshes()
         {
             var world = ECSWorld.Instance;
-            foreach (Entity id in world.Entities)
-            {
-                if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) continue;
-                if (string.IsNullOrEmpty(mr.MeshPath)) continue;
-                if (mr.MeshPath.StartsWith("prim:", StringComparison.Ordinal)) continue;
-                if (mr.MeshPath.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal)) continue;
-
-                // Normalize to Assets-relative so the stored path is portable.
-                string? relPath = ToAssetsRelativePath(mr.MeshPath);
-                if (relPath == null)
-                {
-                    Logger.Warning($"[SceneManager] Cannot resolve mesh path: '{mr.MeshPath}'");
-                    continue;
-                }
-
-                if (mr.MeshPath != relPath)
-                {
-                    mr.MeshPath = relPath;
-                    world.AddComponent(id, mr);
-                }
-
-                string path = relPath;
-                if (RenderingServer.Meshes.GetByPath(path) != null) continue;
-
-                // glTF/GLB resource key ("<file>.glb#m{i}p{j}"): re-register the file's meshes,
-                // materials, and textures (NOT entities — those are already deserialized). One
-                // preload per unique file covers every primitive it references.
-                int hashIdx = path.IndexOf('#');
-                if (hashIdx > 0)
-                {
-                    string gltfFile = path.Substring(0, hashIdx);
-                    if (gltfFile.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ||
-                        gltfFile.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (_pendingGltfPreloads.Add(gltfFile))
-                        {
-                            string captured = gltfFile;
-                            RenderingServer.PreloadGltfAsync(captured, () => _pendingGltfPreloads.Remove(captured));
-                        }
-                        continue;
-                    }
-                }
-
-                if (_pendingMeshLoads.Contains(path)) continue;
-
-                // Try desktop sync path first (resolves relative → absolute via ProjectFolder).
-                string? absPath = ToAbsoluteDesktopPath(path);
-                if (absPath != null && System.IO.File.Exists(absPath))
-                {
-                    RenderingServer.Meshes.Load(path, System.IO.File.ReadAllBytes(absPath));
-                    TryLoadMeshMtlDesktop(path);
-                }
-                else
-                {
-                    // Web / mobile: async load using the Assets-relative path.
-                    _pendingMeshLoads.Add(path);
-                    string captured = path;
-                    SFilesystem.LoadFileAsync(path, (_, buffer, status) =>
-                    {
-                        _pendingMeshLoads.Remove(captured);
-                        if (status == SFileLoadStatus.Success && buffer != null)
-                        {
-                            RenderingServer.Meshes.Load(captured, buffer);
-                            TryLoadMeshMtlAsync(captured);
-                        }
-                        else
-                            Logger.Warning($"[SceneManager] Failed to load mesh: '{captured}'");
-                    });
-                }
-            }
+            foreach (Entity id in world.Entities) PreloadMeshOf(world, id);
 
             // Skinned characters: re-import each referenced glTF once so SkinnedCharacterRegistry is
             // repopulated on a cold scene load (the deserialized SkinnedMeshRenderer entities resolve
@@ -502,6 +627,83 @@ namespace GameEditor.Framework.Scene
                 if (!_pendingGltfPreloads.Add(file)) continue;
                 string captured = file;
                 RenderingServer.PreloadGltfAsync(captured, () => _pendingGltfPreloads.Remove(captured));
+            }
+        }
+
+        /// <summary>Asks for the mesh an entity's MeshRenderer names, when it is a file that is not loaded yet.</summary>
+        private static void PreloadMeshOf(ECSWorld world, Entity id)
+        {
+            if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) return;
+            if (string.IsNullOrEmpty(mr.MeshPath)) return;
+            if (mr.MeshPath.StartsWith("prim:", StringComparison.Ordinal)) return;
+            if (mr.MeshPath.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal)) return;
+
+            // Normalize to Assets-relative so the stored path is portable.
+            string? relPath = ToAssetsRelativePath(mr.MeshPath);
+            if (relPath == null)
+            {
+                Logger.Warning($"[SceneManager] Cannot resolve mesh path: '{mr.MeshPath}'");
+                return;
+            }
+
+            if (mr.MeshPath != relPath)
+            {
+                mr.MeshPath = relPath;
+                world.AddComponent(id, mr);
+            }
+
+            PreloadMesh(relPath);
+        }
+
+        /// <summary>Asks for a mesh file by its Assets-relative path, unless it is loaded or on its way.</summary>
+        private static void PreloadMesh(string path)
+        {
+            if (RenderingServer.Meshes.GetByPath(path) != null) return;
+
+            // glTF/GLB resource key ("<file>.glb#m{i}p{j}"): re-register the file's meshes,
+            // materials, and textures (NOT entities — those are already deserialized). One
+            // preload per unique file covers every primitive it references.
+            int hashIdx = path.IndexOf('#');
+            if (hashIdx > 0)
+            {
+                string gltfFile = path.Substring(0, hashIdx);
+                if (gltfFile.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ||
+                    gltfFile.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_pendingGltfPreloads.Add(gltfFile))
+                    {
+                        string captured = gltfFile;
+                        RenderingServer.PreloadGltfAsync(captured, () => _pendingGltfPreloads.Remove(captured));
+                    }
+                    return;
+                }
+            }
+
+            if (_pendingMeshLoads.Contains(path)) return;
+
+            // Try desktop sync path first (resolves relative → absolute via ProjectFolder).
+            string? absPath = ToAbsoluteDesktopPath(path);
+            if (absPath != null && System.IO.File.Exists(absPath))
+            {
+                RenderingServer.Meshes.Load(path, System.IO.File.ReadAllBytes(absPath));
+                TryLoadMeshMtlDesktop(path);
+            }
+            else
+            {
+                // Web / mobile: async load using the Assets-relative path.
+                _pendingMeshLoads.Add(path);
+                string captured = path;
+                SFilesystem.LoadFileAsync(path, (_, buffer, status) =>
+                {
+                    _pendingMeshLoads.Remove(captured);
+                    if (status == SFileLoadStatus.Success && buffer != null)
+                    {
+                        RenderingServer.Meshes.Load(captured, buffer);
+                        TryLoadMeshMtlAsync(captured);
+                    }
+                    else
+                        Logger.Warning($"[SceneManager] Failed to load mesh: '{captured}'");
+                });
             }
         }
 
@@ -1012,147 +1214,158 @@ namespace GameEditor.Framework.Scene
             _physics.SetCollisionListener(new PhysicsCollisionDispatcher());
 
             var world = ECSWorld.Instance;
-            foreach (Entity entity in world.Entities)
-            {
-                if (!world.TryGetComponent<RigidbodyComponent>(entity, out var rb)) continue;
-                if (!world.TryGetComponent<Transform>(entity, out var tr)) continue;
-
-                // Build the shapes list, populating geometry for ConvexHull/Mesh from the mesh renderer.
-                var shapes = rb.Shapes != null
-                    ? new List<ShapeEntry>(rb.Shapes)
-                    : new List<ShapeEntry> { ShapeEntry.Default() };
-
-                if (world.TryGetComponent<MeshRenderer>(entity, out var mr) &&
-                    PrimitiveMeshSpec.TryParse(mr.MeshPath, out var spec))
-                {
-                    for (int i = 0; i < shapes.Count; i++)
-                    {
-                        var entry = shapes[i];
-                        if (entry.Shape == ColliderShape.ConvexHull && entry.MeshVertices == null)
-                        {
-                            entry.MeshVertices = PrimitiveMeshGeometry.GetHullPoints(spec);
-                            shapes[i] = entry;
-                        }
-                        else if (entry.Shape == ColliderShape.Mesh && entry.MeshVertices == null)
-                        {
-                            (entry.MeshVertices, entry.MeshIndices) = PrimitiveMeshGeometry.GetMeshTriangles(spec);
-                            shapes[i] = entry;
-                        }
-                    }
-                }
-
-                // Child entities store local position/rotation; Jolt needs world-space.
-                var worldPos = GetEntityWorldPosition(world, tr);
-                var worldRot = GetEntityWorldRotation(world, tr);
-
-                var desc = new BodyDesc(
-                    worldPos, worldRot, tr.Scale,
-                    rb.MotionType, rb.Mass, rb.UseGravity, shapes,
-                    rb.Friction, rb.Restitution, rb.LinearDamping, rb.AngularDamping,
-                    rb.IsTrigger, rb.Layer, rb.LayerMask);
-
-                var handle = _physics.CreateBody(desc);
-                _entityToHandle[entity] = handle;
-                _handleToEntity[handle.Value] = entity;
-            }
+            foreach (Entity entity in world.Entities) CreateBody(world, entity);
 
             Logger.Info($"[SceneManager] Physics initialized. {_entityToHandle.Count} bodies created.");
 
             // Create constraints after all bodies are registered.
-            foreach (Entity entity in world.Entities)
-            {
-                if (!world.TryGetComponent<ConstraintComponent>(entity, out var cc)) continue;
-
-                _entityToHandle.TryGetValue(cc.BodyA, out var handleA);
-                _entityToHandle.TryGetValue(cc.BodyB, out var handleB);
-                if (!handleA.IsValid || !handleB.IsValid) continue;
-
-                var cdesc = new ConstraintDesc(
-                    cc.Type,
-                    handleA, handleB,
-                    cc.LocalAnchorA, cc.LocalAnchorB,
-                    cc.LocalAxisA, cc.LocalAxisB,
-                    cc.MinLimit, cc.MaxLimit);
-
-                var ch = _physics.CreateConstraint(cdesc);
-                cc.RuntimeHandle = ch;
-                world.AddComponent(entity, cc);
-            }
+            foreach (Entity entity in world.Entities) CreateConstraint(world, entity);
 
             // Create character controllers.
-            foreach (Entity entity in world.Entities)
-            {
-                if (!world.TryGetComponent<CharacterComponent>(entity, out var cc)) continue;
-                if (!world.TryGetComponent<Transform>(entity, out var tr)) continue;
-
-                var charDesc = new CharacterDesc
-                {
-                    Position           = tr.Position,
-                    Rotation           = tr.Rotation,
-                    Height             = cc.Height,
-                    Radius             = cc.Radius,
-                    MaxSlopeAngle      = cc.MaxSlopeAngle,
-                    MaxStrength        = cc.MaxStrength,
-                    Mass               = cc.Mass,
-                    Friction           = cc.Friction,
-                    GravityFactor      = cc.GravityFactor,
-                    CollisionTolerance = cc.CollisionTolerance,
-                    ShapeOffset        = cc.ShapeOffset,
-                    IsKinematic        = cc.Mode == CharacterMode.Kinematic,
-                    Layer              = cc.Layer,
-                    LayerMask          = cc.LayerMask,
-                };
-                var charHandle = _physics.CreateCharacter(charDesc);
-                _entityToCharHandle[entity] = charHandle;
-                _charHandleToEntity[charHandle.Value] = entity;
-            }
+            foreach (Entity entity in world.Entities) CreateCharacter(world, entity);
 
             // Create vehicle controllers.
-            foreach (Entity entity in world.Entities)
-            {
-                if (!world.TryGetComponent<VehicleComponent>(entity, out var vc)) continue;
-                if (!world.TryGetComponent<Transform>(entity, out var tr)) continue;
+            foreach (Entity entity in world.Entities) CreateVehicle(world, entity);
+        }
 
-                var wheels = new VehicleWheelDesc[vc.Wheels.Length];
-                for (int i = 0; i < vc.Wheels.Length; i++)
+        // What Play makes for each entity of the scene, and Instantiate for the entities it places: a rigid body,
+        // a constraint, a character controller, a vehicle. Each does nothing for an entity without the component.
+
+        static void CreateBody(ECSWorld world, Entity entity)
+        {
+            if (!world.TryGetComponent<RigidbodyComponent>(entity, out var rb)) return;
+            if (!world.TryGetComponent<Transform>(entity, out var tr)) return;
+
+            // Build the shapes list, populating geometry for ConvexHull/Mesh from the mesh renderer.
+            var shapes = rb.Shapes != null
+                ? new List<ShapeEntry>(rb.Shapes)
+                : new List<ShapeEntry> { ShapeEntry.Default() };
+
+            if (world.TryGetComponent<MeshRenderer>(entity, out var mr) &&
+                PrimitiveMeshSpec.TryParse(mr.MeshPath, out var spec))
+            {
+                for (int i = 0; i < shapes.Count; i++)
                 {
-                    var w = vc.Wheels[i];
-                    wheels[i] = new VehicleWheelDesc
+                    var entry = shapes[i];
+                    if (entry.Shape == ColliderShape.ConvexHull && entry.MeshVertices == null)
                     {
-                        LocalPosition     = w.Position,
-                        Radius            = w.Radius,
-                        Width             = w.Width,
-                        SuspMinLength     = w.SuspMinLength,
-                        SuspMaxLength     = w.SuspMaxLength,
-                        SuspFrequency     = w.SuspFrequency,
-                        SuspDamping       = w.SuspDamping,
-                        MaxSteerAngle     = w.MaxSteerAngle,
-                        MaxHandBrakeTorque = w.MaxHandBrakeTorque,
-                        IsDriven          = w.IsDriven,
-                    };
+                        entry.MeshVertices = PrimitiveMeshGeometry.GetHullPoints(spec);
+                        shapes[i] = entry;
+                    }
+                    else if (entry.Shape == ColliderShape.Mesh && entry.MeshVertices == null)
+                    {
+                        (entry.MeshVertices, entry.MeshIndices) = PrimitiveMeshGeometry.GetMeshTriangles(spec);
+                        shapes[i] = entry;
+                    }
                 }
-                var vdesc = new VehicleDesc
-                {
-                    Type              = vc.Type,
-                    Position          = tr.Position,
-                    Rotation          = tr.Rotation,
-                    ChassisHalfExtent = vc.ChassisHalfExtent,
-                    Mass              = vc.Mass,
-                    COMOffsetY        = vc.COMOffsetY,
-                    MaxEngineTorque   = vc.MaxEngineTorque,
-                    ClutchStrength    = vc.ClutchStrength,
-                    MaxRollAngle      = vc.MaxRollAngle,
-                    Friction          = vc.Friction,
-                    Wheels            = wheels,
-                    Layer             = vc.Layer,
-                    LayerMask         = vc.LayerMask,
-                };
-                var vHandle = _physics!.CreateVehicle(vdesc);
-                vc.RuntimeHandle = vHandle;
-                world.AddComponent(entity, vc);
-                _entityToVehicleHandle[entity] = vHandle;
-                _vehicleHandleToEntity[vHandle.Value] = entity;
             }
+
+            // Child entities store local position/rotation; Jolt needs world-space.
+            var worldPos = GetEntityWorldPosition(world, tr);
+            var worldRot = GetEntityWorldRotation(world, tr);
+
+            var desc = new BodyDesc(
+                worldPos, worldRot, tr.Scale,
+                rb.MotionType, rb.Mass, rb.UseGravity, shapes,
+                rb.Friction, rb.Restitution, rb.LinearDamping, rb.AngularDamping,
+                rb.IsTrigger, rb.Layer, rb.LayerMask);
+
+            var handle = _physics!.CreateBody(desc);
+            _entityToHandle[entity] = handle;
+            _handleToEntity[handle.Value] = entity;
+        }
+
+        static void CreateConstraint(ECSWorld world, Entity entity)
+        {
+            if (!world.TryGetComponent<ConstraintComponent>(entity, out var cc)) return;
+
+            _entityToHandle.TryGetValue(cc.BodyA, out var handleA);
+            _entityToHandle.TryGetValue(cc.BodyB, out var handleB);
+            if (!handleA.IsValid || !handleB.IsValid) return;
+
+            var cdesc = new ConstraintDesc(
+                cc.Type,
+                handleA, handleB,
+                cc.LocalAnchorA, cc.LocalAnchorB,
+                cc.LocalAxisA, cc.LocalAxisB,
+                cc.MinLimit, cc.MaxLimit);
+
+            var ch = _physics!.CreateConstraint(cdesc);
+            cc.RuntimeHandle = ch;
+            world.AddComponent(entity, cc);
+        }
+
+        static void CreateCharacter(ECSWorld world, Entity entity)
+        {
+            if (!world.TryGetComponent<CharacterComponent>(entity, out var cc)) return;
+            if (!world.TryGetComponent<Transform>(entity, out var tr)) return;
+
+            var charDesc = new CharacterDesc
+            {
+                Position           = tr.Position,
+                Rotation           = tr.Rotation,
+                Height             = cc.Height,
+                Radius             = cc.Radius,
+                MaxSlopeAngle      = cc.MaxSlopeAngle,
+                MaxStrength        = cc.MaxStrength,
+                Mass               = cc.Mass,
+                Friction           = cc.Friction,
+                GravityFactor      = cc.GravityFactor,
+                CollisionTolerance = cc.CollisionTolerance,
+                ShapeOffset        = cc.ShapeOffset,
+                IsKinematic        = cc.Mode == CharacterMode.Kinematic,
+                Layer              = cc.Layer,
+                LayerMask          = cc.LayerMask,
+            };
+            var charHandle = _physics!.CreateCharacter(charDesc);
+            _entityToCharHandle[entity] = charHandle;
+            _charHandleToEntity[charHandle.Value] = entity;
+        }
+
+        static void CreateVehicle(ECSWorld world, Entity entity)
+        {
+            if (!world.TryGetComponent<VehicleComponent>(entity, out var vc)) return;
+            if (!world.TryGetComponent<Transform>(entity, out var tr)) return;
+
+            var wheels = new VehicleWheelDesc[vc.Wheels.Length];
+            for (int i = 0; i < vc.Wheels.Length; i++)
+            {
+                var w = vc.Wheels[i];
+                wheels[i] = new VehicleWheelDesc
+                {
+                    LocalPosition     = w.Position,
+                    Radius            = w.Radius,
+                    Width             = w.Width,
+                    SuspMinLength     = w.SuspMinLength,
+                    SuspMaxLength     = w.SuspMaxLength,
+                    SuspFrequency     = w.SuspFrequency,
+                    SuspDamping       = w.SuspDamping,
+                    MaxSteerAngle     = w.MaxSteerAngle,
+                    MaxHandBrakeTorque = w.MaxHandBrakeTorque,
+                    IsDriven          = w.IsDriven,
+                };
+            }
+            var vdesc = new VehicleDesc
+            {
+                Type              = vc.Type,
+                Position          = tr.Position,
+                Rotation          = tr.Rotation,
+                ChassisHalfExtent = vc.ChassisHalfExtent,
+                Mass              = vc.Mass,
+                COMOffsetY        = vc.COMOffsetY,
+                MaxEngineTorque   = vc.MaxEngineTorque,
+                ClutchStrength    = vc.ClutchStrength,
+                MaxRollAngle      = vc.MaxRollAngle,
+                Friction          = vc.Friction,
+                Wheels            = wheels,
+                Layer             = vc.Layer,
+                LayerMask         = vc.LayerMask,
+            };
+            var vHandle = _physics!.CreateVehicle(vdesc);
+            vc.RuntimeHandle = vHandle;
+            world.AddComponent(entity, vc);
+            _entityToVehicleHandle[entity] = vHandle;
+            _vehicleHandleToEntity[vHandle.Value] = entity;
         }
 
         /// <summary>

@@ -262,7 +262,11 @@ namespace GameEditor.Framework.ECS
         {
             if (_children.TryGetValue(parent, out var list))
             {
-                list.Remove(child);
+                // By hand, not list.Remove(child): in a web build (Mono AOT for WebAssembly) List<Entity>.Remove,
+                // Contains and IndexOf end in the trap "function signature mismatch" — the search the runtime
+                // picks for an 8-byte struct is not there. Found when a game first destroyed a child entity in a browser.
+                for (int i = 0; i < list.Count; i++)
+                    if (list[i] == child) { list.RemoveAt(i); break; }
                 if (list.Count == 0) _children.Remove(parent);
             }
         }

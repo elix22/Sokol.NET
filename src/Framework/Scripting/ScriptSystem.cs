@@ -31,6 +31,10 @@ namespace GameEditor.Framework.Scripting
         // Active behaviour instances for the running scene
         private static readonly List<(Entity EntityId, GameBehaviour Behaviour)> _running = new();
 
+        // Behaviours of entities that came into the scene during play (SceneManager.Instantiate): OnStart runs at
+        // the top of the next UpdateAll, before their first OnUpdate.
+        private static readonly List<(Entity EntityId, GameBehaviour Behaviour)> _pendingStart = new();
+
         private static bool _started = false;
 
         // ── Factory registration ─────────────────────────────────────────────
@@ -68,6 +72,7 @@ namespace GameEditor.Framework.Scripting
         public static void PopulateFromScene(ECSWorld world)
         {
             _running.Clear();
+            _pendingStart.Clear();
             foreach (Entity id in world.Entities)
             {
                 if (world.TryGetComponent<ScriptComponent>(id, out var sc))
@@ -83,7 +88,45 @@ namespace GameEditor.Framework.Scripting
             Logger.Info($"[ScriptSystem] Populated {_running.Count} behaviour(s) from scene.");
         }
 
-        private static void TryCreateBehaviour(Entity id, ScriptComponent sc)
+        /// <summary>
+        /// Creates the behaviours of entities that came into the scene while it plays (a prefab instance placed by
+        /// <see cref="Scene.SceneManager.Instantiate"/>). Their <see cref="GameBehaviour.OnStart"/> runs at the top
+        /// of the next <see cref="UpdateAll"/>, before their first <see cref="GameBehaviour.OnUpdate"/> — so the
+        /// script that placed them can set them up first. Before play has started they join the scene's own.
+        /// </summary>
+        public static void AddEntities(ECSWorld world, IReadOnlyList<Entity> entities)
+        {
+            var target = _started ? _pendingStart : _running;
+            foreach (Entity id in entities)
+            {
+                if (world.TryGetComponent<ScriptComponent>(id, out var sc))
+                    TryCreateBehaviour(id, sc, target);
+
+                if (world.TryGetComponent<ScriptCollectionComponent>(id, out var extra) && extra.Scripts != null)
+                    foreach (var item in extra.Scripts)
+                        TryCreateBehaviour(id, item, target);
+            }
+        }
+
+        /// <summary>
+        /// Ends the behaviours of an entity that leaves the scene during play: <see cref="GameBehaviour.OnDestroy"/>
+        /// for each one that has started, then they are forgotten. Not to be called while behaviours are being
+        /// updated — <see cref="Scene.SceneManager.Destroy"/> waits for the end of the frame for that reason.
+        /// </summary>
+        public static void RemoveEntity(Entity entity)
+        {
+            for (int i = _running.Count - 1; i >= 0; i--)
+            {
+                if (_running[i].EntityId != entity) continue;
+                SafeCall(_running[i].Behaviour, static beh => beh.OnDestroy(), "OnDestroy");
+                _running.RemoveAt(i);
+            }
+            _pendingStart.RemoveAll(entry => entry.EntityId == entity);   // never started: nothing to end
+        }
+
+        private static void TryCreateBehaviour(Entity id, ScriptComponent sc) => TryCreateBehaviour(id, sc, _running);
+
+        private static void TryCreateBehaviour(Entity id, ScriptComponent sc, List<(Entity EntityId, GameBehaviour Behaviour)> target)
         {
             if (string.IsNullOrEmpty(sc.TypeName)) return;
 
@@ -99,7 +142,7 @@ namespace GameEditor.Framework.Scripting
                 behaviour.EntityId = id;
                 if (sc.Properties != null && sc.Properties.Count > 0)
                     behaviour.ApplySerializedProperties(sc.Properties);
-                _running.Add((id, behaviour));
+                target.Add((id, behaviour));
             }
             catch (Exception ex)
             {
@@ -128,11 +171,28 @@ namespace GameEditor.Framework.Scripting
         public static void UpdateAll(float deltaTime)
         {
             if (!_started) return;
-            foreach (var (_, b) in _running)
+
+            // Behaviours placed since the last pass start now. One that places another in its OnStart adds to the
+            // list while it is walked: that one starts in this pass too.
+            for (int i = 0; i < _pendingStart.Count; i++)
+            {
+                var entry = _pendingStart[i];
+                _running.Add(entry);
+                SafeCall(entry.Behaviour, static beh => beh.OnStart(), "OnStart");
+            }
+            _pendingStart.Clear();
+
+            // By index: a behaviour may place entities during the pass (their behaviours wait in _pendingStart),
+            // and nothing leaves the list before the pass is over.
+            int count = _running.Count;
+            for (int i = 0; i < count; i++)
             {
                 float dt = deltaTime;
-                SafeCall(b, beh => beh.OnUpdate(dt), "OnUpdate");
+                SafeCall(_running[i].Behaviour, beh => beh.OnUpdate(dt), "OnUpdate");
             }
+
+            // The end of the frame for scripts: entities handed to Destroy leave now.
+            Scene.SceneManager.FlushDestroyed();
         }
 
         /// <summary>Calls <see cref="GameBehaviour.OnDestroy"/> on all behaviours and clears the list.</summary>
@@ -141,6 +201,7 @@ namespace GameEditor.Framework.Scripting
             foreach (var (_, b) in _running)
                 SafeCall(b, static beh => beh.OnDestroy(), "OnDestroy");
             _running.Clear();
+            _pendingStart.Clear();
             _started = false;
             Logger.Info("[ScriptSystem] Stopped — all behaviours destroyed.");
         }
@@ -229,7 +290,8 @@ namespace GameEditor.Framework.Scripting
                 }
                 else
                 {
-                    value = propertyValue;
+                    // A text stays a text; a vector, an enum or a prefab is read as it is when play starts.
+                    value = GameBehaviour.ParseFieldValue(field.FieldType, propertyValue);
                 }
 
                 if (value != null)
