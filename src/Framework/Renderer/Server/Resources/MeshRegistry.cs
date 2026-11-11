@@ -149,10 +149,12 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         public MeshResource? GetById(ushort id)
             => (id > 0 && id < _byId.Length) ? _byId[id] : null;
 
-        /// <summary>Look up a mesh by file path. Returns null if not loaded.</summary>
+        /// <summary>Look up a mesh by file path. Returns null if not loaded, or when <paramref name="path"/> is null
+        /// (a MeshRenderer with no mesh assigned yet).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public MeshResource? GetByPath(string path)
+        public MeshResource? GetByPath(string? path)
         {
+            if (path == null) return null;
             if (_byPath.TryGetValue(path, out var r))
                 return r;
 
