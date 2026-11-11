@@ -442,6 +442,16 @@ namespace Scene.Tests
             Assert.Equal(new[] { "Levels/Start.scene.json" }, TableKeys(ConfigManager.Serialize(read)));
         }
 
+        [Fact]
+        public void An_objs_mtl_is_keyed_by_where_the_file_is()
+        {
+            // The .mtl an .obj names lies beside it: two files of one name in two folders have two keys.
+            Assert.Equal("Models/Red/shape.mtl", GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.MtlKey("Models/Red/shape.obj", "shape.mtl"));
+            Assert.Equal("Models/Blue/shape.mtl", GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.MtlKey("Models/Blue/shape.obj", "shape.mtl"));
+            Assert.Equal("shape.mtl", GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.MtlKey("shape.obj", "shape.mtl"));
+            Assert.Equal("Models/Kit/Materials/a.mtl", GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.MtlKey("Models/Kit/a.obj", "Materials/a.mtl"));
+        }
+
         // ── The .meta files of a project ────────────────────────────────────────────────
 
         [Fact]

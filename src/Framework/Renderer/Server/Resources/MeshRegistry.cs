@@ -67,7 +67,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                     IndexCount   = sm.Indices.Length,
                     MaterialName = sm.MaterialName,
                     MaterialKey  = (!string.IsNullOrEmpty(obj.MtlLib) && !string.IsNullOrEmpty(sm.MaterialName))
-                                       ? string.Concat(obj.MtlLib, "#", sm.MaterialName)
+                                       ? string.Concat(MtlKey(path, obj.MtlLib), "#", sm.MaterialName)
                                        : ""
                 };
             }
@@ -87,6 +87,17 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             _byPath[path] = res;
             _byId[id]     = res;
             return id;
+        }
+
+        /// <summary>
+        /// The key of the <c>.mtl</c> file an <c>.obj</c> names: the file of that name beside the mesh
+        /// ("Models/duck.obj" + "duck.mtl" = "Models/duck.mtl"). Its materials are registered as "&lt;this key&gt;#&lt;name&gt;",
+        /// so two files of one name in two folders are two sets of materials.
+        /// </summary>
+        public static string MtlKey(string meshPath, string mtlLib)
+        {
+            string dir = System.IO.Path.GetDirectoryName(meshPath)?.Replace('\\', '/') ?? string.Empty;
+            return string.IsNullOrEmpty(dir) ? mtlLib : dir + "/" + mtlLib;
         }
 
         /// <summary>

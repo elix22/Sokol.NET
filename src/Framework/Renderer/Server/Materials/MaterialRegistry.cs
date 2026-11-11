@@ -134,15 +134,13 @@ namespace GameEditor.Framework.Renderer.Server.Materials
             => _byPath.TryGetValue(key, out var m) ? m.Id : (ushort)0;
 
         /// <summary>
-        /// Returns the id of the first material registered from the given MTL file.
-        /// <paramref name="mtlPath"/> may be a full/relative path or just a filename —
-        /// only the filename part is compared against the "filename#materialName" registry keys.
+        /// Returns the id of the first material registered from the given MTL file, by the file's key
+        /// (its path below Assets, "Models/duck.mtl") — the registry keys are "&lt;key&gt;#&lt;materialName&gt;".
         /// Returns 0 if no material from that file is registered.
         /// </summary>
         public ushort GetFirstIdByMtlFile(string mtlPath)
         {
-            string fname  = System.IO.Path.GetFileName(mtlPath);
-            string prefix = fname + "#";
+            string prefix = mtlPath.Replace('\\', '/') + "#";
             foreach (var (key, mat) in _byPath)
                 if (key.StartsWith(prefix, StringComparison.Ordinal))
                     return mat.Id;
