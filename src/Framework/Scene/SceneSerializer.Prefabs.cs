@@ -392,6 +392,17 @@ namespace GameEditor.Framework.Scene
                 AddPrefabEntity(prefab, expanded[rootIndex], components[rootIndex], rootId);
                 for (int i = 0; i < expanded.Count; i++)
                     if (i != rootIndex) AddPrefabEntity(prefab, expanded[i], components[i], rootId);
+
+                prefab.NextId = nextId;
+                foreach (var e in prefab.Entities)
+                    if (e.Id >= prefab.NextId) prefab.NextId = e.Id + 1;
+                StringBuilder? other = null;
+                foreach (var p in root.EnumerateObject())
+                {
+                    if (p.NameEquals("name") || p.NameEquals("entities") || p.NameEquals("nextId")) continue;
+                    (other ??= new StringBuilder()).Append(",\"").Append(Esc(p.Name)).Append("\":").Append(Compact(p.Value));
+                }
+                prefab.OtherRootMembers = other?.ToString() ?? "";
                 return prefab;
             }
         }
@@ -434,7 +445,7 @@ namespace GameEditor.Framework.Scene
                                                    JsonElement removed, bool isRoot)
         {
             var buffer = new ArrayBufferWriter<byte>(512);
-            using (var w = new Utf8JsonWriter(buffer))
+            using (var w = new Utf8JsonWriter(buffer, RelaxedJson))   // its text also goes into prefab files: names stay readable
             {
                 w.WriteStartObject();
                 bool hasOver = over.ValueKind == JsonValueKind.Object;
@@ -526,10 +537,12 @@ namespace GameEditor.Framework.Scene
             w.WriteEndObject();
         }
 
+        private static readonly JsonWriterOptions RelaxedJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
         private static string Compact(JsonElement value)
         {
             var buffer = new ArrayBufferWriter<byte>(256);
-            using (var w = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+            using (var w = new Utf8JsonWriter(buffer, RelaxedJson))
                 value.WriteTo(w);
             return Encoding.UTF8.GetString(buffer.WrittenSpan);
         }
@@ -647,17 +660,20 @@ namespace GameEditor.Framework.Scene
         }
 
         // The fields of a component block that differ from the prefab's, as a JSON object; null when none does.
-        private static string? DiffBlock(string key, JsonElement b, JsonElement c, bool isRoot)
+        // describe: for showing what an instance changed — the root's position, rotation and parent, its own, are left out.
+        private static string? DiffBlock(string key, JsonElement b, JsonElement c, bool isRoot, bool describe = false)
         {
             if (b.ValueKind != JsonValueKind.Object || c.ValueKind != JsonValueKind.Object)
                 return JsonValueEquals(b, c) ? null : c.GetRawText();
             if (key != "Transform") return DiffObject(b, c, 0);
+            if (describe && isRoot) return DiffObject(b, c, 4 | 8);
             // The root's position and rotation are the instance's own. "E" is "Q" in degrees: written with it, never alone.
             bool rotation = isRoot || !(b.TryGetProperty("Q", out var bq) && c.TryGetProperty("Q", out var cq) && JsonValueEquals(bq, cq));
             return DiffObject(b, c, (isRoot ? 1 : 0) | (rotation ? 2 : 4));
         }
 
-        // transformRule: 0 = compare every field; bit 0 = always "P"; bit 1 = always "E" and "Q"; bit 2 = never "E" and "Q".
+        // transformRule: 0 = compare every field; bit 0 = always "P"; bit 1 = always "E" and "Q"; bit 2 = never "E" and "Q";
+        // bit 3 = never "P" and "Par".
         private static string? DiffObject(JsonElement b, JsonElement c, int transformRule)
         {
             StringBuilder? sb = null;
@@ -665,6 +681,7 @@ namespace GameEditor.Framework.Scene
             {
                 bool rotationField = transformRule != 0 && (p.NameEquals("E") || p.NameEquals("Q"));
                 if (rotationField && (transformRule & 4) != 0) continue;
+                if ((transformRule & 8) != 0 && (p.NameEquals("P") || p.NameEquals("Par"))) continue;
                 bool always = (rotationField && (transformRule & 2) != 0) || ((transformRule & 1) != 0 && p.NameEquals("P"));
                 string value = p.Value.GetRawText();
                 if (!always && b.TryGetProperty(p.Name, out var bv))
@@ -684,6 +701,7 @@ namespace GameEditor.Framework.Scene
             foreach (var p in b.EnumerateObject())
             {
                 if (c.TryGetProperty(p.Name, out _)) continue;
+                if ((transformRule & 8) != 0 && p.NameEquals("Par")) continue;
                 sb ??= new StringBuilder("{");
                 if (sb.Length > 1) sb.Append(',');
                 sb.Append('"').Append(Esc(p.Name)).Append("\":null");   // the prefab has the field, the instance does not

@@ -30,7 +30,8 @@ namespace GameEditor.Framework.Scene
         private static readonly HashSet<string> RootKeys = new(StringComparer.Ordinal) { "name", "physics", "entities", "nextId" };
 
         private static readonly Dictionary<string, (Func<ECSWorld, Entity, string?> Write,
-                                                    Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> Read)>
+                                                    Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> Read,
+                                                    Action<ECSWorld, Entity>? Remove)>
             _extensions = new(StringComparer.Ordinal);
 
         /// <summary>
@@ -43,14 +44,17 @@ namespace GameEditor.Framework.Scene
         /// or never existed) — the reader skips such a reference.
         /// In a build without the extension the block is kept verbatim (<see cref="PreservedComponents"/>).
         /// Entities keep their scene ids through load and save, so references inside it stay valid.
+        /// <paramref name="remove"/> takes the component off an entity: needed for an entity of a prefab instance
+        /// to lose the component when its prefab does (without it the component stays until the scene is loaded again).
         /// </summary>
         public static void RegisterComponentExtension(string key,
             Func<ECSWorld, Entity, string?> write,
-            Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> read)
+            Action<ECSWorld, Entity, JsonElement, Func<int, Entity>> read,
+            Action<ECSWorld, Entity>? remove = null)
         {
             if (BuiltInKeys.Contains(key))
                 throw new ArgumentException($"'{key}' is a built-in component key.", nameof(key));
-            _extensions[key] = (write, read);
+            _extensions[key] = (write, read, remove);
         }
 
         public static string Serialize(Scene scene)

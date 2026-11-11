@@ -680,5 +680,367 @@ namespace Scene.Tests
             Assert.Equal(9f, World.GetComponent<LightComponent>(Member(boss, "Lamp")).Intensity);
             Assert.Equal(50f, World.GetComponent<RigidbodyComponent>(boss).Mass);
         }
+
+        // ── Editing: writing a prefab file, applying, reverting, unpacking, refreshing ──
+
+        static void SetLinks(Dictionary<Entity, PrefabLink> links)
+        {
+            foreach (var (e, link) in links) World.AddComponent(e, link);
+        }
+
+        static void SetMass(Entity e, float mass)
+        {
+            var rb = World.GetComponent<RigidbodyComponent>(e);
+            rb.Mass = mass;
+            World.AddComponent(e, rb);
+        }
+
+        static JsonElement Describe(Entity e) => JsonDocument.Parse(SceneSerializer.DescribePrefabLink(e)!).RootElement;
+
+        [Fact]
+        public void APrefabMadeFromEntities_HasThemWithNewIds_AndTheEntitiesBecomeAnInstanceWithNothingChanged()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            const string robotKey = "Prefabs/Robot.prefab";
+            var s = NewScene();
+            Entity floor = s.CreateEntity("Floor");
+            Entity robot = Child(s, "Robot", floor);
+            MoveTo(robot, new Vector3(2f, 0f, 0f));
+            Entity arm = Child(s, "Arm", robot);
+            World.AddComponent(arm, new ConstraintComponent { Type = ConstraintType.Fixed, BodyA = robot, BodyB = floor });   // B is outside
+            Entity pet = Instantiate(EnemyKey);                                              // an instance among the entities
+            var tr = World.GetComponent<Transform>(pet);
+            tr.Parent = robot;
+            World.AddComponent(pet, tr);
+            SetLight(Member(pet, "Lamp"), 3f);
+
+            string? text = SceneSerializer.WritePrefabFile(robot, "Robot", robotKey, apply: false, out var links, out string? error);
+
+            Assert.Null(error);
+            Assert.Equal(6, links.Count);
+            using (var doc = JsonDocument.Parse(text!))
+            {
+                Assert.Equal(1, doc.RootElement.GetProperty("prefab").GetInt32());
+                Assert.Equal("Robot", doc.RootElement.GetProperty("name").GetString());
+                Assert.Equal(7, doc.RootElement.GetProperty("nextId").GetInt32());
+                var lines = doc.RootElement.GetProperty("entities");
+                Assert.Equal(1, lines[0].GetProperty("id").GetInt32());
+                Assert.False(lines[0].GetProperty("c").GetProperty("Transform").TryGetProperty("Par", out _));   // the root has no parent
+                var armC = lines[1].GetProperty("c");
+                Assert.Equal(1, armC.GetProperty("Transform").GetProperty("Par").GetInt32());
+                Assert.Equal(1, armC.GetProperty("Constraint").GetProperty("A").GetInt32());
+                Assert.Equal(-1, armC.GetProperty("Constraint").GetProperty("B").GetInt32());   // outside the prefab: nothing
+                Assert.Equal(EnemyKey, lines[2].GetProperty("src").GetProperty("prefab").GetString());
+            }
+
+            _files[robotKey] = text!;
+            SetLinks(links);
+            Assert.Equal(robotKey, World.GetComponent<PrefabLink>(robot).Asset);
+            Assert.Null(World.GetComponent<PrefabLink>(pet).Asset);                          // a part of the robot now
+            Assert.Equal(robot, World.GetComponent<PrefabLink>(Find("Lamp")).Root);
+            Assert.Equal(new[] { 3, 3 }, World.GetComponent<PrefabLink>(Find("Lamp")).Path);
+
+            string json = SceneSerializer.Serialize(s);
+            foreach (var line in Lines(json).EnumerateArray())
+            {
+                if (!line.TryGetProperty("src", out var src)) continue;
+                if (src.TryGetProperty("prefab", out _)) Assert.Equal(new[] { "NameTag", "Transform" }, Keys(line.GetProperty("c")));
+                else if (line.GetProperty("id").GetInt32() == World.GetSceneId(arm))
+                    Assert.Equal("{\"Constraint\":{\"B\":" + World.GetSceneId(floor) + "}}", line.GetProperty("c").GetRawText());   // its own again
+                else Assert.False(line.TryGetProperty("c", out _));
+            }
+            Assert.Equal(json, SceneSerializer.Serialize(Load(json)));
+
+            Entity second = Instantiate(robotKey);
+            Assert.Equal(13, World.Entities.Count);
+            Assert.Equal(3f, World.GetComponent<LightComponent>(Member(second, "Lamp")).Intensity);   // the robot's value for its pet
+        }
+
+        [Fact]
+        public void APrefab_CannotBeMadeFromAPartOfAnInstance()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            NewScene();
+            Entity body = Member(Instantiate(EnemyKey), "Body");
+            Assert.Null(SceneSerializer.WritePrefabFile(body, "Body", "Prefabs/Body.prefab", apply: false, out _, out string? error));
+            Assert.Contains("unpack", error);
+        }
+
+        [Fact]
+        public void APrefabMadeFromAnInstancesRoot_IsAVariantOfItsPrefab()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            NewScene();
+            Entity enemy = Instantiate(EnemyKey);
+            SetMass(enemy, 50f);
+
+            string? text = SceneSerializer.WritePrefabFile(enemy, "Boss", "Prefabs/Boss.prefab", apply: false, out var links, out _);
+
+            using var doc = JsonDocument.Parse(text!);
+            var rootLine = doc.RootElement.GetProperty("entities")[0];
+            Assert.Equal(EnemyKey, rootLine.GetProperty("src").GetProperty("prefab").GetString());
+            Assert.Equal(50f, rootLine.GetProperty("c").GetProperty("Rigidbody").GetProperty("Mass").GetSingle());
+            Assert.Equal(new[] { 1, 3 }, links[Member(enemy, "Lamp")].Path);
+        }
+
+        [Fact]
+        public void Apply_WritesTheInstancesValuesIntoThePrefab_AndTheOtherInstancesFollow_ThereAndBack()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            string before = _files[EnemyKey];
+            var s = NewScene();
+            Entity first = Instantiate(EnemyKey), second = Instantiate(EnemyKey);
+            World.AddComponent(first, new NameTag { Name = "Boss" });
+            MoveTo(first, new Vector3(5f, 0f, 0f));
+            MoveTo(second, new Vector3(-5f, 0f, 0f));
+            SetMass(first, 5f);
+            SetLight(Member(first, "Lamp"), 3f);
+            Entity hat = Child(s, "Hat", Member(first, "Body"));
+            int secondLampId = World.GetSceneId(Member(second, "Lamp"));
+            Entity secondLamp = Member(second, "Lamp");
+
+            string? after = SceneSerializer.WritePrefabFile(first, "", "", apply: true, out var links, out string? error);
+            Assert.Null(error);
+            using (var doc = JsonDocument.Parse(after!))
+            {
+                var root = doc.RootElement;
+                Assert.Equal(1, root.GetProperty("prefab").GetInt32());
+                Assert.Equal(6, root.GetProperty("nextId").GetInt32());
+                var rootC = root.GetProperty("entities")[0].GetProperty("c");
+                Assert.Equal("Enemy", rootC.GetProperty("NameTag").GetProperty("Name").GetString());            // not "Boss"
+                Assert.Equal("[0,0,0]", rootC.GetProperty("Transform").GetProperty("P").GetRawText());           // not moved
+                Assert.Equal(5f, rootC.GetProperty("Rigidbody").GetProperty("Mass").GetSingle());
+                Assert.Equal(5, root.GetProperty("entities")[4].GetProperty("id").GetInt32());                   // Hat, a new id
+                Assert.Equal(2, root.GetProperty("entities")[4].GetProperty("c").GetProperty("Transform").GetProperty("Par").GetInt32());
+            }
+
+            var memo = new PrefabRefreshMemo();
+            SetLinks(links);
+            SceneSerializer.RefreshPrefabInstances(() => _files[EnemyKey] = after!, except: first, memo);
+
+            Assert.Equal(new[] { 5 }, World.GetComponent<PrefabLink>(hat).Path);            // the hat is part of the prefab now
+            Assert.Equal(5f, World.GetComponent<RigidbodyComponent>(second).Mass);
+            Assert.Equal(secondLamp, Member(second, "Lamp"));                                // the same entity, new values
+            Assert.Equal(3f, World.GetComponent<LightComponent>(secondLamp).Intensity);
+            Assert.Equal("Enemy", NameOf(second));
+            Assert.Equal(new Vector3(-5f, 0f, 0f), World.GetComponent<Transform>(second).Position);
+            Entity secondHat = Member(second, "Hat");
+            Assert.Equal(Member(second, "Body"), World.GetComponent<Transform>(secondHat).Parent);
+            int secondHatId = World.GetSceneId(secondHat);
+            Assert.Equal(10, World.Entities.Count);
+
+            string json = SceneSerializer.Serialize(s);                                      // nothing differs from the prefab any more
+            foreach (var line in Lines(json).EnumerateArray())
+                if (line.GetProperty("src").TryGetProperty("in", out _)) Assert.False(line.TryGetProperty("c", out _));
+            Assert.Equal(json, SceneSerializer.Serialize(Load(json)));
+
+            // Back (an undo restores the file; the editor also restores the first instance's own entities).
+            Load(json);
+            first = Find("Boss"); second = Find("Enemy");
+            SceneSerializer.RefreshPrefabInstances(() => _files[EnemyKey] = before, except: first, memo);
+            Assert.Equal(2f, World.GetComponent<RigidbodyComponent>(second).Mass);
+            Assert.Equal(1.5f, World.GetComponent<LightComponent>(Member(second, "Lamp")).Intensity);
+            Assert.Equal(secondLampId, World.GetSceneId(Member(second, "Lamp")));
+            Assert.False(World.TryGetEntityBySceneId(secondHatId, out _));
+            Assert.Equal(9, World.Entities.Count);
+
+            // And again (a redo): the same hat comes back, with the id it had.
+            SceneSerializer.RefreshPrefabInstances(() => _files[EnemyKey] = after!, except: first, memo);
+            Assert.True(World.TryGetEntityBySceneId(secondHatId, out secondHat));
+            Assert.Equal("Hat", NameOf(secondHat));
+            Assert.Equal(Member(second, "Body"), World.GetComponent<Transform>(secondHat).Parent);
+            Assert.Equal(10, World.Entities.Count);
+            memo.Discard();
+        }
+
+        [Fact]
+        public void Apply_OfOneComponent_LeavesTheRestOfThePrefabAsItWas()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            var s = NewScene();
+            Entity first = Instantiate(EnemyKey);
+            SetMass(first, 5f);
+            Entity lamp = Member(first, "Lamp");
+            SetLight(lamp, 3f);
+            Child(s, "Hat", first);
+
+            string? text = SceneSerializer.WritePrefabFile(first, "", "", apply: true, out _, out string? error, onlyEntity: lamp, onlyComponent: "Light");
+            Assert.Null(error);
+            _files[EnemyKey] = text!;
+            PrefabLibrary.Invalidate();
+
+            var prefab = PrefabLibrary.Get(EnemyKey)!;
+            Assert.Equal(4, prefab.Entities.Count);                                          // no hat
+            Assert.Equal(3f, prefab.ById(3)!.Components.GetProperty("Light").GetProperty("Int").GetSingle());
+            Assert.Equal(2f, prefab.Root.Components.GetProperty("Rigidbody").GetProperty("Mass").GetSingle());
+            Assert.Equal(2, prefab.ById(3)!.Components.GetProperty("TestLink").GetProperty("T").GetInt32());
+        }
+
+        [Fact]
+        public void Apply_OnANestedInstance_WritesTheOuterPrefabsValueForIt_AndLeavesTheInnerPrefabAlone()
+        {
+            _files[WheelKey] = WheelPrefab();
+            _files[CarKey] = CarPrefab();
+            string wheelText = _files[WheelKey];
+            NewScene();
+            Entity car = Instantiate(CarKey);
+            SetLight(At(car, 3, 2), 7f);
+
+            string? text = SceneSerializer.WritePrefabFile(car, "", "", apply: true, out _, out string? error);
+            Assert.Null(error);
+
+            using var doc = JsonDocument.Parse(text!);
+            var lines = doc.RootElement.GetProperty("entities");
+            Assert.Equal(6, lines.GetArrayLength());
+            foreach (var line in lines.EnumerateArray())
+            {
+                int id = line.GetProperty("id").GetInt32();
+                if (id == 4) Assert.Equal("{\"Light\":{\"Int\":7}}", line.GetProperty("c").GetRawText());
+                if (id == 6) Assert.Equal("{\"Light\":{\"Int\":4}}", line.GetProperty("c").GetRawText());
+                if (id is 4 or 6) Assert.Equal("[2]", line.GetProperty("src").GetProperty("e").GetRawText());
+                if (id is 3 or 5) Assert.Equal(WheelKey, line.GetProperty("src").GetProperty("prefab").GetString());
+            }
+            Assert.Equal(wheelText, _files[WheelKey]);
+        }
+
+        [Fact]
+        public void Describe_SaysWhatAnInstanceEntityChanged_AndNotWhatIsTheRootsOwn()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            var s = NewScene();
+            Entity root = Instantiate(EnemyKey);
+            World.AddComponent(root, new NameTag { Name = "Other" });
+            MoveTo(root, new Vector3(1f, 2f, 3f));
+            Entity lamp = Member(root, "Lamp"), body = Member(root, "Body");
+
+            var d = Describe(root);
+            Assert.Equal(EnemyKey, d.GetProperty("asset").GetString());
+            Assert.Equal(World.GetSceneId(root), d.GetProperty("root").GetInt32());
+            Assert.Equal("{}", d.GetProperty("overrides").GetRawText());                      // moved and renamed: its own
+            Assert.Equal("{}", Describe(lamp).GetProperty("overrides").GetRawText());
+            Assert.Equal("[3]", Describe(lamp).GetProperty("path").GetRawText());
+
+            SetLight(lamp, 3f);
+            World.RemoveComponent<TestLink>(lamp);
+            World.AddComponent(body, new LightComponent { Type = LightType.Spot, Color = Vector3.One, Intensity = 2f, Range = 5f, InnerAngle = 25f, OuterAngle = 35f, Enabled = true });
+            var tr = World.GetComponent<Transform>(root);
+            tr.Scale = new Vector3(2f, 2f, 2f);
+            World.AddComponent(root, tr);
+
+            Assert.Equal("{\"Light\":{\"Int\":3}}", Describe(lamp).GetProperty("overrides").GetRawText());
+            Assert.Equal("[\"TestLink\"]", Describe(lamp).GetProperty("removed").GetRawText());
+            Assert.Equal("[\"Light\"]", Describe(body).GetProperty("added").GetRawText());
+            Assert.Equal("{\"Transform\":{\"S\":[2,2,2]}}", Describe(root).GetProperty("overrides").GetRawText());
+            Assert.Null(SceneSerializer.DescribePrefabLink(s.CreateEntity("Plain")));
+        }
+
+        [Fact]
+        public void Revert_TakesBackAField_AComponent_OrEverything_AndKeepsTheRootsNameAndPlace()
+        {
+            _files[EnemyKey] = EnemyPrefab();
+            NewScene();
+            Entity root = Instantiate(EnemyKey);
+            World.AddComponent(root, new NameTag { Name = "Other" });
+            MoveTo(root, new Vector3(1f, 2f, 3f));
+            Entity lamp = Member(root, "Lamp"), body = Member(root, "Body");
+
+            // A field: the others the instance changed stay.
+            var light = World.GetComponent<LightComponent>(lamp);
+            light.Intensity = 3f; light.Range = 44f;
+            World.AddComponent(lamp, light);
+            Assert.Null(SceneSerializer.RevertToPrefab(lamp, "Light", "Int"));
+            Assert.Equal(1.5f, World.GetComponent<LightComponent>(lamp).Intensity);
+            Assert.Equal(44f, World.GetComponent<LightComponent>(lamp).Range);
+            Assert.NotNull(SceneSerializer.RevertToPrefab(lamp, "Light", "Nothing"));
+
+            // A component: one that was changed, one that was removed, one that was added.
+            Assert.Null(SceneSerializer.RevertToPrefab(lamp, "Light"));
+            Assert.Equal(10f, World.GetComponent<LightComponent>(lamp).Range);
+            World.RemoveComponent<RigidbodyComponent>(root);
+            Assert.Null(SceneSerializer.RevertToPrefab(root, "Rigidbody"));
+            Assert.Equal(2f, World.GetComponent<RigidbodyComponent>(root).Mass);
+            World.AddComponent(body, new LightComponent { Type = LightType.Spot, Intensity = 2f, Range = 5f, Enabled = true });
+            Assert.Null(SceneSerializer.RevertToPrefab(body, "Light"));
+            Assert.False(World.HasComponent<LightComponent>(body));
+            Assert.NotNull(SceneSerializer.RevertToPrefab(body, "Camera"));
+
+            // Everything of an entity. The root keeps its name, place and parent.
+            SetMass(root, 9f);
+            var tr = World.GetComponent<Transform>(root);
+            tr.Scale = new Vector3(2f, 2f, 2f);
+            World.AddComponent(root, tr);
+            World.AddComponent(root, new CameraComponent { Fov = 60f, NearZ = 0.1f, FarZ = 100f });
+            Assert.NotNull(SceneSerializer.RevertToPrefab(root, "Transform", "P"));
+            Assert.Null(SceneSerializer.RevertToPrefab(root));
+            Assert.Equal(2f, World.GetComponent<RigidbodyComponent>(root).Mass);
+            Assert.False(World.HasComponent<CameraComponent>(root));
+            Assert.Equal(Vector3.One, World.GetComponent<Transform>(root).Scale);
+            Assert.Equal(new Vector3(1f, 2f, 3f), World.GetComponent<Transform>(root).Position);
+            Assert.Equal("Other", NameOf(root));
+            Assert.Equal("{}", Describe(root).GetProperty("overrides").GetRawText());
+            Assert.Equal(root, World.GetComponent<ConstraintComponent>(Member(root, "Hinge")).BodyA);
+
+            Assert.NotNull(SceneSerializer.RevertToPrefab(World.CreateEntity("Plain")));
+        }
+
+        [Fact]
+        public void Refresh_GivesOpenInstancesAChangedPrefabsValues_OnTheSameEntities()
+        {
+            string changed = EnemyPrefab(lamp: 9f, mass: 7f);                                // (building a prefab text empties the world)
+            _files[EnemyKey] = EnemyPrefab();
+            NewScene();
+            Entity root = Instantiate(EnemyKey);
+            Entity lamp = Member(root, "Lamp");
+            SetMass(root, 5f);
+            int lampId = World.GetSceneId(lamp);
+
+            _files[EnemyKey] = changed;
+            SceneSerializer.RefreshPrefabInstances();
+
+            Assert.Equal(lamp, Member(root, "Lamp"));
+            Assert.Equal(lampId, World.GetSceneId(lamp));
+            Assert.Equal(9f, World.GetComponent<LightComponent>(lamp).Intensity);
+            Assert.Equal(5f, World.GetComponent<RigidbodyComponent>(root).Mass);             // its own
+            Assert.Equal(Member(root, "Body"), World.GetComponent<TestLink>(lamp).Target);
+            Assert.Equal(4, World.Entities.Count);
+        }
+
+        [Fact]
+        public void Unpack_LeavesOrdinaryEntities_AndNestedInstancesStayInstances_UnlessCompletely()
+        {
+            _files[WheelKey] = WheelPrefab();
+            _files[CarKey] = CarPrefab();
+            var s = NewScene();
+            Entity car = Instantiate(CarKey);
+            Entity wheelR = At(car, 5), hubR = At(car, 5, 2), seat = At(car, 2);
+
+            var completely = SceneSerializer.UnpackedLinks(car, completely: true);
+            Assert.Equal(6, completely.Count);
+            Assert.All(completely.Values, l => Assert.Null(l));
+
+            var links = SceneSerializer.UnpackedLinks(car, completely: false);
+            Assert.Null(links[car]);
+            Assert.Null(links[seat]);
+            Assert.Equal(WheelKey, links[wheelR]!.Value.Asset);
+            Assert.Equal(wheelR, links[wheelR]!.Value.Root);
+            Assert.Equal(wheelR, links[hubR]!.Value.Root);
+            Assert.Equal(new[] { 2 }, links[hubR]!.Value.Path);
+
+            foreach (var (e, link) in links)
+                if (link is { } l) World.AddComponent(e, l); else World.RemoveComponent<PrefabLink>(e);
+            string json = SceneSerializer.Serialize(s);
+            Assert.Equal(WheelKey, Line(json, World.GetSceneId(wheelR)).GetProperty("src").GetProperty("prefab").GetString());
+            Assert.Equal("{\"Light\":{\"Int\":4}}", Line(json, World.GetSceneId(hubR)).GetProperty("c").GetRawText());   // the car's value, the scene's now
+            Assert.False(Line(json, World.GetSceneId(seat)).TryGetProperty("src", out _));
+            Assert.Equal(json, SceneSerializer.Serialize(Load(json)));
+            Assert.Equal(4f, World.GetComponent<LightComponent>(Find("Hub", 1)).Intensity);
+        }
+
+        static Entity Find(string name, int index)
+        {
+            foreach (Entity e in World.Entities)
+                if (NameOf(e) == name && index-- == 0) return e;
+            throw new Xunit.Sdk.XunitException($"entity '{name}' not found");
+        }
     }
 }

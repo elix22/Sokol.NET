@@ -30,6 +30,10 @@ namespace GameEditor.Framework.Scene
         public List<PrefabEntity> Entities = new();
         /// <summary>Every prefab this one holds an instance of, at any depth.</summary>
         public HashSet<string> Dependencies = new(StringComparer.Ordinal);
+        /// <summary>The id a new entity of the prefab gets: above every id the file ever used.</summary>
+        public int NextId = 1;
+        /// <summary>The file's root members besides "name", "entities" and "nextId", as <c>,"key":value…</c> — written back when the file is rewritten.</summary>
+        public string OtherRootMembers = "";
 
         private readonly Dictionary<string, PrefabEntity> _byPath = new(StringComparer.Ordinal);
         private readonly Dictionary<int, PrefabEntity> _byId = new();

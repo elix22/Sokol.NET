@@ -124,6 +124,8 @@ namespace GameEditor.Framework.Scene
             SokolFile.WriteAllText(path, json);
             ActiveScene.FilePath = path;
             ActiveScene.IsDirty = false;
+            // A prefab that is open like a scene was written: what was loaded of it, and of prefabs holding it, is stale.
+            if (path.EndsWith(PrefabLibrary.Extension, StringComparison.OrdinalIgnoreCase)) PrefabLibrary.Invalidate();
             Logger.Info($"Scene saved to {path}");
         }
 
@@ -137,6 +139,7 @@ namespace GameEditor.Framework.Scene
             EventBus.RaiseSceneUnloaded();
             ActiveScene ??= new Scene("Untitled");
             string json = SokolFile.ReadAllText(path);
+            PrefabLibrary.Invalidate();   // a scene read from its file takes its prefabs from their files as they are now
             SceneSerializer.Deserialize(json, ActiveScene);
             ActiveScene.FilePath = path;
             ActiveScene.IsDirty = false;
@@ -370,6 +373,16 @@ namespace GameEditor.Framework.Scene
                 else
                     Logger.Warning($"[SceneManager] Failed to load MTL: '{relPath}'");
             });
+        }
+
+        /// <summary>
+        /// Loads the meshes and materials the scene's entities name and that are not loaded yet — for entities
+        /// that came into the scene after it was loaded (a prefab instance placed or brought up to date).
+        /// </summary>
+        public static void PreloadSceneAssets()
+        {
+            PreloadSceneMeshes();
+            PreloadSceneMaterials();
         }
 
         // ── Scene material preloading ─────────────────────────────────────────────────────
