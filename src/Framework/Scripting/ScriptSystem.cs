@@ -191,6 +191,9 @@ namespace GameEditor.Framework.Scripting
                 SafeCall(_running[i].Behaviour, beh => beh.OnUpdate(dt), "OnUpdate");
             }
 
+            // After the scripts: sprite animations show the frame for this moment, a clip a script just chose too.
+            Scene.SpriteAnimSystem.Update(ECS.ECSWorld.Instance, deltaTime);
+
             // The end of the frame for scripts: entities handed to Destroy leave now.
             Scene.SceneManager.FlushDestroyed();
         }

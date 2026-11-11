@@ -14,6 +14,7 @@ namespace GameEditor.Framework.Scene
         static SceneSerializer()
         {
             RegisterComponentExtension("Sprite", WriteSprite, ReadSprite, static (w, e) => w.RemoveComponent<SpriteRenderer>(e));
+            RegisterComponentExtension("SpriteAnim", WriteSpriteAnim, ReadSpriteAnim, static (w, e) => w.RemoveComponent<SpriteAnimator>(e));
         }
 
         private static string? WriteSprite(ECSWorld world, Frent.Entity e)
@@ -43,6 +44,22 @@ namespace GameEditor.Framework.Scene
             if (el.TryGetProperty("Order", out var order)) s.Order = order.GetInt32();
             s.Visible = !el.TryGetProperty("Vis", out var vis) || vis.GetBoolean();
             world.AddComponent(e, s);
+        }
+
+        // What a running game keeps in the component (the frame shown, the time into the clip) is not written.
+        private static string? WriteSpriteAnim(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<SpriteAnimator>(e, out var a)) return null;
+            return "{\"Clip\":\"" + Esc(a.Clip ?? "") + "\",\"Speed\":" + F(a.Speed) + ",\"Playing\":" + (a.Playing ? "true" : "false") + "}";
+        }
+
+        private static void ReadSpriteAnim(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var a = SpriteAnimator.Default;
+            if (el.TryGetProperty("Clip", out var clip)) a.Clip = clip.GetString() ?? "";
+            if (el.TryGetProperty("Speed", out var speed) && speed.ValueKind == JsonValueKind.Number) a.Speed = speed.GetSingle();
+            a.Playing = !el.TryGetProperty("Playing", out var playing) || playing.ValueKind != JsonValueKind.False;
+            world.AddComponent(e, a);
         }
     }
 }

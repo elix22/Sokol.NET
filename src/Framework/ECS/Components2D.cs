@@ -23,4 +23,31 @@ namespace GameEditor.Framework.ECS.Components
 
         public static SpriteRenderer Default => new() { Texture = "", Color = Vector4.One, Visible = true };
     }
+
+    /// <summary>
+    /// Plays a clip of the sheet the entity's sprite shows (scene block "SpriteAnim"): while the game plays, the
+    /// sprite's <see cref="SpriteRenderer.Texture"/> is set to the clip's frame for the time passed. A script
+    /// changes <see cref="Clip"/>, <see cref="Speed"/> and <see cref="Playing"/>; a new clip starts at its first
+    /// frame. A clip that does not loop stops on its last frame and sets <see cref="Playing"/> false.
+    /// </summary>
+    public struct SpriteAnimator
+    {
+        /// <summary>The name of a clip of the sprite's sheet.</summary>
+        public string Clip;
+        /// <summary>1 plays the clip at its own frames per second; 2 twice as fast; a negative speed plays it backwards.</summary>
+        public float Speed;
+        public bool Playing;
+
+        // ── Set while the game plays; not saved ──
+        /// <summary>The frame of the clip that is shown, from 0.</summary>
+        public int Frame;
+        /// <summary>Seconds into the clip.</summary>
+        public float Time;
+        /// <summary>The clip <see cref="Time"/> and <see cref="Frame"/> belong to; another <see cref="Clip"/> starts from 0.</summary>
+        public string? Current;
+        /// <summary>The sheet the sprite showed when the clip was last looked up.</summary>
+        public string? Sheet;
+
+        public static SpriteAnimator Default => new() { Clip = "", Speed = 1f, Playing = true };
+    }
 }

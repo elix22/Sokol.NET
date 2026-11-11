@@ -158,7 +158,9 @@ namespace GameEditor.Framework.Scene
                     // Files are read asynchronously here, and a scene resolves its prefab instances while it is
                     // read: the prefabs it names — placed in it, or in a script's field — are read first, and
                     // the prefabs those hold. A scene that names none goes on at once.
-                    Prefabs.LoadNamedIn(json, loaded =>
+                    // The sprite sheets the scene and those prefabs name are read next, for the same reason: a
+                    // sprite's frame and an animation's clip are there from the first frame.
+                    Prefabs.LoadNamedIn(json, loaded => SpriteLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
                     {
                         EventBus.RaiseSceneUnloaded();
                         ActiveScene ??= new Scene("Untitled");
@@ -174,7 +176,7 @@ namespace GameEditor.Framework.Scene
                         EventBus.RaiseSceneLoaded();
                         UndoStack.Clear();
                         Logger.Info($"Scene loaded from assets: {assetPath}");
-                    });
+                    }));
                 }
                 else
                 {
@@ -182,6 +184,15 @@ namespace GameEditor.Framework.Scene
                 }
             });
 
+        }
+
+        // The scene's text and the texts of the prefabs read for it.
+        private static List<string> TextsOf(string json, List<string> prefabKeys)
+        {
+            var texts = new List<string> { json };
+            foreach (string key in prefabKeys)
+                if (PrefabLibrary.TextOf(key) is { } text) texts.Add(text);
+            return texts;
         }
 
         public static void SetPlayMode(PlayModeState state)

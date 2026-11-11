@@ -94,6 +94,9 @@ namespace GameEditor.Framework.Scene
         /// <summary>True when the prefab's text was handed over with <see cref="Put"/>.</summary>
         public static bool HasText(string key) => _texts.ContainsKey(key);
 
+        /// <summary>The text handed over for the key with <see cref="Put"/>, or null.</summary>
+        public static string? TextOf(string key) => _texts.TryGetValue(key, out string? text) ? text : null;
+
         /// <summary>
         /// True when <see cref="Get"/> has something to read for the key: it is loaded, its text was handed over,
         /// or its file is there (<see cref="Reader"/>, the open project's Assets folder). False on a platform that
