@@ -56,10 +56,10 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                 var answer = SpriteLibrary.Find(sprite.Texture, out SpriteFrame frame);
                 if (answer == SpriteLibrary.Answer.Loading) continue;
                 bool missing = answer == SpriteLibrary.Answer.Missing;
-                if (missing) frame = new SpriteFrame { Size = Vector2.One, Pivot = new Vector2(0.5f, 0.5f) };
+                if (missing) frame = SpriteGeometry.Missing;
 
                 Matrix4x4 model = Transform.GetWorldMatrix(world, row.Item3.Value);
-                var corner = new Vector3(-frame.Pivot.X * frame.Size.X, -frame.Pivot.Y * frame.Size.Y, 0f);
+                SpriteGeometry.Quad(in model, frame.Size, frame.Pivot, out Vector3 origin, out Vector3 axisX, out Vector3 axisY);
 
                 // uv of the quad's bottom-left and top-right corners: an image's first row is its top one.
                 float u0 = frame.Uv.X, u1 = frame.Uv.Z, vTop = frame.Uv.Y, vBottom = frame.Uv.W;
@@ -76,13 +76,13 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                 {
                     View    = missing ? default : frame.View,
                     Nearest = frame.Nearest,
-                    Origin  = Vector3.Transform(corner, model),
-                    AxisX   = Vector3.TransformNormal(new Vector3(frame.Size.X, 0f, 0f), model),
-                    AxisY   = Vector3.TransformNormal(new Vector3(0f, frame.Size.Y, 0f), model),
+                    Origin  = origin,
+                    AxisX   = axisX,
+                    AxisY   = axisY,
                     Uv      = new Vector4(u0, vBottom, u1, vTop),
                     Rgba    = missing ? Magenta : Pack(sprite.Color),
                 };
-                _keys[count]  = SortKey(sprite.Layer, sprite.Order, model.Translation, in viewProj);
+                _keys[count]  = SpriteGeometry.DrawKey(sprite.Layer, sprite.Order, model.Translation, in viewProj);
                 _order[count] = count;
                 count++;
             }
@@ -99,17 +99,6 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
             _batch.Flush(in viewProj, offscreen);
             LastSprites = _batch.SpriteCount;
             LastDrawCalls = _batch.DrawCalls;
-        }
-
-        // Smaller keys are drawn first: lower layer, then lower order, then farther from the camera.
-        private static ulong SortKey(int layer, int order, Vector3 position, in Matrix4x4 viewProj)
-        {
-            ulong l = (ulong)(Math.Clamp(layer, short.MinValue, short.MaxValue) - short.MinValue);
-            ulong o = (ulong)(Math.Clamp(order, short.MinValue, short.MaxValue) - short.MinValue);
-            Vector4 clip = Vector4.Transform(new Vector4(position, 1f), viewProj);
-            float depth = clip.W != 0f ? clip.Z / clip.W : 0f;              // 0 at the near plane, 1 at the far one
-            uint far = uint.MaxValue - (uint)(Math.Clamp(depth, 0f, 1f) * 4294967040f);
-            return (l << 48) | (o << 32) | far;
         }
 
         private static uint Pack(Vector4 c)

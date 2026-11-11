@@ -532,14 +532,8 @@ public sealed class Screen : Widget
 
     public override Widget? HitTestDeep(Vector2 screenPoint)
     {
-        // Top overlays (modal dialogs drawn above ImGui) get first claim on input.
-        for (int i = _topHitTest.Length - 1; i >= 0; i--)
-        {
-            var hit = _topHitTest[i].Widget.HitTestDeep(screenPoint);
-            if (hit != null) return hit;
-        }
-
-        // Popup has highest priority (may extend beyond widget bounds).
+        // The open popup is drawn last, over everything — over a top overlay too: a drop-down opened inside a
+        // dialog lies over the dialog's rows, and a click on one of its items is the drop-down's.
         if (_activePopup != null)
         {
             // Ask the popup to test the point using its own local coordinate space.
@@ -552,6 +546,13 @@ public sealed class Screen : Widget
             // Mouse is outside the popup — do NOT dismiss here (dismissal
             // happens only on click via DismissActivePopupIfNeeded).
             // Fall through so overlays and other widgets can be hovered.
+        }
+
+        // Top overlays (modal dialogs drawn above ImGui) come before everything below them.
+        for (int i = _topHitTest.Length - 1; i >= 0; i--)
+        {
+            var hit = _topHitTest[i].Widget.HitTestDeep(screenPoint);
+            if (hit != null) return hit;
         }
 
         // Frame overlays draw on top of screen children — check them before normal tree walk.

@@ -184,6 +184,21 @@ public sealed unsafe class SpriteBatch : IDisposable
     }
 
     /// <summary>
+    /// Adds a line from <paramref name="a"/> to <paramref name="b"/>, <paramref name="width"/> world units wide, of
+    /// one colour: a thin quad that faces a camera looking along <paramref name="viewDirection"/>. Drawn in its
+    /// turn among the sprites.
+    /// </summary>
+    public void DrawLine(Vector3 a, Vector3 b, Vector3 viewDirection, float width, uint rgba)
+    {
+        Vector3 along = b - a;
+        Vector3 across = Vector3.Cross(along, viewDirection);
+        float length = across.Length();
+        if (length < 1e-12f) return;                       // no length, or seen end-on
+        across *= width / length;
+        Draw(default, false, a - across * 0.5f, along, across, new Vector4(0f, 0f, 1f, 1f), rgba);
+    }
+
+    /// <summary>
     /// Draws the view's sprites into the open pass. <paramref name="offscreen"/>: the pass's target is an
     /// offscreen one (RGBA8 colour, a depth image, one sample); false = the swapchain.
     /// </summary>
