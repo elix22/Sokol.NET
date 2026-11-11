@@ -104,7 +104,7 @@ namespace GameEditor.Framework.Scene
         public static void SaveScene(string path)
         {
             if (ActiveScene == null) return;
-            string compact = SceneSerializer.Serialize(ActiveScene);
+            string compact = Assets.AssetRefs.Stamp(SceneSerializer.Serialize(ActiveScene));   // with the id of each file it names
 
             // Re-format as indented JSON for human readability.
             // Uses Utf8JsonWriter directly — avoids JsonSerializer.Serialize which requires
@@ -923,7 +923,7 @@ namespace GameEditor.Framework.Scene
 
             mat.Name = fileName;
             string relKey = $"Materials/{fileName}{PbrMaterialSerializer.Extension}";
-            try { System.IO.File.WriteAllText(absPath, PbrMaterialSerializer.Serialize(mat)); }
+            try { System.IO.File.WriteAllText(absPath, Assets.AssetRefs.Stamp(PbrMaterialSerializer.Serialize(mat))); }
             catch (Exception ex) { Logger.Warning($"[SceneManager] Failed to write .pbrmat: {ex.Message}"); return null; }
 
             RenderingServer.Materials.RegisterOrReplacePbr(relKey, mat);
@@ -939,7 +939,7 @@ namespace GameEditor.Framework.Scene
             {
                 string? dir = System.IO.Path.GetDirectoryName(absPath);
                 if (dir != null) SokolFile.EnsureDirectory(dir);
-                System.IO.File.WriteAllText(absPath, PbrMaterialSerializer.Serialize(mat));
+                System.IO.File.WriteAllText(absPath, Assets.AssetRefs.Stamp(PbrMaterialSerializer.Serialize(mat)));
             }
             catch (Exception ex) { Logger.Warning($"[SceneManager] Failed to save .pbrmat '{relKey}': {ex.Message}"); }
         }

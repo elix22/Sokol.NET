@@ -42,6 +42,7 @@ namespace GameEditor.Framework.Scene
         public static List<string> KeysIn(string json)
         {
             var keys = new List<string>();
+            json = Assets.AssetRefs.Resolve(json);   // a prefab that moved is asked for where it is now
             try
             {
                 using var doc = JsonDocument.Parse(json);

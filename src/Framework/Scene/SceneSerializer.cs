@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using Frent;
+using GameEditor.Framework.Assets;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Physics;
@@ -83,6 +84,7 @@ namespace GameEditor.Framework.Scene
         public static void Deserialize(string json, Scene scene)
         {
             scene.Clear();
+            json = AssetRefs.Resolve(json);   // the files it names, where they are now
 
             JsonDocument doc;
             try { doc = JsonDocument.Parse(json); }

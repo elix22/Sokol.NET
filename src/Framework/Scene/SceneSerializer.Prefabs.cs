@@ -328,6 +328,7 @@ namespace GameEditor.Framework.Scene
         internal static Prefab? LoadPrefab(string key, string json, HashSet<string> loading, out string? error)
         {
             error = null;
+            json = Assets.AssetRefs.Resolve(json);   // the files it names, where they are now
             JsonDocument doc;
             try { doc = JsonDocument.Parse(json); }
             catch (JsonException ex) { error = $"prefab '{key}' is not valid JSON: {ex.Message}"; return null; }

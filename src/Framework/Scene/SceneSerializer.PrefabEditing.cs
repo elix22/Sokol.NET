@@ -591,7 +591,7 @@ namespace GameEditor.Framework.Scene
             sb.Append("],\"nextId\":").Append(nextId);
             sb.Append(apply ? target!.OtherRootMembers : ",\"prefab\":1");
             sb.Append('}');
-            return sb.ToString();
+            return Assets.AssetRefs.Stamp(sb.ToString());   // with the id of each file it names
         }
 
         // Where an entity of an existing prefab goes in its file: the file's own entity, the root of a nested instance, or an entity of one.

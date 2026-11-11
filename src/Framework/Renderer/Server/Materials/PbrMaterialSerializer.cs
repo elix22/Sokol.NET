@@ -129,7 +129,8 @@ namespace GameEditor.Framework.Renderer.Server.Materials
         public static PbrMaterial Deserialize(ReadOnlySpan<byte> json, string fallbackName)
         {
             var m = new PbrMaterial { Name = fallbackName };
-            using var doc = JsonDocument.Parse(json.ToArray());
+            // The texture maps it names, where they are now.
+            using var doc = JsonDocument.Parse(GameEditor.Framework.Assets.AssetRefs.Resolve(Encoding.UTF8.GetString(json)));
             JsonElement r = doc.RootElement;
 
             if (r.TryGetProperty("name", out var nm) && nm.ValueKind == JsonValueKind.String)

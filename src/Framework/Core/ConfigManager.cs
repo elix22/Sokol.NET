@@ -36,7 +36,7 @@ namespace GameEditor.Framework.Core
 
             try
             {
-                string json = SokolFile.ReadAllText(path);
+                string json = Assets.AssetRefs.Resolve(SokolFile.ReadAllText(path));   // the start scene, where it is now
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -71,7 +71,7 @@ namespace GameEditor.Framework.Core
             if (data == null) return null;
             try
             {
-                string json = Encoding.UTF8.GetString(data);
+                string json = Assets.AssetRefs.Resolve(Encoding.UTF8.GetString(data));
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -113,32 +113,7 @@ namespace GameEditor.Framework.Core
         {
             try
             {
-                var sb = new StringBuilder();
-                sb.Append("{\n");
-                sb.Append($"  \"version\": \"{Esc(config.Version)}\",\n");
-                sb.Append($"  \"projectName\": \"{Esc(config.ProjectName)}\",\n");
-                sb.Append($"  \"defaultScene\": \"{Esc(config.DefaultScene)}\",\n");
-                sb.Append($"  \"defaultCamera\": \"{Esc(config.DefaultCamera)}\",\n");
-                sb.Append($"  \"screenWidth\": {config.ScreenWidth},\n");
-                sb.Append($"  \"screenHeight\": {config.ScreenHeight},\n");
-                sb.Append("  \"physics\": {\n");
-                sb.Append($"    \"engine3D\": \"{Esc(config.Physics3D)}\",\n");
-                sb.Append($"    \"engine2D\": \"{Esc(config.Physics2D)}\"\n");
-                sb.Append("  },\n");
-                sb.Append($"  \"environmentMode\": \"{Esc(config.EnvironmentMode)}\",\n");
-                sb.Append($"  \"environmentFolder\": \"{Esc(config.EnvironmentFolder)}\",\n");
-                sb.Append($"  \"environmentFaces\": \"{Esc(config.EnvironmentFaces)}\",\n");
-                sb.Append($"  \"environmentIntensity\": {config.EnvironmentIntensity.ToString(CultureInfo.InvariantCulture)},\n");
-                sb.Append($"  \"environmentRotation\": {config.EnvironmentRotation.ToString(CultureInfo.InvariantCulture)},\n");
-                sb.Append($"  \"environmentShowSkybox\": {(config.EnvironmentShowSkybox ? "true" : "false")},\n");
-                sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
-                sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")},\n");
-                sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
-                sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
-                sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)}\n");
-                sb.Append('}');
-
-                string json = sb.ToString();
+                string json = Serialize(config);
 
                 // Root copy
                 SokolFile.WriteAllText(Path.Combine(projectFolder, ConfigFileName), json);
@@ -154,6 +129,36 @@ namespace GameEditor.Framework.Core
             {
                 Logger.Error($"Failed to save config.json: {ex.Message}");
             }
+        }
+
+        /// <summary>The text of <c>config.json</c> for a config, with the id of each file it names.</summary>
+        public static string Serialize(ProjectConfig config)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\n");
+            sb.Append($"  \"version\": \"{Esc(config.Version)}\",\n");
+            sb.Append($"  \"projectName\": \"{Esc(config.ProjectName)}\",\n");
+            sb.Append($"  \"defaultScene\": \"{Esc(config.DefaultScene)}\",\n");
+            sb.Append($"  \"defaultCamera\": \"{Esc(config.DefaultCamera)}\",\n");
+            sb.Append($"  \"screenWidth\": {config.ScreenWidth},\n");
+            sb.Append($"  \"screenHeight\": {config.ScreenHeight},\n");
+            sb.Append("  \"physics\": {\n");
+            sb.Append($"    \"engine3D\": \"{Esc(config.Physics3D)}\",\n");
+            sb.Append($"    \"engine2D\": \"{Esc(config.Physics2D)}\"\n");
+            sb.Append("  },\n");
+            sb.Append($"  \"environmentMode\": \"{Esc(config.EnvironmentMode)}\",\n");
+            sb.Append($"  \"environmentFolder\": \"{Esc(config.EnvironmentFolder)}\",\n");
+            sb.Append($"  \"environmentFaces\": \"{Esc(config.EnvironmentFaces)}\",\n");
+            sb.Append($"  \"environmentIntensity\": {config.EnvironmentIntensity.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"environmentRotation\": {config.EnvironmentRotation.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"environmentShowSkybox\": {(config.EnvironmentShowSkybox ? "true" : "false")},\n");
+            sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")},\n");
+            sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
+            sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
+            sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)}\n");
+            sb.Append('}');
+            return Assets.AssetRefs.Stamp(sb.ToString());
         }
 
         /// <summary>
