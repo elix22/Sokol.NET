@@ -953,7 +953,10 @@ namespace SokolApplicationBuilder
         /// Scans the project's JIT-built DLL for concrete GameBehaviour subclasses using
         /// PE metadata (no CLR loading). Emits Source/Generated/RegisteredScripts.g.cs
         /// with static RegisterType&lt;T&gt;() calls safe for NativeAOT trimming.
-        /// Runs a `dotnet build` first if no DLL exists yet.
+        /// A script may sit in a namespace or inside another class, and may derive from another script.
+        /// Runs a `dotnet build` first if no DLL exists yet, or if the DLL has scripts' base assembly
+        /// (GameEditor.Framework) among its references and a source file is newer than it: a script added
+        /// since the last desktop build would otherwise not be registered.
         /// Returns true if the file was created or changed (caller should rebuild).
         /// </summary>
         public static bool GenerateRegisteredScripts(TaskLoggingHelper log, string projectPath, string projectName)
@@ -969,10 +972,16 @@ namespace SokolApplicationBuilder
                     .FirstOrDefault();
             }
 
+            if (dllPath != null && ReferencesScriptFramework(dllPath) && NewestSourceWriteTimeUtc(projectPath) > File.GetLastWriteTimeUtc(dllPath))
+            {
+                log.LogMessage(MessageImportance.High, "Sources are newer than the built DLL — rebuilding it to scan for scripts...");
+                dllPath = null;
+            }
+
             if (dllPath == null)
             {
-                // No DLL yet — do a quick dotnet build to produce it.
-                log.LogMessage(MessageImportance.High, "No built DLL found — running dotnet build to scan for scripts...");
+                // No current DLL — do a quick dotnet build to produce it.
+                log.LogMessage(MessageImportance.High, "No current DLL found — running dotnet build to scan for scripts...");
                 string projectFile = Path.GetFullPath(Path.Combine(projectPath, $"{projectName}.csproj"));
                 (int exitCode, _) = RunShellCommand(
                     log,
@@ -1022,14 +1031,19 @@ namespace SokolApplicationBuilder
                     var typeDef = mr.GetTypeDefinition(typeDefHandle);
 
                     if ((typeDef.Attributes & System.Reflection.TypeAttributes.Abstract) != 0) continue;
+                    if (!DerivesFromGameBehaviour(mr, typeDef)) continue;
 
-                    var baseHandle = typeDef.BaseType;
-                    if (baseHandle.IsNil) continue;
-
-                    string? baseName = GetPETypeName(mr, baseHandle);
-                    if (baseName != "GameBehaviour") continue;
-
-                    string typeName = mr.GetString(typeDef.Name);
+                    string? typeName = GetCSharpTypeName(mr, typeDef);
+                    if (typeName == null)
+                    {
+                        log.LogWarning($"Script '{mr.GetString(typeDef.Name)}' is not registered: a script class must not be generic, and a class it is nested in must be public or internal.");
+                        continue;
+                    }
+                    if (!HasPublicParameterlessConstructor(mr, typeDef))
+                    {
+                        log.LogWarning($"Script '{typeName}' is not registered: it has no public constructor without parameters.");
+                        continue;
+                    }
                     scriptTypes.Add(typeName);
                     log.LogMessage(MessageImportance.Normal, $"  Found script: {typeName}");
                 }
@@ -1080,19 +1094,98 @@ namespace SokolApplicationBuilder
             return true;
         }
 
-        private static string? GetPETypeName(MetadataReader mr, EntityHandle handle)
+        /// <summary>True when the DLL references GameEditor.Framework, the assembly GameBehaviour is in.</summary>
+        private static bool ReferencesScriptFramework(string dllPath)
         {
-            if (handle.Kind == HandleKind.TypeDefinition)
+            try
             {
-                var td = mr.GetTypeDefinition((TypeDefinitionHandle)handle);
-                return mr.GetString(td.Name);
+                using var fs = new FileStream(dllPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var peReader = new PEReader(fs);
+                if (!peReader.HasMetadata) return false;
+                var mr = peReader.GetMetadataReader();
+                foreach (var handle in mr.AssemblyReferences)
+                    if (mr.GetString(mr.GetAssemblyReference(handle).Name) == "GameEditor.Framework") return true;
             }
-            if (handle.Kind == HandleKind.TypeReference)
+            catch { }
+            return false;
+        }
+
+        /// <summary>The newest write time of the project's own C# sources (not build output, platform folders or generated files).</summary>
+        private static DateTime NewestSourceWriteTimeUtc(string projectPath)
+        {
+            var newest = DateTime.MinValue;
+            var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", "Android", "ios", "output", "shaders", "Generated", "node_modules" };
+            var pending = new Stack<string>();
+            pending.Push(projectPath);
+            while (pending.Count > 0)
             {
-                var tr = mr.GetTypeReference((TypeReferenceHandle)handle);
-                return mr.GetString(tr.Name);
+                string dir = pending.Pop();
+                try
+                {
+                    foreach (string sub in Directory.GetDirectories(dir))
+                    {
+                        string name = Path.GetFileName(sub);
+                        if (!skip.Contains(name) && !name.StartsWith('.')) pending.Push(sub);
+                    }
+                    foreach (string file in Directory.GetFiles(dir, "*.cs"))
+                    {
+                        var t = File.GetLastWriteTimeUtc(file);
+                        if (t > newest) newest = t;
+                    }
+                }
+                catch { }
             }
-            return null;
+            return newest;
+        }
+
+        /// <summary>Follows the base types inside the assembly up to a class named GameBehaviour that another assembly defines.</summary>
+        private static bool DerivesFromGameBehaviour(MetadataReader mr, TypeDefinition typeDef)
+        {
+            for (int depth = 0; depth < 64; depth++)
+            {
+                var baseHandle = typeDef.BaseType;
+                if (baseHandle.IsNil) return false;
+                if (baseHandle.Kind == HandleKind.TypeReference)
+                    return mr.GetString(mr.GetTypeReference((TypeReferenceHandle)baseHandle).Name) == "GameBehaviour";
+                if (baseHandle.Kind != HandleKind.TypeDefinition) return false;   // a generic base: not a script
+                typeDef = mr.GetTypeDefinition((TypeDefinitionHandle)baseHandle);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The type's name as C# writes it (Namespace.Outer.Inner), or null when the generated code could not
+        /// name it: a generic type, or one nested in a class that is not public or internal.
+        /// </summary>
+        private static string? GetCSharpTypeName(MetadataReader mr, TypeDefinition typeDef)
+        {
+            string name = mr.GetString(typeDef.Name);
+            if (name.Contains('`')) return null;
+            var declaring = typeDef.GetDeclaringType();
+            if (declaring.IsNil)
+            {
+                string ns = mr.GetString(typeDef.Namespace);
+                return ns.Length == 0 ? name : ns + "." + name;
+            }
+            var visibility = typeDef.Attributes & System.Reflection.TypeAttributes.VisibilityMask;
+            if (visibility != System.Reflection.TypeAttributes.NestedPublic && visibility != System.Reflection.TypeAttributes.NestedAssembly
+                && visibility != System.Reflection.TypeAttributes.NestedFamORAssem) return null;
+            string? outer = GetCSharpTypeName(mr, mr.GetTypeDefinition(declaring));
+            return outer == null ? null : outer + "." + name;
+        }
+
+        private static bool HasPublicParameterlessConstructor(MetadataReader mr, TypeDefinition typeDef)
+        {
+            foreach (var handle in typeDef.GetMethods())
+            {
+                var method = mr.GetMethodDefinition(handle);
+                if (mr.GetString(method.Name) != ".ctor") continue;
+                if ((method.Attributes & System.Reflection.MethodAttributes.MemberAccessMask) != System.Reflection.MethodAttributes.Public) continue;
+                var sig = mr.GetBlobReader(method.Signature);
+                sig.ReadSignatureHeader();
+                if (sig.ReadCompressedInteger() == 0) return true;
+            }
+            return false;
         }
 
     }

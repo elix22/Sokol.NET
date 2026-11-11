@@ -2579,6 +2579,18 @@ KeyAlias={keystoreInfo.KeyAlias}
             string androidPath = Path.Combine(opts.ProjectPath, "Android", "native-activity");
             string unsignedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release-unsigned.apk");
 
+            // --device-archs passes android.injected.build.abi, and the Android Gradle Plugin then writes the
+            // APK under intermediates/ instead of outputs/ (see CopyToOutputPath). Sign that one.
+            if (!File.Exists(unsignedApkPath))
+            {
+                string injected = Path.Combine(androidPath, "app", "build", "intermediates", "apk", "release", "app-release-unsigned.apk");
+                if (File.Exists(injected))
+                {
+                    Log.LogMessage(MessageImportance.Normal, $"Unsigned APK found at the injected-ABI location: {injected}");
+                    unsignedApkPath = injected;
+                }
+            }
+
             if (!File.Exists(unsignedApkPath))
             {
                 Log.LogError("Unsigned release APK not found!");
@@ -2599,6 +2611,7 @@ KeyAlias={keystoreInfo.KeyAlias}
 
             // Sign the APK
             string signedApkPath = Path.Combine(androidPath, "app", "build", "outputs", "apk", "release", "app-release.apk");
+            Directory.CreateDirectory(Path.GetDirectoryName(signedApkPath)!);   // absent after an injected-ABI build
 
             // Don't copy the unsigned APK yet - let apksigner do it with --out parameter
             // Copy unsigned APK to final location before signing
