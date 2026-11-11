@@ -14,10 +14,14 @@ namespace GameEditor.Framework.Assets
     /// <see cref="Stamp"/> writes the table when the file is saved; <see cref="Resolve"/> reads it before the
     /// file is read, and puts the key a file has now in place of the key it had when the table was written.
     /// Both work on any JSON text whose root is an object, so a file of another kind can carry the table too.
+    /// Scripts are named by their class, not by a file: a second table, <c>"scripts"</c>, holds the id of the file
+    /// behind each class named in a <c>"Script"</c> or <c>"Scripts"</c> block (<c>"Type": "Enemy"</c>), so a script
+    /// whose file and class were renamed is found too.
     /// </summary>
     public static class AssetRefs
     {
         public const string Member = "assets";
+        public const string ScriptsMember = "scripts";
 
         // ── Reading ─────────────────────────────────────────────────────────────────────
 
@@ -29,28 +33,37 @@ namespace GameEditor.Framework.Assets
         /// </summary>
         public static string Resolve(string json)
         {
-            if (AssetDatabase.IsEmpty || json.IndexOf("\"" + Member + "\"", StringComparison.Ordinal) < 0) return json;
+            if (AssetDatabase.IsEmpty) return json;
             Dictionary<string, string>? table = ReadTable(json);
-            if (table == null) return json;
+            Dictionary<string, string>? scripts = ReadTable(json, ScriptsMember);
+            if (table == null && scripts == null) return json;
 
-            Dictionary<string, string>? moved = null;
-            foreach (var line in table)
-                if (AssetDatabase.KeyOfId(line.Value) is { } now && now != line.Key)
-                    (moved ??= new Dictionary<string, string>(StringComparer.Ordinal))[line.Key] = now;
-            return moved == null ? json : Rewrite(json, moved);
+            Dictionary<string, string>? moved = null, renamed = null;
+            if (table != null)
+                foreach (var line in table)
+                    if (AssetDatabase.KeyOfId(line.Value) is { } now && now != line.Key)
+                        (moved ??= new Dictionary<string, string>(StringComparer.Ordinal))[line.Key] = now;
+            if (scripts != null)
+                foreach (var line in scripts)
+                    if (AssetDatabase.ScriptOfId(line.Value) is { } now && now != line.Key)
+                        (renamed ??= new Dictionary<string, string>(StringComparer.Ordinal))[line.Key] = now;
+            return moved == null && renamed == null ? json : Rewrite(json, moved, renamed);
         }
 
         /// <summary>The table a text carries (key → id), or null when it has none or is not a JSON object.</summary>
-        public static Dictionary<string, string>? ReadTable(string json)
+        public static Dictionary<string, string>? ReadTable(string json) => ReadTable(json, Member);
+
+        /// <summary>One of the two tables a text carries: <see cref="Member"/> (key → id) or <see cref="ScriptsMember"/> (class → id).</summary>
+        public static Dictionary<string, string>? ReadTable(string json, string member)
         {
-            if (json.IndexOf("\"" + Member + "\"", StringComparison.Ordinal) < 0) return null;
+            if (json.IndexOf("\"" + member + "\"", StringComparison.Ordinal) < 0) return null;
             try
             {
                 var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(json), new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
                 if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return null;
                 while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
                 {
-                    bool mine = reader.ValueTextEquals(Member);
+                    bool mine = reader.ValueTextEquals(member);
                     reader.Read();
                     if (!mine || reader.TokenType != JsonTokenType.StartObject) { reader.Skip(); continue; }
 
@@ -77,24 +90,32 @@ namespace GameEditor.Framework.Assets
         public static string Current(string json)
         {
             if (!AssetDatabase.HasMoves) return json;
-            Dictionary<string, string>? moved = null;
+            Dictionary<string, string>? moved = null, renamed = null;
             try
             {
                 using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-                Find(doc.RootElement, ref moved);
+                Find(doc.RootElement, ref moved, ref renamed);
             }
             catch (JsonException) { return json; }
-            return moved == null ? json : Rewrite(json, moved);
+            return moved == null && renamed == null ? json : Rewrite(json, moved, renamed);
 
-            static void Find(JsonElement e, ref Dictionary<string, string>? moved)
+            static void Find(JsonElement e, ref Dictionary<string, string>? moved, ref Dictionary<string, string>? renamed)
             {
                 switch (e.ValueKind)
                 {
                     case JsonValueKind.Object:
-                        foreach (var p in e.EnumerateObject()) Find(p.Value, ref moved);
+                        foreach (var p in e.EnumerateObject())
+                        {
+                            foreach (string type in ScriptTypes(p))
+                            {
+                                string named = AssetDatabase.CurrentScript(type);
+                                if (named != type) (renamed ??= new Dictionary<string, string>(StringComparer.Ordinal))[type] = named;
+                            }
+                            Find(p.Value, ref moved, ref renamed);
+                        }
                         break;
                     case JsonValueKind.Array:
-                        foreach (var item in e.EnumerateArray()) Find(item, ref moved);
+                        foreach (var item in e.EnumerateArray()) Find(item, ref moved, ref renamed);
                         break;
                     case JsonValueKind.String:
                         string? value = e.GetString();
@@ -109,8 +130,24 @@ namespace GameEditor.Framework.Assets
             }
         }
 
-        // The text again with the moved keys replaced: in every text value, and in the names of the table's lines.
-        private static string Rewrite(string json, Dictionary<string, string> moved)
+        // The classes a member names when it is a "Script" block ({"Type": …}) or a "Scripts" list of such blocks.
+        private static IEnumerable<string> ScriptTypes(JsonProperty member)
+        {
+            if (member.NameEquals("Script") && member.Value.ValueKind == JsonValueKind.Object)
+            {
+                if (member.Value.TryGetProperty("Type", out var t) && t.ValueKind == JsonValueKind.String && t.GetString() is { Length: > 0 } type) yield return type;
+            }
+            else if (member.NameEquals("Scripts") && member.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in member.Value.EnumerateArray())
+                    if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("Type", out var t) && t.ValueKind == JsonValueKind.String
+                        && t.GetString() is { Length: > 0 } type) yield return type;
+            }
+        }
+
+        // The text again with the moved keys replaced — in every text value, and in the names of the table's lines
+        // — and the renamed classes, in the "Type" of script blocks and in the names of the script table's lines.
+        private static string Rewrite(string json, Dictionary<string, string>? moved, Dictionary<string, string>? renamed)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(json);
             var buffer = new ArrayBufferWriter<byte>(bytes.Length + 256);
@@ -118,53 +155,63 @@ namespace GameEditor.Framework.Assets
             {
                 var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
                 using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-                int tableDepth = -1;        // the depth of the table's lines while the reader is inside the table
-                bool nextIsTable = false;
+                // What each open object or array is the value of: a member's name; "" for an element of an array, and for the root.
+                var holders = new List<string>();
+                string member = "";   // the name the next value belongs to
                 while (reader.Read())
                 {
                     switch (reader.TokenType)
                     {
-                        case JsonTokenType.StartObject:
-                            writer.WriteStartObject();
-                            if (nextIsTable) tableDepth = reader.CurrentDepth + 1;
-                            nextIsTable = false;
-                            break;
-                        case JsonTokenType.EndObject:
-                            writer.WriteEndObject();
-                            if (tableDepth == reader.CurrentDepth + 1) tableDepth = -1;
-                            break;
-                        case JsonTokenType.StartArray: writer.WriteStartArray(); nextIsTable = false; break;
-                        case JsonTokenType.EndArray: writer.WriteEndArray(); break;
+                        case JsonTokenType.StartObject: writer.WriteStartObject(); holders.Add(member); member = ""; break;
+                        case JsonTokenType.StartArray: writer.WriteStartArray(); holders.Add(member); member = ""; break;
+                        case JsonTokenType.EndObject: writer.WriteEndObject(); holders.RemoveAt(holders.Count - 1); member = ""; break;
+                        case JsonTokenType.EndArray: writer.WriteEndArray(); holders.RemoveAt(holders.Count - 1); member = ""; break;
                         case JsonTokenType.PropertyName:
                         {
                             string name = reader.GetString() ?? "";
-                            if (reader.CurrentDepth == tableDepth && moved.TryGetValue(name, out string? renamed)) name = renamed;
-                            nextIsTable = reader.CurrentDepth == 1 && name == Member;
+                            if (holders.Count == 2)   // a line of one of the root's tables
+                            {
+                                if (holders[1] == Member && moved != null && moved.TryGetValue(name, out string? key)) name = key;
+                                else if (holders[1] == ScriptsMember && renamed != null && renamed.TryGetValue(name, out string? type)) name = type;
+                            }
+                            member = name;
                             writer.WritePropertyName(name);
                             break;
                         }
                         case JsonTokenType.String:
                         {
                             string value = reader.GetString() ?? "";
-                            int hash = value.IndexOf('#');
-                            if (hash < 0) writer.WriteStringValue(moved.TryGetValue(value, out string? now) ? now : value);
-                            else writer.WriteStringValue(moved.TryGetValue(value.Substring(0, hash), out string? file) ? file + value.Substring(hash) : value);
-                            nextIsTable = false;
+                            if (renamed != null && member == "Type" && InScriptBlock(holders) && renamed.TryGetValue(value, out string? type)) value = type;
+                            else if (moved != null)
+                            {
+                                int hash = value.IndexOf('#');
+                                if (hash < 0) { if (moved.TryGetValue(value, out string? now)) value = now; }
+                                else if (moved.TryGetValue(value.Substring(0, hash), out string? file)) value = file + value.Substring(hash);
+                            }
+                            writer.WriteStringValue(value);
+                            member = "";
                             break;
                         }
                         case JsonTokenType.Number:
                             writer.WriteRawValue(reader.ValueSpan, skipInputValidation: true);   // as written: a number is not read and formatted again
-                            nextIsTable = false;
+                            member = "";
                             break;
-                        case JsonTokenType.True: writer.WriteBooleanValue(true); nextIsTable = false; break;
-                        case JsonTokenType.False: writer.WriteBooleanValue(false); nextIsTable = false; break;
-                        case JsonTokenType.Null: writer.WriteNullValue(); nextIsTable = false; break;
+                        case JsonTokenType.True: writer.WriteBooleanValue(true); member = ""; break;
+                        case JsonTokenType.False: writer.WriteBooleanValue(false); member = ""; break;
+                        case JsonTokenType.Null: writer.WriteNullValue(); member = ""; break;
                     }
                 }
                 writer.Flush();
             }
             catch (JsonException) { return json; }   // the reader of the file reports a text that is not JSON
             return Encoding.UTF8.GetString(buffer.WrittenSpan);
+
+            // The innermost open object is a "Script" block, or an element of a "Scripts" list.
+            static bool InScriptBlock(List<string> holders)
+            {
+                int n = holders.Count;
+                return n >= 1 && (holders[n - 1] == "Script" || (holders[n - 1] == "" && n >= 2 && holders[n - 2] == "Scripts"));
+            }
         }
 
         // ── Writing ─────────────────────────────────────────────────────────────────────
@@ -181,34 +228,52 @@ namespace GameEditor.Framework.Assets
         public static string Stamp(string json, bool keep = false)
         {
             Dictionary<string, string>? old = ReadTable(json);
-            if (AssetDatabase.IsEmpty && old == null) return json;
+            Dictionary<string, string>? oldScripts = ReadTable(json, ScriptsMember);
+            if (AssetDatabase.IsEmpty && old == null && oldScripts == null) return json;
 
             var table = new SortedDictionary<string, string>(StringComparer.Ordinal);
-            if (keep && old != null)
-                foreach (var line in old) table[line.Key] = line.Value;
+            var scripts = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            if (keep)
+            {
+                if (old != null) foreach (var line in old) table[line.Key] = line.Value;
+                if (oldScripts != null) foreach (var line in oldScripts) scripts[line.Key] = line.Value;
+            }
             try
             {
                 using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
                 if (doc.RootElement.ValueKind != JsonValueKind.Object) return json;
                 var notAssets = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var member in doc.RootElement.EnumerateObject())
-                    if (!member.NameEquals(Member)) Collect(member.Value, old, table, notAssets);
+                    if (!member.NameEquals(Member) && !member.NameEquals(ScriptsMember)) Collect(member, old, table, notAssets, oldScripts, scripts);
             }
             catch (JsonException) { return json; }
 
-            if (old == null ? table.Count == 0 : Same(old, table)) return json;
-            return WithTable(json, table);
+            if ((old == null ? table.Count == 0 : Same(old, table)) && (oldScripts == null ? scripts.Count == 0 : Same(oldScripts, scripts))) return json;
+            return WithTables(json, table, scripts);
         }
 
-        private static void Collect(JsonElement e, Dictionary<string, string>? old, SortedDictionary<string, string> table, HashSet<string> notAssets)
+        private static void Collect(JsonProperty member, Dictionary<string, string>? old, SortedDictionary<string, string> table, HashSet<string> notAssets,
+                                    Dictionary<string, string>? oldScripts, SortedDictionary<string, string> scripts)
+        {
+            foreach (string type in ScriptTypes(member))
+            {
+                if (scripts.ContainsKey(type)) continue;
+                if (AssetDatabase.IdOfScript(type) is { } id) scripts[type] = id;
+                else if (oldScripts != null && oldScripts.TryGetValue(type, out string? kept)) scripts[type] = kept;
+            }
+            Collect(member.Value, old, table, notAssets, oldScripts, scripts);
+        }
+
+        private static void Collect(JsonElement e, Dictionary<string, string>? old, SortedDictionary<string, string> table, HashSet<string> notAssets,
+                                    Dictionary<string, string>? oldScripts, SortedDictionary<string, string> scripts)
         {
             switch (e.ValueKind)
             {
                 case JsonValueKind.Object:
-                    foreach (var p in e.EnumerateObject()) Collect(p.Value, old, table, notAssets);
+                    foreach (var p in e.EnumerateObject()) Collect(p, old, table, notAssets, oldScripts, scripts);
                     break;
                 case JsonValueKind.Array:
-                    foreach (var item in e.EnumerateArray()) Collect(item, old, table, notAssets);
+                    foreach (var item in e.EnumerateArray()) Collect(item, old, table, notAssets, oldScripts, scripts);
                     break;
                 case JsonValueKind.String:
                     string? value = e.GetString();
@@ -231,9 +296,9 @@ namespace GameEditor.Framework.Assets
             return true;
         }
 
-        // The text with its table member taken out and the new one (when it has lines) put last. Every other
+        // The text with its table members taken out and the new ones (those that have lines) put last. Every other
         // byte stays: the members are cut and joined where they are, not parsed and written again.
-        private static string WithTable(string json, SortedDictionary<string, string> table)
+        private static string WithTables(string json, SortedDictionary<string, string> table, SortedDictionary<string, string> scripts)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(json);
             var members = new List<(int start, int end, bool mine)>();
@@ -246,7 +311,7 @@ namespace GameEditor.Framework.Assets
                 while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
                 {
                     int start = (int)reader.TokenStartIndex;
-                    bool mine = reader.ValueTextEquals(Member);
+                    bool mine = reader.ValueTextEquals(Member) || reader.ValueTextEquals(ScriptsMember);
                     reader.Read();
                     reader.Skip();
                     members.Add((start, (int)reader.BytesConsumed, mine));
@@ -279,13 +344,14 @@ namespace GameEditor.Framework.Assets
                 }
                 previousEnd = m.end;
             }
-            if (table.Count > 0)
+            foreach (var (name, lines) in new[] { (Member, table), (ScriptsMember, scripts) })
             {
+                if (lines.Count == 0) continue;
                 if (any) sb.Append(',');
                 if (indented) sb.Append(newline).Append(indent);
-                sb.Append('"').Append(Member).Append(indented ? "\": {" : "\":{");
+                sb.Append('"').Append(name).Append(indented ? "\": {" : "\":{");
                 bool first = true;
-                foreach (var line in table)
+                foreach (var line in lines)
                 {
                     if (!first) sb.Append(',');
                     first = false;

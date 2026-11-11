@@ -452,6 +452,163 @@ namespace Scene.Tests
             Assert.Equal("Models/Kit/Materials/a.mtl", GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.MtlKey("Models/Kit/a.obj", "Materials/a.mtl"));
         }
 
+        // ── Scripts ─────────────────────────────────────────────────────────────────────
+
+        static Entity Scripted(GameEditor.Framework.Scene.Scene s, string name, string type, params string[] more)
+        {
+            Entity e = s.CreateEntity(name);
+            World.AddComponent(e, new ScriptComponent { TypeName = type, Properties = new() { ["Target"] = "Cannon" } });
+            if (more.Length > 0)
+            {
+                var list = new List<ScriptComponent>();
+                foreach (string t in more) list.Add(new ScriptComponent { TypeName = t });
+                World.AddComponent(e, new ScriptCollectionComponent { Scripts = list });
+            }
+            return e;
+        }
+
+        static string ScriptOf(string name) => World.GetComponent<ScriptComponent>(Find(name)).TypeName;
+
+        [Fact]
+        public void A_scene_holds_the_id_of_the_file_behind_each_script_it_names()
+        {
+            AssetDatabase.Set(Id(1), "Source/Cannon.cs");
+            AssetDatabase.Set(Id(2), "Source/AI/Patrol.cs");
+            AssetDatabase.Set(Id(3), "Source/A/Twin.cs");
+            AssetDatabase.Set(Id(4), "Source/B/Twin.cs");
+            AssetDatabase.Set(Id(5), "Assets/Models/Cannon.obj");
+            var s = NewScene();
+            Scripted(s, "Cannon", "Cannon", "Patrol", "Twin", "NotInTheProject");
+            string saved = Save(s);
+
+            var scripts = AssetRefs.ReadTable(saved, AssetRefs.ScriptsMember)!;
+            Assert.Equal(2, scripts.Count);              // a class two files have, and one no file has, get no line
+            Assert.Equal(Id(1), scripts["Cannon"]);
+            Assert.Equal(Id(2), scripts["Patrol"]);
+            Assert.Null(AssetRefs.ReadTable(saved));     // "Cannon" is a class here, not the key of an asset
+            Assert.EndsWith(",\"scripts\":{\"Cannon\":\"" + Id(1) + "\",\"Patrol\":\"" + Id(2) + "\"}}", saved);
+            Assert.Same(saved, AssetRefs.Stamp(saved));
+        }
+
+        [Fact]
+        public void A_renamed_script_is_found_and_only_script_blocks_change()
+        {
+            AssetDatabase.Set(Id(1), "Source/Cannon.cs");
+            AssetDatabase.Set(Id(2), "Source/AI/Patrol.cs");
+            AssetDatabase.Set(Id(3), "Source/Point.cs");
+            var s = NewScene();
+            Scripted(s, "Cannon", "Cannon", "Patrol", "Cannon");
+            Entity lamp = Scripted(s, "Lamp", "Point");
+            World.AddComponent(lamp, new LightComponent { Type = LightType.Point, Color = System.Numerics.Vector3.One, Intensity = 1, Range = 10, InnerAngle = 25, OuterAngle = 35, CastsShadows = true, Enabled = true });
+            string saved = Save(s);
+
+            // Moved to another folder: the class is the same.
+            AssetDatabase.Rename("Source/AI/Patrol.cs", "Source/Enemies/Patrol.cs");
+            Assert.Same(saved, AssetRefs.Resolve(saved));
+
+            AssetDatabase.Rename("Source/Cannon.cs", "Source/Guns/Turret.cs");
+            AssetDatabase.Rename("Source/Point.cs", "Source/Dot.cs");
+            var loaded = Load(saved);
+            Assert.Equal("Turret", ScriptOf("Cannon"));
+            Assert.Equal("Dot", ScriptOf("Lamp"));
+            Assert.Equal(LightType.Point, World.GetComponent<LightComponent>(Find("Lamp")).Type);   // a light's "Type" is not a script's
+            Assert.Equal("Cannon", World.GetComponent<NameTag>(Find("Cannon")).Name);                          // an entity of that name is not a script
+            Assert.Equal("Cannon", World.GetComponent<ScriptComponent>(Find("Cannon")).Properties!["Target"]);  // nor is a value of that text
+            var more = World.GetComponent<ScriptCollectionComponent>(Find("Cannon")).Scripts!;
+            Assert.Equal(new[] { "Patrol", "Turret" }, new[] { more[0].TypeName, more[1].TypeName });
+
+            string again = Save(loaded);
+            var scripts = AssetRefs.ReadTable(again, AssetRefs.ScriptsMember)!;
+            Assert.Equal(Id(1), scripts["Turret"]);
+            Assert.False(scripts.ContainsKey("Cannon"));
+            Assert.Equal(again, Save(Load(again)));
+
+            // A scene made after the rename gets the line by the class's new name.
+            Assert.Equal(Id(1), AssetDatabase.IdOfScript("Turret"));
+            Assert.Null(AssetDatabase.IdOfScript("Cannon"));
+            var fresh = NewScene();
+            Scripted(fresh, "Gun", "Turret");
+            Assert.Equal(Id(1), AssetRefs.ReadTable(Save(fresh), AssetRefs.ScriptsMember)!["Turret"]);
+
+            // What is held in memory from before the rename — an undo brings it back — is brought up to date too.
+            Assert.Equal("Turret", AssetDatabase.CurrentScript("Cannon"));
+            Assert.Equal("Patrol", AssetDatabase.CurrentScript("Patrol"));
+            string held = "{\"id\":1,\"c\":{\"NameTag\":{\"Name\":\"Cannon\"},\"Script\":{\"Type\":\"Cannon\"},\"Scripts\":[{\"Type\":\"Cannon\"},{\"Type\":\"Patrol\"}]}}";
+            Assert.Equal("{\"id\":1,\"c\":{\"NameTag\":{\"Name\":\"Cannon\"},\"Script\":{\"Type\":\"Turret\"},\"Scripts\":[{\"Type\":\"Turret\"},{\"Type\":\"Patrol\"}]}}",
+                         AssetRefs.Current(held));
+        }
+
+        [Fact]
+        public void A_script_in_a_prefab_instance_follows_its_file()
+        {
+            AssetDatabase.Set(Id(1), "Source/Cannon.cs");
+            Known(Enemy);
+            var p = NewScene();
+            Scripted(p, "Enemy", "Cannon");
+            _files[Enemy] = AsPrefab(p, "Enemy");
+            var s = NewScene();
+            SceneSerializer.InstantiatePrefab(Enemy, out _);
+            string saved = Save(s);
+
+            AssetDatabase.Rename("Source/Cannon.cs", "Source/Turret.cs");
+            PrefabLibrary.Invalidate();
+            var loaded = Load(saved);
+            Assert.Equal("Turret", ScriptOf("Enemy"));
+            Assert.DoesNotContain("Script", Save(loaded).Replace("\"scripts\"", ""));   // the instance differs from its prefab in nothing
+        }
+
+        [Fact]
+        public void A_script_file_is_its_class_only_when_it_declares_it()
+        {
+            Assert.True(AssetDatabase.DeclaresClass("public class Turret : GameBehaviour { }", "Turret"));
+            Assert.True(AssetDatabase.DeclaresClass("namespace A {\n  sealed  class\tTurret\n  { } }", "Turret"));
+            Assert.False(AssetDatabase.DeclaresClass("public class TurretBase { } // Turret", "Turret"));
+            Assert.False(AssetDatabase.DeclaresClass("public class Cannon { subclass Turret; Turret t; }", "Turret"));
+
+            string folder = Project("Source/Cannon.cs");
+            Write(folder, "Source/Cannon.cs", "public class Cannon : GameBehaviour { }");
+            AssetDatabase.Open(folder);
+            string id = AssetDatabase.IdOfScript("Cannon")!;
+            Assert.Equal(AssetDatabase.IdOfPath("Source/Cannon.cs"), id);
+            Assert.Equal("Cannon", AssetDatabase.ScriptOfId(id));
+            var s = NewScene();
+            Scripted(s, "Gun", "Cannon");
+            string saved = Save(s);
+
+            // The file renamed and its class not: the scene's script is still the class of the old name.
+            Assert.Null(AssetDatabase.Move("Source/Cannon.cs", "Source/Turret.cs"));
+            Assert.Null(AssetDatabase.ScriptOfId(id));
+            Load(saved);
+            Assert.Equal("Cannon", ScriptOf("Gun"));
+
+            // The class renamed too: found.
+            Write(folder, "Source/Turret.cs", "public class Turret : GameBehaviour { }");
+            Assert.Equal("Turret", AssetDatabase.ScriptOfId(id));
+            Load(saved);
+            Assert.Equal("Turret", ScriptOf("Gun"));
+        }
+
+        [Fact]
+        public void A_game_is_told_the_new_names_of_scripts_by_its_index()
+        {
+            AssetDatabase.Set(Id(1), "Source/Cannon.cs");
+            Known(Duck);
+            var s = NewScene();
+            Scripted(s, "Gun", "Cannon");
+            Mesh(s, "Duck", Duck);
+            string saved = Save(s);
+            string duckId = AssetDatabase.IdOfKey(Duck)!;
+
+            // In the game: no project, only what the index says moved.
+            AssetDatabase.Clear();
+            Assert.Same(saved, AssetRefs.Resolve(saved));
+            Assert.True(AssetDatabase.LoadIndex("{\"index\":1,\"assets\":{\"" + duckId + "\":\"Props/bird.obj\"},\"scripts\":{\"" + Id(1) + "\":\"Turret\"}}"));
+            Assert.False(AssetDatabase.LoadIndex("not an index"));
+            Load(saved);
+            Assert.Equal("Turret", ScriptOf("Gun"));
+            Assert.Equal("Props/bird.obj", MeshOf("Duck").MeshPath);
+        }
+
         // ── The .meta files of a project ────────────────────────────────────────────────
 
         [Fact]

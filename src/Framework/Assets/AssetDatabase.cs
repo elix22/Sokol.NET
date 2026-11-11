@@ -47,6 +47,14 @@ namespace GameEditor.Framework.Assets
         private static readonly Dictionary<string, string> _idOfKey = new(StringComparer.Ordinal);
         // Keys files had before they were moved since the project was opened → their id.
         private static readonly Dictionary<string, string> _movedFrom = new(StringComparer.Ordinal);
+        // Scripts by class: a script's class is its file's name ("Source/AI/Enemy.cs" = Enemy). Null: two files have the name.
+        private static readonly Dictionary<string, string?> _idOfScript = new(StringComparer.Ordinal);
+        // The names scripts had before they were renamed since the project was opened → their id.
+        private static readonly Dictionary<string, string> _scriptMovedFrom = new(StringComparer.Ordinal);
+        // In a game: the class a renamed script has now, by its id (from the index).
+        private static readonly Dictionary<string, string> _scriptOfId = new(StringComparer.Ordinal);
+        // Whether a script file declares the class of its name, by the file's time.
+        private static readonly Dictionary<string, (DateTime time, bool declares)> _declares = new(StringComparer.Ordinal);
         private static string? _root;
 
         /// <summary>A file moved: its old and its new path. Raised once for each file of a folder that moved.</summary>
@@ -56,10 +64,10 @@ namespace GameEditor.Framework.Assets
         public static string? Root => _root;
 
         /// <summary>True when a file was moved since the project was opened: a key from before may still be held somewhere.</summary>
-        public static bool HasMoves => _movedFrom.Count > 0;
+        public static bool HasMoves => _movedFrom.Count > 0 || _scriptMovedFrom.Count > 0;
 
         /// <summary>True when no id is known: nothing a file names can have moved.</summary>
-        public static bool IsEmpty => _pathOfId.Count == 0;
+        public static bool IsEmpty => _pathOfId.Count == 0 && _scriptOfId.Count == 0;
 
         public static int Count => _pathOfId.Count;
 
@@ -73,6 +81,10 @@ namespace GameEditor.Framework.Assets
             _idOfPath.Clear();
             _idOfKey.Clear();
             _movedFrom.Clear();
+            _idOfScript.Clear();
+            _scriptMovedFrom.Clear();
+            _scriptOfId.Clear();
+            _declares.Clear();
             _root = null;
         }
 
@@ -119,12 +131,88 @@ namespace GameEditor.Framework.Assets
             _pathOfId[id] = path;
             _idOfPath[path] = id;
             if (KeyOfPath(path) is { } key) _idOfKey[key] = id;
+            if (ScriptNameOf(path) is { } script) _idOfScript[script] = _idOfScript.TryGetValue(script, out string? other) && other != id ? null : id;
         }
 
         private static void Forget(string path)
         {
             _idOfPath.Remove(path);
             if (KeyOfPath(path) is { } key) _idOfKey.Remove(key);
+            if (ScriptNameOf(path) is { } script)
+            {
+                // The name belongs to the files that still have it: one, or more than one (then to none).
+                _idOfScript.Remove(script);
+                foreach (var kv in _idOfPath)
+                    if (ScriptNameOf(kv.Key) == script) _idOfScript[script] = _idOfScript.ContainsKey(script) ? null : kv.Value;
+            }
+        }
+
+        // ── Scripts ─────────────────────────────────────────────────────────────────────
+        //
+        // A scene names a script by its class ("Type": "Enemy"), and a game finds the class by that name. A
+        // script's class is its file's name; the file has an id like any asset, so a scene that also holds that
+        // id (AssetRefs) finds the script after its file and class were renamed.
+
+        /// <summary>The class of a script file ("Source/AI/Enemy.cs" = "Enemy"), or null for a path that is not one.</summary>
+        public static string? ScriptNameOf(string path)
+            => path.StartsWith(SourcePrefix, StringComparison.Ordinal) && path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                ? Path.GetFileNameWithoutExtension(path) : null;
+
+        /// <summary>The id of the script file of a class, or null when there is none, or more than one file of that name.</summary>
+        public static string? IdOfScript(string type) => _idOfScript.TryGetValue(type, out string? id) ? id : null;
+
+        /// <summary>True when one or more script files have this name.</summary>
+        public static bool IsScriptName(string type) => _idOfScript.ContainsKey(type);
+
+        /// <summary>
+        /// The class of the script file with an id: its file's name, when the file declares a class of that name
+        /// (in a game: what the index says). Null when the id is unknown or its file is no such script.
+        /// </summary>
+        public static string? ScriptOfId(string id)
+        {
+            if (_scriptOfId.TryGetValue(id, out string? indexed)) return indexed;
+            if (!_pathOfId.TryGetValue(id, out string? path) || ScriptNameOf(path) is not { } name) return null;
+            if (_idOfScript.TryGetValue(name, out string? owner) && owner != id) return null;   // two files of the name
+            return _root == null || Declares(path, name) ? name : null;
+        }
+
+        /// <summary>
+        /// The class a script has now, for a name it had before it was renamed in this session; any other name
+        /// comes back as it is.
+        /// </summary>
+        public static string CurrentScript(string type)
+        {
+            if (_scriptMovedFrom.Count == 0 || string.IsNullOrEmpty(type) || _idOfScript.ContainsKey(type)) return type;
+            return _scriptMovedFrom.TryGetValue(type, out string? id) && ScriptOfId(id) is { } now ? now : type;
+        }
+
+        /// <summary>True when a C# text has the words <c>class Name</c> (the name not part of a longer one).</summary>
+        public static bool DeclaresClass(string code, string name)
+        {
+            for (int at = code.IndexOf(name, StringComparison.Ordinal); at >= 0; at = code.IndexOf(name, at + 1, StringComparison.Ordinal))
+            {
+                int end = at + name.Length;
+                if (end < code.Length && (char.IsLetterOrDigit(code[end]) || code[end] == '_')) continue;
+                int before = at;
+                while (before > 0 && char.IsWhiteSpace(code[before - 1])) before--;
+                if (before == at || before < 5 || string.CompareOrdinal(code, before - 5, "class", 0, 5) != 0) continue;
+                if (before == 5 || !(char.IsLetterOrDigit(code[before - 6]) || code[before - 6] == '_')) return true;
+            }
+            return false;
+        }
+
+        private static bool Declares(string path, string name)
+        {
+            try
+            {
+                string file = Abs(path);
+                DateTime time = File.GetLastWriteTimeUtc(file);
+                if (_declares.TryGetValue(path, out var known) && known.time == time) return known.declares;
+                bool declares = DeclaresClass(File.ReadAllText(file), name);
+                _declares[path] = (time, declares);
+                return declares;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
         }
 
         /// <summary>
@@ -141,6 +229,10 @@ namespace GameEditor.Framework.Assets
                     foreach (var p in assets.EnumerateObject())
                         if (p.Value.ValueKind == JsonValueKind.String && p.Value.GetString() is { Length: > 0 } key)
                             Set(p.Name, AssetsPrefix + key);
+                if (doc.RootElement.TryGetProperty("scripts", out var scripts) && scripts.ValueKind == JsonValueKind.Object)
+                    foreach (var p in scripts.EnumerateObject())
+                        if (p.Value.ValueKind == JsonValueKind.String && p.Value.GetString() is { Length: > 0 } type)
+                            _scriptOfId[p.Name] = type;
                 return true;
             }
             catch (JsonException) { return false; }
@@ -409,7 +501,13 @@ namespace GameEditor.Framework.Assets
                 _idOfKey[newKey] = id;
                 _movedFrom.Remove(newKey);   // the file is back where it was
             }
+            if (ScriptNameOf(newPath) is { } script) _idOfScript[script] = _idOfScript.TryGetValue(script, out string? other) && other != id ? null : id;
             if (KeyOfPath(oldPath) is { } oldKey) _movedFrom[oldKey] = id;
+            if (ScriptNameOf(oldPath) is { } oldName && ScriptNameOf(newPath) is { } newName && oldName != newName)
+            {
+                _scriptMovedFrom[oldName] = id;
+                _scriptMovedFrom.Remove(newName);   // the script has the name again that it once had
+            }
             if (raise) Moved?.Invoke(oldPath, newPath);
         }
 
