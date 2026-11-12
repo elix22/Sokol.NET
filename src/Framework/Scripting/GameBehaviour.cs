@@ -335,11 +335,20 @@ namespace GameEditor.Framework.Scripting
 
         /// <summary>Number of currently active touch points.</summary>
         protected static int TouchCount                           => Input.InputManager.TouchCount;
+        /// <summary>The game runs on an Android or an iOS device: a touch screen is how it is played.</summary>
+        protected static bool TouchScreen                         => Input.InputManager.TouchScreen;
         /// <summary>Returns the touch at the given index (0 ≤ index &lt; TouchCount).</summary>
         protected static Input.Touch GetTouch(int index)          => Input.InputManager.GetTouch(index);
 
         /// <summary>Current mouse position in screen pixels.</summary>
         protected static Vector2 MousePosition                    => Input.InputManager.MousePosition;
+        /// <summary>The size of the game's picture in pixels: the pixels MousePosition and a touch's Position are in.</summary>
+        protected static Vector2 ScreenSize                       => Input.InputManager.ScreenSize;
+        /// <summary>
+        /// The world point the main camera shows at a pixel of the picture (MousePosition, a touch's Position), on
+        /// the plane z = <paramref name="z"/>: where a click or a finger is in a 2D scene.
+        /// </summary>
+        protected static Vector3 ScreenToWorld(Vector2 screen, float z = 0f) => Scene.SceneManager.ScreenToWorld(screen, z);
         /// <summary>Mouse movement delta accumulated this frame.</summary>
         protected static Vector2 MouseDelta                       => Input.InputManager.MouseDelta;
         /// <summary>Vertical scroll delta this frame.</summary>

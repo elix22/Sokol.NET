@@ -709,6 +709,24 @@ namespace GameEditor.Framework.Scene
             return false;
         }
 
+        /// <summary>
+        /// The world point the main camera shows at a pixel of the game's picture (x to the right, y down, as
+        /// pointer positions are given), on the plane z = <paramref name="z"/>. With no camera, or a camera that
+        /// looks along that plane, the point is (0, 0, z).
+        /// </summary>
+        public static Vector3 ScreenToWorld(Vector2 screen, float z = 0f)
+        {
+            Vector2 size = Input.InputManager.ScreenSize;
+            if (!GetMainCamera((int)size.X, (int)size.Y, out Matrix4x4 view, out Matrix4x4 proj, out _, out _)
+                || !Matrix4x4.Invert(view * proj, out Matrix4x4 inverse)) return new Vector3(0f, 0f, z);
+            float x = screen.X / size.X * 2f - 1f, y = 1f - screen.Y / size.Y * 2f;
+            Vector4 near = Vector4.Transform(new Vector4(x, y, 0f, 1f), inverse), far = Vector4.Transform(new Vector4(x, y, 1f, 1f), inverse);
+            Vector3 from = new Vector3(near.X, near.Y, near.Z) / near.W, to = new Vector3(far.X, far.Y, far.Z) / far.W;
+            float along = to.Z - from.Z;
+            if (MathF.Abs(along) < 1e-9f) return new Vector3(0f, 0f, z);
+            return from + (to - from) * ((z - from.Z) / along);
+        }
+
         public static bool GetMainCameraMatrices(int width, int height,out Matrix4x4 viewProj, out Vector3 eyePos)
         {
             bool found = GetMainCamera(width, height, out var view, out var proj, out _, out eyePos);

@@ -113,6 +113,7 @@ namespace GameEditor.Framework.Input
         // Where the game is drawn inside the window (SetPointerViewport).
         private static Vector2 _pointerOrigin;
         private static float   _pointerScale = 1f;
+        private static Vector2 _screenSize;         // (0, 0): the window's own
 
         // ── Mouse state ───────────────────────────────────────────────────────
 
@@ -145,6 +146,14 @@ namespace GameEditor.Framework.Input
 
         /// <summary>Number of currently active touch points.</summary>
         public static int TouchCount { get; private set; }
+
+        /// <summary>The game runs where a touch screen is how it is played: on an Android or an iOS device.</summary>
+        public static bool TouchScreen =>
+#if __ANDROID__ || __IOS__
+            true;
+#else
+            false;
+#endif
 
         // ── Named-axis virtual overrides ──────────────────────────────────────
 
@@ -259,6 +268,16 @@ namespace GameEditor.Framework.Input
         }
 
         private static Vector2 ToGame(float x, float y) => (new Vector2(x, y) - _pointerOrigin) * _pointerScale;
+
+        /// <summary>
+        /// The size of the game's picture, in the pixels <see cref="MousePosition"/> and a touch's position are
+        /// given in: the window's, or what a host that shows the game in a part of its window said
+        /// (<see cref="SetScreenSize"/>).
+        /// </summary>
+        public static Vector2 ScreenSize => _screenSize.X > 0f && _screenSize.Y > 0f ? _screenSize : new Vector2(sapp_width(), sapp_height());
+
+        /// <summary>For a host that shows the game in a part of its window: the picture's size. (0, 0): the window's own again.</summary>
+        public static void SetScreenSize(float width, float height) => _screenSize = new Vector2(width, height);
 
         private static void ApplyEvent(sapp_event* e)
         {

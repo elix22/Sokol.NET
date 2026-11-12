@@ -199,6 +199,42 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void A_pixel_of_the_picture_is_a_world_point_on_the_plane_asked_for()
+        {
+            // A 2D camera of size 5 at (3, 1, 10) in a picture of 800 x 400: 10 units to each side, 5 up and down.
+            var s = NewScene();
+            var (tr, cam) = Camera2D(5f);
+            tr.Position = new Vector3(3f, 1f, 10f);
+            Entity camera = s.CreateEntity("Cam");
+            World.AddComponent(camera, tr);
+            World.AddComponent(camera, cam);
+            GameEditor.Framework.Input.InputManager.SetScreenSize(800f, 400f);
+            try
+            {
+                Vector3 middle = SceneManager.ScreenToWorld(new Vector2(400f, 200f));
+                Near(3f, middle.X); Near(1f, middle.Y); Near(0f, middle.Z);
+                Vector3 topLeft = SceneManager.ScreenToWorld(new Vector2(0f, 0f));          // y down in the picture, up in the world
+                Near(-7f, topLeft.X); Near(6f, topLeft.Y);
+                Vector3 lowRight = SceneManager.ScreenToWorld(new Vector2(800f, 400f), z: -2f);
+                Near(13f, lowRight.X); Near(-4f, lowRight.Y); Near(-2f, lowRight.Z);
+
+                // A perspective camera: the point where the ray through the pixel meets the plane.
+                tr.Position = new Vector3(0f, 0f, 10f);
+                World.AddComponent(camera, tr);
+                World.AddComponent(camera, new CameraComponent { NearZ = 0.1f, FarZ = 100f, Fov = 90f, IsMain = true, Enabled = true });
+                Vector3 centre = SceneManager.ScreenToWorld(new Vector2(400f, 200f));
+                Near(0f, centre.X); Near(0f, centre.Y);
+                Vector3 top = SceneManager.ScreenToWorld(new Vector2(400f, 0f));              // 45 degrees up, 10 away: 10 high
+                Assert.Equal(10f, MathF.Abs(top.Y), 2);
+                Near(0f, top.Z);
+
+                World.Clear();
+                Assert.Equal(new Vector3(0f, 0f, 4f), SceneManager.ScreenToWorld(new Vector2(1f, 1f), 4f));       // no camera
+            }
+            finally { GameEditor.Framework.Input.InputManager.SetScreenSize(0f, 0f); }
+        }
+
+        [Fact]
         public void An_orthographic_camera_shows_its_size_above_and_below_and_x_to_the_right()
         {
             var (tr, cam) = Camera2D(5f);
