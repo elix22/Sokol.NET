@@ -288,9 +288,11 @@ namespace GameEditor.Framework.Physics
                 default:
                     cs.mMotionType  = JPH.EMotionType.Dynamic;
                     cs.mObjectLayer = ObjLayerMoving;
-                    if (desc.ExactMass && desc.Mass > 0f)
+                    // A dynamic body weighs its Mass (its inertia from its shapes). Without this Jolt gave it its shapes'
+                    // volume at the default density — a 1 m box weighed 1,000 kg whatever the component said.
+                    if (desc.Mass > 0f)
                     {
-                        cs.SetOverrideMassProperties(1);   // CalculateInertia: the mass given, the inertia from the shapes
+                        cs.SetOverrideMassProperties(1);   // EOverrideMassProperties::CalculateInertia
                         cs.SetMassOverride(desc.Mass);
                     }
                     break;
@@ -682,7 +684,18 @@ namespace GameEditor.Framework.Physics
             float fraction = result.mFraction;
             Vector3 hitPoint = origin + Vector3.Normalize(direction) * (maxDistance * fraction);
 
-            hit = new RaycastHit(new PhysicsBodyHandle(handleId), hitPoint, Vector3.Normalize(direction), maxDistance * fraction);
+            // The surface's normal where the ray met it (the face's: a vertex or an edge gives one of its faces').
+            Vector3 normal = -Vector3.Normalize(direction);
+            if (_bodyInterface != null)
+            {
+                using var shape = _bodyInterface.GetTransformedShape(result.mBodyID);
+                using var at = new JPH.Vec3(hitPoint.X, hitPoint.Y, hitPoint.Z);
+                using var n = shape.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, at);
+                var found3 = new Vector3(n.GetX(), n.GetY(), n.GetZ());
+                if (found3.LengthSquared() > 1e-8f) normal = Vector3.Normalize(found3);
+            }
+
+            hit = new RaycastHit(new PhysicsBodyHandle(handleId), hitPoint, normal, maxDistance * fraction);
             return true;
         }
 

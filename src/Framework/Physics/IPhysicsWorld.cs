@@ -72,13 +72,6 @@ namespace GameEditor.Framework.Physics
         public bool IsStatic    => MotionType == RigidbodyMotionType.Static;
         public bool IsKinematic => MotionType == RigidbodyMotionType.Kinematic;
 
-        /// <summary>
-        /// A dynamic body that weighs <see cref="Mass"/> exactly (its inertia from its shapes). Without it a body
-        /// weighs what its shapes hold at the default density — as every body did before this flag, which is kept
-        /// so that no existing scene changes. A kart asks for it: its forces are worked out from its mass.
-        /// </summary>
-        public bool ExactMass { get; init; }
-
         public BodyDesc(
             Vector3 position, Quaternion rotation, Vector3 scale,
             RigidbodyMotionType motionType, float mass, bool useGravity,

@@ -79,6 +79,44 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void A_body_weighs_its_Mass_whatever_its_size()
+        {
+            // No gravity on these: an impulse of 10 gives 5 m/s to a body of 2 kg, small or large.
+            Entity small = Body("Small", new Vector3(0, 10, 0), RigidbodyMotionType.Dynamic, 2f, new Vector3(0.1f, 0.1f, 0.1f));
+            Entity large = Body("Large", new Vector3(10, 10, 0), RigidbodyMotionType.Dynamic, 2f, new Vector3(2f, 2f, 2f));
+            foreach (Entity e in new[] { small, large })
+            {
+                var rb = World.GetComponent<RigidbodyComponent>(e);
+                rb.UseGravity = false;
+                World.AddComponent(e, rb);
+            }
+            SceneManager.Play();
+            Assert.True(SceneManager.AddImpulse(small, new Vector3(10, 0, 0)));
+            Assert.True(SceneManager.AddImpulse(large, new Vector3(10, 0, 0)));
+            Run(Step);
+            Assert.True(SceneManager.TryGetLinearVelocity(small, out Vector3 vs));
+            Assert.True(SceneManager.TryGetLinearVelocity(large, out Vector3 vl));
+            Assert.Equal(5f, vs.X, 2);
+            Assert.Equal(5f, vl.X, 2);
+        }
+
+        [Fact]
+        public void A_ray_gives_the_surface_normal_where_it_hits()
+        {
+            // A ramp turned 30 degrees about X: a ray straight down meets its top face, whose normal leans toward +Z.
+            Entity ramp = Body("Ramp", new Vector3(0, 0, 0), RigidbodyMotionType.Static, 0f, new Vector3(5, 0.5f, 5));
+            var tr = World.GetComponent<Transform>(ramp);
+            tr.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI / 6f);
+            World.AddComponent(ramp, tr);
+            SceneManager.Play();
+            Assert.True(SceneManager.Raycast(new Vector3(0, 10, 0), -Vector3.UnitY, 20f, out Entity met, out RaycastHit hit));
+            Assert.Equal(ramp, met);
+            Vector3 want = Vector3.Transform(Vector3.UnitY, tr.Rotation);
+            Assert.True(Vector3.Distance(hit.Normal, want) < 1e-3f, $"{hit.Normal} want {want}");
+            Assert.True(hit.Normal.Z > 0.4f, hit.Normal.ToString());                  // not the ray's direction (0, -1, 0)
+        }
+
+        [Fact]
         public void Rays_that_start_inside_the_kart_pass_through_it_to_the_ground()
         {
             Ground();

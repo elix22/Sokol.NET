@@ -46,7 +46,7 @@
 [submodule "ext/JoltPhysics"]
 	path = ext/JoltPhysics
 	url = https://github.com/elix22/JoltPhysics.git
-	branch = v5.5.0.bindings
+	branch = v5.6.0.bindings
 [submodule "ext/miniaudio"]
 	path = ext/miniaudio
 	url = https://github.com/elix22/miniaudio.git

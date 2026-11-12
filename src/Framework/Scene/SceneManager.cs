@@ -1198,7 +1198,7 @@ namespace GameEditor.Framework.Scene
                 worldPos, worldRot, tr.Scale,
                 rb.MotionType, rb.Mass, rb.UseGravity, shapes,
                 rb.Friction, rb.Restitution, rb.LinearDamping, rb.AngularDamping,
-                rb.IsTrigger, rb.Layer, rb.LayerMask) { ExactMass = world.HasComponent<KartComponent>(entity) };
+                rb.IsTrigger, rb.Layer, rb.LayerMask);
 
             var handle = _physics!.CreateBody(desc);
             _entityToHandle[entity] = handle;
