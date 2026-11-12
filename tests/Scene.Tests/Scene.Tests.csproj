@@ -32,6 +32,19 @@
     <ProjectReference Include="../../src/Framework/Framework.csproj" />
   </ItemGroup>
 
+  <!-- The 2D physics tests run the real Box2D: its library for this machine goes beside the tests. (The 3D
+       tests need no native library: they play with a stand-in backend.) -->
+  <Target Name="CopyBox2D" AfterTargets="Build">
+    <PropertyGroup>
+      <Box2DLibs>$(MSBuildThisFileDirectory)../../ext/box2d/libs</Box2DLibs>
+      <Box2DArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</Box2DArch>
+      <Box2DLib Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(Box2DLibs)/macos/$(Box2DArch)/release/libbox2d.dylib</Box2DLib>
+      <Box2DLib Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(Box2DLibs)/linux/$(Box2DArch)/release/libbox2d.so</Box2DLib>
+      <Box2DLib Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(Box2DLibs)/windows/$(Box2DArch)/release/box2d.dll</Box2DLib>
+    </PropertyGroup>
+    <Copy SourceFiles="$(Box2DLib)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(Box2DLib)')" />
+  </Target>
+
   <!-- As a game project embeds its Embedded folder (EmbeddedFiles reads it). -->
   <ItemGroup>
     <EmbeddedResource Include="Embedded/**/*" LogicalName="Embedded/%(RecursiveDir)%(Filename)%(Extension)" />

@@ -51,6 +51,8 @@ namespace GameEditor.Framework.Core
                 {
                     if (phys.TryGetProperty("engine3D", out var e3)) cfg.Physics3D = e3.GetString() ?? cfg.Physics3D;
                     if (phys.TryGetProperty("engine2D", out var e2)) cfg.Physics2D = e2.GetString() ?? cfg.Physics2D;
+                    if (phys.TryGetProperty("gravity2D", out var g2) && g2.ValueKind == JsonValueKind.Array && g2.GetArrayLength() == 2)
+                        cfg.Gravity2D = new System.Numerics.Vector2(g2[0].GetSingle(), g2[1].GetSingle());
                 }
                 ReadEnvironment(root, cfg);
 
@@ -86,6 +88,8 @@ namespace GameEditor.Framework.Core
                 {
                     if (phys.TryGetProperty("engine3D", out var e3)) cfg.Physics3D = e3.GetString() ?? cfg.Physics3D;
                     if (phys.TryGetProperty("engine2D", out var e2)) cfg.Physics2D = e2.GetString() ?? cfg.Physics2D;
+                    if (phys.TryGetProperty("gravity2D", out var g2) && g2.ValueKind == JsonValueKind.Array && g2.GetArrayLength() == 2)
+                        cfg.Gravity2D = new System.Numerics.Vector2(g2[0].GetSingle(), g2[1].GetSingle());
                 }
                 ReadEnvironment(root, cfg);
 
@@ -144,7 +148,9 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"screenHeight\": {config.ScreenHeight},\n");
             sb.Append("  \"physics\": {\n");
             sb.Append($"    \"engine3D\": \"{Esc(config.Physics3D)}\",\n");
-            sb.Append($"    \"engine2D\": \"{Esc(config.Physics2D)}\"\n");
+            sb.Append($"    \"engine2D\": \"{Esc(config.Physics2D)}\",\n");
+            sb.Append("    \"gravity2D\": [").Append(config.Gravity2D.X.ToString("G", System.Globalization.CultureInfo.InvariantCulture)).Append(", ")
+              .Append(config.Gravity2D.Y.ToString("G", System.Globalization.CultureInfo.InvariantCulture)).Append("]\n");
             sb.Append("  },\n");
             sb.Append($"  \"environmentMode\": \"{Esc(config.EnvironmentMode)}\",\n");
             sb.Append($"  \"environmentFolder\": \"{Esc(config.EnvironmentFolder)}\",\n");

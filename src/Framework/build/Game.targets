@@ -13,4 +13,26 @@
       <Link>Render2D/%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
   </ItemGroup>
+
+  <!-- Box2D, the 2D physics library. Its binding is inside the engine; the library is a file of its own.
+       Desktop: copied beside the app. Web: linked into the page. (Android and iOS: the project's
+       Directory.Build.props names the folders, where the app builder reads them.) -->
+  <PropertyGroup>
+    <Box2DLibs>$(MSBuildThisFileDirectory)../../../ext/box2d/libs</Box2DLibs>
+    <Box2DArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</Box2DArch>
+    <Box2DLib Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(Box2DLibs)/macos/$(Box2DArch)/release/libbox2d.dylib</Box2DLib>
+    <Box2DLib Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(Box2DLibs)/linux/$(Box2DArch)/release/libbox2d.so</Box2DLib>
+    <Box2DLib Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(Box2DLibs)/windows/$(Box2DArch)/release/box2d.dll</Box2DLib>
+  </PropertyGroup>
+  <Target Name="CopyBox2D" AfterTargets="AfterBuild" Condition="'$(TargetOS)' != 'browser' and '$(Box2DLib)' != '' and Exists('$(Box2DLib)')">
+    <Copy SourceFiles="$(Box2DLib)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyBox2DPublish" AfterTargets="Publish" Condition="'$(TargetOS)' != 'browser' and '$(Box2DLib)' != '' and Exists('$(Box2DLib)')">
+    <Copy SourceFiles="$(Box2DLib)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup Condition="'$(TargetOS)' == 'browser' and Exists('$(Box2DLibs)/emscripten/x86/release/box2d.a')">
+    <NativeFileReference Include="$(Box2DLibs)/emscripten/x86/release/box2d.a">
+      <Link>libs\box2d.a</Link>
+    </NativeFileReference>
+  </ItemGroup>
 </Project>

@@ -13,6 +13,8 @@ namespace GameEditor.Framework.Core
         public int    ScreenHeight  { get; set; } = 720;
         public string Physics3D     { get; set; } = "jolt";
         public string Physics2D     { get; set; } = "box2d";
+        /// <summary>The 2D world's gravity, in units per second squared ("physics": { "gravity2D": [0, -9.81] }).</summary>
+        public System.Numerics.Vector2 Gravity2D { get; set; } = new(0f, -9.81f);
 
         // ── Environment / IBL (authored in the editor's Environment panel) ──────────────
         public string EnvironmentMode      { get; set; } = "cubemap";          // "procedural" | "cubemap"

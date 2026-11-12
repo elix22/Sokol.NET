@@ -259,6 +259,21 @@ namespace GameEditor.Framework.Scripting
         protected bool TeleportTo(Vector3 position, Quaternion rotation)
             => SceneManager.TeleportBody(EntityId, position, rotation);
 
+        // ── 2D queries (the Box2D world; the calls above act on a 2D body too) ──────────
+
+        /// <summary>The first 2D body a ray meets, from <paramref name="origin"/> along <paramref name="direction"/> for <paramref name="distance"/> units. Triggers are not met.</summary>
+        protected bool Raycast2D(Vector2 origin, Vector2 direction, float distance, out Entity hitEntity, out Physics2D.RaycastHit2D hit)
+            => Physics2D.Physics2DWorld.Raycast(origin, direction, distance, out hitEntity, out hit);
+
+        /// <summary>The entities whose 2D body holds a point. Returns how many.</summary>
+        protected int OverlapPoint2D(Vector2 point, List<Entity> results) => Physics2D.Physics2DWorld.OverlapPoint(point, results);
+
+        /// <summary>The entities whose 2D body a circle reaches.</summary>
+        protected int OverlapCircle2D(Vector2 center, float radius, List<Entity> results) => Physics2D.Physics2DWorld.OverlapCircle(center, radius, results);
+
+        /// <summary>The entities whose 2D body a box reaches: its middle, its width and height, its turn in degrees.</summary>
+        protected int OverlapBox2D(Vector2 center, Vector2 size, float angle, List<Entity> results) => Physics2D.Physics2DWorld.OverlapBox(center, size, angle, results);
+
         protected bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out Entity hitEntity, out RaycastHit hit)
             => SceneManager.Raycast(origin, direction, maxDistance, out hitEntity, out hit);
 

@@ -68,4 +68,45 @@ namespace GameEditor.Framework.ECS.Components
 
         public static TilemapRenderer Default => new() { Map = "", Color = Vector4.One, Visible = true };
     }
+
+    public enum Body2DType { Static, Kinematic, Dynamic }
+
+    public enum Shape2DType { Box, Circle, Capsule, Polygon }
+
+    /// <summary>One shape of a <see cref="Body2D"/>, in the entity's own units (scaled by its Transform when the body is made).</summary>
+    public struct Shape2D
+    {
+        public Shape2DType Type;
+        /// <summary>Width and height, for a box and a capsule.</summary>
+        public Vector2 Size;
+        /// <summary>For a circle.</summary>
+        public float Radius;
+        /// <summary>The shape's middle, from the entity's position.</summary>
+        public Vector2 Offset;
+        /// <summary>The shape's turn about z, in degrees.</summary>
+        public float Angle;
+        /// <summary>For a polygon: three to eight points of a convex shape.</summary>
+        public Vector2[]? Points;
+    }
+
+    /// <summary>
+    /// A body of the 2D physics world (scene block "Body2D"): it falls, collides and is moved in the XY plane.
+    /// With no <see cref="Shapes"/> it is a box as large as the entity's sprite, or one unit. A dynamic body
+    /// writes its entity's x, y and turn about z after each step; a kinematic one is moved by its Transform and
+    /// pushes what it meets; a static one stands. 2D bodies and 3D bodies do not touch each other.
+    /// </summary>
+    public struct Body2D
+    {
+        public Body2DType Type;
+        public float GravityScale, LinearDamping, AngularDamping;
+        public bool FixedRotation, Bullet;
+        public float Density, Friction, Restitution;
+        /// <summary>Nothing bumps into it; scripts are told what enters and leaves it (OnTriggerEnter / Exit).</summary>
+        public bool IsTrigger;
+        /// <summary>The bits of what the body is, and of what it collides with.</summary>
+        public int Layer, Mask;
+        public Shape2D[]? Shapes;
+
+        public static Body2D Default => new() { Type = Body2DType.Dynamic, GravityScale = 1f, Density = 1f, Friction = 0.6f, Layer = 1, Mask = 65535 };
+    }
 }

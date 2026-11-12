@@ -340,6 +340,7 @@ namespace GameEditor.Framework.Scene
                     foreach (Entity e in created) CreateCharacter(world, e);
                     foreach (Entity e in created) CreateVehicle(world, e);
                 }
+                foreach (Entity e in created) Physics2D.Physics2DWorld.AddEntity(world, e);
                 ScriptSystem.AddEntities(world, created);
             }
             return root;
@@ -384,7 +385,7 @@ namespace GameEditor.Framework.Scene
                 if (doomed.Count == 0) continue;
 
                 foreach (Entity e in doomed) ScriptSystem.RemoveEntity(e);   // while their components are still there
-                if (_physics != null) DestroyPhysicsOf(world, doomed, seen);
+                DestroyPhysicsOf(world, doomed, seen);   // the 2D bodies too, which need no 3D world
                 foreach (Entity e in doomed)
                     if (e.IsAlive) world.DestroyEntity(e);                   // the world takes the children with a parent
             }
@@ -393,6 +394,8 @@ namespace GameEditor.Framework.Scene
         // Takes the entities' constraints, character controllers, vehicles and bodies out of the physics world.
         static void DestroyPhysicsOf(ECSWorld world, List<Entity> entities, HashSet<Entity> set)
         {
+            foreach (Entity e in entities) Physics2D.Physics2DWorld.RemoveEntity(e);
+            if (_physics == null) return;
             // Constraints first: those on the entities, and those of any entity that hold one of their bodies.
             bool anyBody = false;
             foreach (Entity e in entities) anyBody |= _entityToHandle.ContainsKey(e);
@@ -715,6 +718,8 @@ namespace GameEditor.Framework.Scene
 
         public static void UpdatePhysics(float deltaTime)
         {
+            if (PlayMode == PlayModeState.Playing) Physics2D.Physics2DWorld.Step(ECSWorld.Instance, deltaTime);
+
             if (_simulator != null)
             {
                 if (PlayMode == PlayModeState.Playing) _simulator.Step(deltaTime);
@@ -803,9 +808,13 @@ namespace GameEditor.Framework.Scene
             return _handleToEntity.TryGetValue(hit.Body.Value, out hitEntity);
         }
 
+        // The calls below act on the entity's body, whichever kind it has. For a 2D body x and y are used, and z of
+        // a torque or an angular velocity (the turn about z).
+
         public static bool TryGetLinearVelocity(Entity entity, out Vector3 velocity)
         {
             velocity = Vector3.Zero;
+            if (Physics2D.Physics2DWorld.TryGetLinearVelocity(entity, out Vector2 flat)) { velocity = new Vector3(flat, 0f); return true; }
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             velocity = _physics.GetLinearVelocity(handle);
@@ -814,6 +823,7 @@ namespace GameEditor.Framework.Scene
 
         public static bool SetLinearVelocity(Entity entity, Vector3 velocity)
         {
+            if (Physics2D.Physics2DWorld.SetLinearVelocity(entity, new Vector2(velocity.X, velocity.Y))) return true;
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             _physics.SetLinearVelocity(handle, velocity);
@@ -823,6 +833,7 @@ namespace GameEditor.Framework.Scene
         public static bool TryGetAngularVelocity(Entity entity, out Vector3 velocity)
         {
             velocity = Vector3.Zero;
+            if (Physics2D.Physics2DWorld.TryGetAngularVelocity(entity, out float turn)) { velocity = new Vector3(0f, 0f, turn); return true; }
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             velocity = _physics.GetAngularVelocity(handle);
@@ -831,6 +842,7 @@ namespace GameEditor.Framework.Scene
 
         public static bool SetAngularVelocity(Entity entity, Vector3 velocity)
         {
+            if (Physics2D.Physics2DWorld.SetAngularVelocity(entity, velocity.Z)) return true;
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             _physics.SetAngularVelocity(handle, velocity);
@@ -839,6 +851,7 @@ namespace GameEditor.Framework.Scene
 
         public static bool AddForce(Entity entity, Vector3 force)
         {
+            if (Physics2D.Physics2DWorld.AddForce(entity, new Vector2(force.X, force.Y))) return true;
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             _physics.AddForce(handle, force);
@@ -847,6 +860,7 @@ namespace GameEditor.Framework.Scene
 
         public static bool AddImpulse(Entity entity, Vector3 impulse)
         {
+            if (Physics2D.Physics2DWorld.AddImpulse(entity, new Vector2(impulse.X, impulse.Y))) return true;
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             _physics.AddImpulse(handle, impulse);
@@ -855,6 +869,7 @@ namespace GameEditor.Framework.Scene
 
         public static bool AddTorque(Entity entity, Vector3 torque)
         {
+            if (Physics2D.Physics2DWorld.AddTorque(entity, torque.Z)) return true;
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
             _physics.AddTorque(handle, torque);
@@ -891,6 +906,18 @@ namespace GameEditor.Framework.Scene
 
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
         {
+            // A 2D body is read from its Transform before the next step: setting the Transform is the whole of it.
+            if (Physics2D.Physics2DWorld.Has(entity))
+            {
+                var world2D = ECSWorld.Instance;
+                if (!world2D.TryGetComponent<Transform>(entity, out var tr2D)) return false;
+                tr2D.Position = position;
+                tr2D.Rotation = rotation;
+                world2D.AddComponent(entity, tr2D);
+                Physics2D.Physics2DWorld.SetLinearVelocity(entity, Vector2.Zero);
+                Physics2D.Physics2DWorld.SetAngularVelocity(entity, 0f);
+                return true;
+            }
             if (_physics == null) return false;
             if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
 
@@ -908,6 +935,9 @@ namespace GameEditor.Framework.Scene
 
         static void InitializePhysics()
         {
+            // The 2D world, beside whichever 3D one the scene has: made only when the scene has a 2D body.
+            Physics2D.Physics2DWorld.Start(ECSWorld.Instance);
+
             string? backend = ActiveScene?.PhysicsBackend;
             if (backend != null && !backend.Equals("jolt", StringComparison.OrdinalIgnoreCase))
             {
@@ -1122,6 +1152,13 @@ namespace GameEditor.Framework.Scene
         /// Returns the world-space position of <paramref name="tr"/> by resolving the parent chain.
         /// For root entities (no parent) this is just <c>tr.Position</c>.
         /// </summary>
+        /// <summary>An entity's rotation in the world, through its parents.</summary>
+        internal static Quaternion WorldRotationOf(ECSWorld world, in Transform tr) => GetEntityWorldRotation(world, in tr);
+
+        /// <summary>A place and a rotation in the world as the values an entity under <paramref name="parent"/> stores.</summary>
+        internal static (Vector3 Position, Quaternion Rotation) ToLocal(ECSWorld world, Entity? parent, Vector3 worldPosition, Quaternion worldRotation)
+            => WorldToLocalTransform(world, parent, worldPosition, worldRotation);
+
         static Vector3 GetEntityWorldPosition(ECSWorld world, in Transform tr)
         {
             if (!tr.Parent.HasValue) return tr.Position;
@@ -1174,6 +1211,7 @@ namespace GameEditor.Framework.Scene
 
         static void ShutdownPhysics()
         {
+            Physics2D.Physics2DWorld.Stop();
             if (_simulator != null)
             {
                 _simulator.Stop();

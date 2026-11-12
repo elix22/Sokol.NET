@@ -16,6 +16,7 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("Sprite", WriteSprite, ReadSprite, static (w, e) => w.RemoveComponent<SpriteRenderer>(e));
             RegisterComponentExtension("SpriteAnim", WriteSpriteAnim, ReadSpriteAnim, static (w, e) => w.RemoveComponent<SpriteAnimator>(e));
             RegisterComponentExtension("Tilemap", WriteTilemap, ReadTilemap, static (w, e) => w.RemoveComponent<TilemapRenderer>(e));
+            RegisterComponentExtension("Body2D", WriteBody2D, ReadBody2D, static (w, e) => w.RemoveComponent<Body2D>(e));
         }
 
         private static string? WriteSprite(ECSWorld world, Frent.Entity e)
@@ -45,6 +46,85 @@ namespace GameEditor.Framework.Scene
             if (el.TryGetProperty("Order", out var order)) s.Order = order.GetInt32();
             s.Visible = !el.TryGetProperty("Vis", out var vis) || vis.GetBoolean();
             world.AddComponent(e, s);
+        }
+
+        private static string? WriteBody2D(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<Body2D>(e, out var b)) return null;
+            var sb = new StringBuilder();
+            sb.Append("{\"Type\":\"").Append(b.Type.ToString())
+              .Append("\",\"GravityScale\":").Append(F(b.GravityScale))
+              .Append(",\"LinearDamping\":").Append(F(b.LinearDamping))
+              .Append(",\"AngularDamping\":").Append(F(b.AngularDamping))
+              .Append(",\"FixedRotation\":").Append(b.FixedRotation ? "true" : "false")
+              .Append(",\"Bullet\":").Append(b.Bullet ? "true" : "false")
+              .Append(",\"Density\":").Append(F(b.Density))
+              .Append(",\"Friction\":").Append(F(b.Friction))
+              .Append(",\"Restitution\":").Append(F(b.Restitution))
+              .Append(",\"IsTrigger\":").Append(b.IsTrigger ? "true" : "false")
+              .Append(",\"Layer\":").Append(b.Layer)
+              .Append(",\"Mask\":").Append(b.Mask)
+              .Append(",\"Shapes\":[");
+            if (b.Shapes != null)
+                for (int i = 0; i < b.Shapes.Length; i++)
+                {
+                    Shape2D s = b.Shapes[i];
+                    sb.Append(i == 0 ? "" : ",").Append("{\"Type\":\"").Append(s.Type.ToString()).Append('"');
+                    if (s.Type == Shape2DType.Circle) sb.Append(",\"Radius\":").Append(F(s.Radius));
+                    else if (s.Type == Shape2DType.Polygon)
+                    {
+                        sb.Append(",\"Points\":[");
+                        if (s.Points != null)
+                            for (int k = 0; k < s.Points.Length; k++)
+                                sb.Append(k == 0 ? "" : ",").Append('[').Append(F(s.Points[k].X)).Append(',').Append(F(s.Points[k].Y)).Append(']');
+                        sb.Append(']');
+                    }
+                    else sb.Append(",\"Size\":[").Append(F(s.Size.X)).Append(',').Append(F(s.Size.Y)).Append(']');
+                    sb.Append(",\"Offset\":[").Append(F(s.Offset.X)).Append(',').Append(F(s.Offset.Y)).Append(']');
+                    if (s.Type != Shape2DType.Circle) sb.Append(",\"Angle\":").Append(F(s.Angle));
+                    sb.Append('}');
+                }
+            return sb.Append("]}").ToString();
+        }
+
+        private static void ReadBody2D(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var b = Body2D.Default;
+            if (el.TryGetProperty("Type", out var type) && Enum.TryParse(type.GetString(), true, out Body2DType parsed)) b.Type = parsed;
+            if (el.TryGetProperty("GravityScale", out var g)) b.GravityScale = g.GetSingle();
+            if (el.TryGetProperty("LinearDamping", out var ld)) b.LinearDamping = ld.GetSingle();
+            if (el.TryGetProperty("AngularDamping", out var ad)) b.AngularDamping = ad.GetSingle();
+            b.FixedRotation = el.TryGetProperty("FixedRotation", out var fr) && fr.GetBoolean();
+            b.Bullet = el.TryGetProperty("Bullet", out var bu) && bu.GetBoolean();
+            if (el.TryGetProperty("Density", out var d)) b.Density = d.GetSingle();
+            if (el.TryGetProperty("Friction", out var f)) b.Friction = f.GetSingle();
+            if (el.TryGetProperty("Restitution", out var r)) b.Restitution = r.GetSingle();
+            b.IsTrigger = el.TryGetProperty("IsTrigger", out var t) && t.GetBoolean();
+            if (el.TryGetProperty("Layer", out var layer)) b.Layer = layer.GetInt32();
+            if (el.TryGetProperty("Mask", out var mask)) b.Mask = mask.GetInt32();
+            if (el.TryGetProperty("Shapes", out var shapes) && shapes.ValueKind == JsonValueKind.Array && shapes.GetArrayLength() > 0)
+            {
+                b.Shapes = new Shape2D[shapes.GetArrayLength()];
+                int i = 0;
+                foreach (JsonElement se in shapes.EnumerateArray())
+                {
+                    var s = new Shape2D { Size = Vector2.One, Radius = 0.5f };
+                    if (se.TryGetProperty("Type", out var st) && Enum.TryParse(st.GetString(), true, out Shape2DType shapeType)) s.Type = shapeType;
+                    if (se.TryGetProperty("Size", out var size) && size.ValueKind == JsonValueKind.Array && size.GetArrayLength() == 2) s.Size = new Vector2(size[0].GetSingle(), size[1].GetSingle());
+                    if (se.TryGetProperty("Radius", out var radius)) s.Radius = radius.GetSingle();
+                    if (se.TryGetProperty("Offset", out var offset) && offset.ValueKind == JsonValueKind.Array && offset.GetArrayLength() == 2) s.Offset = new Vector2(offset[0].GetSingle(), offset[1].GetSingle());
+                    if (se.TryGetProperty("Angle", out var angle)) s.Angle = angle.GetSingle();
+                    if (se.TryGetProperty("Points", out var points) && points.ValueKind == JsonValueKind.Array)
+                    {
+                        var list = new System.Collections.Generic.List<Vector2>();
+                        foreach (JsonElement p in points.EnumerateArray())
+                            if (p.ValueKind == JsonValueKind.Array && p.GetArrayLength() == 2) list.Add(new Vector2(p[0].GetSingle(), p[1].GetSingle()));
+                        s.Points = list.ToArray();
+                    }
+                    b.Shapes[i++] = s;
+                }
+            }
+            world.AddComponent(e, b);
         }
 
         private static string? WriteTilemap(ECSWorld world, Frent.Entity e)
