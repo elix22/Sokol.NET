@@ -508,6 +508,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
         }
 
+        /// <summary>
+        /// How many shader families (a shader and its pipelines) have been made: each is made by the first draw that
+        /// needs it, so a scene with no meshes makes none. <see cref="ShaderVariantCache.LowTier"/> tells which kind.
+        /// </summary>
+        public static int ShaderFamiliesMade => _shaderCache.FamiliesMade;
+
         /// <summary>When true, <see cref="RenderSkybox"/> draws the IBL environment cubemap.</summary>
         public static bool ShowSkybox { get; set; } = true;
 
@@ -974,7 +980,7 @@ namespace GameEditor.Framework.Renderer.Server
                     // Always apply FS uniforms per sub-mesh: each sub-mesh can have distinct
                     // Kd/Ks/Ns values from the .mtl file, independent of the group-level material.
                     BuildFsParams(bpm ?? mat, cameraPos, out var subFs);
-                    sg_apply_uniforms(UB_blinn_phong_fs_params, SG_RANGE(ref subFs));
+                    LowTierUniforms.ApplyBlinnFs(UB_blinn_phong_fs_params, in subFs, _shaderCache.CurrentLow);
 
                     sg_view  diffuse  = bpm?.DiffuseMap  ?? _texCache.PlaceholderWhite;
                     sg_view  specular = bpm?.SpecularMap ?? _texCache.PlaceholderWhite;
@@ -1467,7 +1473,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             sg_apply_uniforms(UB_pbr_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
             sg_apply_uniforms(UB_pbr_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(UB_pbr_pbr_light_params,    SG_RANGE(ref Unsafe.AsRef(in lights)));
+            LowTierUniforms.ApplyPbrLights(UB_pbr_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(UB_pbr_pbr_ibl_params,      SG_RANGE(ref Unsafe.AsRef(in ibl)));
             sg_apply_uniforms(UB_pbr_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(UB_pbr_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -1760,7 +1766,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_light_params,    SG_RANGE(ref Unsafe.AsRef(in lights)));
+            LowTierUniforms.ApplyPbrLights(PbrTx.UB_pbr_transmission_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2011,6 +2017,7 @@ namespace GameEditor.Framework.Renderer.Server
             // the per-character joint texture (use_uniform_skinning=0), uploaded earlier this frame by
             // RefreshJointTextureIfNeeded. Fall back to the uniform path if the texture isn't ready.
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkin.Shaders.pbr_skinning_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -2129,9 +2136,9 @@ namespace GameEditor.Framework.Renderer.Server
                 ambient_strength    = 0.4f,
             };
 
-            sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkin.Shaders.UB_pbr_skinning_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkin.Shaders.UB_pbr_skinning_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2207,6 +2214,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             // >128-bone skeletons take the joint-texture path (see DrawSkinned for the rationale).
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -2337,9 +2345,9 @@ namespace GameEditor.Framework.Renderer.Server
                 csm_pcf_taps     = pcf,
             };
 
-            sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2413,6 +2421,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             // >128-bone skeletons take the joint-texture path (see DrawSkinned for the rationale).
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -2540,9 +2549,9 @@ namespace GameEditor.Framework.Renderer.Server
                 csm_pcf_taps     = pcf,
             };
 
-            sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2633,6 +2642,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_pipeline(_shaderCache.GetPbrSkinMorphPipeline(pf));
 
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -2752,9 +2762,9 @@ namespace GameEditor.Framework.Renderer.Server
                 ambient_strength    = 0.4f,
             };
 
-            sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2824,6 +2834,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_pipeline(_shaderCache.GetPbrSkinMorphCsm1Pipeline(pf));
 
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -2953,9 +2964,9 @@ namespace GameEditor.Framework.Renderer.Server
                 csm_pcf_taps     = pcf,
             };
 
-            sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -3026,6 +3037,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_pipeline(_shaderCache.GetPbrSkinMorphCsm4Pipeline(pf));
 
             bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+            if (_shaderCache.CurrentLow && !useTex) return;   // LOW_TIER: no bone array — the joint texture comes next frame
             var vs = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_vs_params_t
             {
                 view_proj            = viewProj,
@@ -3158,9 +3170,9 @@ namespace GameEditor.Framework.Renderer.Server
                 csm_pcf_taps     = pcf,
             };
 
-            sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_vs_params,       SG_RANGE(ref vs));
+            LowTierUniforms.ApplySkinnedVs(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -3354,7 +3366,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_vs_params,       SG_RANGE(ref vs));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -3565,7 +3577,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_vs_params,       SG_RANGE(ref vs));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, SG_RANGE(ref matParams));
-            sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_light_params,    SG_RANGE(ref lights));
+            LowTierUniforms.ApplyPbrLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_rendering_flags, SG_RANGE(ref flags));

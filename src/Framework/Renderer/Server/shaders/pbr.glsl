@@ -308,7 +308,11 @@ vec2 applyTextureTransform(vec2 uv, vec2 offset, float rotation, vec2 scale) {
 #define shadow_ambient_weight          shadow_ambient_weight
 
 // Convenience aliases for the light block.
+#ifdef LOW_TIER
+#define num_lights  min(int(ambient_num.w + 0.5), LIGHT_VEC4S / 4)
+#else
 #define num_lights  int(ambient_num.w + 0.5)
+#endif
 
 // ── Normal mapping ────────────────────────────────────────────────────────────
 vec3 getNormal() {

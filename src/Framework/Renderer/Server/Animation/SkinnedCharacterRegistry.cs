@@ -32,7 +32,9 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             // which also drives positions and normals from one matrix).
 
             /// <summary>True when the skeleton is too large for the uniform array → use the joint texture.</summary>
-            public bool UsesTextureSkinning => BoneCount > AnimationConstants.MAX_BONES;
+            // A LOW_TIER GPU's skinned shaders have no bone array, and a GPU with few vertex uniforms cannot index all of it:
+            // every skeleton rides in the joint texture there.
+            public bool UsesTextureSkinning => BoneCount > AnimationConstants.MAX_BONES || ShaderVariantCache.TextureSkinning;
 
             public sg_image JointTexture;
             public sg_view  JointTextureView;

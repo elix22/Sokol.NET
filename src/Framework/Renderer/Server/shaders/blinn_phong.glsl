@@ -83,14 +83,27 @@ void main() {
 
 // Layout: material params + packed light array.
 // GpuLight = 4 vec4s (64 B) → MAX_LIGHTS(32) * 4 = 128 vec4s.
+// LOW_TIER: the variant for a GPU that refuses the full block — e.g. the PowerVR GE8320 (Redmi 6A), whose
+// 1024 fragment uniform components cannot hold the 257 vec4 below. 16 lights, 4 spot-shadow matrices
+// (atlas slices 4-7) and 1 point-shadow light; the engine packs its full block into this one
+// (LowTierUniforms.cs, whose numbers must match these). Made only when the full shader fails to compile.
+#ifdef LOW_TIER
+#define LIGHT_VEC4S        64   // 16 lights x 4 vec4s
+#define SPOT_SHADOW_VEC4S  16   // 4 spot matrices x 4 rows
+#define POINT_SHADOW_VEC4S 24   // 1 point light x 6 faces x 4 rows
+#else
+#define LIGHT_VEC4S        128
+#define SPOT_SHADOW_VEC4S  32
+#define POINT_SHADOW_VEC4S 96
+#endif
 layout(binding=1) uniform blinn_phong_fs_params {
     vec4 material_kd_alpha;   // xyz = Kd (diffuse colour), w = opacity
     vec4 material_ks_shin;    // xyz = Ks (specular colour), w = Ns (shininess)
     vec4 ambient_num;         // xyz = ambient colour, w = float(numLights)
     vec4 cam_pos_pad;         // xyz = camera world position (for spec), w = pad
-    vec4 lights_data[128];    // 32 lights × 4 vec4s
-    vec4 spot_shadow_vp[32];  // 8 spot matrices × 4 rows (slices 4..11)
-    vec4 point_shadow_vp[96]; // 4 point lights × 6 faces × 4 rows
+    vec4 lights_data[LIGHT_VEC4S];          // 32 lights × 4 vec4s
+    vec4 spot_shadow_vp[SPOT_SHADOW_VEC4S];   // 8 spot matrices × 4 rows (slices 4..11)
+    vec4 point_shadow_vp[POINT_SHADOW_VEC4S]; // 4 point lights × 6 faces × 4 rows
     vec4 ambient_sky[9];      // Environment sky ambient, per channel 3 vec4 (AmbientSH.Pack); zero unless source = Sky
 };
 
@@ -175,7 +188,7 @@ float sample_dir_shadow(float atlas_slice, float bias)
 float sample_spot_shadow(float atlas_slice, float bias)
 {
     int local = int(atlas_slice) - 4;
-    if (local < 0 || local >= 8) return 1.0;
+    if (local < 0 || local >= SPOT_SHADOW_VEC4S / 4) return 1.0;
 
     int b = local * 4;
     mat4 spot_vp = mat4(
@@ -234,7 +247,7 @@ float sample_spot_shadow(float atlas_slice, float bias)
 
 float sample_point_shadow(int point_slot, vec3 light_pos, float bias, vec3 receiver_pos)
 {
-    if (point_slot < 0 || point_slot >= 4) return 1.0;
+    if (point_slot < 0 || point_slot >= POINT_SHADOW_VEC4S / 24) return 1.0;
 
     vec3 to_frag = receiver_pos - light_pos;
     vec3 at = abs(to_frag);
@@ -331,7 +344,7 @@ void main() {
     vec3 sky     = max(vec3(sky_ambient_channel(0, N), sky_ambient_channel(3, N), sky_ambient_channel(6, N)), vec3(0.0));
     vec3 ambient = (ambient_num.xyz + sky) * Kd;
     vec3 accum   = ambient;
-    int  count   = min(int(ambient_num.w), 32);
+    int  count   = min(int(ambient_num.w), LIGHT_VEC4S / 4);
 
     for (int i = 0; i < count; i++) {
         vec4 d0 = lights_data[i * 4 + 0];  // xyz=pos,      w=type

@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using System.Collections.Generic;
+using GameEditor.Framework.Core;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Renderer.Server.Lighting;
@@ -10,6 +11,7 @@ using static Sokol.SG;
 using static Sokol.Utils;
 using static shadow_caster_shader_cs.Shaders;
 using SkinnedCaster = shadow_caster_skinned_shader_cs.Shaders;
+using SkinnedCasterLow = shadow_caster_skinned_low_shader_cs_shadow_caster_skinned_low.Shaders;
 
 namespace GameEditor.Framework.Renderer.Server.Passes
 {
@@ -30,8 +32,12 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         private sg_pass_action _passAction;
         // Skinned caster: 80 B vertex (pos + joints + weights) + a bone UBO. Rendered into the
         // directional cascades with depth LOAD so the static casters' depth is preserved.
+        // Made by the first skinned caster (MakeSkinned), not at Init: a scene with no skinned mesh never compiles it.
+        // LOW_TIER (the GPU refused the full one, ShaderVariantCache.LowTier): no bone array, bones from the joint texture.
         private sg_shader _skinnedShader;
         private sg_pipeline _skinnedPipeline;
+        private bool _skinnedMade;
+        private bool _skinnedLow;
         private sg_pass_action _passActionLoad;
         private sg_image _atlasDummyColorImage;
         private sg_view _atlasDummyColorView;
@@ -87,39 +93,6 @@ namespace GameEditor.Framework.Renderer.Server.Passes
 
             _pipeline = sg_make_pipeline(desc);
 
-            // ── Skinned caster pipeline: 80 B SkinnedVertex (pos@0 + joints@48 + weights@64) ──
-            _skinnedShader = sg_make_shader(SkinnedCaster.shadow_caster_shader_desc(sg_query_backend()));
-            var sdesc = new sg_pipeline_desc
-            {
-                shader       = _skinnedShader,
-                index_type   = sg_index_type.SG_INDEXTYPE_UINT32,
-                cull_mode    = sg_cull_mode.SG_CULLMODE_FRONT,
-                color_count  = 1,
-                sample_count = 1,
-                depth = new sg_depth_state
-                {
-                    pixel_format  = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
-                    compare       = sg_compare_func.SG_COMPAREFUNC_LESS_EQUAL,
-                    write_enabled = true
-                },
-                colors =
-                {
-                    [0] = new sg_color_target_state
-                    {
-                        pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-                        write_mask   = sg_color_mask.SG_COLORMASK_NONE
-                    }
-                },
-                label = "shadow-caster-skinned-pipeline"
-            };
-            sdesc.layout.buffers[0].stride = 88;   // SkinnedVertex now carries TEXCOORD_1; caster reads pos+joints+weights
-            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_in_pos]    = new sg_vertex_attr_state
-            { buffer_index = 0, offset =  0, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT3 };
-            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_joints_0]  = new sg_vertex_attr_state
-            { buffer_index = 0, offset = 48, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
-            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_weights_0] = new sg_vertex_attr_state
-            { buffer_index = 0, offset = 64, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
-            _skinnedPipeline = sg_make_pipeline(sdesc);
 
             _passAction = default;
             _passAction.colors[0].load_action = sg_load_action.SG_LOADACTION_DONTCARE;
@@ -208,6 +181,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 sg_destroy_shader(_skinnedShader);
                 _skinnedShader = default;
             }
+            _skinnedMade = false;
+            _skinnedLow = false;
             if (_pipeline.id != 0)
             {
                 sg_destroy_pipeline(_pipeline);
@@ -339,6 +314,62 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             return RenderSkinnedSlice(world, _atlasDummyColorView, atlas.GetDepthSliceView(slice), in lightViewProj);
         }
 
+        private void MakeSkinned()
+        {
+            _skinnedMade = true;
+            // ── Skinned caster pipeline: 80 B SkinnedVertex (pos@0 + joints@48 + weights@64) ──
+            var backend = sg_query_backend();
+            bool lowAvailable = backend == sg_backend.SG_BACKEND_GLES3;
+            if (!(ShaderVariantCache.LowTier && lowAvailable))
+            {
+                _skinnedShader = sg_make_shader(SkinnedCaster.shadow_caster_shader_desc(backend));
+                if (sg_query_shader_state(_skinnedShader) == sg_resource_state.SG_RESOURCESTATE_FAILED && lowAvailable)
+                {
+                    sg_destroy_shader(_skinnedShader);
+                    _skinnedShader = default;
+                    ShaderVariantCache.MarkLowTier("shadow-caster-skinned");
+                }
+            }
+            if (_skinnedShader.id == 0)
+            {
+                _skinnedShader = sg_make_shader(SkinnedCasterLow.shadow_caster_skinned_low_shadow_caster_shader_desc(backend));
+                _skinnedLow = true;
+                if (System.Runtime.CompilerServices.Unsafe.SizeOf<SkinnedCasterLow.shadow_caster_skinned_low_shadow_caster_vs_params_t>() != LowTierUniforms.SkinnedCasterBytes)
+                    Logger.Error("[ShadowPass] LOW_TIER skinned caster: block size differs from LowTierUniforms");
+            }
+            var sdesc = new sg_pipeline_desc
+            {
+                shader       = _skinnedShader,
+                index_type   = sg_index_type.SG_INDEXTYPE_UINT32,
+                cull_mode    = sg_cull_mode.SG_CULLMODE_FRONT,
+                color_count  = 1,
+                sample_count = 1,
+                depth = new sg_depth_state
+                {
+                    pixel_format  = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
+                    compare       = sg_compare_func.SG_COMPAREFUNC_LESS_EQUAL,
+                    write_enabled = true
+                },
+                colors =
+                {
+                    [0] = new sg_color_target_state
+                    {
+                        pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                        write_mask   = sg_color_mask.SG_COLORMASK_NONE
+                    }
+                },
+                label = "shadow-caster-skinned-pipeline"
+            };
+            sdesc.layout.buffers[0].stride = 88;   // SkinnedVertex now carries TEXCOORD_1; caster reads pos+joints+weights
+            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_in_pos]    = new sg_vertex_attr_state
+            { buffer_index = 0, offset =  0, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT3 };
+            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_joints_0]  = new sg_vertex_attr_state
+            { buffer_index = 0, offset = 48, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_weights_0] = new sg_vertex_attr_state
+            { buffer_index = 0, offset = 64, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            _skinnedPipeline = sg_make_pipeline(sdesc);
+        }
+
         /// <summary>Renders skinned casters into one cube-map face of a point light (depth LOAD, on top of statics).</summary>
         public int RenderSkinnedPointFaceCounted(ECSWorld world, CubeShadowArray cubeArray, int pointLightIndex, int faceIndex, in Matrix4x4 lightViewProj)
         {
@@ -359,7 +390,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sg_begin_pass(pass);
             try
             {
-                sg_apply_pipeline(_skinnedPipeline);
+                bool applied = false;
                 foreach (var row in world.Query<ActiveFlag, SkinnedMeshRenderer, Transform>()
                                          .Enumerate<ActiveFlag, SkinnedMeshRenderer, Transform>())
                 {
@@ -373,7 +404,11 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     // >128-bone rigs can't fit finalBonesMatrices[128] → cast via the joint texture
                     // (use_uniform_skinning=0), the same per-character texture the color pass uses
                     // (uploaded by UpdateSkinnedAnimators before this pass). Else the uniform path.
+                    // The caster's shader is made by the first skinned mesh that casts, not before.
+                    if (!_skinnedMade) MakeSkinned();
+                    if (!applied) { sg_apply_pipeline(_skinnedPipeline); applied = true; }
                     bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
+                    if (_skinnedLow && !useTex) continue;   // LOW_TIER: no bone array — the joint texture comes next frame
                     var vsParams = new SkinnedCaster.shadow_caster_vs_params_t
                     {
                         mvp                  = lightViewProj,
@@ -389,7 +424,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                             for (int b = 0; b < bc; b++) vsParams.finalBonesMatrices[b] = bones[b];
                         }
                     }
-                    sg_apply_uniforms(SkinnedCaster.UB_shadow_caster_vs_params, SG_RANGE(ref vsParams));
+                    LowTierUniforms.ApplySkinnedCaster(SkinnedCaster.UB_shadow_caster_vs_params, in vsParams, _skinnedLow);
 
                     sg_apply_bindings(new sg_bindings
                     {

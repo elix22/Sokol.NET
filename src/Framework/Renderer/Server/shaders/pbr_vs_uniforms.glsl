@@ -5,6 +5,9 @@
 //   - `view_proj` + `eye_pos` are combined with animation params in a single UBO so
 //     the binding-0 slot remains consistent with the rest of the Framework shaders.
 
+#ifdef LOW_TIER
+#define MAX_BONES 1     // LOW_TIER: every skinned mesh takes the joint-texture path (use_uniform_skinning = 0)
+#endif
 #ifndef MAX_BONES
 #define MAX_BONES 128   // Must match RenderingConstants.MAX_BONES
 #endif

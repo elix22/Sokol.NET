@@ -156,6 +156,49 @@
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_transmission_shader.cs&quot; --module pbr_transmission --defines TRANSMISSION --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
+  <!-- LOW_TIER variants (GLSL ES 3.0 only: WebGL 2 and Android GLES 3): the lit shaders with 16 lights,
+       4 spot-shadow matrices, 1 point-shadow light and skinning through the joint texture, for a GPU whose
+       uniform limits refuse the full ones (PowerVR GE8320: 1024 fragment components). ShaderVariantCache
+       makes one only when the full shader of its family failed to compile; other GPUs never load them. -->
+  <Target Name="CompileFrameworkLowTierShaders" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_PbrGlsl);
+                  $(_BlinnPhongGlsl);
+                  $(_ShadowCasterGlsl);
+                  $(_ShaderDir)fs_constants.glsl;
+                  $(_ShaderDir)pbr_vs_uniforms.glsl;
+                  $(_ShaderDir)pbr_fs_uniforms.glsl;
+                  $(_ShaderDir)fs_lighting.glsl;
+                  $(_ShaderDir)brdf.glsl;
+                  $(_ShaderDir)ibl.glsl;
+                  $(_ShaderDir)animation.glsl"
+          Outputs="$(_ShaderOutDir)pbr_low_shader.cs;
+                   $(_ShaderOutDir)pbr_csm1_low_shader.cs;
+                   $(_ShaderOutDir)pbr_csm4_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_csm1_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_csm4_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_csm1_low_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_csm4_low_shader.cs;
+                   $(_ShaderOutDir)pbr_transmission_low_shader.cs;
+                   $(_ShaderOutDir)blinn_phong_low_shader.cs;
+                   $(_ShaderOutDir)shadow_caster_skinned_low_shader.cs">
+    <Message Text="Compiling Framework LOW_TIER shader variants (12, glsl300es)" Importance="high" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_low_shader.cs&quot; --module pbr_low --defines LOW_TIER --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_csm1_low_shader.cs&quot; --module pbr_csm1_low --defines LOW_TIER:CSM1 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_csm4_low_shader.cs&quot; --module pbr_csm4_low --defines LOW_TIER:CSM4 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_low_shader.cs&quot; --module pbr_skinning_low --defines LOW_TIER:SKINNING --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_csm1_low_shader.cs&quot; --module pbr_skinning_csm1_low --defines LOW_TIER:SKINNING:CSM1 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_csm4_low_shader.cs&quot; --module pbr_skinning_csm4_low --defines LOW_TIER:SKINNING:CSM4 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_low_shader.cs&quot; --module pbr_skinning_morphing_low --defines LOW_TIER:SKINNING:MORPHING --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_csm1_low_shader.cs&quot; --module pbr_skinning_morphing_csm1_low --defines LOW_TIER:SKINNING:MORPHING:CSM1 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_csm4_low_shader.cs&quot; --module pbr_skinning_morphing_csm4_low --defines LOW_TIER:SKINNING:MORPHING:CSM4 --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_transmission_low_shader.cs&quot; --module pbr_transmission_low --defines LOW_TIER:TRANSMISSION --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_BlinnPhongGlsl)&quot; --output &quot;$(_ShaderOutDir)blinn_phong_low_shader.cs&quot; --module blinn_phong_low --defines LOW_TIER --slang glsl300es --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_ShadowCasterGlsl)&quot; --output &quot;$(_ShaderOutDir)shadow_caster_skinned_low_shader.cs&quot; --module shadow_caster_skinned_low --defines LOW_TIER:SKINNING --slang glsl300es --reflection -f sokol_csharp" />
+  </Target>
+
   <!-- Sokol bindings (separate DLL, shared by the ALC along with Framework) -->
   <ItemGroup>
     <ProjectReference Include="../sokol/sokol.csproj" />

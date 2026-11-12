@@ -1,6 +1,9 @@
 @ctype mat4 System.Numerics.Matrix4x4
 
 @vs shadow_caster_vs
+#ifdef LOW_TIER
+#define MAX_BONES 1     // LOW_TIER: every skinned mesh takes the joint-texture path (use_uniform_skinning = 0)
+#endif
 #ifndef MAX_BONES
 #define MAX_BONES 128   // must match RenderingConstants.MAX_BONES
 #endif

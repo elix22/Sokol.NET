@@ -83,10 +83,23 @@ layout(binding=1) uniform pbr_material_params {
 };
 
 // ─── Lights (binding=2) — packed GpuLight[32] ────────────────────────────────
+// LOW_TIER: the variant for a GPU that refuses the full block — e.g. the PowerVR GE8320 (Redmi 6A), whose
+// 1024 fragment uniform components cannot hold the 257 vec4 below. 16 lights, 4 spot-shadow matrices
+// (atlas slices 4-7) and 1 point-shadow light; the engine packs its full block into this one
+// (LowTierUniforms.cs, whose numbers must match these). Made only when the full shader fails to compile.
+#ifdef LOW_TIER
+#define LIGHT_VEC4S        64   // 16 lights x 4 vec4s
+#define SPOT_SHADOW_VEC4S  16   // 4 spot matrices x 4 rows
+#define POINT_SHADOW_VEC4S 24   // 1 point light x 6 faces x 4 rows
+#else
+#define LIGHT_VEC4S        128
+#define SPOT_SHADOW_VEC4S  32
+#define POINT_SHADOW_VEC4S 96
+#endif
 layout(binding=2) uniform pbr_light_params {
-    vec4  lights_data[128];     // 32 lights × 4 vec4s
-    vec4  spot_shadow_vp[32];   // 8 spot matrices × 4 rows (shadow atlas slices 4-11)
-    vec4  point_shadow_vp[96];  // 4 point lights × 6 faces × 4 rows
+    vec4  lights_data[LIGHT_VEC4S];          // 32 lights × 4 vec4s
+    vec4  spot_shadow_vp[SPOT_SHADOW_VEC4S];   // 8 spot matrices × 4 rows (shadow atlas slices 4-11)
+    vec4  point_shadow_vp[POINT_SHADOW_VEC4S]; // 4 point lights × 6 faces × 4 rows
     vec4  ambient_num;          // xyz = ambient colour, w = float(numLights)
 };
 

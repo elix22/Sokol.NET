@@ -140,7 +140,7 @@ float sampleCsmShadow(vec3 worldPos, float view_depth, float ndotl)
 float sample_spot_shadow(float atlas_slice, vec3 worldPos, vec3 nrm)
 {
     int local = int(atlas_slice) - 4;
-    if (local < 0 || local >= 8) return 1.0;
+    if (local < 0 || local >= SPOT_SHADOW_VEC4S / 4) return 1.0;
 
     int b = local * 4;
     mat4 spot_vp = mat4(
@@ -180,7 +180,7 @@ float sample_spot_shadow(float atlas_slice, vec3 worldPos, vec3 nrm)
 // pbr_fs_uniforms.glsl. Sampling code below is identical regardless of binding.
 float sample_point_shadow(int point_slot, vec3 light_pos, vec3 worldPos, vec3 nrm)
 {
-    if (point_slot < 0 || point_slot >= 4) return 1.0;
+    if (point_slot < 0 || point_slot >= POINT_SHADOW_VEC4S / 24) return 1.0;
 
     // Face selection uses the true position; the depth sample uses a normal-offset position
     // (avoids the self-shadow acne rings of a close point light).

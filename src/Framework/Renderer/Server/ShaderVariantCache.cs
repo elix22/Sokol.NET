@@ -32,6 +32,17 @@ using PbrSkinMorph = pbr_skinning_morphing_shader_cs_pbr_skinning_morphing.Shade
 using PbrSkinMorphCsm1 = pbr_skinning_morphing_csm1_shader_cs_pbr_skinning_morphing_csm1.Shaders;
 using PbrSkinMorphCsm4 = pbr_skinning_morphing_csm4_shader_cs_pbr_skinning_morphing_csm4.Shaders;
 using PbrTransmission = pbr_transmission_shader_cs_pbr_transmission.Shaders;
+using BlinnLow = blinn_phong_low_shader_cs_blinn_phong_low.Shaders;
+using PbrLow = pbr_low_shader_cs_pbr_low.Shaders;
+using PbrCsm1Low = pbr_csm1_low_shader_cs_pbr_csm1_low.Shaders;
+using PbrCsm4Low = pbr_csm4_low_shader_cs_pbr_csm4_low.Shaders;
+using PbrSkinningLow = pbr_skinning_low_shader_cs_pbr_skinning_low.Shaders;
+using PbrSkinningCsm1Low = pbr_skinning_csm1_low_shader_cs_pbr_skinning_csm1_low.Shaders;
+using PbrSkinningCsm4Low = pbr_skinning_csm4_low_shader_cs_pbr_skinning_csm4_low.Shaders;
+using PbrSkinMorphLow = pbr_skinning_morphing_low_shader_cs_pbr_skinning_morphing_low.Shaders;
+using PbrSkinMorphCsm1Low = pbr_skinning_morphing_csm1_low_shader_cs_pbr_skinning_morphing_csm1_low.Shaders;
+using PbrSkinMorphCsm4Low = pbr_skinning_morphing_csm4_low_shader_cs_pbr_skinning_morphing_csm4_low.Shaders;
+using PbrTransmissionLow = pbr_transmission_low_shader_cs_pbr_transmission_low.Shaders;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Renderer.Server.Materials;
 
@@ -48,246 +59,226 @@ namespace GameEditor.Framework.Renderer.Server
 
     public sealed class ShaderVariantCache : IDisposable
     {
-        // For M1 we have at most 4 variants (alpha × doublesided × rt).
-        private readonly sg_pipeline[] _pipelines = new sg_pipeline[8];
-        private readonly sg_shader[]   _shaders   = new sg_shader[8];
+        // ── Families ─────────────────────────────────────────────────────────────────
+        // A family = one shader + its 8 pipelines (alpha × double-sided × offscreen). A family is made the first time
+        // a draw asks for one of its pipelines, never before: a 2D game, or a 3D scene that has no skinned mesh, never
+        // compiles the shaders it does not draw with (a low-end GPU spends seconds on each — the PowerVR GE8320 of a
+        // Redmi 6A took over a minute for all twelve when they were made at start).
+        //
+        // LOW_TIER: when the GPU refuses a family's full shader (its uniform limits: the GE8320 has 1024 fragment
+        // components, the full light block alone needs 1028), the family is made from its LOW_TIER shader instead
+        // (16 lights, 4 spot shadows, 1 point shadow, skinning through the joint texture; GLSL ES 3.0 only) and every
+        // family made after it goes straight to LOW_TIER. A GPU that compiles the full shaders never loads a LOW_TIER one.
+        private sealed class Family
+        {
+            public readonly string Name;
+            public readonly Func<sg_backend, sg_shader_desc> FullDesc;
+            public readonly Func<sg_backend, sg_shader_desc> LowDesc;
+            public readonly Func<sg_shader, PipelineFlags, sg_pipeline> Build;
+            public readonly int LowLightBytes;   // the LOW_TIER shader's light block, as sokol-shdc sized it (0 = not checked)
+            public readonly int ExpectedLowBytes;
+            public readonly sg_pipeline[] Pipelines = new sg_pipeline[8];
+            public sg_shader Shader;
+            public bool Made;
+            public bool Low;
 
-        // M4: PBR base-variant pipelines, keyed by the same flag combination as blinn.
-        private readonly sg_pipeline[] _pbrPipelines = new sg_pipeline[8];
-        private sg_shader _pbrShader;
+            public Family(string name, Func<sg_backend, sg_shader_desc> full, Func<sg_backend, sg_shader_desc> low,
+                          Func<sg_shader, PipelineFlags, sg_pipeline> build, int lowLightBytes, int expectedLowBytes)
+            {
+                Name = name; FullDesc = full; LowDesc = low; Build = build;
+                LowLightBytes = lowLightBytes; ExpectedLowBytes = expectedLowBytes;
+            }
+        }
 
-        // M4: PBR + 1-cascade directional-shadow variant (samples the slice-0 shadow map).
-        private readonly sg_pipeline[] _pbrCsm1Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrCsm1Shader;
+        private static bool A(PipelineFlags f) => (f & PipelineFlags.AlphaBlend)  != 0;
+        private static bool D(PipelineFlags f) => (f & PipelineFlags.DoubleSided) != 0;
+        private static bool O(PipelineFlags f) => (f & PipelineFlags.OffscreenRt) != 0;
 
-        // M4: PBR + 4-cascade directional-shadow variant (samples atlas slices 0-3).
-        private readonly sg_pipeline[] _pbrCsm4Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrCsm4Shader;
+        private static readonly int PbrLowLight = Unsafe.SizeOf<PbrLow.pbr_low_pbr_light_params_t>();
 
-        // M4: PBR + GPU skinning variant (per-vertex buffer extended to 80 B with joints/weights).
-        private readonly sg_pipeline[] _pbrSkinningPipelines = new sg_pipeline[8];
-        private sg_shader _pbrSkinningShader;
+        private readonly Family _blinn = new("blinn-phong",
+            blinn_phong_shader_desc, BlinnLow.blinn_phong_low_blinn_phong_shader_desc,
+            (s, f) => BuildPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<BlinnLow.blinn_phong_low_blinn_phong_fs_params_t>(), LowTierUniforms.BlinnFsBytes);
+        private readonly Family _pbr = new("pbr",
+            PbrShaders.pbr_pbr_program_shader_desc, PbrLow.pbr_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrPipeline(s, A(f), D(f), O(f)), PbrLowLight, LowTierUniforms.PbrLightBytes);
+        private readonly Family _pbrCsm1 = new("pbr-csm1",
+            PbrCsm1.pbr_csm1_pbr_program_shader_desc, PbrCsm1Low.pbr_csm1_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrCsm1Pipeline(s, A(f), D(f), O(f)), PbrLowLight, LowTierUniforms.PbrLightBytes);
+        private readonly Family _pbrCsm4 = new("pbr-csm4",
+            PbrCsm4.pbr_csm4_pbr_program_shader_desc, PbrCsm4Low.pbr_csm4_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrCsm4Pipeline(s, A(f), D(f), O(f)), PbrLowLight, LowTierUniforms.PbrLightBytes);
+        // The skinning families share one 80 B vertex layout, so all six build with BuildPbrSkinningPipeline;
+        // their check is the vertex block without its bones (LowTierUniforms.ApplySkinnedVs).
+        private readonly Family _pbrSkin = new("pbr-skinning",
+            PbrSkinning.pbr_skinning_pbr_program_shader_desc, PbrSkinningLow.pbr_skinning_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinningLow.pbr_skinning_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(0));
+        private readonly Family _pbrSkinCsm1 = new("pbr-skinning-csm1",
+            PbrSkinningCsm1.pbr_skinning_csm1_pbr_program_shader_desc, PbrSkinningCsm1Low.pbr_skinning_csm1_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinningCsm1Low.pbr_skinning_csm1_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(1));
+        private readonly Family _pbrSkinCsm4 = new("pbr-skinning-csm4",
+            PbrSkinningCsm4.pbr_skinning_csm4_pbr_program_shader_desc, PbrSkinningCsm4Low.pbr_skinning_csm4_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinningCsm4Low.pbr_skinning_csm4_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(4));
+        // Skinning + morph targets (morph-only meshes take this path too, with identity bones).
+        private readonly Family _pbrSkinMorph = new("pbr-skinning-morphing",
+            PbrSkinMorph.pbr_skinning_morphing_pbr_program_shader_desc, PbrSkinMorphLow.pbr_skinning_morphing_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinMorphLow.pbr_skinning_morphing_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(0));
+        private readonly Family _pbrSkinMorphCsm1 = new("pbr-skinning-morphing-csm1",
+            PbrSkinMorphCsm1.pbr_skinning_morphing_csm1_pbr_program_shader_desc, PbrSkinMorphCsm1Low.pbr_skinning_morphing_csm1_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinMorphCsm1Low.pbr_skinning_morphing_csm1_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(1));
+        private readonly Family _pbrSkinMorphCsm4 = new("pbr-skinning-morphing-csm4",
+            PbrSkinMorphCsm4.pbr_skinning_morphing_csm4_pbr_program_shader_desc, PbrSkinMorphCsm4Low.pbr_skinning_morphing_csm4_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrSkinningPipeline(s, A(f), D(f), O(f)),
+            Unsafe.SizeOf<PbrSkinMorphCsm4Low.pbr_skinning_morphing_csm4_low_pbr_vs_params_t>(), LowTierUniforms.SkinnedVsBytes(4));
+        // Transmission (screen-space refraction): static meshes only; no alpha-blend variant of its own.
+        private readonly Family _pbrTransmission = new("pbr-transmission",
+            PbrTransmission.pbr_transmission_pbr_program_shader_desc, PbrTransmissionLow.pbr_transmission_low_pbr_program_shader_desc,
+            (s, f) => BuildPbrTransmissionPipeline(s, D(f), O(f)), PbrLowLight, LowTierUniforms.PbrLightBytes);
 
-        // M4: PBR + GPU skinning + 4-cascade directional shadow (skinned chars receive CSM).
-        private readonly sg_pipeline[] _pbrSkinningCsm4Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrSkinningCsm4Shader;
-
-        // M4: PBR + GPU skinning + 1-cascade directional shadow (default CSM1-mode receive).
-        private readonly sg_pipeline[] _pbrSkinningCsm1Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrSkinningCsm1Shader;
-
-        // M4: PBR + GPU skinning + morph targets. Same 80 B skinned vertex layout (morph displacements
-        // ride a texture indexed by gl_VertexIndex, not vertex attributes), so all three reuse
-        // BuildPbrSkinningPipeline. Morph-only meshes (no skin) take this path too with identity bones.
-        private readonly sg_pipeline[] _pbrSkinMorphPipelines     = new sg_pipeline[8];
-        private sg_shader _pbrSkinMorphShader;
-        private readonly sg_pipeline[] _pbrSkinMorphCsm1Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrSkinMorphCsm1Shader;
-        private readonly sg_pipeline[] _pbrSkinMorphCsm4Pipelines = new sg_pipeline[8];
-        private sg_shader _pbrSkinMorphCsm4Shader;
-
-        // M4: PBR + KHR_materials_transmission (screen-space refraction). Static-mesh only —
-        // skinned/morph transmission deferred. Same 48 B vertex + 80 B instance layout as base PBR;
-        // binding 10 carries the captured screen-color framebuffer (no shadow atlas in this variant).
-        private readonly sg_pipeline[] _pbrTransmissionPipelines = new sg_pipeline[8];
-        private sg_shader _pbrTransmissionShader;
+        private readonly Family[] All;
         private bool _disposed;
+
+        public ShaderVariantCache()
+        {
+            All = new[] { _blinn, _pbr, _pbrCsm1, _pbrCsm4, _pbrSkin, _pbrSkinCsm1, _pbrSkinCsm4,
+                          _pbrSkinMorph, _pbrSkinMorphCsm1, _pbrSkinMorphCsm4, _pbrTransmission };
+        }
+
+        /// <summary>
+        /// True once a full shader was refused by the GPU (or <see cref="ForceLowTier"/> asked for it): every family
+        /// made from then on uses its LOW_TIER shader, and every skinned mesh takes the joint-texture path
+        /// (<see cref="Animation.SkinnedCharacterRegistry.Entry.UsesTextureSkinning"/>).
+        /// </summary>
+        public static bool LowTier { get; private set; }
+
+        /// <summary>
+        /// Makes every family LOW_TIER from the start, as on a GPU that refuses the full shaders — so a check can see
+        /// the LOW_TIER picture on any GLES 3 / WebGL 2 device. Set it before the first 3D draw; it does nothing on
+        /// Metal, D3D11 and desktop GL (the LOW_TIER shaders are GLSL ES 3.0 only).
+        /// </summary>
+        public static bool ForceLowTier { get; set; }
+
+        /// <summary>
+        /// Every skinned mesh reads its bones from the joint texture, not from the bone array of its shader: on LOW_TIER,
+        /// and on a GLES 3 / WebGL 2 GPU whose reported vertex uniform components cannot hold that array (128 bones, 2,084
+        /// components with the rest of the block). Adreno GPUs report 1,024 and compile the shader all the same, but a bone
+        /// past their limit reads nothing right: a dancer's upper body came apart on a Galaxy A71 and an S20 FE.
+        /// </summary>
+        public static bool TextureSkinning => LowTier || _smallVertexUniforms;
+        private static bool _smallVertexUniforms;
+        private const int SkinnedVertexComponents = 2084;
+
+        /// <summary>
+        /// True when the pipeline handed out last belongs to a LOW_TIER shader: the uniform blocks applied after it go
+        /// through <see cref="LowTierUniforms"/> (as sokol's own state: a pipeline is applied, then its uniforms).
+        /// </summary>
+        public bool CurrentLow { get; private set; }
+
+        /// <summary>How many families have been made (a check: a 2D scene makes none).</summary>
+        public int FamiliesMade { get { int n = 0; foreach (var f in All) if (f.Made) n++; return n; } }
 
         // ── lifecycle ────────────────────────────────────────────────────────────────
 
         public void Init()
         {
-            sg_shader shader = sg_make_shader(blinn_phong_shader_desc(sg_query_backend()));
-
-            // Create all pipeline variants we'll need at runtime.
-            // Variants enumerated at init time → AOT-safe (no runtime generic instantiation).
-            for (int i = 0; i < _pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                bool alpha      = (flags & PipelineFlags.AlphaBlend)  != 0;
-                bool doubleSide = (flags & PipelineFlags.DoubleSided)  != 0;
-                bool offscreen  = (flags & PipelineFlags.OffscreenRt)  != 0;
-
-                _shaders[i]   = shader; // all variants share the same shader object
-                _pipelines[i] = BuildPipeline(shader, alpha, doubleSide, offscreen);
-            }
-
-            // ── M4: PBR base-variant pipelines (shared per-vertex + per-instance layout) ──
-            _pbrShader = sg_make_shader(PbrShaders.pbr_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrPipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrPipelines[i] = BuildPbrPipeline(
-                    _pbrShader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR CSM1 (1-cascade directional shadow) — same vertex layout as base PBR ──
-            _pbrCsm1Shader = sg_make_shader(PbrCsm1.pbr_csm1_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrCsm1Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrCsm1Pipelines[i] = BuildPbrCsm1Pipeline(
-                    _pbrCsm1Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR CSM4 (4-cascade directional shadow) — same vertex layout as base PBR ──
-            _pbrCsm4Shader = sg_make_shader(PbrCsm4.pbr_csm4_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrCsm4Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrCsm4Pipelines[i] = BuildPbrCsm4Pipeline(
-                    _pbrCsm4Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR skinning (GPU bone skinning) — buffer 0 extended to 80 B (joints/weights) ──
-            _pbrSkinningShader = sg_make_shader(PbrSkinning.pbr_skinning_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinningPipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinningPipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinningShader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR skinning + CSM4 — same 80 B vertex layout (attribute locations match), so
-            //        BuildPbrSkinningPipeline is reused with the skinning+csm4 shader. ──
-            _pbrSkinningCsm4Shader = sg_make_shader(PbrSkinningCsm4.pbr_skinning_csm4_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinningCsm4Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinningCsm4Pipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinningCsm4Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR skinning + CSM1 — same 80 B layout, reuses BuildPbrSkinningPipeline. ──
-            _pbrSkinningCsm1Shader = sg_make_shader(PbrSkinningCsm1.pbr_skinning_csm1_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinningCsm1Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinningCsm1Pipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinningCsm1Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR skinning + morph (no CSM / CSM1 / CSM4) — same 80 B layout, BuildPbrSkinningPipeline. ──
-            _pbrSkinMorphShader = sg_make_shader(PbrSkinMorph.pbr_skinning_morphing_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinMorphPipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinMorphPipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinMorphShader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            _pbrSkinMorphCsm1Shader = sg_make_shader(PbrSkinMorphCsm1.pbr_skinning_morphing_csm1_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinMorphCsm1Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinMorphCsm1Pipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinMorphCsm1Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            _pbrSkinMorphCsm4Shader = sg_make_shader(PbrSkinMorphCsm4.pbr_skinning_morphing_csm4_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrSkinMorphCsm4Pipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrSkinMorphCsm4Pipelines[i] = BuildPbrSkinningPipeline(
-                    _pbrSkinMorphCsm4Shader,
-                    (flags & PipelineFlags.AlphaBlend)  != 0,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
-
-            // ── M4: PBR transmission (screen-space refraction) — base PBR vertex layout. ──
-            _pbrTransmissionShader = sg_make_shader(PbrTransmission.pbr_transmission_pbr_program_shader_desc(sg_query_backend()));
-            for (int i = 0; i < _pbrTransmissionPipelines.Length; i++)
-            {
-                var flags = (PipelineFlags)i;
-                _pbrTransmissionPipelines[i] = BuildPbrTransmissionPipeline(
-                    _pbrTransmissionShader,
-                    (flags & PipelineFlags.DoubleSided) != 0,
-                    (flags & PipelineFlags.OffscreenRt) != 0);
-            }
+            // Nothing is made here: each family is made by the first draw that asks for it (Get).
+            var backend = sg_query_backend();
+            if (ForceLowTier && backend == sg_backend.SG_BACKEND_GLES3) LowTier = true;
+            int vertexComponents = sg_query_limits().gl_max_vertex_uniform_components;
+            _smallVertexUniforms = backend == sg_backend.SG_BACKEND_GLES3 && vertexComponents < SkinnedVertexComponents;
+            if (backend == sg_backend.SG_BACKEND_GLES3)
+                unsafe
+                {
+                    Sokol.SLog.slog_func_native("Framework", 3, 0,
+                        $"GPU: vertex uniform components {vertexComponents}; skinning through the joint texture: {(TextureSkinning ? "yes" : "no")}", 0, "ShaderVariantCache.cs", null);
+                }
         }
 
-        /// <summary>Look up the cached pipeline for the given flag combination.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPipeline(PipelineFlags flags)
-            => _pipelines[(int)flags & 0x07];
+        /// <summary>A full shader named <paramref name="what"/> was refused by the GPU: LOW_TIER from now on.</summary>
+        internal static void MarkLowTier(string what)
+        {
+            if (!LowTier)
+                Logger.Warning($"[ShaderVariantCache] the GPU refused the '{what}' shader (its uniform limits) — " +
+                               "using the LOW_TIER shaders from now on: 16 lights, 4 spot shadows, 1 point shadow");
+            LowTier = true;
+        }
+
+        private sg_pipeline Get(Family f, PipelineFlags flags)
+        {
+            if (!f.Made) Make(f);
+            CurrentLow = f.Low;
+            return f.Pipelines[(int)flags & 0x07];
+        }
+
+        private void Make(Family f)
+        {
+            f.Made = true;
+            var backend = sg_query_backend();
+            if (ForceLowTier && backend == sg_backend.SG_BACKEND_GLES3) LowTier = true;
+            bool lowAvailable = backend == sg_backend.SG_BACKEND_GLES3;
+            sg_shader shader = default;
+            if (!LowTier || !lowAvailable)
+            {
+                shader = sg_make_shader(f.FullDesc(backend));
+                if (sg_query_shader_state(shader) == sg_resource_state.SG_RESOURCESTATE_FAILED && lowAvailable)
+                {
+                    sg_destroy_shader(shader);
+                    shader = default;
+                    MarkLowTier(f.Name);
+                }
+            }
+            if (shader.id == 0)
+            {
+                shader = sg_make_shader(f.LowDesc(backend));
+                f.Low = true;
+                if (f.LowLightBytes != f.ExpectedLowBytes)
+                    Logger.Error($"[ShaderVariantCache] LOW_TIER '{f.Name}': block is {f.LowLightBytes} bytes, LowTierUniforms packs {f.ExpectedLowBytes}");
+                if (sg_query_shader_state(shader) == sg_resource_state.SG_RESOURCESTATE_FAILED)
+                    Logger.Error($"[ShaderVariantCache] the GPU refused the LOW_TIER '{f.Name}' shader too — its meshes are not drawn");
+            }
+            f.Shader = shader;
+            for (int i = 0; i < f.Pipelines.Length; i++)
+                f.Pipelines[i] = f.Build(shader, (PipelineFlags)i);
+        }
+
+        /// <summary>Look up the Blinn-Phong pipeline for the given flag combination.</summary>
+        public sg_pipeline GetPipeline(PipelineFlags flags) => Get(_blinn, flags);
 
         /// <summary>Look up the cached PBR (base-variant) pipeline for the given flag combination.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrPipeline(PipelineFlags flags)
-            => _pbrPipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrPipeline(PipelineFlags flags) => Get(_pbr, flags);
 
         /// <summary>PBR pipeline that also samples the 1-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrCsm1Pipeline(PipelineFlags flags)
-            => _pbrCsm1Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrCsm1Pipeline(PipelineFlags flags) => Get(_pbrCsm1, flags);
 
         /// <summary>PBR pipeline that also samples the 4-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrCsm4Pipeline(PipelineFlags flags)
-            => _pbrCsm4Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrCsm4Pipeline(PipelineFlags flags) => Get(_pbrCsm4, flags);
 
         /// <summary>PBR pipeline with GPU skinning (80 B per-vertex buffer: +joints_0,+weights_0).</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinningPipeline(PipelineFlags flags)
-            => _pbrSkinningPipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinningPipeline(PipelineFlags flags) => Get(_pbrSkin, flags);
 
         /// <summary>GPU-skinning PBR pipeline that also samples the 4-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinningCsm4Pipeline(PipelineFlags flags)
-            => _pbrSkinningCsm4Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinningCsm4Pipeline(PipelineFlags flags) => Get(_pbrSkinCsm4, flags);
 
         /// <summary>GPU-skinning PBR pipeline that also samples the 1-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinningCsm1Pipeline(PipelineFlags flags)
-            => _pbrSkinningCsm1Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinningCsm1Pipeline(PipelineFlags flags) => Get(_pbrSkinCsm1, flags);
 
         /// <summary>GPU-skinning + morph-target PBR pipeline (no directional CSM).</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinMorphPipeline(PipelineFlags flags)
-            => _pbrSkinMorphPipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinMorphPipeline(PipelineFlags flags) => Get(_pbrSkinMorph, flags);
 
         /// <summary>GPU-skinning + morph-target PBR pipeline that also samples the 1-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinMorphCsm1Pipeline(PipelineFlags flags)
-            => _pbrSkinMorphCsm1Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinMorphCsm1Pipeline(PipelineFlags flags) => Get(_pbrSkinMorphCsm1, flags);
 
         /// <summary>GPU-skinning + morph-target PBR pipeline that also samples the 4-cascade directional shadow.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrSkinMorphCsm4Pipeline(PipelineFlags flags)
-            => _pbrSkinMorphCsm4Pipelines[(int)flags & 0x07];
+        public sg_pipeline GetPbrSkinMorphCsm4Pipeline(PipelineFlags flags) => Get(_pbrSkinMorphCsm4, flags);
 
         /// <summary>PBR transmission pipeline (screen-space refraction; samples the captured screen color).</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sg_pipeline GetPbrTransmissionPipeline(PipelineFlags flags)
-            => _pbrTransmissionPipelines[(int)flags & 0x07];
-
-        /// <summary>The shared shader object (for inspecting reflection).</summary>
-        public sg_shader Shader => _shaders[0];
+        public sg_pipeline GetPbrTransmissionPipeline(PipelineFlags flags) => Get(_pbrTransmission, flags);
 
         // ── pipeline builder ─────────────────────────────────────────────────────────
 
@@ -774,133 +765,20 @@ namespace GameEditor.Framework.Renderer.Server
 
         public void Shutdown()
         {
-            // Destroy all pipeline variants.
-            for (int i = 0; i < _pipelines.Length; i++)
+            foreach (var f in All)
             {
-                if (_pipelines[i].id != 0)
+                for (int i = 0; i < f.Pipelines.Length; i++)
                 {
-                    sg_destroy_pipeline(_pipelines[i]);
-                    _pipelines[i] = default;
+                    if (f.Pipelines[i].id != 0) sg_destroy_pipeline(f.Pipelines[i]);
+                    f.Pipelines[i] = default;
                 }
+                if (f.Shader.id != 0) sg_destroy_shader(f.Shader);
+                f.Shader = default;
+                f.Made = false;
+                f.Low = false;
             }
-
-            // Destroy PBR pipeline variants + shader.
-            for (int i = 0; i < _pbrPipelines.Length; i++)
-            {
-                if (_pbrPipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrPipelines[i]);
-                    _pbrPipelines[i] = default;
-                }
-            }
-            if (_pbrShader.id != 0)
-            {
-                sg_destroy_shader(_pbrShader);
-                _pbrShader = default;
-            }
-
-            for (int i = 0; i < _pbrCsm1Pipelines.Length; i++)
-            {
-                if (_pbrCsm1Pipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrCsm1Pipelines[i]);
-                    _pbrCsm1Pipelines[i] = default;
-                }
-            }
-            if (_pbrCsm1Shader.id != 0)
-            {
-                sg_destroy_shader(_pbrCsm1Shader);
-                _pbrCsm1Shader = default;
-            }
-
-            for (int i = 0; i < _pbrCsm4Pipelines.Length; i++)
-            {
-                if (_pbrCsm4Pipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrCsm4Pipelines[i]);
-                    _pbrCsm4Pipelines[i] = default;
-                }
-            }
-            if (_pbrCsm4Shader.id != 0)
-            {
-                sg_destroy_shader(_pbrCsm4Shader);
-                _pbrCsm4Shader = default;
-            }
-
-            for (int i = 0; i < _pbrSkinningPipelines.Length; i++)
-            {
-                if (_pbrSkinningPipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrSkinningPipelines[i]);
-                    _pbrSkinningPipelines[i] = default;
-                }
-            }
-            if (_pbrSkinningShader.id != 0)
-            {
-                sg_destroy_shader(_pbrSkinningShader);
-                _pbrSkinningShader = default;
-            }
-
-            for (int i = 0; i < _pbrSkinningCsm4Pipelines.Length; i++)
-            {
-                if (_pbrSkinningCsm4Pipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrSkinningCsm4Pipelines[i]);
-                    _pbrSkinningCsm4Pipelines[i] = default;
-                }
-            }
-            if (_pbrSkinningCsm4Shader.id != 0)
-            {
-                sg_destroy_shader(_pbrSkinningCsm4Shader);
-                _pbrSkinningCsm4Shader = default;
-            }
-
-            for (int i = 0; i < _pbrSkinningCsm1Pipelines.Length; i++)
-            {
-                if (_pbrSkinningCsm1Pipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(_pbrSkinningCsm1Pipelines[i]);
-                    _pbrSkinningCsm1Pipelines[i] = default;
-                }
-            }
-            if (_pbrSkinningCsm1Shader.id != 0)
-            {
-                sg_destroy_shader(_pbrSkinningCsm1Shader);
-                _pbrSkinningCsm1Shader = default;
-            }
-
-            // Skinning + morph variants (no CSM / CSM1 / CSM4).
-            DestroyPipelineSet(_pbrSkinMorphPipelines,     ref _pbrSkinMorphShader);
-            DestroyPipelineSet(_pbrSkinMorphCsm1Pipelines, ref _pbrSkinMorphCsm1Shader);
-            DestroyPipelineSet(_pbrSkinMorphCsm4Pipelines, ref _pbrSkinMorphCsm4Shader);
-
-            // Transmission (screen-space refraction) variant.
-            DestroyPipelineSet(_pbrTransmissionPipelines,  ref _pbrTransmissionShader);
-
-            // Destroy the single shader object (shared across all variants).
-            if (_shaders[0].id != 0)
-            {
-                sg_destroy_shader(_shaders[0]);
-                for (int i = 0; i < _shaders.Length; i++)
-                    _shaders[i] = default;
-            }
-        }
-
-        private static void DestroyPipelineSet(sg_pipeline[] pipelines, ref sg_shader shader)
-        {
-            for (int i = 0; i < pipelines.Length; i++)
-            {
-                if (pipelines[i].id != 0)
-                {
-                    sg_destroy_pipeline(pipelines[i]);
-                    pipelines[i] = default;
-                }
-            }
-            if (shader.id != 0)
-            {
-                sg_destroy_shader(shader);
-                shader = default;
-            }
+            CurrentLow = false;
+            LowTier = false;
         }
 
         public void Dispose()
