@@ -1078,6 +1078,12 @@ namespace GameEditor.Framework.Scene
             return results.Count;
         }
 
+        /// <summary>The 3D world of the scene that plays (null when it has none, or another backend).</summary>
+        internal static IPhysicsWorld? Physics3D => _physics;
+
+        /// <summary>The 3D body an entity has in the world that plays.</summary>
+        internal static bool TryGetBody(Entity entity, out PhysicsBodyHandle body) => _entityToHandle.TryGetValue(entity, out body);
+
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
         {
             // A 2D body is read from its Transform before the next step: setting the Transform is the whole of it.
@@ -1135,6 +1141,7 @@ namespace GameEditor.Framework.Scene
             _physics = new JoltPhysicsWorld();
             _physics.Initialize(new Vector3(0f, -9.81f, 0f));
             _physics.SetCollisionListener(new PhysicsCollisionDispatcher());
+            _physics.BeforeStep = KartSystem.Step;
 
             var world = ECSWorld.Instance;
             foreach (Entity entity in world.Entities) CreateBody(world, entity);
@@ -1191,7 +1198,7 @@ namespace GameEditor.Framework.Scene
                 worldPos, worldRot, tr.Scale,
                 rb.MotionType, rb.Mass, rb.UseGravity, shapes,
                 rb.Friction, rb.Restitution, rb.LinearDamping, rb.AngularDamping,
-                rb.IsTrigger, rb.Layer, rb.LayerMask);
+                rb.IsTrigger, rb.Layer, rb.LayerMask) { ExactMass = world.HasComponent<KartComponent>(entity) };
 
             var handle = _physics!.CreateBody(desc);
             _entityToHandle[entity] = handle;

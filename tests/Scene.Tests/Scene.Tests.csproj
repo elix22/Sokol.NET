@@ -32,8 +32,8 @@
     <ProjectReference Include="../../src/Framework/Framework.csproj" />
   </ItemGroup>
 
-  <!-- The 2D physics tests run the real Box2D: its library for this machine goes beside the tests. (The 3D
-       tests need no native library: they play with a stand-in backend.) -->
+  <!-- The 2D physics tests run the real Box2D: its library for this machine goes beside the tests. (Most 3D
+       tests play with a stand-in backend; the kart tests run the real Jolt, below.) -->
   <!-- The sound tests run the real mixer, with no device: its library goes beside the tests too. -->
   <Target Name="CopyMiniAudio" AfterTargets="Build">
     <PropertyGroup>
@@ -57,6 +57,20 @@
       <Box2DLib Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(Box2DLibs)/windows/$(Box2DArch)/release/box2d.dll</Box2DLib>
     </PropertyGroup>
     <Copy SourceFiles="$(Box2DLib)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(Box2DLib)')" />
+  </Target>
+
+  <!-- The kart tests run the real Jolt: its library for this machine goes beside the tests too. -->
+  <Target Name="CopyJolt" AfterTargets="Build">
+    <PropertyGroup>
+      <JoltLibs>$(MSBuildThisFileDirectory)../../ext/JoltPhysics/libs</JoltLibs>
+      <JoltArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</JoltArch>
+      <JoltMac Condition="'$(JoltArch)' == 'Arm64'">arm64</JoltMac>
+      <JoltMac Condition="'$(JoltArch)' != 'Arm64'">x86_64</JoltMac>
+      <JoltLib Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(JoltLibs)/macos/$(JoltMac)/release/libcjolt.dylib</JoltLib>
+      <JoltLib Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(JoltLibs)/linux/X64/release/libcjolt.so</JoltLib>
+      <JoltLib Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(JoltLibs)/windows/x64/release/cjolt.dll</JoltLib>
+    </PropertyGroup>
+    <Copy SourceFiles="$(JoltLib)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(JoltLib)' != '' and Exists('$(JoltLib)')" />
   </Target>
 
   <!-- As a game project embeds its Embedded folder (EmbeddedFiles reads it). -->

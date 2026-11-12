@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using System.Collections.Generic;
 
@@ -70,6 +71,13 @@ namespace GameEditor.Framework.Physics
 
         public bool IsStatic    => MotionType == RigidbodyMotionType.Static;
         public bool IsKinematic => MotionType == RigidbodyMotionType.Kinematic;
+
+        /// <summary>
+        /// A dynamic body that weighs <see cref="Mass"/> exactly (its inertia from its shapes). Without it a body
+        /// weighs what its shapes hold at the default density — as every body did before this flag, which is kept
+        /// so that no existing scene changes. A kart asks for it: its forces are worked out from its mass.
+        /// </summary>
+        public bool ExactMass { get; init; }
 
         public BodyDesc(
             Vector3 position, Quaternion rotation, Vector3 scale,
@@ -219,6 +227,12 @@ namespace GameEditor.Framework.Physics
     {
         void Initialize(Vector3 gravity);
         void Step(float deltaTime);
+
+        /// <summary>
+        /// Called before each fixed step of the world, with the step's length: forces a system adds here act on that
+        /// step (a force added once a frame would act only on the first of the frame's steps).
+        /// </summary>
+        Action<float>? BeforeStep { get; set; }
         void Shutdown();
 
         PhysicsBodyHandle CreateBody(BodyDesc desc);

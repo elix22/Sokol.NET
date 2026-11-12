@@ -153,6 +153,8 @@ namespace GameEditor.Framework.Physics
             SetupContactListener();
         }
 
+        public Action<float>? BeforeStep { get; set; }
+
         public void Step(float deltaTime)
         {
             if (_physics == null) return;
@@ -166,6 +168,7 @@ namespace GameEditor.Framework.Physics
                 // Kinematic characters (Character): PostSimulation + velocity BEFORE physics step.
                 if (_kinCharStates.Count > 0)
                     StepKinematicCharacters(FixedDt);
+                BeforeStep?.Invoke(FixedDt);
                 _physics.Update(FixedDt, 1, _tempAlloc, _jobSystem);
                 _accumulator -= FixedDt;
             }
@@ -285,6 +288,11 @@ namespace GameEditor.Framework.Physics
                 default:
                     cs.mMotionType  = JPH.EMotionType.Dynamic;
                     cs.mObjectLayer = ObjLayerMoving;
+                    if (desc.ExactMass && desc.Mass > 0f)
+                    {
+                        cs.SetOverrideMassProperties(1);   // CalculateInertia: the mass given, the inertia from the shapes
+                        cs.SetMassOverride(desc.Mass);
+                    }
                     break;
             }
 
