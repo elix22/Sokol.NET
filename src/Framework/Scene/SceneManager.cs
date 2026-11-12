@@ -340,6 +340,19 @@ namespace GameEditor.Framework.Scene
         /// Saves a scene snapshot, populates the ScriptSystem from current entities,
         /// starts all behaviours and transitions to Playing state.
         /// </summary>
+        /// <summary>
+        /// How fast the game's time goes: 1 as the clock, 0.5 half as fast, 0 not at all — a pause screen. It
+        /// scales the time physics moves by, the <c>deltaTime</c> scripts get in OnUpdate and sprite animations;
+        /// scripts still run every frame, buttons are still pressed, sound goes on. It lives across scenes, and is
+        /// 1 again when a game starts. (<see cref="ScriptSystem.UnscaledDeltaTime"/>: the frame's real time.)
+        /// </summary>
+        public static float TimeScale
+        {
+            get => _timeScale;
+            set => _timeScale = float.IsFinite(value) ? Math.Clamp(value, 0f, 100f) : 1f;
+        }
+        private static float _timeScale = 1f;
+
         public static void Play()
         {
             if (PlayMode == PlayModeState.Playing) return;
@@ -361,6 +374,7 @@ namespace GameEditor.Framework.Scene
 
                 SaveData.Forget();   // the game's saved data is read from its file when the game first asks
                 SceneChanges = 0;
+                TimeScale = 1f;
 
                 // Where the game starts: its scene's key, when the scene is a file of the project (a built game
                 // knows it from the file it read).
@@ -875,6 +889,9 @@ namespace GameEditor.Framework.Scene
 
         public static void UpdatePhysics(float deltaTime)
         {
+            // A game that slowed its time, or stopped it (a pause screen): the worlds move as much.
+            deltaTime *= TimeScale;
+            if (deltaTime <= 0f) return;
             if (PlayMode == PlayModeState.Playing) Physics2D.Physics2DWorld.Step(ECSWorld.Instance, deltaTime);
 
             if (_simulator != null)

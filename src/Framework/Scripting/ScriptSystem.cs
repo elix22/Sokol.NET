@@ -168,9 +168,15 @@ namespace GameEditor.Framework.Scripting
         }
 
         /// <summary>Calls <see cref="GameBehaviour.OnUpdate"/> on all registered behaviours.</summary>
+        /// <summary>The real time of the frame being run, whatever <see cref="Scene.SceneManager.TimeScale"/> is.</summary>
+        public static float UnscaledDeltaTime { get; private set; }
+
         public static void UpdateAll(float deltaTime)
         {
             if (!_started) return;
+            UnscaledDeltaTime = deltaTime;
+            float realTime = deltaTime;
+            deltaTime *= Scene.SceneManager.TimeScale;
 
             // Behaviours placed since the last pass start now. One that places another in its OnStart adds to the
             // list while it is walked: that one starts in this pass too.
@@ -196,7 +202,7 @@ namespace GameEditor.Framework.Scripting
 
             // After the scripts: sprite animations show the frame for this moment, a clip a script just chose too.
             Scene.SpriteAnimSystem.Update(ECS.ECSWorld.Instance, deltaTime);
-            Sound.Audio.Update(ECS.ECSWorld.Instance, deltaTime);
+            Sound.Audio.Update(ECS.ECSWorld.Instance, realTime);     // sound goes on while the game's time stands
 
             // The end of the frame for scripts: entities handed to Destroy leave now, and a scene that was
             // asked for takes this one's place.

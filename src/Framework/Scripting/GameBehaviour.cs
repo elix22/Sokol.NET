@@ -225,6 +225,22 @@ namespace GameEditor.Framework.Scripting
         /// </summary>
         protected static bool PlaySound(string key, float volume = 1f, float pitch = 1f) => Sound.Audio.PlaySound(key, volume, pitch);
 
+        // ── Time ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// How fast the game's time goes: 1 as the clock, 0 not at all (a pause screen). Physics, the deltaTime of
+        /// OnUpdate and sprite animations follow it; OnUpdate is still called every frame — with 0 while the time
+        /// stands — buttons are still pressed and sound goes on. It lives across scenes.
+        /// </summary>
+        protected static float TimeScale
+        {
+            get => Scene.SceneManager.TimeScale;
+            set => Scene.SceneManager.TimeScale = value;
+        }
+
+        /// <summary>The real time of this frame, whatever <see cref="TimeScale"/> is: for what moves on a pause screen.</summary>
+        protected static float UnscaledDeltaTime => ScriptSystem.UnscaledDeltaTime;
+
         // ── Scenes ───────────────────────────────────────────────────────────
 
         /// <summary>

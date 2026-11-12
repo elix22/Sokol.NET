@@ -155,6 +155,14 @@ namespace GameEditor.Framework.Input
             false;
 #endif
 
+        /// <summary>
+        /// On an Android phone the Back key ends the app. Set to true, it is a press of Escape for the game's
+        /// scripts instead (GetKeyDown(Key.Escape), GetButtonDown("Cancel")) — a pause screen, a way back to the
+        /// title — and the app goes on. Nothing changes elsewhere: a window's close button still closes it.
+        /// </summary>
+        public static bool BackIsEscape { get; set; }
+        private static int _backFrames;
+
         // ── Named-axis virtual overrides ──────────────────────────────────────
 
         private static readonly Dictionary<string, float> _axisOverride   = new(StringComparer.Ordinal);
@@ -175,6 +183,9 @@ namespace GameEditor.Framework.Input
         /// </summary>
         public static void BeginFrame()
         {
+            // A Back key that was made an Escape press: let go in the frame after the one that saw it.
+            if (_backFrames > 0 && --_backFrames == 0) SetVirtualKey(Key.Escape, false);
+
             // Clear per-frame key flash arrays; virtual transitions since the last frame take their turn
             Array.Clear(_pressedThisFrame,  0, KeySlots);
             Array.Clear(_releasedThisFrame, 0, KeySlots);
@@ -239,6 +250,15 @@ namespace GameEditor.Framework.Input
         /// </summary>
         public static void ProcessEvent(sapp_event* e)
         {
+#if __ANDROID__
+            // Android's Back key arrives as a request to quit, which can be refused only here, while it is handled.
+            if (e->type == sapp_event_type.SAPP_EVENTTYPE_QUIT_REQUESTED && BackIsEscape)
+            {
+                sapp_cancel_quit();
+                PressBack();
+                return;
+            }
+#endif
             switch (e->type)
             {
                 case sapp_event_type.SAPP_EVENTTYPE_KEY_DOWN:
@@ -585,6 +605,13 @@ namespace GameEditor.Framework.Input
         /// Inject a virtual key event (e.g. from an on-screen button or gamepad mapping).
         /// GetKey follows at once; GetKeyDown / GetKeyUp fire for the one frame after the change.
         /// </summary>
+        /// <summary>The Back key as an Escape press that lasts one frame (what <see cref="BackIsEscape"/> makes of it).</summary>
+        public static void PressBack()
+        {
+            SetVirtualKey(Key.Escape, true);
+            _backFrames = 2;
+        }
+
         public static void SetVirtualKey(Key key, bool down)
         {
             int k = (int)key;
