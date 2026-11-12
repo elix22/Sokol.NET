@@ -172,12 +172,14 @@ namespace GameEditor.Framework.Scene
                     // the prefabs those hold. A scene that names none goes on at once.
                     // The sprite sheets the scene and those prefabs name are read next, for the same reason: a
                     // sprite's frame and an animation's clip are there from the first frame.
-                    // Then the tile maps, and the sheets the maps' tiles come from.
+                    // Then the tile maps, and the sheets the maps' tiles come from; then the sounds and the tracks.
                     Prefabs.LoadNamedIn(json, loaded => TilemapLibrary.LoadNamedIn(TextsOf(json, loaded), maps =>
                     {
                         var texts = TextsOf(json, loaded);
                         texts.AddRange(maps);
-                        SpriteLibrary.LoadNamedIn(texts, () => Sound.AudioClips.LoadNamedIn(TextsOf(json, loaded), () => then(json, loaded)));
+                        // And the race tracks: their roads and walls are made from them when the scene is drawn and played.
+                        SpriteLibrary.LoadNamedIn(texts, () => Sound.AudioClips.LoadNamedIn(TextsOf(json, loaded),
+                            () => TrackLibrary.LoadNamedIn(TextsOf(json, loaded), _ => then(json, loaded))));
                     }, freshMaps));
                 }
                 else
@@ -283,6 +285,8 @@ namespace GameEditor.Framework.Scene
 
         private static void LeaveScene()
         {
+            Race.Reset();
+            DriverSystem.Reset();
             ScriptSystem.StopAll();
             _destroyQueue.Clear();
             ShutdownPhysics();
@@ -417,6 +421,8 @@ namespace GameEditor.Framework.Scene
 
             // Destroy all running scripts
             ScriptSystem.StopAll();
+            Race.Reset();
+            DriverSystem.Reset();
             _destroyQueue.Clear();   // the whole scene goes back to the snapshot
             Sound.Audio.StopAll();
             _askedScene = null;
@@ -711,8 +717,7 @@ namespace GameEditor.Framework.Scene
                 if (!entity.Components.TryGetProperty("MeshRenderer", out var mr) || mr.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
 
                 if (mr.TryGetProperty("Path", out var pathEl) && pathEl.GetString() is { Length: > 0 } mesh &&
-                    !mesh.StartsWith("prim:", StringComparison.Ordinal) &&
-                    !mesh.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal) &&
+                    !GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.IsMadeInCode(mesh) &&
                     AssetLibrary.ToAssetsRelativePath(mesh) is { } meshRel)
                     AssetLibrary.Mesh(meshRel);
 
@@ -757,8 +762,7 @@ namespace GameEditor.Framework.Scene
         {
             if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) return;
             if (string.IsNullOrEmpty(mr.MeshPath)) return;
-            if (mr.MeshPath.StartsWith("prim:", StringComparison.Ordinal)) return;
-            if (mr.MeshPath.StartsWith(GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.InMemoryPrefix, StringComparison.Ordinal)) return;
+            if (GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.IsMadeInCode(mr.MeshPath)) return;
 
             // Normalize to Assets-relative so the stored path is portable.
             string? relPath = AssetLibrary.ToAssetsRelativePath(mr.MeshPath);
@@ -970,6 +974,9 @@ namespace GameEditor.Framework.Scene
                 wfTr.Position = new Vector3(wm.M41, wm.M42, wm.M43);
                 wfTr.Rotation = Quaternion.CreateFromRotationMatrix(wm);
             }
+
+            // The race's HUD, if the scene has one (the race itself moves in the fixed steps, StepKarts).
+            Race.Update(deltaTime);
         }
 
         public static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out Entity hitEntity, out RaycastHit hit)
@@ -1084,6 +1091,14 @@ namespace GameEditor.Framework.Scene
         /// <summary>The 3D body an entity has in the world that plays.</summary>
         internal static bool TryGetBody(Entity entity, out PhysicsBodyHandle body) => _entityToHandle.TryGetValue(entity, out body);
 
+        // Before each fixed step of the 3D world: the computer's drivers choose their karts' inputs, then every kart drives.
+        private static void StepKarts(float dt)
+        {
+            Race.Step(dt);
+            DriverSystem.Step(dt);
+            KartSystem.Step(dt);
+        }
+
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
         {
             // A 2D body is read from its Transform before the next step: setting the Transform is the whole of it.
@@ -1141,7 +1156,7 @@ namespace GameEditor.Framework.Scene
             _physics = new JoltPhysicsWorld();
             _physics.Initialize(new Vector3(0f, -9.81f, 0f));
             _physics.SetCollisionListener(new PhysicsCollisionDispatcher());
-            _physics.BeforeStep = KartSystem.Step;
+            _physics.BeforeStep = StepKarts;
 
             var world = ECSWorld.Instance;
             foreach (Entity entity in world.Entities) CreateBody(world, entity);
@@ -1171,7 +1186,22 @@ namespace GameEditor.Framework.Scene
                 ? new List<ShapeEntry>(rb.Shapes)
                 : new List<ShapeEntry> { ShapeEntry.Default() };
 
-            if (world.TryGetComponent<MeshRenderer>(entity, out var mr) &&
+            if (world.TryGetComponent<MeshRenderer>(entity, out var trackMr) &&
+                TrackData.TryParseMeshPath(trackMr.MeshPath, out string trackKey, out string trackPart) &&
+                TrackLibrary.Track(trackKey) is { } track)
+            {
+                // A track's road or walls: a Mesh (or hull) shape is the part's own triangles.
+                for (int i = 0; i < shapes.Count; i++)
+                {
+                    var entry = shapes[i];
+                    if ((entry.Shape == ColliderShape.Mesh || entry.Shape == ColliderShape.ConvexHull) && entry.MeshVertices == null)
+                    {
+                        (entry.MeshVertices, entry.MeshIndices) = track.Triangles(trackPart);
+                        shapes[i] = entry;
+                    }
+                }
+            }
+            else if (world.TryGetComponent<MeshRenderer>(entity, out var mr) &&
                 PrimitiveMeshSpec.TryParse(mr.MeshPath, out var spec))
             {
                 for (int i = 0; i < shapes.Count; i++)

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using GameEditor.Framework.Assets;
 using GameEditor.Framework.Renderer;
 using static Sokol.SG;
 using static Sokol.SShape;
@@ -19,6 +20,17 @@ namespace GameEditor.Framework.Renderer.Server.Resources
     {
         /// <summary>Key prefix of meshes their owner builds and registers in memory (<see cref="RegisterMesh"/>): never a file.</summary>
         public const string InMemoryPrefix = "mem:";
+
+        /// <summary>
+        /// A mesh the engine makes from numbers, not a file to load: a primitive ("prim:…"), one handed over in memory
+        /// ("mem:…"), or a part of a race track ("Tracks/loop.track#road", "#walls").
+        /// </summary>
+        public static bool IsMadeInCode(string? path)
+            => path != null && (path.StartsWith("prim:", StringComparison.Ordinal) || path.StartsWith(InMemoryPrefix, StringComparison.Ordinal)
+                                || TrackData.TryParseMeshPath(path, out _, out _));
+
+        // The track parts made, with the TrackLibrary.Version they were made at: made again when it moves on.
+        private readonly Dictionary<string, int> _trackMade = new(StringComparer.Ordinal);
 
         private readonly Dictionary<string, MeshResource> _byPath = new(StringComparer.Ordinal);
         private readonly MeshResource?[] _byId;    // sparse id → resource
@@ -167,7 +179,13 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         {
             if (path == null) return null;
             if (_byPath.TryGetValue(path, out var r))
+            {
+                if (_trackMade.Count != 0 && _trackMade.TryGetValue(path, out int made) && made != TrackLibrary.Version) RemakeTrackPart(path, r);
                 return r;
+            }
+
+            if (TrackData.TryParseMeshPath(path, out string trackKey, out string part))
+                return TryCreateTrackPart(path, trackKey, part, out var trackRes) ? trackRes : null;
 
             if (!path.StartsWith("prim:", StringComparison.Ordinal))
                 return null;
@@ -348,6 +366,72 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             _byPath[path] = resource;
             _byId[id]     = resource;
             return true;
+        }
+
+        // ── a race track's road and walls ─────────────────────────────────────────────
+
+        // The part's vertices and triangles, from the track as the library has it now; false while it is not read
+        // (a built game: its file is on its way) or has nothing to draw (walls of height 0).
+        private static bool TrackPart(string key, string part, out ObjVertex[] vertices, out uint[] indices, out Aabb bounds)
+        {
+            vertices = Array.Empty<ObjVertex>(); indices = Array.Empty<uint>(); bounds = default;
+            if (TrackLibrary.Track(key) is not { } track) return false;
+            var p = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var tg = new List<Vector4>(); var ix = new List<uint>();
+            if (part == TrackData.RoadPart) track.RoadMesh(p, n, uv, tg, ix); else track.WallMesh(p, n, uv, tg, ix);
+            if (ix.Count == 0) return false;
+            vertices = new ObjVertex[p.Count];
+            var bmin = new Vector3(float.MaxValue); var bmax = new Vector3(float.MinValue);
+            for (int i = 0; i < p.Count; i++)
+            {
+                vertices[i] = new ObjVertex { Position = p[i], Normal = n[i], Uv = uv[i], Tangent = tg[i] };
+                bmin = Vector3.Min(bmin, p[i]); bmax = Vector3.Max(bmax, p[i]);
+            }
+            indices = ix.ToArray();
+            bounds = new Aabb(bmin, bmax);
+            return true;
+        }
+
+        private bool TryCreateTrackPart(string path, string key, string part, out MeshResource resource)
+        {
+            resource = default!;
+            int version = TrackLibrary.Version;
+            if (!TrackPart(key, part, out var vertices, out var indices, out var bounds)) return false;
+            ushort id = _nextId;
+            if (id == 0 || id >= _byId.Length) return false;
+            _nextId++;
+            var sub = new ObjSubMesh { MaterialName = "", Vertices = vertices, Indices = indices };
+            resource = new MeshResource
+            {
+                Id          = id,
+                SourcePath  = path,
+                MtlLib      = "",
+                SubMeshes   = new[] { new MeshSubResource { VertexBuffer = UploadVertexBuffer(sub, path, 0), IndexBuffer = UploadIndexBuffer(sub, path, 0),
+                                                            IndexCount = indices.Length, MaterialName = "", MaterialKey = "" } },
+                LocalBounds = bounds,
+                RefCount    = 1
+            };
+            _byPath[path] = resource;
+            _byId[id]     = resource;
+            _trackMade[path] = version;
+            return true;
+        }
+
+        // The track changed: the same resource (and id) gets the part's new buffers. A part with nothing to draw now
+        // keeps no triangles.
+        private void RemakeTrackPart(string path, MeshResource resource)
+        {
+            int version = TrackLibrary.Version;
+            _trackMade[path] = version;
+            foreach (var old in resource.SubMeshes) old.Destroy();
+            if (!TrackPart(TrackData.KeyOf(path)!, path.Substring(path.IndexOf('#') + 1), out var vertices, out var indices, out var bounds))
+            {
+                resource.SubMeshes = Array.Empty<MeshSubResource>();
+                return;
+            }
+            var sub = new ObjSubMesh { MaterialName = "", Vertices = vertices, Indices = indices };
+            resource.SubMeshes = new[] { new MeshSubResource { VertexBuffer = UploadVertexBuffer(sub, path, 0), IndexBuffer = UploadIndexBuffer(sub, path, 0),
+                                                               IndexCount = indices.Length, MaterialName = "", MaterialKey = "" } };
+            resource.LocalBounds = bounds;
         }
 
         // ── primitive vertex builders ─────────────────────────────────────────────────
@@ -583,6 +667,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         {
             foreach (var res in _byPath.Values) res.Destroy();
             _byPath.Clear();
+            _trackMade.Clear();
             Array.Clear(_byId, 0, _byId.Length);
             _nextId = 1;
         }

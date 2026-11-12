@@ -43,6 +43,8 @@ namespace GameEditor.Framework.Scene
                 k.Brake = MathF.Max(-v, 0f);
             }
             float throttle = Math.Clamp(k.Throttle, 0f, 1f), brake = Math.Clamp(k.Brake, 0f, 1f), steer = Math.Clamp(k.Steer, -1f, 1f);
+            bool held = k.Held;
+            if (held) { throttle = 0f; brake = 0f; steer = 0f; }
 
             Vector3 at = physics.GetPosition(body);
             Quaternion turn = physics.GetRotation(body);
@@ -84,7 +86,8 @@ namespace GameEditor.Framework.Scene
                 // Drive and brake along the kart's forward direction (on its wheels it lies along the ground).
                 Vector3 along = forward;
                 float change;
-                if (brake > 0f && speed > 0.5f) change = -k.Braking * brake;
+                if (held) change = -MathF.Sign(speed) * MathF.Min(k.Braking, MathF.Abs(speed) / dt);   // held: to a standstill, and kept there
+                else if (brake > 0f && speed > 0.5f) change = -k.Braking * brake;
                 else if (brake > 0f) change = speed > -k.ReverseSpeed ? -k.Acceleration * brake : 0f;
                 else if (throttle > 0f) change = speed < k.TopSpeed ? k.Acceleration * throttle : 0f;
                 else change = -MathF.Sign(speed) * MathF.Min(k.Coasting, MathF.Abs(speed) / dt);

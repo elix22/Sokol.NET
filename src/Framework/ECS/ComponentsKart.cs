@@ -47,6 +47,8 @@ namespace GameEditor.Framework.ECS.Components
         public float Brake;
         /// <summary>-1 (left) to 1 (right).</summary>
         public float Steer;
+        /// <summary>Held by a race's countdown: braked to a standstill and kept there, the inputs not used (the race sets it).</summary>
+        public bool Held;
 
         // ── What the controller found in the last step (read only) ─────────────────
         /// <summary>Metres a second along the kart's forward direction (negative: backward).</summary>

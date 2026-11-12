@@ -20,6 +20,9 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("AudioSource", WriteAudioSource, ReadAudioSource, static (w, e) => w.RemoveComponent<AudioSource>(e));
             RegisterUI();
             RegisterKart();
+            RegisterTrack();
+            RegisterRace();
+            RegisterDriver();
         }
 
         private static string? WriteAudioSource(ECSWorld world, Frent.Entity e)
