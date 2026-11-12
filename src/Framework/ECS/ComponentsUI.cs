@@ -73,10 +73,33 @@ namespace GameEditor.Framework.ECS.Components
         public Vector4 TextColor;
         /// <summary>How round its corners are, in design units.</summary>
         public float Radius;
+        /// <summary>
+        /// What it holds while a finger (or the mouse) is on it: an axis and a value, "Horizontal:-1", "Vertical:1", or a
+        /// button's name, "Fire1", "Jump" — as a key held down. Empty: it only clicks. Several fingers on several buttons hold all.
+        /// </summary>
+        public string Holds;
 
         public static UIButton Default => new()
         {
             Text = "Button", Font = "", FontSize = 28f, Color = new Vector4(0.2f, 0.45f, 0.9f, 1f), TextColor = Vector4.One, Radius = 10f,
+        };
+    }
+
+    /// <summary>
+    /// A map of the race (scene block "UIMiniMap"): the scene's track drawn into the element's rectangle, a dot for each kart
+    /// that races — the player's in its own colour.
+    /// </summary>
+    public struct UIMiniMap
+    {
+        public Vector4 Road;
+        public Vector4 Kart;
+        public Vector4 Player;
+        /// <summary>The road's line width, in design units.</summary>
+        public float Line;
+
+        public static UIMiniMap Default => new()
+        {
+            Road = new Vector4(1f, 1f, 1f, 0.8f), Kart = new Vector4(0.95f, 0.3f, 0.25f, 1f), Player = new Vector4(1f, 0.85f, 0.1f, 1f), Line = 4f,
         };
     }
 

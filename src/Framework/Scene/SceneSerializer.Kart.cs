@@ -21,7 +21,8 @@ namespace GameEditor.Framework.Scene
                  + ",\"Braking\":" + F(k.Braking) + ",\"Coasting\":" + F(k.Coasting) + ",\"TurnRate\":" + F(k.TurnRate)
                  + ",\"TurnFullSpeed\":" + F(k.TurnFullSpeed) + ",\"Grip\":" + F(k.Grip) + ",\"WheelSpan\":" + Pair(k.WheelSpan)
                  + ",\"WheelHeight\":" + F(k.WheelHeight) + ",\"Suspension\":" + F(k.Suspension) + ",\"Spring\":" + F(k.Spring)
-                 + ",\"Damper\":" + F(k.Damper) + ",\"Player\":" + (k.Player ? "true" : "false") + "}";
+                 + ",\"Damper\":" + F(k.Damper) + ",\"Player\":" + (k.Player ? "true" : "false")
+                 + ",\"AutoThrottle\":" + (k.AutoThrottle ? "true" : "false") + "}";
         }
 
         private static void ReadKart(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
@@ -41,6 +42,7 @@ namespace GameEditor.Framework.Scene
             k.Spring = Number(el, "Spring", k.Spring);
             k.Damper = Number(el, "Damper", k.Damper);
             k.Player = el.TryGetProperty("Player", out var p) && p.ValueKind == JsonValueKind.True;
+            k.AutoThrottle = el.TryGetProperty("AutoThrottle", out var at) && at.ValueKind == JsonValueKind.True;
             world.AddComponent(e, k);
         }
     }

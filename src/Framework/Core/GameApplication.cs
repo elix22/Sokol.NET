@@ -268,6 +268,7 @@ namespace GameEditor.Framework.Core
         /// </summary>
         public static unsafe void RunFrame(Sokol.SG.sg_pass_action clear)
         {
+            AutoScreenshots();
             Input.InputManager.BeginFrame();
             Update((float)sapp_frame_duration());
 
@@ -305,7 +306,7 @@ namespace GameEditor.Framework.Core
                     RenderingServer.RenderTransmission(_sceneTarget, viewProj);
                 }
 
-                Sokol.SG.sg_begin_pass(new Sokol.SG.sg_pass { action = clear, swapchain = Sokol.SGlue.sglue_swapchain() });
+                Sokol.ScreenCapture.BeginFrame(clear);     // the swapchain - or, once after Screenshot(), a picture of the frame
                 if (_sceneTarget.IsValid)
                     RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
                 Render();
@@ -313,13 +314,150 @@ namespace GameEditor.Framework.Core
             }
             else
             {
-                Sokol.SG.sg_begin_pass(new Sokol.SG.sg_pass { action = clear, swapchain = Sokol.SGlue.sglue_swapchain() });
+                Sokol.ScreenCapture.BeginFrame(clear);     // the swapchain - or, once after Screenshot(), a picture of the frame
                 RenderingServer.RenderSkybox(viewProj, offscreen: false);
                 RenderingServer.SubmitView(viewProj, PipelineFlags.None, allowShadowPassRendering: false, csm: csm);
                 Render();
                 Sokol.SG.sg_end_pass();
             }
-            Sokol.SG.sg_commit();
+            Sokol.ScreenCapture.Commit();
+        }
+
+        /// <summary>
+        /// A picture of the next frame as it is drawn (the scene and the game's UI), written as a PNG named
+        /// <paramref name="name"/> in the app's own folder (<see cref="SaveData.Folder"/>) - on a phone the only way to take one
+        /// from the game itself. That frame is not shown (one black frame). Returns the file's path, or null when this
+        /// platform or GPU cannot read a picture back, the app has no folder (a browser), or a picture is already on
+        /// its way; <see cref="LastScreenshot"/> is the path once it is written. For a game built from the engine: in an
+        /// editor it is the editor's whole window.
+        /// </summary>
+        public static string? Screenshot(string name)
+        {
+            string folder = ShotFolder();
+            if (folder.Length == 0 || string.IsNullOrEmpty(name)) return null;
+            // A picture the game asks for goes before a waiting automatic one (SOKOL_SCREENSHOTS), which is asked again after it.
+            if (_shotAsked != null && Sokol.ScreenCapture.Pending)
+            {
+                Sokol.ScreenCapture.Cancel();
+                if (_shotAsked.EndsWith("begin.png", StringComparison.Ordinal)) _shotBegun = false;
+                else if (_shotAsked.EndsWith("end.png", StringComparison.Ordinal)) { _shotEnded = false; _shotEndIn = 2; }
+                _shotAsked = null;
+            }
+            string path = Path.Combine(folder, name);
+            return Sokol.ScreenCapture.Request(path) ? path : null;
+        }
+
+        /// <summary>The path of the last picture <see cref="Screenshot"/> wrote, null before one.</summary>
+        public static string? LastScreenshot => Sokol.ScreenCapture.LastPath;
+
+        // A game started with SOKOL_SCREENSHOTS=1 in its environment (a check launching it: `devicectl device process launch
+        // --environment-variables`, or the desktop app's environment; on Android `adb shell setprop debug.sokol.screenshots 1`)
+        // takes pictures of itself through ScreenCapture - the frame as drawn - in its folder, and logs "[Shot] <path>" for
+        // each: begin.png 0.3 s after it starts, t004.png, t008.png, ... every 4 seconds, and end.png a few frames after a
+        // script says its verdict (a line with " PASS", " FAIL" or " finished"). How a phone that cannot be photographed from
+        // the computer (an iPhone on iOS 26) shows what it drew.
+        private static int _shotMode = -1;            // -1: not read yet, 0: off, 1: on
+        private static double _shotStart, _shotNext;
+        private static bool _shotBegun, _shotEnded;
+        private static int _shotEndIn;
+        private static string? _shotAsked;
+
+        // Where the pictures go: the app's own folder; on Android its external files folder
+        // (/sdcard/Android/data/<package>/files), which adb can read from a release build (the inner one it cannot).
+        private static string? _shotFolder;
+
+        // An Android build is NativeAOT for linux-bionic, where OperatingSystem.IsAndroid() is false: sokol's native activity says it.
+        private static unsafe bool IsAndroid => sapp_android_get_native_activity() != null;
+
+        private static unsafe string ShotFolder()
+        {
+            // Not kept: the project's name (the folder's) is known only once its config is read, after the first frame.
+            if (_shotFolder != null) return _shotFolder;
+            if (IsAndroid)
+            {
+                // ANativeActivity: callbacks, vm, env, clazz, internalDataPath, externalDataPath, ...
+                byte* activity = (byte*)sapp_android_get_native_activity();
+                IntPtr external = *(IntPtr*)(activity + 5 * IntPtr.Size);
+                string? path = external != IntPtr.Zero ? System.Runtime.InteropServices.Marshal.PtrToStringUTF8(external) : null;
+                if (!string.IsNullOrEmpty(path)) return _shotFolder = path + "/";
+            }
+            return SaveData.Folder;
+        }
+
+        [System.Runtime.InteropServices.DllImport("libc", EntryPoint = "__system_property_get")]
+        private static extern unsafe int SystemPropertyGet(byte* name, byte* value);
+
+        private static unsafe string? AndroidProperty(string name)
+        {
+            try
+            {
+                byte* value = stackalloc byte[92];                 // PROP_VALUE_MAX
+                byte[] key = System.Text.Encoding.ASCII.GetBytes(name + "\0");
+                fixed (byte* k = key)
+                {
+                    int n = SystemPropertyGet(k, value);
+                    return n > 0 ? System.Text.Encoding.ASCII.GetString(value, n) : null;
+                }
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static void AutoScreenshots()
+        {
+            if (_shotMode < 0)
+            {
+                string? on = Environment.GetEnvironmentVariable("SOKOL_SCREENSHOTS");
+                if (string.IsNullOrEmpty(on) && IsAndroid) on = AndroidProperty("debug.sokol.screenshots");
+                _shotMode = !string.IsNullOrEmpty(on) && on != "0" ? 1 : 0;
+                if (_shotMode == 0) return;
+                _shotStart = stm_sec(stm_now());
+                _shotNext = _shotStart + 4.0;
+                Logger.OnLog += ShotOnVerdict;
+                OpenLogFile();
+                Logger.Info("[Shot] at the begin, every 4 s and at the end, in " + ShotFolder());
+            }
+            if (_shotMode == 0) return;
+            if (_shotAsked != null)
+            {
+                if (Sokol.ScreenCapture.Pending) return;
+                if (Sokol.ScreenCapture.LastPath == _shotAsked) Logger.Info("[Shot] " + _shotAsked);
+                else Logger.Warning("[Shot] not taken: " + Sokol.ScreenCapture.LastError);
+                _shotAsked = null;
+            }
+            double now = stm_sec(stm_now());
+            if (!_shotBegun && now - _shotStart >= 0.3) { _shotBegun = true; _shotAsked = Screenshot("begin.png"); return; }
+            if (_shotEndIn > 0 && --_shotEndIn == 0) { _shotEnded = true; _shotAsked = Screenshot("end.png"); return; }
+            if (_shotBegun && !_shotEnded && _shotEndIn == 0 && now >= _shotNext)
+            {
+                int at = (int)Math.Round(_shotNext - _shotStart);
+                _shotNext += 4.0;
+                _shotAsked = Screenshot("t" + at.ToString("000", System.Globalization.CultureInfo.InvariantCulture) + ".png");
+            }
+        }
+
+        // The game's log lines in a file too, where a check can read them when it cannot read the app's output: an iPhone on
+        // iOS 15 (launched detached: Documents/sokol_log.txt), an Android phone (its external files folder: sokol_log.txt).
+        private static StreamWriter? _logFile;
+
+        private static void OpenLogFile()
+        {
+            string? folder = IsAndroid ? ShotFolder() : OperatingSystem.IsIOS() ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) : null;
+            if (string.IsNullOrEmpty(folder)) return;
+            try
+            {
+                _logFile = new StreamWriter(Path.Combine(folder, "sokol_log.txt"), false) { AutoFlush = true };
+                Logger.OnLog += (level, msg) => { try { _logFile?.WriteLine(msg); } catch (Exception) { } };
+            }
+            catch (Exception) { _logFile = null; }
+        }
+
+        // A script's verdict ("[Ctl] PASS ...", "[Zip] finished place=1 ..."): the end picture, a few frames later (the
+        // verdict's own picture or panel is on the screen by then).
+        private static void ShotOnVerdict(LogLevel level, string msg)
+        {
+            if (_shotEnded || _shotEndIn > 0 || msg.StartsWith("[Shot]", StringComparison.Ordinal)) return;
+            if (msg.Contains(" PASS", StringComparison.Ordinal) || msg.Contains(" FAIL", StringComparison.Ordinal) || msg.Contains(" finished", StringComparison.Ordinal))
+                _shotEndIn = 4;
         }
 
         public static void Render()

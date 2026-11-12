@@ -30,6 +30,16 @@ namespace GameEditor.Framework.Scene
         public float BestLap { get; internal set; }
         /// <summary>How many times it was put back on the road.</summary>
         public int Respawns { get; internal set; }
+        /// <summary>The item in its slot (None: empty).</summary>
+        public ItemKind Item { get; internal set; }
+        /// <summary>Seconds left of a boost, a puddle's slowdown, a bolt's stun, a guard, the protection after a hit.</summary>
+        public float Boosting { get; internal set; }
+        public float Slowed { get; internal set; }
+        public float Stunned { get; internal set; }
+        public float Guarded { get; internal set; }
+        public float Protected { get; internal set; }
+        /// <summary>How many times an item hit it (a guard's block not counted).</summary>
+        public int Hits { get; internal set; }
 
         internal Vector3 Last;
         internal float LapStart, Bad;
@@ -65,6 +75,17 @@ namespace GameEditor.Framework.Scene
         {
             foreach (var r in _racers) if (r.Entity == e) return r;
             return null;
+        }
+
+        /// <summary>Uses the item in a racer's slot now (a boost, a puddle behind, a bolt ahead, a guard); false when its slot is empty.</summary>
+        public static bool UseItem(Entity kart) => Of(kart) is { } r && State == RaceState.Racing && ItemSystem.Use(r);
+
+        /// <summary>Puts an item in a racer's slot (a script's own pick-up, a test); false when it is not a racer.</summary>
+        public static bool GiveItem(Entity kart, ItemKind item)
+        {
+            if (Of(kart) is not { } r) return false;
+            r.Item = item;
+            return true;
         }
 
         /// <summary>A racer finished a lap: (kart, the lap done, its time in seconds).</summary>
@@ -110,7 +131,7 @@ namespace GameEditor.Framework.Scene
         }
 
         // Where a racer's kart is now: its body's place in the 3D world (a fixed step reads it before the Transform is synced).
-        private static bool Where(ECSWorld world, Entity e, out Vector3 at, out Quaternion turn)
+        internal static bool Where(ECSWorld world, Entity e, out Vector3 at, out Quaternion turn)
         {
             if (SceneManager.Physics3D is { } physics && SceneManager.TryGetBody(e, out var body))
             {

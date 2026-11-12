@@ -167,6 +167,7 @@ namespace GameEditor.Framework.Input
 
         private static readonly Dictionary<string, float> _axisOverride   = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, bool>  _buttonOverride = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> _buttonOverrideBefore = new(StringComparer.Ordinal);   // held by an override last frame
 
         // ── Gamepad ───────────────────────────────────────────────────────────
 
@@ -229,6 +230,8 @@ namespace GameEditor.Framework.Input
 
             // Clear single-frame axis / button overrides
             _axisOverride.Clear();
+            _buttonOverrideBefore.Clear();
+            foreach (var pair in _buttonOverride) if (pair.Value) _buttonOverrideBefore.Add(pair.Key);
             _buttonOverride.Clear();
 
             // This frame's events
@@ -554,7 +557,10 @@ namespace GameEditor.Framework.Input
         }
 
         /// <summary>True only during the first frame the named button is pressed.</summary>
-        public static bool GetButtonDown(string name) => name switch
+        public static bool GetButtonDown(string name)
+            => (_buttonOverride.TryGetValue(name, out bool held) && held && !_buttonOverrideBefore.Contains(name)) || KeyButtonDown(name);
+
+        private static bool KeyButtonDown(string name) => name switch
         {
             "Fire1"  => GetKeyDown(Key.LeftControl) || GetMouseButtonDown(0),
             "Fire2"  => GetKeyDown(Key.LeftAlt)     || GetMouseButtonDown(1),

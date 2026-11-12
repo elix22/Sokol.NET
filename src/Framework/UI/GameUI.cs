@@ -102,7 +102,8 @@ namespace GameEditor.Framework.UI
         {
             if (_hostScreen == null) return;
             if (!playing) _clicked.Clear();
-            Sync(ECSWorld.Instance, width, height, Thickness.Zero);
+            // The buttons that hold are held at the start of each game frame (ApplyHolds), not here at the end of the editor's.
+            Sync(ECSWorld.Instance, width, height, Thickness.Zero, holds: false);
             _hostScreen.Update(width, height, dpi);
         }
 
@@ -181,9 +182,10 @@ namespace GameEditor.Framework.UI
         /// <summary>
         /// Brings the widgets in line with the scene. <paramref name="width"/> and <paramref name="height"/>: the
         /// game's picture in the root's units; <paramref name="safe"/>: what a phone's notch and home bar take
-        /// from its edges.
+        /// from its edges. <paramref name="holds"/>: the buttons that hold are held for this frame (<see cref="ApplyHolds"/>);
+        /// a game calls Sync after the frame's input and before its physics.
         /// </summary>
-        public static void Sync(ECSWorld world, float width, float height, Thickness safe)
+        public static void Sync(ECSWorld world, float width, float height, Thickness safe, bool holds = true)
         {
             if (width <= 0f || height <= 0f) return;
             _frame++;
@@ -192,13 +194,15 @@ namespace GameEditor.Framework.UI
             Area = (screen.X, screen.Y, screen.Width, screen.Height);
             _rects.Clear();
             _above.Clear();
+            _holders.Clear();
+            _holdWidth = width;
             bool order = false;
 
             foreach (Entity e in world.Entities)
             {
                 if (!world.TryGetComponent<UIElement>(e, out var element)) continue;
                 int kind = world.HasComponent<UIText>(e) ? 1 : world.HasComponent<UIPicture>(e) ? 2 : world.HasComponent<UIButton>(e) ? 3
-                         : world.HasComponent<UIPanel>(e) ? 4 : 0;
+                         : world.HasComponent<UIPanel>(e) ? 4 : world.HasComponent<UIMiniMap>(e) ? 5 : 0;
                 if (!_items.TryGetValue(e, out Item? item) || item.Kind != kind)
                 {
                     if (item != null) item.Widget.RemoveFromParent();
@@ -221,7 +225,10 @@ namespace GameEditor.Framework.UI
                 w.Bounds = rect;
                 w.Visible = element.Visible && Shown(world, e);
                 Apply(world, e, item);
+                if (kind == 3 && w.Visible && world.TryGetComponent<UIButton>(e, out var held) && !string.IsNullOrEmpty(held.Holds))
+                    _holders.Add((rect, held.Holds));
             }
+            if (holds) ApplyHolds();
 
             _gone.Clear();
             foreach (var pair in _items)
@@ -299,6 +306,59 @@ namespace GameEditor.Framework.UI
             return true;
         }
 
+        // ── Buttons that hold ───────────────────────────────────────────────────────────
+
+        private static readonly Dictionary<string, float> _holdAxes = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> _holdButtons = new(StringComparer.Ordinal);
+        private static readonly List<(Rect Rect, string Holds)> _holders = new();   // the buttons that hold, where the last Sync placed them
+        private static float _holdWidth;
+
+        /// <summary>
+        /// The axes and buttons of the buttons that a finger or the mouse is on now, as the input of this frame
+        /// (InputManager's overrides, which last one frame): call after the frame's InputManager.BeginFrame and before
+        /// its physics. <see cref="Sync"/> calls it; an editor, whose Sync comes at the end of its frame, calls it at the
+        /// start of each game frame it runs.
+        /// </summary>
+        public static void ApplyHolds()
+        {
+            if (_holders.Count == 0) return;
+            _holdAxes.Clear();
+            _holdButtons.Clear();
+            foreach (var (rect, spec) in _holders)
+                if (Held(rect, _holdWidth)) Hold(spec);
+            foreach (var pair in _holdAxes) Input.InputManager.SetVirtualAxis(pair.Key, Math.Clamp(pair.Value, -1f, 1f));
+            foreach (string name in _holdButtons) Input.InputManager.SetVirtualButton(name, true);
+        }
+
+        // A finger on the rectangle (logical units), or the mouse's left button held on it.
+        private static bool Held(Rect rect, float width)
+        {
+            var size = Input.InputManager.ScreenSize;
+            float k = size.X > 0f ? width / size.X : 1f;
+            for (int i = 0; i < Input.InputManager.TouchCount; i++)
+            {
+                var t = Input.InputManager.GetTouch(i);
+                if (t.Phase == Input.TouchPhase.Ended || t.Phase == Input.TouchPhase.Cancelled) continue;
+                if (Inside(rect, t.Position.X * k, t.Position.Y * k)) return true;
+            }
+            var m = Input.InputManager.MousePosition;
+            return Input.InputManager.GetMouseButton(0) && Inside(rect, m.X * k, m.Y * k);
+
+            static bool Inside(Rect r, float x, float y) => x >= r.X && y >= r.Y && x <= r.X + r.Width && y <= r.Y + r.Height;
+        }
+
+        // "Horizontal:-1" adds to an axis (two buttons of one axis cancel); "Fire1" holds a button.
+        private static void Hold(string spec)
+        {
+            int colon = spec.IndexOf(':');
+            if (colon > 0 && float.TryParse(spec.AsSpan(colon + 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+            {
+                string axis = spec.Substring(0, colon);
+                _holdAxes[axis] = (_holdAxes.TryGetValue(axis, out float sum) ? sum : 0f) + v;
+            }
+            else _holdButtons.Add(spec);
+        }
+
         private static Widget Make(int kind, Entity e)
         {
             switch (kind)
@@ -310,6 +370,7 @@ namespace GameEditor.Framework.UI
                     button.Clicked += () => _clicked.Add(e);
                     return button;
                 case 4: return new PanelWidget();
+                case 5: return new MiniMapWidget();
                 default: return new PlaceWidget();
             }
         }
@@ -343,6 +404,11 @@ namespace GameEditor.Framework.UI
                 case 4 when item.Widget is PanelWidget panel && world.TryGetComponent<UIPanel>(e, out var p):
                     panel.Face = Colour(p.Color);
                     panel.Radius = p.Radius * Scale;
+                    break;
+                case 5 when item.Widget is MiniMapWidget map && world.TryGetComponent<UIMiniMap>(e, out var mm):
+                    map.Road = Colour(mm.Road); map.Kart = Colour(mm.Kart); map.Player = Colour(mm.Player);
+                    map.Line = MathF.Max(1f, mm.Line * Scale);
+                    map.Refresh(world);
                     break;
             }
         }
@@ -433,6 +499,7 @@ namespace GameEditor.Framework.UI
             _rects.Clear();
             _clicked.Clear();
             _clickedNow.Clear();
+            _holders.Clear();
         }
 
         // ── The widgets ─────────────────────────────────────────────────────────────────
@@ -461,6 +528,87 @@ namespace GameEditor.Framework.UI
 
         // An element that is a place only: something for its children to lie in.
         private sealed class PlaceWidget : Widget { }
+
+        // The race's map: the track's centre line fitted into the rectangle (north, +Z, up), a dot for each racer.
+        private sealed class MiniMapWidget : Widget
+        {
+            public UIColor Road, Kart, Player;
+            public float Line;
+            private TrackData? _track;
+            private int _version = -1;
+            private readonly List<System.Numerics.Vector2> _line = new();
+            private readonly List<(System.Numerics.Vector2 at, bool player)> _dots = new();
+            private float _minX, _maxZ, _scale = 1f, _ox, _oy, _w, _h;
+
+            public void Refresh(ECSWorld world)
+            {
+                if (Bounds.Width != _w || Bounds.Height != _h) { _w = Bounds.Width; _h = Bounds.Height; _version = -1; }   // fitted again when it is resized
+                if (Scene.Race.Track is { } raced) _track = raced;
+                else if (_track == null || _version != TrackLibrary.Version)
+                {
+                    _track = null;
+                    foreach (Entity e in world.Entities)
+                        if (world.TryGetComponent<TrackComponent>(e, out var tc) && TrackLibrary.Track(tc.Key) is { } t) { _track = t; break; }
+                }
+                if (_track != null && _version != TrackLibrary.Version)
+                {
+                    _version = TrackLibrary.Version;
+                    _line.Clear();
+                    float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+                    for (int i = 0; i < _track.Frames.Count; i += 4)
+                    {
+                        var p = _track.Frames[i].Position;
+                        _line.Add(new System.Numerics.Vector2(p.X, p.Z));
+                        minX = MathF.Min(minX, p.X); maxX = MathF.Max(maxX, p.X); minZ = MathF.Min(minZ, p.Z); maxZ = MathF.Max(maxZ, p.Z);
+                    }
+                    float pad = 6f;
+                    float w = MathF.Max(1f, maxX - minX), h = MathF.Max(1f, maxZ - minZ);
+                    _scale = MathF.Min((Bounds.Width - 2 * pad) / w, (Bounds.Height - 2 * pad) / h);
+                    _minX = minX; _maxZ = maxZ;
+                    _ox = (Bounds.Width - w * _scale) * 0.5f; _oy = (Bounds.Height - h * _scale) * 0.5f;
+                }
+                _dots.Clear();
+                foreach (var r in Scene.Race.Racers)
+                    if (world.TryGetComponent<Transform>(r.Entity, out var tr))
+                    {
+                        var at = Transform.GetWorldMatrix(world, tr).Translation;
+                        bool player = world.TryGetComponent<KartComponent>(r.Entity, out var k) && k.Player;
+                        _dots.Add((new System.Numerics.Vector2(at.X, at.Z), player));
+                    }
+            }
+
+            private GVec2 Map(System.Numerics.Vector2 p) => new(_ox + (p.X - _minX) * _scale, _oy + (_maxZ - p.Y) * _scale);
+
+            /// <summary>Where each racer's dot is drawn in the element (for a check).</summary>
+            public int Dots => _dots.Count;
+
+            public override void Draw(Sokol.GUI.Renderer renderer)
+            {
+                if (!Visible || _line.Count < 2) return;
+                renderer.SetStrokeColor(Road);
+                renderer.SetStrokeWidth(Line);
+                renderer.BeginPath();
+                GVec2 first = Map(_line[0]);
+                renderer.MoveTo(first.X, first.Y);
+                for (int i = 1; i < _line.Count; i++) { GVec2 q = Map(_line[i]); renderer.LineTo(q.X, q.Y); }
+                renderer.ClosePath();
+                renderer.Stroke();
+                float dot = MathF.Max(3f, Line * 1.4f);
+                foreach (var (at, player) in _dots)
+                {
+                    if (player) continue;
+                    renderer.SetFillColor(Kart);
+                    renderer.FillCircle(Map(at), dot);
+                }
+                foreach (var (at, player) in _dots)           // the player's dot over the others
+                {
+                    if (!player) continue;
+                    renderer.SetFillColor(Player);
+                    renderer.FillCircle(Map(at), dot * 1.3f);
+                }
+                base.Draw(renderer);
+            }
+        }
 
         private class PanelWidget : Widget
         {

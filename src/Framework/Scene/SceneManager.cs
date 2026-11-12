@@ -287,6 +287,8 @@ namespace GameEditor.Framework.Scene
         {
             Race.Reset();
             DriverSystem.Reset();
+            ItemSystem.Reset();
+            WorldParticles.Clear();
             ScriptSystem.StopAll();
             _destroyQueue.Clear();
             ShutdownPhysics();
@@ -423,6 +425,8 @@ namespace GameEditor.Framework.Scene
             ScriptSystem.StopAll();
             Race.Reset();
             DriverSystem.Reset();
+            ItemSystem.Reset();
+            WorldParticles.Clear();
             _destroyQueue.Clear();   // the whole scene goes back to the snapshot
             Sound.Audio.StopAll();
             _askedScene = null;
@@ -893,6 +897,13 @@ namespace GameEditor.Framework.Scene
 
         public static void UpdatePhysics(float deltaTime)
         {
+            StepWorlds(deltaTime);
+            // The particles: after everything moved this frame, with the game's time - in a 2D game too, and held while it stands.
+            if (PlayMode == PlayModeState.Playing) WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
+        }
+
+        private static void StepWorlds(float deltaTime)
+        {
             // A game that slowed its time, or stopped it (a pause screen): the worlds move as much.
             deltaTime *= TimeScale;
             if (deltaTime <= 0f) return;
@@ -977,6 +988,8 @@ namespace GameEditor.Framework.Scene
 
             // The race's HUD, if the scene has one (the race itself moves in the fixed steps, StepKarts).
             Race.Update(deltaTime);
+            // A camera that follows a kart: after the karts moved this frame.
+            ChaseCameraSystem.Update(deltaTime);
         }
 
         public static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out Entity hitEntity, out RaycastHit hit)
@@ -1095,6 +1108,7 @@ namespace GameEditor.Framework.Scene
         private static void StepKarts(float dt)
         {
             Race.Step(dt);
+            ItemSystem.Step(dt);
             DriverSystem.Step(dt);
             KartSystem.Step(dt);
         }

@@ -4,6 +4,7 @@ using Frent;
 using GameEditor.Framework.Assets;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
+using GameEditor.Framework.Scene;
 using Sokol.Render2D;
 
 namespace GameEditor.Framework.Renderer.Server.Sprites2D
@@ -50,13 +51,14 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
 
         public static void BeginFrame() => _batch.BeginFrame();
 
-        public static void Shutdown() => _batch.Dispose();
+        public static void Shutdown() { WorldParticles.Shutdown(); _batch.Dispose(); }
 
         public static void Draw(ECSWorld world, in Matrix4x4 viewProj, bool offscreen)
         {
             LastSprites = 0; LastDrawCalls = 0;
             bool sprites = world.HasAnyComponent<SpriteRenderer>(), maps = world.HasAnyComponent<TilemapRenderer>();
-            if (!sprites && !maps) return;
+            bool particles = WorldParticles.Alive > 0;
+            if (!sprites && !maps && !particles) return;
 
             int count = 0, layers = 0;
             if (sprites)
@@ -125,7 +127,7 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                         count++;
                     }
                 }
-            if (count == 0) return;
+            if (count == 0 && !particles) return;
 
             Array.Sort(_keys, _order, 0, count);
 
@@ -137,6 +139,8 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                 if (it.TileLayer < 0) _batch.Draw(it.View, it.Nearest, it.Origin, it.AxisX, it.AxisY, it.Uv, it.Rgba);
                 else DrawLayer(in _tileLayers[it.TileLayer], in inverse, invertible);
             }
+            // The particles after the sprites: quads facing the camera, a texture's in one call (docs/H5_DESIGN.md §16).
+            if (particles) WorldParticles.Draw(_batch, in viewProj);
             _batch.Flush(in viewProj, offscreen);
             LastSprites = _batch.SpriteCount;
             LastDrawCalls = _batch.DrawCalls;

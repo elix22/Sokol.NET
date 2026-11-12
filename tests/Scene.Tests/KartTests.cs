@@ -235,7 +235,7 @@ namespace Scene.Tests
             World.AddComponent(e, k);
             string text = SceneSerializer.Serialize(SceneManager.ActiveScene!);
             Assert.Contains("\"Kart\":{\"TopSpeed\":22,", text);
-            Assert.DoesNotContain("Throttle", text);
+            Assert.DoesNotContain("\"Throttle\"", text);   // the input of a frame (AutoThrottle, a setting, is written)
             SceneSerializer.Deserialize(text, SceneManager.ActiveScene!);
             Entity back = System.Linq.Enumerable.First(World.Entities, x => World.GetComponent<NameTag>(x).Name == "K");
             var read = World.GetComponent<KartComponent>(back);

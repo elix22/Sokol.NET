@@ -23,6 +23,9 @@ namespace GameEditor.Framework.Scene
             RegisterTrack();
             RegisterRace();
             RegisterDriver();
+            RegisterItems();
+            RegisterChaseCamera();
+            RegisterParticles();
         }
 
         private static string? WriteAudioSource(ECSWorld world, Frent.Entity e)

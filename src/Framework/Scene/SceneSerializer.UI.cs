@@ -15,6 +15,7 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("UIText", WriteUIText, ReadUIText, static (w, e) => w.RemoveComponent<UIText>(e));
             RegisterComponentExtension("UIImage", WriteUIImage, ReadUIImage, static (w, e) => w.RemoveComponent<UIPicture>(e));
             RegisterComponentExtension("UIButton", WriteUIButton, ReadUIButton, static (w, e) => w.RemoveComponent<UIButton>(e));
+            RegisterComponentExtension("UIMiniMap", WriteUIMiniMap, ReadUIMiniMap, static (w, e) => w.RemoveComponent<UIMiniMap>(e));
             RegisterComponentExtension("UIPanel", WriteUIPanel, ReadUIPanel, static (w, e) => w.RemoveComponent<UIPanel>(e));
         }
 
@@ -96,7 +97,22 @@ namespace GameEditor.Framework.Scene
         {
             if (!world.TryGetComponent<UIButton>(e, out var b)) return null;
             return "{\"Text\":\"" + Esc(b.Text ?? "") + "\",\"Font\":\"" + Esc(b.Font ?? "") + "\",\"FontSize\":" + F(b.FontSize) + ",\"Color\":" + Four(b.Color)
-                 + ",\"TextColor\":" + Four(b.TextColor) + ",\"Radius\":" + F(b.Radius) + "}";
+                 + ",\"TextColor\":" + Four(b.TextColor) + ",\"Radius\":" + F(b.Radius)
+                 + ",\"Holds\":\"" + Esc(b.Holds ?? "") + "\"}";
+        }
+
+        private static string? WriteUIMiniMap(ECSWorld world, Frent.Entity e)
+            => world.TryGetComponent<UIMiniMap>(e, out var m)
+                ? "{\"Road\":" + Four(m.Road) + ",\"Kart\":" + Four(m.Kart) + ",\"Player\":" + Four(m.Player) + ",\"Line\":" + F(m.Line) + "}" : null;
+
+        private static void ReadUIMiniMap(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var m = UIMiniMap.Default;
+            Four(el, "Road", ref m.Road);
+            Four(el, "Kart", ref m.Kart);
+            Four(el, "Player", ref m.Player);
+            m.Line = Number(el, "Line", m.Line);
+            world.AddComponent(e, m);
         }
 
         private static void ReadUIButton(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
@@ -108,6 +124,7 @@ namespace GameEditor.Framework.Scene
             Four(el, "Color", ref b.Color);
             Four(el, "TextColor", ref b.TextColor);
             b.Radius = Number(el, "Radius", b.Radius);
+            b.Holds = Text(el, "Holds", "");
             world.AddComponent(e, b);
         }
 

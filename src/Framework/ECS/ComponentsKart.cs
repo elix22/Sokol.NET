@@ -39,6 +39,8 @@ namespace GameEditor.Framework.ECS.Components
         public float Damper;
         /// <summary>The player drives it: steer from GetAxis("Horizontal"), throttle and brake from GetAxis("Vertical").</summary>
         public bool Player;
+        /// <summary>The player's kart drives on by itself: full throttle unless Vertical asks for the brake (a phone's setting).</summary>
+        public bool AutoThrottle;
 
         // ── The game's inputs, each frame (not written in the scene) ────────────────
         /// <summary>0 to 1.</summary>
@@ -49,6 +51,12 @@ namespace GameEditor.Framework.ECS.Components
         public float Steer;
         /// <summary>Held by a race's countdown: braked to a standstill and kept there, the inputs not used (the race sets it).</summary>
         public bool Held;
+        /// <summary>Drive (top speed and acceleration) times this — a boost's 1.4, a puddle's 0.4; 0 counts as 1 (the race's items set it).</summary>
+        public float DriveScale;
+        /// <summary>Grip times this — a puddle's 0.5; 0 counts as 1.</summary>
+        public float GripScale;
+        /// <summary>No drive at all (hit by a bolt); it rolls on and the physics carries it.</summary>
+        public bool Stunned;
 
         // ── What the controller found in the last step (read only) ─────────────────
         /// <summary>Metres a second along the kart's forward direction (negative: backward).</summary>
