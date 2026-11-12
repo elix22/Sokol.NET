@@ -63,6 +63,12 @@
     </NativeFileReference>
   </ItemGroup>
 
+  <!-- The font of a game's UI: inside the engine's assembly on the desktop and on phones; on the web the engine is
+       compiled into the game, so the font goes into the game's own assembly under the same name. -->
+  <ItemGroup Condition="'$(TargetOS)' == 'browser'">
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)../UI/Roboto-Regular.ttf" LogicalName="GameEditor.Framework.UI.Roboto-Regular.ttf" />
+  </ItemGroup>
+
   <!-- Saved data on the web: the app's own folder is kept in the browser. The file is given to the linker, which
        needs the IndexedDB file system for it. -->
   <PropertyGroup Condition="'$(TargetOS)' == 'browser'">

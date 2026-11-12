@@ -208,6 +208,9 @@ namespace GameEditor.Framework.Scripting
         /// <summary>Called every fixed step while this entity is overlapping a non-trigger body.</summary>
         public virtual void OnCollisionStay(Entity other) { }
 
+        /// <summary>The entity's UI button (a UIButton) was pressed and let go.</summary>
+        public virtual void OnClick() { }
+
         /// <summary>Called when this entity enters a trigger volume.</summary>
         public virtual void OnTriggerEnter(Entity other) { }
 

@@ -18,6 +18,7 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("Tilemap", WriteTilemap, ReadTilemap, static (w, e) => w.RemoveComponent<TilemapRenderer>(e));
             RegisterComponentExtension("Body2D", WriteBody2D, ReadBody2D, static (w, e) => w.RemoveComponent<Body2D>(e));
             RegisterComponentExtension("AudioSource", WriteAudioSource, ReadAudioSource, static (w, e) => w.RemoveComponent<AudioSource>(e));
+            RegisterUI();
         }
 
         private static string? WriteAudioSource(ECSWorld world, Frent.Entity e)

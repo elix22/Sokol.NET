@@ -159,6 +159,7 @@ namespace GameEditor.Framework.Core
                 stm_setup();
                 _nvgCtx = nvgCreateSokol(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
                 _screen = Screen.Initialize(_nvgCtx);
+                UI.GameUI.ShowOn(_screen);
             }
 
             Logger.OnLog -= ConsoleLog;
@@ -243,6 +244,8 @@ namespace GameEditor.Framework.Core
                 float dpi = sapp_dpi_scale();
                 float logicalWidth = sapp_width() / MathF.Max(1f, dpi);
                 float logicalHeight = sapp_height() / MathF.Max(1f, dpi);
+                // The game's UI: the scene's UI entities as widgets over the whole picture.
+                UI.GameUI.Sync(ECS.ECSWorld.Instance, logicalWidth, logicalHeight, _screen.SafeAreaInsets);
                 _screen.Update(logicalWidth, logicalHeight, dpi);
             }
 

@@ -182,6 +182,9 @@ namespace GameEditor.Framework.Scripting
             }
             _pendingStart.Clear();
 
+            // The UI buttons pressed since the last frame: their entities' scripts are told, before this frame's updates.
+            UI.GameUI.TakeClicks(_tellClick);
+
             // By index: a behaviour may place entities during the pass (their behaviours wait in _pendingStart),
             // and nothing leaves the list before the pass is over.
             int count = _running.Count;
@@ -348,6 +351,12 @@ namespace GameEditor.Framework.Scripting
                 SafeCall(entry.Behaviour, b => b.OnCollisionStay(other), nameof(GameBehaviour.OnCollisionStay));
             }
         }
+
+        private static readonly Action<Entity> _tellClick = static entity =>
+        {
+            foreach (var entry in _running)
+                if (entry.EntityId == entity) SafeCall(entry.Behaviour, static b => b.OnClick(), nameof(GameBehaviour.OnClick));
+        };
 
         internal static void DispatchTriggerEnter(Entity entity, Entity other)
         {

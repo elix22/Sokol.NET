@@ -192,6 +192,11 @@
     </Compile>
   </ItemGroup>
 
+  <!-- The font a game's UI text is drawn with when it names none (Roboto, Apache License 2.0: UI/Roboto-LICENSE.txt). -->
+  <ItemGroup>
+    <EmbeddedResource Include="UI/Roboto-Regular.ttf" LogicalName="GameEditor.Framework.UI.Roboto-Regular.ttf" />
+  </ItemGroup>
+
   <!-- Sokol.GUI framework sources (used by GameApplication mobile touch UI host) -->
   <ItemGroup>
     <Compile Include="../GUI/**/*.cs">

@@ -1,0 +1,91 @@
+using System.Numerics;
+
+namespace GameEditor.Framework.ECS.Components
+{
+    /// <summary>The nine points of a screen (or of a parent element) an element is placed from.</summary>
+    public enum UIAnchor { TopLeft, Top, TopRight, Left, Center, Right, BottomLeft, Bottom, BottomRight }
+
+    /// <summary>How a text lies in its element.</summary>
+    public enum UIAlign { Left, Center, Right }
+
+    /// <summary>
+    /// A place on the screen (scene block "UI"): what makes an entity a part of the game's UI. With it goes one of
+    /// <see cref="UIText"/>, <see cref="UIPicture"/>, <see cref="UIButton"/> or <see cref="UIPanel"/>, which says
+    /// what is drawn there. Sizes are in design units of a screen 720 high: on a phone and in a window the UI is
+    /// as large in parts of the screen. An element whose entity is a child of another UI entity is placed in
+    /// that one's rectangle (a button on a panel).
+    /// </summary>
+    public struct UIElement
+    {
+        /// <summary>The point of the screen — less a phone's notch and home bar — the element is placed from.</summary>
+        public UIAnchor Anchor;
+        /// <summary>
+        /// How far from that point, towards the inside: from a corner, in from both edges; from the middle of an
+        /// edge, in from the edge and along it (right or down); from the centre, right and down.
+        /// </summary>
+        public Vector2 Offset;
+        /// <summary>Its width and height.</summary>
+        public Vector2 Size;
+        /// <summary>Drawn over elements of a lower order; a child over its parent.</summary>
+        public int Order;
+        public bool Visible;
+
+        public static UIElement Default => new() { Anchor = UIAnchor.Center, Size = new Vector2(200f, 48f), Visible = true };
+    }
+
+    /// <summary>A text (scene block "UIText"). A script changes what it says: <c>ref var t = ref GetComponent&lt;UIText&gt;(); t.Text = "…";</c></summary>
+    public struct UIText
+    {
+        public string Text;
+        /// <summary>The key of a font file below Assets ("Fonts/pixel.ttf"); empty: the engine's own.</summary>
+        public string Font;
+        /// <summary>The height of its letters, in design units.</summary>
+        public float FontSize;
+        public Vector4 Color;
+        public UIAlign Align;
+        /// <summary>A text longer than its element is broken into lines.</summary>
+        public bool Wrap;
+
+        public static UIText Default => new() { Text = "Text", Font = "", FontSize = 28f, Color = Vector4.One, Align = UIAlign.Left };
+    }
+
+    /// <summary>A picture (scene block "UIImage"): an image, or a frame of a sprite sheet, stretched over its element.</summary>
+    public struct UIPicture
+    {
+        /// <summary>An image's key, or a sheet's frame: "Sprites/hud.sprites#heart".</summary>
+        public string Texture;
+        public Vector4 Color;
+
+        public static UIPicture Default => new() { Texture = "", Color = Vector4.One };
+    }
+
+    /// <summary>
+    /// A button (scene block "UIButton"). Pressed and let go on it, the scripts of its entity get OnClick(), and
+    /// for that frame UI.GameUI.WasClicked(entity) is true for any script.
+    /// </summary>
+    public struct UIButton
+    {
+        public string Text;
+        public string Font;
+        public float FontSize;
+        /// <summary>Its face; it is drawn darker while it is held.</summary>
+        public Vector4 Color;
+        public Vector4 TextColor;
+        /// <summary>How round its corners are, in design units.</summary>
+        public float Radius;
+
+        public static UIButton Default => new()
+        {
+            Text = "Button", Font = "", FontSize = 28f, Color = new Vector4(0.2f, 0.45f, 0.9f, 1f), TextColor = Vector4.One, Radius = 10f,
+        };
+    }
+
+    /// <summary>A plain rectangle (scene block "UIPanel"): what stands behind a group of elements.</summary>
+    public struct UIPanel
+    {
+        public Vector4 Color;
+        public float Radius;
+
+        public static UIPanel Default => new() { Color = new Vector4(0f, 0f, 0f, 0.6f), Radius = 12f };
+    }
+}
