@@ -214,6 +214,30 @@ namespace GameEditor.Framework.Scripting
         /// <summary>Called when this entity exits a trigger volume.</summary>
         public virtual void OnTriggerExit(Entity other) { }
 
+        // ── Scenes ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Goes to another scene, named by its key below Assets ("Scenes/Level2.scene.json"), at the end of this
+        /// frame: every behaviour of this scene gets OnDestroy, the new scene's get OnStart. Static fields live
+        /// on — that is how a score crosses scenes. A key that names no scene is said in the log.
+        /// </summary>
+        protected static void LoadScene(string key) => Scene.SceneManager.RequestScene(key);
+
+        /// <summary>Starts the scene the game is in again, from its file.</summary>
+        protected static void ReloadScene()
+        {
+            if (Scene.SceneManager.CurrentSceneKey is { } key) Scene.SceneManager.RequestScene(key);
+        }
+
+        /// <summary>The scene the game is in, as a key below Assets; null when it has no file there.</summary>
+        protected static string? CurrentScene => Scene.SceneManager.CurrentSceneKey;
+
+        /// <summary>
+        /// How many times the game has gone to another scene: 0 in the scene it started in. Static fields live on
+        /// across scenes and, in the editor, from one Play to the next: set them in OnStart when this is 0.
+        /// </summary>
+        protected static int SceneChanges => Scene.SceneManager.SceneChanges;
+
         // ── Prefabs: entities that come and go while the game runs ───────────
 
         /// <summary>

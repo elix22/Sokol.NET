@@ -99,6 +99,12 @@ namespace GameEditor.Framework.Scene
         public static void SaveScene(string path)
         {
             if (ActiveScene == null) return;
+            if (GameChangedScene)
+            {
+                // What is in the world is another scene's entities under the open scene's name and file.
+                Logger.Warning($"[SceneManager] Nothing was saved: the game that plays went to another scene ({CurrentSceneKey}), and Stop gives back the one that was open. Stop the game first.");
+                return;
+            }
             EventBus.RaiseSceneSaving();
             // In an editor: a file made since the project was opened has its id before the scene that names it is written.
             if (AssetDatabase.Root != null)
@@ -150,6 +156,11 @@ namespace GameEditor.Framework.Scene
         }
 
         public static void LoadSceneFromAssetsAsync(string assetPath)
+            => ReadSceneFromAssets(assetPath, false, (json, loaded) => Loaded(json, loaded, assetPath), null);
+
+        // Reads a scene's text from the app's files, and every file it must have read before it; then `then`
+        // with the text and the keys of the prefabs read for it. `freshMaps`: the scene's maps from their files again.
+        private static void ReadSceneFromAssets(string assetPath, bool freshMaps, Action<string, List<string>> then, Action? failed)
         {
             SFilesystem.LoadFileAsync(assetPath, (path, buffer, status) =>
             {
@@ -166,15 +177,125 @@ namespace GameEditor.Framework.Scene
                     {
                         var texts = TextsOf(json, loaded);
                         texts.AddRange(maps);
-                        SpriteLibrary.LoadNamedIn(texts, () => Loaded(json, loaded, assetPath));
-                    }));
+                        SpriteLibrary.LoadNamedIn(texts, () => then(json, loaded));
+                    }, freshMaps));
                 }
                 else
                 {
                     Logger.Warning($"Failed to load scene from assets: {assetPath}");
+                    failed?.Invoke();
                 }
             });
 
+        }
+
+        // ── A game goes to another scene ─────────────────────────────────────────────────
+
+        private static string? _askedScene;
+        private static bool _readingScene;
+
+        /// <summary>
+        /// A game that plays in an editor went to another scene: the world holds that scene's entities until Stop
+        /// gives back the one that was open. <see cref="SaveScene"/> writes nothing meanwhile.
+        /// </summary>
+        public static bool GameChangedScene { get; private set; }
+
+        /// <summary>
+        /// The scene the game is in, as a key below Assets ("Scenes/Level2.scene.json"); null when nothing plays,
+        /// or when the scene that plays has no file below Assets.
+        /// </summary>
+        public static string? CurrentSceneKey { get; private set; }
+
+        /// <summary>
+        /// How many times the game that plays has gone to another scene: 0 in the scene it started in. A script's
+        /// static fields live on across scenes — and, in an editor, from one Play to the next: a script that
+        /// keeps something in them sets it in OnStart when this is 0.
+        /// </summary>
+        public static int SceneChanges { get; private set; }
+
+        /// <summary>
+        /// Asks for another scene while the game plays (a script's LoadScene). The change is made at the end of the
+        /// frame: the behaviours of the scene that is left get OnDestroy and its bodies are given back, the new
+        /// scene is read with the files it names — its tile maps as their files have them — and its behaviours
+        /// start. Static fields of scripts live on. A key that names no scene is said in the log, and the game
+        /// stays where it is. In an editor, Stop still gives back the scene that was open when Play was pressed.
+        /// </summary>
+        public static void RequestScene(string key)
+        {
+            if (PlayMode == PlayModeState.Stopped) { Logger.Warning($"[SceneManager] LoadScene(\"{key}\"): no game is playing."); return; }
+            _askedScene = key;
+        }
+
+        /// <summary>The end of a frame of play: the change of scene a script asked for. Called by the script system.</summary>
+        internal static void ChangeSceneIfAsked()
+        {
+            if (_askedScene is not { } key || _readingScene || PlayMode == PlayModeState.Stopped) return;
+            _askedScene = null;
+
+            if (SceneReader != null || ConfigManager.HasProject)
+            {
+                // An editor: the project's own file, read at once.
+                string? json = SceneReader != null ? SceneReader(key) : ReadProjectScene(key);
+                if (json == null) { Logger.Error($"[SceneManager] LoadScene: there is no scene '{key}' in the project's Assets."); return; }
+                TilemapLibrary.LoadNamedIn(new[] { json }, static _ => { }, again: true);
+                LeaveScene();
+                EventBus.RaiseSceneUnloaded();
+                SceneSerializer.Deserialize(json, ActiveScene!);
+                PreloadSceneMeshes();
+                PreloadSceneMaterials();
+                EventBus.RaiseSceneLoaded();
+                GameChangedScene = true;
+                EnterScene(key);
+                return;
+            }
+
+            // A built game: the old scene plays on until the new one's files have arrived.
+            _readingScene = true;
+            ReadSceneFromAssets(key, true,
+                (json, loaded) =>
+                {
+                    _readingScene = false;
+                    if (PlayMode == PlayModeState.Stopped) return;
+                    LeaveScene();
+                    Loaded(json, loaded, key);
+                    EnterScene(key);
+                },
+                () =>
+                {
+                    _readingScene = false;
+                    Logger.Error($"[SceneManager] LoadScene: there is no scene '{key}' among the game's files.");
+                });
+        }
+
+        /// <summary>
+        /// Reads a scene's text by its key for <see cref="RequestScene"/>; null when there is none. When set, it
+        /// alone is asked (a test, a tool); otherwise the open project's Assets folder, and without a project the
+        /// app's files as they arrive.
+        /// </summary>
+        public static System.Func<string, string?>? SceneReader { get; set; }
+
+        private static string? ReadProjectScene(string key)
+        {
+            string path = System.IO.Path.Combine(ConfigManager.ProjectFolder!, "Assets", key);
+            try { return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null; }
+            catch (System.IO.IOException) { return null; }
+        }
+
+        private static void LeaveScene()
+        {
+            ScriptSystem.StopAll();
+            _destroyQueue.Clear();
+            ShutdownPhysics();
+        }
+
+        private static void EnterScene(string key)
+        {
+            CurrentSceneKey = key;
+            SceneChanges++;
+            ScriptSystem.PopulateFromScene(ECS.ECSWorld.Instance);
+            InitializePhysics();
+            ScriptSystem.StartAll();
+            Logger.Info($"[SceneManager] The game is in '{key}'. {ScriptSystem.Count} script(s) running.");
         }
 
         // The scene's text has arrived, and with it every file it must have read before it.
@@ -193,6 +314,7 @@ namespace GameEditor.Framework.Scene
                 if (PrefabLibrary.Get(key) is { } prefab) PreloadPrefabAssets(prefab);
             EventBus.RaiseSceneLoaded();
             UndoStack.Clear();
+            CurrentSceneKey = assetPath;
             Logger.Info($"Scene loaded from assets: {assetPath}");
         }
 
@@ -234,6 +356,13 @@ namespace GameEditor.Framework.Scene
                     Logger.Info("[SceneManager] Play snapshot saved.");
                 }
 
+                SaveData.Forget();   // the game's saved data is read from its file when the game first asks
+                SceneChanges = 0;
+
+                // Where the game starts: its scene's key, when the scene is a file of the project (a built game
+                // knows it from the file it read).
+                if (ActiveScene.FilePath is { } file && AssetLibrary.ToAssetsRelativePath(file) is { } startKey) CurrentSceneKey = startKey;
+
                 // Populate script behaviours from current scene entities
                 ScriptSystem.PopulateFromScene(ECS.ECSWorld.Instance);
 
@@ -271,6 +400,9 @@ namespace GameEditor.Framework.Scene
             // Destroy all running scripts
             ScriptSystem.StopAll();
             _destroyQueue.Clear();   // the whole scene goes back to the snapshot
+            _askedScene = null;
+            CurrentSceneKey = null;
+            SaveData.Save();         // as when the app quits
 
             // Shutdown physics
             ShutdownPhysics();
@@ -288,6 +420,7 @@ namespace GameEditor.Framework.Scene
                 EventBus.RaiseSceneLoaded();
                 Logger.Info("[SceneManager] Scene restored from play snapshot.");
             }
+            GameChangedScene = false;
 
             UndoStack.Clear();
         }

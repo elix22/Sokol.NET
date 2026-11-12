@@ -35,4 +35,10 @@
       <Link>libs\box2d.a</Link>
     </NativeFileReference>
   </ItemGroup>
+
+  <!-- Saved data on the web: the app's own folder is kept in the browser. The file is given to the linker, which
+       needs the IndexedDB file system for it. -->
+  <PropertyGroup Condition="'$(TargetOS)' == 'browser'">
+    <EmccExtraLDFlags>$(EmccExtraLDFlags) -lidbfs.js --pre-js "$(MSBuildThisFileDirectory)savedata.pre.js"</EmccExtraLDFlags>
+  </PropertyGroup>
 </Project>

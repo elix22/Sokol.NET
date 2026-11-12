@@ -138,17 +138,21 @@ namespace GameEditor.Framework.Assets
         /// <summary>
         /// Reads the map files the texts name, then calls <paramref name="done"/> with the texts of the maps that
         /// are known now (they name the sheets their tiles come from) — at once when the texts name none.
+        /// <paramref name="again"/>: a map that is known is read from its file again — a scene a game goes to
+        /// starts with its maps as they were made, not as the game left them; until the file has arrived the map
+        /// stays what it was.
         /// </summary>
-        internal static void LoadNamedIn(IEnumerable<string> texts, Action<List<string>> done)
+        internal static void LoadNamedIn(IEnumerable<string> texts, Action<List<string>> done, bool again = false)
         {
             var read = new List<string>();
+            var asked = again ? new HashSet<string>(StringComparer.Ordinal) : null;
             int waiting = 0;
             bool listed = false;
             foreach (string text in texts)
                 foreach (string key in KeysIn(text))
                 {
-                    if (_maps.ContainsKey(key) || _pending.Contains(key)) continue;
-                    if (Reader != null || ConfigManager.HasProject) { Map(key); continue; }
+                    if (_pending.Contains(key) || (asked != null ? !asked.Add(key) : _maps.ContainsKey(key))) continue;
+                    if (Reader != null || ConfigManager.HasProject) { if (again) _maps.Remove(key); Map(key); continue; }
                     waiting++;
                     Ask(key, mapText =>
                     {

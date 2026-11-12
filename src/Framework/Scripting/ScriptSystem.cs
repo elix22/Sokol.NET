@@ -194,8 +194,10 @@ namespace GameEditor.Framework.Scripting
             // After the scripts: sprite animations show the frame for this moment, a clip a script just chose too.
             Scene.SpriteAnimSystem.Update(ECS.ECSWorld.Instance, deltaTime);
 
-            // The end of the frame for scripts: entities handed to Destroy leave now.
+            // The end of the frame for scripts: entities handed to Destroy leave now, and a scene that was
+            // asked for takes this one's place.
             Scene.SceneManager.FlushDestroyed();
+            Scene.SceneManager.ChangeSceneIfAsked();
         }
 
         /// <summary>Calls <see cref="GameBehaviour.OnDestroy"/> on all behaviours and clears the list.</summary>

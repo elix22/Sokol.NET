@@ -332,6 +332,11 @@ namespace GameEditor.Framework.Core
 
         public static unsafe void DispatchEvent(sapp_event* e)
         {
+            // The app is about to be out of sight, or to end: what the game wanted kept is written now — a phone
+            // may not give it another chance.
+            if (e->type is sapp_event_type.SAPP_EVENTTYPE_SUSPENDED or sapp_event_type.SAPP_EVENTTYPE_QUIT_REQUESTED
+                or sapp_event_type.SAPP_EVENTTYPE_UNFOCUSED)
+                SaveData.Save();
             _screen?.DispatchEvent(e);
         }
 
@@ -342,6 +347,7 @@ namespace GameEditor.Framework.Core
         /// </summary>
         public static void Cleanup()
         {
+            SaveData.Save();
             SFilesystem.Shutdown();
             ScriptSystem.StopAll();
             Screen.Shutdown();
