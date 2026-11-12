@@ -184,6 +184,14 @@
     </Compile>
   </ItemGroup>
 
+  <!-- MiniAudio's binding: the mixer a game's sound plays through (Sound/Audio.cs). Its library is a file of
+       its own, brought to every game by build/Game.targets. -->
+  <ItemGroup>
+    <Compile Include="../../ext/miniaudio/bindings/csharp/MiniAudio.cs">
+      <Link>MiniAudio/MiniAudio.cs</Link>
+    </Compile>
+  </ItemGroup>
+
   <!-- Sokol.GUI framework sources (used by GameApplication mobile touch UI host) -->
   <ItemGroup>
     <Compile Include="../GUI/**/*.cs">

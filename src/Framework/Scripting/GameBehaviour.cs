@@ -214,6 +214,14 @@ namespace GameEditor.Framework.Scripting
         /// <summary>Called when this entity exits a trigger volume.</summary>
         public virtual void OnTriggerExit(Entity other) { }
 
+        // ── Sound ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Plays a sound file once: PlaySound("Audio/coin.wav"). More — the music track, an entity's own sound,
+        /// how loud everything is — is on GameEditor.Framework.Sound.Audio.
+        /// </summary>
+        protected static bool PlaySound(string key, float volume = 1f, float pitch = 1f) => Sound.Audio.PlaySound(key, volume, pitch);
+
         // ── Scenes ───────────────────────────────────────────────────────────
 
         /// <summary>

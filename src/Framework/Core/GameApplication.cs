@@ -337,6 +337,9 @@ namespace GameEditor.Framework.Core
             if (e->type is sapp_event_type.SAPP_EVENTTYPE_SUSPENDED or sapp_event_type.SAPP_EVENTTYPE_QUIT_REQUESTED
                 or sapp_event_type.SAPP_EVENTTYPE_UNFOCUSED)
                 SaveData.Save();
+            // Out of sight (a phone call, the home button): nothing is heard until the app is back.
+            if (e->type == sapp_event_type.SAPP_EVENTTYPE_SUSPENDED) Sound.Audio.Pause();
+            else if (e->type == sapp_event_type.SAPP_EVENTTYPE_RESUMED && SceneManager.PlayMode != PlayModeState.Paused) Sound.Audio.Resume();
             _screen?.DispatchEvent(e);
         }
 
@@ -348,6 +351,7 @@ namespace GameEditor.Framework.Core
         public static void Cleanup()
         {
             SaveData.Save();
+            Sound.Audio.Shutdown();
             SFilesystem.Shutdown();
             ScriptSystem.StopAll();
             Screen.Shutdown();

@@ -17,6 +17,25 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("SpriteAnim", WriteSpriteAnim, ReadSpriteAnim, static (w, e) => w.RemoveComponent<SpriteAnimator>(e));
             RegisterComponentExtension("Tilemap", WriteTilemap, ReadTilemap, static (w, e) => w.RemoveComponent<TilemapRenderer>(e));
             RegisterComponentExtension("Body2D", WriteBody2D, ReadBody2D, static (w, e) => w.RemoveComponent<Body2D>(e));
+            RegisterComponentExtension("AudioSource", WriteAudioSource, ReadAudioSource, static (w, e) => w.RemoveComponent<AudioSource>(e));
+        }
+
+        private static string? WriteAudioSource(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<AudioSource>(e, out var a)) return null;
+            return "{\"Clip\":\"" + Esc(a.Clip ?? "") + "\",\"Volume\":" + F(a.Volume) + ",\"Pitch\":" + F(a.Pitch)
+                 + ",\"Loop\":" + (a.Loop ? "true" : "false") + ",\"PlayOnStart\":" + (a.PlayOnStart ? "true" : "false") + "}";
+        }
+
+        private static void ReadAudioSource(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var a = AudioSource.Default;
+            if (el.TryGetProperty("Clip", out var clip)) a.Clip = clip.GetString() ?? "";
+            if (el.TryGetProperty("Volume", out var volume) && volume.ValueKind == JsonValueKind.Number) a.Volume = volume.GetSingle();
+            if (el.TryGetProperty("Pitch", out var pitch) && pitch.ValueKind == JsonValueKind.Number) a.Pitch = pitch.GetSingle();
+            a.Loop = el.TryGetProperty("Loop", out var loop) && loop.ValueKind == JsonValueKind.True;
+            a.PlayOnStart = !el.TryGetProperty("PlayOnStart", out var start) || start.ValueKind != JsonValueKind.False;
+            world.AddComponent(e, a);
         }
 
         private static string? WriteSprite(ECSWorld world, Frent.Entity e)

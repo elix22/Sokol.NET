@@ -34,6 +34,20 @@
 
   <!-- The 2D physics tests run the real Box2D: its library for this machine goes beside the tests. (The 3D
        tests need no native library: they play with a stand-in backend.) -->
+  <!-- The sound tests run the real mixer, with no device: its library goes beside the tests too. -->
+  <Target Name="CopyMiniAudio" AfterTargets="Build">
+    <PropertyGroup>
+      <MiniAudioLibs>$(MSBuildThisFileDirectory)../../ext/miniaudio/libs</MiniAudioLibs>
+      <MiniAudioArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</MiniAudioArch>
+      <MiniAudioMac Condition="'$(MiniAudioArch)' == 'Arm64'">arm64</MiniAudioMac>
+      <MiniAudioMac Condition="'$(MiniAudioArch)' != 'Arm64'">x86_64</MiniAudioMac>
+      <MiniAudioLib Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(MiniAudioLibs)/macos/$(MiniAudioMac)/release/libminiaudio.dylib</MiniAudioLib>
+      <MiniAudioLib Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(MiniAudioLibs)/linux/X64/release/libminiaudio.so</MiniAudioLib>
+      <MiniAudioLib Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(MiniAudioLibs)/windows/x64/release/miniaudio.dll</MiniAudioLib>
+    </PropertyGroup>
+    <Copy SourceFiles="$(MiniAudioLib)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(MiniAudioLib)' != '' and Exists('$(MiniAudioLib)')" />
+  </Target>
+
   <Target Name="CopyBox2D" AfterTargets="Build">
     <PropertyGroup>
       <Box2DLibs>$(MSBuildThisFileDirectory)../../ext/box2d/libs</Box2DLibs>

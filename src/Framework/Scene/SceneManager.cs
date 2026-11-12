@@ -177,7 +177,7 @@ namespace GameEditor.Framework.Scene
                     {
                         var texts = TextsOf(json, loaded);
                         texts.AddRange(maps);
-                        SpriteLibrary.LoadNamedIn(texts, () => then(json, loaded));
+                        SpriteLibrary.LoadNamedIn(texts, () => Sound.AudioClips.LoadNamedIn(TextsOf(json, loaded), () => then(json, loaded)));
                     }, freshMaps));
                 }
                 else
@@ -294,6 +294,7 @@ namespace GameEditor.Framework.Scene
             SceneChanges++;
             ScriptSystem.PopulateFromScene(ECS.ECSWorld.Instance);
             InitializePhysics();
+            Sound.Audio.StartScene(ECS.ECSWorld.Instance);
             ScriptSystem.StartAll();
             Logger.Info($"[SceneManager] The game is in '{key}'. {ScriptSystem.Count} script(s) running.");
         }
@@ -330,6 +331,8 @@ namespace GameEditor.Framework.Scene
         public static void SetPlayMode(PlayModeState state)
         {
             PlayMode = state;
+            // A paused game is silent, and goes on where it was.
+            if (state == PlayModeState.Paused) Sound.Audio.Pause(); else Sound.Audio.Resume();
             EventBus.RaisePlayModeChanged(state);
         }
 
@@ -370,6 +373,7 @@ namespace GameEditor.Framework.Scene
 
                 // Initialize physics
                 InitializePhysics();
+                Sound.Audio.StartScene(ECS.ECSWorld.Instance);
 
                 // Start all registered behaviours
                 ScriptSystem.StartAll();
@@ -400,6 +404,7 @@ namespace GameEditor.Framework.Scene
             // Destroy all running scripts
             ScriptSystem.StopAll();
             _destroyQueue.Clear();   // the whole scene goes back to the snapshot
+            Sound.Audio.StopAll();
             _askedScene = null;
             CurrentSceneKey = null;
             SaveData.Save();         // as when the app quits
@@ -474,6 +479,7 @@ namespace GameEditor.Framework.Scene
                     foreach (Entity e in created) CreateVehicle(world, e);
                 }
                 foreach (Entity e in created) Physics2D.Physics2DWorld.AddEntity(world, e);
+                foreach (Entity e in created) Sound.Audio.AddEntity(world, e);
                 ScriptSystem.AddEntities(world, created);
             }
             return root;

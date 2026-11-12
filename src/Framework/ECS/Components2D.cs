@@ -25,6 +25,28 @@ namespace GameEditor.Framework.ECS.Components
     }
 
     /// <summary>
+    /// The sound of an entity (scene block "AudioSource"): a sound file that plays when the scene starts
+    /// (<see cref="PlayOnStart"/>) or when a script says so (Sound.Audio.Play(entity)), once or round and round.
+    /// It stops when its entity leaves the scene. While it plays, a script changes how loud and how high it is
+    /// through <see cref="Volume"/> and <see cref="Pitch"/>.
+    /// </summary>
+    public struct AudioSource
+    {
+        /// <summary>The key of a sound file below Assets: "Audio/hum.ogg" (wav, ogg, mp3 or flac).</summary>
+        public string Clip;
+        /// <summary>From 0 (not heard) upwards; 1 is the file as it is.</summary>
+        public float Volume;
+        /// <summary>1 is the file as it is; 2 an octave higher and twice as fast.</summary>
+        public float Pitch;
+        /// <summary>Round and round. A looping source counts as music for Sound.Audio.MusicVolume.</summary>
+        public bool Loop;
+        /// <summary>It plays when its scene starts, or when its entity is placed in a playing scene.</summary>
+        public bool PlayOnStart;
+
+        public static AudioSource Default => new() { Clip = "", Volume = 1f, Pitch = 1f, PlayOnStart = true };
+    }
+
+    /// <summary>
     /// Plays a clip of the sheet the entity's sprite shows (scene block "SpriteAnim"): while the game plays, the
     /// sprite's <see cref="SpriteRenderer.Texture"/> is set to the clip's frame for the time passed. A script
     /// changes <see cref="Clip"/>, <see cref="Speed"/> and <see cref="Playing"/>; a new clip starts at its first
