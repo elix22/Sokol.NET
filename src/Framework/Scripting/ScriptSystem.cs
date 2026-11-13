@@ -28,6 +28,10 @@ namespace GameEditor.Framework.Scripting
         // Type name → factory function (registered in startup code or by GameAssemblyRunner)
         private static readonly Dictionary<string, Func<GameBehaviour>> _factories = new();
 
+        // Type name → the setter of its fields, written by the builder for a game compiled ahead of time (where a
+        // field cannot be found by its name). A type with none has its fields set by name (a JIT: the editor's Play).
+        private static readonly Dictionary<string, ScriptFieldSetter> _setters = new();
+
         // Active behaviour instances for the running scene
         private static readonly List<(Entity EntityId, GameBehaviour Behaviour)> _running = new();
 
@@ -54,13 +58,31 @@ namespace GameEditor.Framework.Scripting
             Logger.Info($"[ScriptSystem] Registered type: {key}");
         }
 
+        /// <summary>Registers a script with the setter of its public fields (generated code: no reflection).</summary>
+        public static void RegisterType<T>(ScriptFieldSetter setter, string? typeName = null) where T : GameBehaviour, new()
+        {
+            string key = typeName ?? typeof(T).Name;
+            _factories[key] = static () => new T();
+            _setters[key] = setter;
+            Logger.Info($"[ScriptSystem] Registered type: {key}");
+        }
+
+        /// <summary>True when the script's fields are set by generated code, not by their names.</summary>
+        public static bool HasFieldSetter(string typeName) => _setters.ContainsKey(typeName);
+
+        /// <summary>True when scripts were registered by generated code: the game's assemblies need not be searched for them.</summary>
+        public static bool HasGeneratedTypes => _setters.Count > 0;
+
+        /// <summary>How many field values the generated setters have set since the game started (0 where fields are set by name).</summary>
+        public static int FieldsSetByGeneratedCode { get; private set; }
+
         public static void RegisterType(string typeName)
         {
             _factories[typeName] = () => Activator.CreateInstance(Type.GetType(typeName)!) as GameBehaviour;
         }
 
         /// <summary>Remove all registered factories (called by GameAssemblyRunner on unload).</summary>
-        public static void ClearFactories() => _factories.Clear();
+        public static void ClearFactories() { _factories.Clear(); _setters.Clear(); }
 
         // ── Instantiation ────────────────────────────────────────────────────
 
@@ -141,7 +163,16 @@ namespace GameEditor.Framework.Scripting
                 var behaviour = factory();
                 behaviour.EntityId = id;
                 if (sc.Properties != null && sc.Properties.Count > 0)
-                    behaviour.ApplySerializedProperties(sc.Properties);
+                {
+                    if (_setters.TryGetValue(sc.TypeName, out var set))
+                    {
+                        foreach (var (field, text) in sc.Properties)
+                            if (set(behaviour, field, new ScriptFieldValue(text))) FieldsSetByGeneratedCode++;
+                            else
+                                Logger.Warning($"[ScriptSystem] {sc.TypeName}.{field}: '{text}' was not set (no such field, or no value of its type).");
+                    }
+                    else behaviour.ApplySerializedProperties(sc.Properties);
+                }
                 target.Add((id, behaviour));
             }
             catch (Exception ex)

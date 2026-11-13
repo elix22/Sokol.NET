@@ -71,6 +71,9 @@ namespace GameEditor.Framework.Core
         static void RegisterAvailableGameBehaviours()
         {
 #if !GAME_EDITOR && ! __ANDROID__ && !__IOS__
+            // A game compiled ahead of time registers its scripts by generated code (RegisteredScripts.g.cs, a
+            // module initializer that has run by now): nothing is searched for.
+            if (ScriptSystem.HasGeneratedTypes) return;
             // GameBehaviour is now in GameEditor.Framework.dll (a separate assembly).
             // Game script types live in the entry/calling assembly, so scan all loaded assemblies.
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
