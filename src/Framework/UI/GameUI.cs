@@ -42,6 +42,7 @@ namespace GameEditor.Framework.UI
         private static readonly Dictionary<Entity, Rect> _rects = new();
         private static readonly List<Entity> _gone = new();
         private static readonly Dictionary<Entity, Entity> _above = new();     // an element's entity → the element it lies in
+        private static readonly Dictionary<Entity, Rect> _parents = new();     // an element's entity → the rectangle it is placed in
         private static readonly List<Item> _sorted = new(), _roots = new();
         private static readonly List<Entity> _clicked = new(), _clickedNow = new();
         private static int _frame, _made;
@@ -120,6 +121,114 @@ namespace GameEditor.Framework.UI
             if (entities != null) _outlined.AddRange(entities);
         }
 
+        private static Entity _canvas;
+
+        /// <summary>The element a host edits with the pointer (its canvas): drawn with handles at its corners and edges and
+        /// a mark at the point of its parent it is placed from. Default: none. Asked for each frame.</summary>
+        public static void HostCanvas(Entity element) => _canvas = element;
+
+        /// <summary>The side of a handle of <see cref="HostCanvas"/>, in the picture's units.</summary>
+        public const float HandleSize = 8f;
+
+        /// <summary>
+        /// The handles of an element's rectangle, in the order a host asks for them by: 0 top-left, 1 top, 2 top-right,
+        /// 3 right, 4 bottom-right, 5 bottom, 6 bottom-left, 7 left. Their centres.
+        /// </summary>
+        public static System.Numerics.Vector2 HandleAt(Rect r, int handle) => handle switch
+        {
+            0 => new(r.X, r.Y), 1 => new(r.X + r.Width * 0.5f, r.Y), 2 => new(r.X + r.Width, r.Y),
+            3 => new(r.X + r.Width, r.Y + r.Height * 0.5f), 4 => new(r.X + r.Width, r.Y + r.Height),
+            5 => new(r.X + r.Width * 0.5f, r.Y + r.Height), 6 => new(r.X, r.Y + r.Height), _ => new(r.X, r.Y + r.Height * 0.5f),
+        };
+
+        /// <summary>The point of a rectangle an anchor names (one of nine).</summary>
+        public static System.Numerics.Vector2 AnchorPoint(UIAnchor anchor, Rect r)
+        {
+            int column = (int)anchor % 3, row = (int)anchor / 3;
+            return new(r.X + r.Width * column * 0.5f, r.Y + r.Height * row * 0.5f);
+        }
+
+        /// <summary>The front-most element under a point of the picture (the root's units) that is seen; Entity.Null for none.
+        /// A child is drawn over its parent: under a child, the child.</summary>
+        public static Entity HitTest(float x, float y)
+        {
+            var children = Root.Children;
+            for (int i = children.Count - 1; i >= 0; i--)
+            {
+                Widget w = children[i];
+                if (!w.Visible) continue;
+                var b = w.Bounds;
+                if (x < b.X || y < b.Y || x > b.X + b.Width || y > b.Y + b.Height) continue;
+                foreach (var pair in _items)
+                    if (ReferenceEquals(pair.Value.Widget, w)) return pair.Key;
+            }
+            return Entity.Null;
+        }
+
+        /// <summary>The rectangle an element is placed in (its parent element's, or the screen's safe area), after the last frame.</summary>
+        public static bool TryGetParentRect(Entity entity, out Rect rect) => _parents.TryGetValue(entity, out rect);
+
+        // The same, in plain numbers: a host with a Sokol.GUI of its own (an editor) has another Rect type.
+
+        public static bool TryGetParentRect(Entity entity, out float x, out float y, out float width, out float height)
+        {
+            bool found = _parents.TryGetValue(entity, out Rect r);
+            (x, y, width, height) = (r.X, r.Y, r.Width, r.Height);
+            return found;
+        }
+
+        public static (float X, float Y, float Width, float Height) DesignRectOf(in UIElement element, float parentWidth, float parentHeight)
+        {
+            Rect r = DesignRect(in element, parentWidth, parentHeight);
+            return (r.X, r.Y, r.Width, r.Height);
+        }
+
+        public static UIElement WithRect(in UIElement element, float x, float y, float width, float height, float parentWidth, float parentHeight) =>
+            WithRect(in element, new Rect(x, y, width, height), parentWidth, parentHeight);
+
+        public static (float X, float Y, float Width, float Height) Resized(float x, float y, float width, float height, int handle, float dx, float dy, float min)
+        {
+            Rect r = Resized(new Rect(x, y, width, height), handle, dx, dy, min);
+            return (r.X, r.Y, r.Width, r.Height);
+        }
+
+        public static System.Numerics.Vector2 HandleAt(float x, float y, float width, float height, int handle) => HandleAt(new Rect(x, y, width, height), handle);
+
+        // ── An element's rectangle in design units, and back ─────────────────────────────
+
+        /// <summary>An element's rectangle inside a parent of <paramref name="parentWidth"/> × <paramref name="parentHeight"/>
+        /// design units, counted from the parent's top-left corner.</summary>
+        public static Rect DesignRect(in UIElement element, float parentWidth, float parentHeight) =>
+            Place(in element, new Rect(0f, 0f, parentWidth, parentHeight), 1f);
+
+        /// <summary>
+        /// The element with its offset and size worked out for <paramref name="rect"/> (design units, from the parent's
+        /// top-left corner) under its own anchor — the opposite of <see cref="DesignRect"/>. A move, a resize and a new
+        /// anchor that keeps the element where it is are each a rectangle given here.
+        /// </summary>
+        public static UIElement WithRect(in UIElement element, Rect rect, float parentWidth, float parentHeight)
+        {
+            var e = element;
+            int column = (int)e.Anchor % 3, row = (int)e.Anchor / 3;
+            float ox = column switch { 0 => rect.X, 1 => rect.X - (parentWidth - rect.Width) * 0.5f, _ => parentWidth - rect.Width - rect.X };
+            float oy = row switch { 0 => rect.Y, 1 => rect.Y - (parentHeight - rect.Height) * 0.5f, _ => parentHeight - rect.Height - rect.Y };
+            e.Offset = new System.Numerics.Vector2(ox, oy);
+            e.Size = new System.Numerics.Vector2(rect.Width, rect.Height);
+            return e;
+        }
+
+        /// <summary>A rectangle with one handle (see <see cref="HandleAt"/>) moved by (dx, dy): the opposite side stays; no
+        /// side shorter than <paramref name="min"/>.</summary>
+        public static Rect Resized(Rect r, int handle, float dx, float dy, float min)
+        {
+            float left = r.X, top = r.Y, right = r.X + r.Width, bottom = r.Y + r.Height;
+            if (handle is 0 or 6 or 7) left = MathF.Min(left + dx, right - min);
+            if (handle is 2 or 3 or 4) right = MathF.Max(right + dx, left + min);
+            if (handle is 0 or 1 or 2) top = MathF.Min(top + dy, bottom - min);
+            if (handle is 4 or 5 or 6) bottom = MathF.Max(bottom + dy, top + min);
+            return new Rect(left, top, right - left, bottom - top);
+        }
+
         /// <summary>An element's rectangle after the last frame, in plain numbers. False for an entity that is no element.</summary>
         public static bool TryGetRect(Entity entity, out float x, out float y, out float width, out float height)
         {
@@ -194,6 +303,7 @@ namespace GameEditor.Framework.UI
             Area = (screen.X, screen.Y, screen.Width, screen.Height);
             _rects.Clear();
             _above.Clear();
+            _parents.Clear();
             _holders.Clear();
             _holdWidth = width;
             bool order = false;
@@ -240,7 +350,7 @@ namespace GameEditor.Framework.UI
             }
 
             // On the screen while there is something to show (see ShowOn).
-            bool wanted = _items.Count > 0 || _outlined.Count > 0;
+            bool wanted = _items.Count > 0 || _outlined.Count > 0 || !_canvas.IsNull;
             if (_host != null && wanted != (Root.Parent == _host))
             {
                 if (wanted) _host.AddChild(Root);
@@ -290,6 +400,7 @@ namespace GameEditor.Framework.UI
             }
             Rect rect = Place(in element, parent, Scale);
             _rects[e] = rect;
+            _parents[e] = parent;
             return rect;
         }
 
@@ -508,6 +619,8 @@ namespace GameEditor.Framework.UI
         private sealed class GameUIRoot : Widget
         {
             private static readonly UIColor Outline = UIColor.FromHex("#F9E2AF");
+            private static readonly UIColor HandleEdge = UIColor.FromHex("#1E1E2E");
+            private static readonly UIColor Anchor = UIColor.FromHex("#89DCEB");
 
             // Sync places every widget itself, each frame: the screen's layout pass has nothing to do here (and
             // allocated in every frame).
@@ -522,6 +635,27 @@ namespace GameEditor.Framework.UI
                     renderer.SetStrokeColor(Outline);
                     renderer.SetStrokeWidth(1.5f);
                     renderer.StrokeRect(new Rect(r.X + 0.75f, r.Y + 0.75f, MathF.Max(0f, r.Width - 1.5f), MathF.Max(0f, r.Height - 1.5f)));
+                }
+                // The element a host edits: a line from the point of its parent it is placed from to its own point that
+                // counts, a mark there, and a handle at each corner and edge.
+                if (!_canvas.IsNull && _rects.TryGetValue(_canvas, out Rect c) && _parents.TryGetValue(_canvas, out Rect parent)
+                    && ECSWorld.Instance.TryGetComponent<UIElement>(_canvas, out var element))
+                {
+                    var from = AnchorPoint(element.Anchor, parent);
+                    var to = AnchorPoint(element.Anchor, c);
+                    renderer.SetStrokeColor(Anchor);
+                    renderer.SetStrokeWidth(1f);
+                    renderer.DrawLine(from.X, from.Y, to.X, to.Y, 1f, Anchor);
+                    renderer.FillRect(new Rect(from.X - 4f, from.Y - 4f, 8f, 8f), Anchor);
+                    for (int h = 0; h < 8; h++)
+                    {
+                        var at = HandleAt(c, h);
+                        var box = new Rect(at.X - HandleSize * 0.5f, at.Y - HandleSize * 0.5f, HandleSize, HandleSize);
+                        renderer.FillRect(box, Outline);
+                        renderer.SetStrokeColor(HandleEdge);
+                        renderer.SetStrokeWidth(1f);
+                        renderer.StrokeRect(box);
+                    }
                 }
             }
         }

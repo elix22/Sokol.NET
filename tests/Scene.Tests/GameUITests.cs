@@ -96,6 +96,89 @@ namespace Scene.Tests
             Same(new Rect(100 + 300 - 100 - 8, 50 + 4, 100, 20), GameUI.Place(At(UIAnchor.TopRight, 16, 8, 200, 40), new Rect(100, 50, 300, 200), 0.5f));
         }
 
+        // ── The canvas's arithmetic (Phase G2.1): an element's rectangle in design units, and back ───────────────
+
+        [Theory]
+        [InlineData(UIAnchor.TopLeft)] [InlineData(UIAnchor.Top)] [InlineData(UIAnchor.TopRight)]
+        [InlineData(UIAnchor.Left)] [InlineData(UIAnchor.Center)] [InlineData(UIAnchor.Right)]
+        [InlineData(UIAnchor.BottomLeft)] [InlineData(UIAnchor.Bottom)] [InlineData(UIAnchor.BottomRight)]
+        public void A_rectangle_given_back_is_the_element_it_came_from_whatever_the_anchor(UIAnchor anchor)
+        {
+            var element = At(anchor, 16, 24, 200, 40);
+            var rect = GameUI.DesignRect(element, 1280, 720);
+            var back = GameUI.WithRect(element, rect, 1280, 720);
+            Assert.Equal(element.Offset.X, back.Offset.X, 3);
+            Assert.Equal(element.Offset.Y, back.Offset.Y, 3);
+            Assert.Equal(element.Size, back.Size);
+            Assert.Equal(anchor, back.Anchor);
+        }
+
+        [Theory]
+        [InlineData(UIAnchor.TopLeft, 30, 10)] [InlineData(UIAnchor.Top, 30, 10)] [InlineData(UIAnchor.TopRight, -30, 10)]
+        [InlineData(UIAnchor.Left, 30, 10)] [InlineData(UIAnchor.Center, 30, 10)] [InlineData(UIAnchor.Right, -30, 10)]
+        [InlineData(UIAnchor.BottomLeft, 30, -10)] [InlineData(UIAnchor.Bottom, 30, -10)] [InlineData(UIAnchor.BottomRight, -30, -10)]
+        public void A_move_right_and_down_changes_the_offset_as_its_anchor_counts(UIAnchor anchor, float wantDx, float wantDy)
+        {
+            // Moved 30 right and 10 down on the screen: from a right-hand anchor the offset counts leftwards, from a bottom one upwards.
+            var element = At(anchor, 16, 24, 200, 40);
+            var rect = GameUI.DesignRect(element, 1280, 720);
+            var moved = GameUI.WithRect(element, new Rect(rect.X + 30, rect.Y + 10, rect.Width, rect.Height), 1280, 720);
+            Assert.Equal(16 + wantDx, moved.Offset.X, 3);
+            Assert.Equal(24 + wantDy, moved.Offset.Y, 3);
+            Same(new Rect(rect.X + 30, rect.Y + 10, 200, 40), GameUI.DesignRect(moved, 1280, 720));
+        }
+
+        [Fact]
+        public void A_handle_moved_keeps_the_opposite_side_and_a_smallest_size()
+        {
+            var r = new Rect(100, 100, 200, 40);
+            Same(new Rect(90, 95, 210, 45), GameUI.Resized(r, 0, -10, -5, 8));      // top-left: right and bottom stay
+            Same(new Rect(100, 95, 200, 45), GameUI.Resized(r, 1, -10, -5, 8));     // top: only the top
+            Same(new Rect(100, 100, 220, 40), GameUI.Resized(r, 3, 20, 7, 8));      // right: only the right
+            Same(new Rect(100, 100, 220, 47), GameUI.Resized(r, 4, 20, 7, 8));      // bottom-right
+            Same(new Rect(100, 100, 200, 47), GameUI.Resized(r, 5, 20, 7, 8));      // bottom
+            Same(new Rect(300 - 8, 100, 8, 40), GameUI.Resized(r, 7, 500, 0, 8));   // left past the right: the smallest width
+            Same(new Rect(100, 100, 200, 8), GameUI.Resized(r, 5, 0, -500, 8));     // bottom past the top: the smallest height
+        }
+
+        [Fact]
+        public void A_new_anchor_given_the_same_rectangle_keeps_the_element_where_it_is()
+        {
+            var element = At(UIAnchor.TopLeft, 50, 60, 200, 40);
+            var rect = GameUI.DesignRect(element, 1280, 720);
+            foreach (UIAnchor anchor in Enum.GetValues<UIAnchor>())
+            {
+                var anchored = element;
+                anchored.Anchor = anchor;
+                anchored = GameUI.WithRect(anchored, rect, 1280, 720);
+                Same(rect, GameUI.DesignRect(anchored, 1280, 720));
+            }
+            Assert.Equal(new Vector2(1280 - 200 - 50, 720 - 40 - 60), GameUI.WithRect(At(UIAnchor.BottomRight, 0, 0, 200, 40), rect, 1280, 720).Offset);
+        }
+
+        [Fact]
+        public void A_point_finds_the_element_in_front_and_a_child_before_its_parent()
+        {
+            Entity panel = Element("Panel", At(UIAnchor.TopLeft, 100, 100, 400, 300));
+            Entity button = Element("Button", At(UIAnchor.TopLeft, 20, 20, 100, 40), panel);
+            Entity over = Element("Over", At(UIAnchor.TopLeft, 450, 100, 200, 100, order: 1));
+            Entity hidden = Element("Hidden", At(UIAnchor.TopLeft, 700, 500, 100, 100));
+            var h = World.GetComponent<UIElement>(hidden); h.Visible = false; World.AddComponent(hidden, h);
+            World.AddComponent(panel, new UIPanel { Color = new Vector4(0, 0, 0, 1) });
+            World.AddComponent(button, new UIButton { Text = "B", FontSize = 20 });
+            GameUI.Sync(World, 1280, 720, Thickness.Zero);
+
+            Assert.Equal(button, GameUI.HitTest(130, 130));          // the child, on its parent
+            Assert.Equal(panel, GameUI.HitTest(300, 300));           // the parent elsewhere
+            Assert.Equal(over, GameUI.HitTest(470, 150));            // the one with the higher order, over the panel
+            Assert.True(GameUI.HitTest(750, 550).IsNull);            // a hidden element is not found
+            Assert.True(GameUI.HitTest(50, 50).IsNull);              // nothing
+            Assert.True(GameUI.TryGetParentRect(button, out var inside));
+            Same(new Rect(100, 100, 400, 300), inside);              // a child is placed in its parent's rectangle
+            Assert.True(GameUI.TryGetParentRect(panel, out var screen));
+            Same(new Rect(0, 0, 1280, 720), screen);
+        }
+
         [Fact]
         public void The_UI_is_as_large_in_parts_of_the_screen_on_every_screen_and_keeps_to_its_corners()
         {
