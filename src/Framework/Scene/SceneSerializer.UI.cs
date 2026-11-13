@@ -65,7 +65,7 @@ namespace GameEditor.Framework.Scene
         {
             if (!world.TryGetComponent<UIText>(e, out var t)) return null;
             return "{\"Text\":\"" + Esc(t.Text ?? "") + "\",\"Font\":\"" + Esc(t.Font ?? "") + "\",\"FontSize\":" + F(t.FontSize) + ",\"Color\":" + Four(t.Color)
-                 + ",\"Align\":\"" + t.Align + "\",\"Wrap\":" + (t.Wrap ? "true" : "false") + "}";
+                 + ",\"Align\":\"" + t.Align + "\",\"Wrap\":" + (t.Wrap ? "true" : "false") + KeyOf(t.Key) + "}";
         }
 
         private static void ReadUIText(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
@@ -77,8 +77,12 @@ namespace GameEditor.Framework.Scene
             Four(el, "Color", ref t.Color);
             if (Enum.TryParse(Text(el, "Align", ""), true, out UIAlign align)) t.Align = align;
             t.Wrap = el.TryGetProperty("Wrap", out var wrap) && wrap.ValueKind == JsonValueKind.True;
+            t.Key = Text(el, "Key", "");
             world.AddComponent(e, t);
         }
+
+        // A text table's key, written only when there is one (scenes made before keys stay as they were).
+        private static string KeyOf(string? key) => string.IsNullOrEmpty(key) ? "" : ",\"Key\":\"" + Esc(key) + "\"";
 
         private static string? WriteUIImage(ECSWorld world, Frent.Entity e)
         {
@@ -99,7 +103,7 @@ namespace GameEditor.Framework.Scene
             if (!world.TryGetComponent<UIButton>(e, out var b)) return null;
             return "{\"Text\":\"" + Esc(b.Text ?? "") + "\",\"Font\":\"" + Esc(b.Font ?? "") + "\",\"FontSize\":" + F(b.FontSize) + ",\"Color\":" + Four(b.Color)
                  + ",\"TextColor\":" + Four(b.TextColor) + ",\"Radius\":" + F(b.Radius)
-                 + ",\"Holds\":\"" + Esc(b.Holds ?? "") + "\"}";
+                 + ",\"Holds\":\"" + Esc(b.Holds ?? "") + "\"" + KeyOf(b.Key) + "}";
         }
 
         private static string? WriteUIMiniMap(ECSWorld world, Frent.Entity e)
@@ -126,6 +130,7 @@ namespace GameEditor.Framework.Scene
             Four(el, "TextColor", ref b.TextColor);
             b.Radius = Number(el, "Radius", b.Radius);
             b.Holds = Text(el, "Holds", "");
+            b.Key = Text(el, "Key", "");
             world.AddComponent(e, b);
         }
 

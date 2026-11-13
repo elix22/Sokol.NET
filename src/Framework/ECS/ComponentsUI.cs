@@ -45,8 +45,10 @@ namespace GameEditor.Framework.ECS.Components
         public UIAlign Align;
         /// <summary>A text longer than its element is broken into lines.</summary>
         public bool Wrap;
+        /// <summary>A key of the game's text table (UI.Texts): set, it shows that text in the game's language, and <see cref="Text"/> where the key has none.</summary>
+        public string Key;
 
-        public static UIText Default => new() { Text = "Text", Font = "", FontSize = 28f, Color = Vector4.One, Align = UIAlign.Left };
+        public static UIText Default => new() { Text = "Text", Font = "", FontSize = 28f, Color = Vector4.One, Align = UIAlign.Left, Key = "" };
     }
 
     /// <summary>A picture (scene block "UIImage"): an image, or a frame of a sprite sheet, stretched over its element.</summary>
@@ -78,10 +80,12 @@ namespace GameEditor.Framework.ECS.Components
         /// button's name, "Fire1", "Jump" — as a key held down. Empty: it only clicks. Several fingers on several buttons hold all.
         /// </summary>
         public string Holds;
+        /// <summary>A key of the game's text table (UI.Texts): set, the button says that text in the game's language, and <see cref="Text"/> where the key has none.</summary>
+        public string Key;
 
         public static UIButton Default => new()
         {
-            Text = "Button", Font = "", FontSize = 28f, Color = new Vector4(0.2f, 0.45f, 0.9f, 1f), TextColor = Vector4.One, Radius = 10f,
+            Text = "Button", Font = "", FontSize = 28f, Color = new Vector4(0.2f, 0.45f, 0.9f, 1f), TextColor = Vector4.One, Radius = 10f, Key = "",
         };
     }
 

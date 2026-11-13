@@ -46,6 +46,7 @@ namespace Scene.Tests
             SceneManager.NewScene("Screen");
             SceneManager.ActiveScene!.PhysicsBackend = "none";
             Clicks.Clear();
+            Texts.Read("");
         }
 
         public void Dispose()
@@ -55,6 +56,7 @@ namespace Scene.Tests
             ScriptSystem.ClearFactories();
             GameUI.Clear();
             World.Clear();
+            Texts.Read("");
         }
 
         static Entity Element(string name, UIElement element, Entity? parent = null)
@@ -508,6 +510,121 @@ namespace Scene.Tests
             Assert.Equal(("Button", 10f), (World.GetComponent<UIButton>(bareE).Text, World.GetComponent<UIButton>(bareE).Radius));
             Assert.Equal(new Vector4(0, 0, 0, 0.6f), World.GetComponent<UIPanel>(bareE).Color);
             Assert.Equal("", World.GetComponent<UIPicture>(bareE).Texture);
+        }
+        // ── G2.4: the text table ───────────────────────────────────────────────────────
+
+        const string Table = "{\"languages\": [\"en\", \"he\"], \"texts\": {\"title\": {\"en\": \"Bopalop\", \"he\": \"\u05d1\u05d5\u05e4\u05dc\u05d5\u05e4\"}, " +
+                             "\"score\": {\"en\": \"Score: {0}\", \"he\": \"\u05e0\u05e7\u05d5\u05d3\u05d5\u05ea: {0}\"}, \"only\": {\"en\": \"English only\"}}}";
+
+        [Fact]
+        public void A_text_by_key_is_in_the_games_language_and_its_own_text_where_the_key_has_none()
+        {
+            Assert.Null(Texts.Read(Table));
+            Assert.Equal(new[] { "en", "he" }, Texts.Languages);
+            Assert.Equal(new[] { "title", "score", "only" }, Texts.Keys);
+            Assert.Equal("Bopalop", Texts.Get("title"));
+            Assert.Equal("Score: 7", Texts.Format("score", 7));
+            Assert.Equal("nothing", Texts.Format("nothing"));               // no such key: the key itself
+            Assert.False(Texts.RightToLeft);
+
+            Entity title = Element("Title", At(UIAnchor.Top, 0, 20, 400, 60));
+            World.AddComponent(title, new UIText { Text = "fallback", Key = "title", FontSize = 28f, Color = Vector4.One, Align = UIAlign.Left });
+            Entity only = Element("Only", At(UIAnchor.Top, 0, 100, 400, 60));
+            World.AddComponent(only, new UIText { Text = "its own", Key = "only", FontSize = 28f, Color = Vector4.One, Align = UIAlign.Right });
+            Entity play = Element("Play", At(UIAnchor.Center, 0, 0, 200, 60));
+            var button = UIButton.Default; button.Key = "score";
+            World.AddComponent(play, button);
+            GameUI.Sync(World, 1280, 720, Thickness.Zero);
+            Assert.Equal(("Bopalop", TextAlign.Left), (Label(title).Text, Label(title).Align));
+            Assert.Equal(("English only", TextAlign.Right), (Label(only).Text, Label(only).Align));
+            Assert.Equal("Score: {0}", Label(play).Text);
+
+            // In Hebrew: the key's Hebrew text, and Left is the start of the line - the right; a key with no Hebrew: its own text.
+            Texts.Language = "he";
+            Assert.True(Texts.RightToLeft);
+            GameUI.Sync(World, 1280, 720, Thickness.Zero);
+            Assert.Equal(("\u05d1\u05d5\u05e4\u05dc\u05d5\u05e4", TextAlign.Right), (Label(title).Text, Label(title).Align));
+            Assert.Equal(("its own", TextAlign.Left), (Label(only).Text, Label(only).Align));
+            Assert.Equal(FlowDirection.LeftToRight, Label(title).FlowDirection);
+            Assert.Equal("\u05e0\u05e7\u05d5\u05d3\u05d5\u05ea: 3", Texts.Format("score", 3));
+
+            Texts.Language = "fr";                                            // not one of the table's: kept
+            Assert.Equal("he", Texts.Language);
+            Texts.Language = "EN-gb";                                         // a tag: its language
+            Assert.Equal("en", Texts.Language);
+        }
+
+        static Label Label(Entity e) => Assert.IsAssignableFrom<Label>(GameUI.WidgetOf(e));
+
+        [Fact]
+        public void The_games_first_language_is_the_start_one_else_the_devices_else_the_tables_first()
+        {
+            Texts.Read("{\"languages\": [\"en\", \"he\"], \"start\": \"he\", \"texts\": {}}");
+            Assert.Equal(("he", "he"), (Texts.Start, Texts.Language));
+            string device = Texts.DeviceLanguage();
+            Texts.Read("{\"languages\": [\"de\", \"en\"], \"texts\": {}}");
+            Assert.Equal(device == "en" ? "en" : "de", Texts.Language);
+            Environment.SetEnvironmentVariable("GAME_LANGUAGE", "en-US");     // a browser's page hands its language in
+            try
+            {
+                Assert.Equal("en", Texts.DeviceLanguage());
+                Texts.Read("{\"languages\": [\"de\", \"en\"], \"texts\": {}}");
+                Assert.Equal("en", Texts.Language);
+            }
+            finally { Environment.SetEnvironmentVariable("GAME_LANGUAGE", null); }
+            Texts.Read("");
+            Assert.Equal("", Texts.Language);                                 // no table: no language
+            Assert.Null(Texts.Get("title"));
+        }
+
+        [Fact]
+        public void The_table_is_changed_and_written_as_its_file_has_it()
+        {
+            Assert.Equal("", Texts.Language);                                 // asked with no language yet …
+            Assert.Null(Texts.Set("title", "en", "Bopalop"));
+            Assert.Equal("en", Texts.Language);                               // … and again when the table has one
+            Assert.Null(Texts.Set("title", "he", "\u05d1\u05d5\u05e4"));
+            Assert.Null(Texts.Set("play", "en", "Play"));
+            Assert.Null(Texts.AddLanguage("ar"));
+            Assert.NotNull(Texts.AddLanguage("english"));                     // no language code
+            Assert.NotNull(Texts.Set(" ", "en", "x"));                        // no key
+            Assert.NotNull(Texts.SetStart("fr"));                             // not one of its languages
+            Assert.Null(Texts.SetStart("he"));
+            string file = Texts.Write();
+            Assert.Contains("\"he\": \"\u05d1\u05d5\u05e4\"", file);                // the letters themselves, not escapes
+            Texts.Read(file);
+            Assert.Equal(new[] { "en", "he", "ar" }, Texts.Languages);
+            Assert.Equal(new[] { "title", "play" }, Texts.Keys);
+            Assert.Equal(("he", "\u05d1\u05d5\u05e4", "Play"), (Texts.Start, Texts.Find("title", "he"), Texts.Find("play", "en")));
+            Assert.Null(Texts.Set("title", "he", ""));                        // an empty text takes that one out
+            Assert.Null(Texts.Find("title", "he"));
+            Assert.True(Texts.Remove("play"));
+            Assert.False(Texts.Remove("play"));
+            Assert.Equal(new[] { "title" }, Texts.Keys);
+            Assert.NotNull(Texts.Read("{ not json"));
+            Assert.Empty(Texts.Keys);
+        }
+
+        [Fact]
+        public void A_key_and_its_letters_the_engines_font_lacks()
+        {
+            Assert.False(Texts.HasForeignLetters("Score: 12 - Caf\u00e9, \u0393\u03b5\u03b9\u03ac, \u041f\u0440\u0438\u0432\u0435\u0442 \u2026"));
+            Assert.True(Texts.HasForeignLetters("\u05e9\u05dc\u05d5\u05dd"));
+            Assert.True(Texts.HasForeignLetters("\u0645\u0631\u062d\u0628\u0627"));
+            Assert.True(Texts.HasForeignLetters("\u65e5\u672c"));
+
+            Entity title = Element("Title", At(UIAnchor.Top, 0, 20, 400, 60));
+            World.AddComponent(title, new UIText { Text = "Title", Key = "title", Font = "" });
+            string json = SceneSerializer.SerializeEntity(title);
+            Assert.Contains("\"Key\":\"title\"", json);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            World.RemoveComponent<UIText>(title);
+            SceneSerializer.ReadComponents(title, doc.RootElement.GetProperty("c"));
+            Assert.Equal("title", World.GetComponent<UIText>(title).Key);
+
+            Entity plain = Element("Plain", At(UIAnchor.Top, 0, 90, 400, 60));
+            World.AddComponent(plain, UIText.Default);
+            Assert.DoesNotContain("\"Key\"", SceneSerializer.SerializeEntity(plain));   // no key: the block as it was
         }
     }
 }

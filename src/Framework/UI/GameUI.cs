@@ -566,11 +566,11 @@ namespace GameEditor.Framework.UI
             switch (item.Kind)
             {
                 case 1 when item.Widget is Label label && world.TryGetComponent<UIText>(e, out var text):
-                    label.Text = text.Text ?? "";
+                    label.Text = Said(text.Key, text.Text);
                     label.FontName = FontOf(text.Font);
                     label.FontSize = MathF.Max(1f, text.FontSize * Scale);
                     label.ForeColor = Colour(text.Color);
-                    label.Align = (TextAlign)(int)text.Align;
+                    AlignText(label, text.Align);
                     label.Wrap = text.Wrap ? TextWrap.Wrap : TextWrap.None;
                     break;
                 case 2 when item.Widget is PictureWidget picture && world.TryGetComponent<UIPicture>(e, out var image):
@@ -578,7 +578,7 @@ namespace GameEditor.Framework.UI
                     picture.Tint = image.Color;
                     break;
                 case 3 when item.Widget is ButtonWidget button && world.TryGetComponent<UIButton>(e, out var b):
-                    button.Text = b.Text ?? "";
+                    button.Text = Said(b.Key, b.Text);
                     button.FontName = FontOf(b.Font);
                     button.FontSize = MathF.Max(1f, b.FontSize * Scale);
                     button.ForeColor = Colour(b.TextColor);
@@ -594,6 +594,26 @@ namespace GameEditor.Framework.UI
                     map.Line = MathF.Max(1f, mm.Line * Scale);
                     map.Refresh(world);
                     break;
+            }
+        }
+
+        // What a text or a button says: its key's text in the game's language, else its own text.
+        private static string Said(string? key, string? text) =>
+            string.IsNullOrEmpty(key) ? text ?? "" : Texts.Get(key) ?? text ?? "";
+
+        // In a right-to-left language Left and Right are the start and the end of the line: swapped, and the label told
+        // not to flip again. Otherwise as Sokol.GUI does (a Hebrew line in an English game starts at the right).
+        private static void AlignText(Label label, UIAlign align)
+        {
+            if (Texts.RightToLeft)
+            {
+                label.FlowDirection = FlowDirection.LeftToRight;
+                label.Align = align switch { UIAlign.Left => TextAlign.Right, UIAlign.Right => TextAlign.Left, _ => TextAlign.Center };
+            }
+            else
+            {
+                label.FlowDirection = FlowDirection.Auto;
+                label.Align = (TextAlign)(int)align;
             }
         }
 
@@ -619,7 +639,16 @@ namespace GameEditor.Framework.UI
                 }
             }
             if (string.IsNullOrEmpty(key)) return DefaultFont;
-            if (_fonts.Contains(key)) return key;
+            if (_fonts.Contains(key))
+            {
+                // A font of the game falls back to the engine's for the letters it lacks (a Hebrew font has no Latin).
+                if (!_fallbacks.Contains(key) && FontRegistry.Instance.Get(key) is { } font && FontRegistry.Instance.Get(DefaultFont) is { } engine)
+                {
+                    _fallbacks.Add(key);
+                    _ = nvgAddFallbackFontId(vg, font.Id, engine.Id);
+                }
+                return key;
+            }
             // A font file of the game: in an editor read at once, in a built game when it arrives; until then
             // the text is drawn with nothing (the registry measures it again when the font is there).
             if (ConfigManager.HasProject)
@@ -643,7 +672,7 @@ namespace GameEditor.Framework.UI
             return key;
         }
 
-        private static readonly HashSet<string> _fonts = new(StringComparer.Ordinal), _fontsMissing = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> _fonts = new(StringComparer.Ordinal), _fontsMissing = new(StringComparer.Ordinal), _fallbacks = new(StringComparer.Ordinal);
 
         // ── Clicks ──────────────────────────────────────────────────────────────────────
 

@@ -208,6 +208,7 @@ namespace GameEditor.Framework.Scripting
         public static void StartAll()
         {
             _started = true;
+            UI.Texts.CheckFonts(ECS.ECSWorld.Instance);   // a text by key in letters the engine's font lacks: told once
             foreach (var (_, b) in _running)
                 SafeCall(b, static beh => beh.OnStart(), "OnStart");
         }
