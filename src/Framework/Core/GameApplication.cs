@@ -241,6 +241,7 @@ namespace GameEditor.Framework.Core
         public static void Update(float deltaTime)
         {
             SFilesystem.Update();
+            SceneManager.TickLoadTimes();      // how long the scene took to load, once it has every file (G12.1)
 
             if (_screen != null)
             {

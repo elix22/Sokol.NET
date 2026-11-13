@@ -158,14 +158,51 @@ namespace GameEditor.Framework.Scene
         public static void LoadSceneFromAssetsAsync(string assetPath)
             => ReadSceneFromAssets(assetPath, false, (json, loaded) => Loaded(json, loaded, assetPath), null);
 
+        // ── How long a built game took to load a scene (G12.1, docs/SCENE_LOAD_DESIGN.md) ────────────────
+
+        private sealed class LoadTimes
+        {
+            public string Key = "";
+            public long Started = System.Diagnostics.Stopwatch.GetTimestamp();
+            public double File, Prefabs, Maps, Sheets, Sounds, Tracks, Read, Entities, Asked;
+            public int Bytes;
+            public bool WaitingForAssets;
+            public double Now => System.Diagnostics.Stopwatch.GetElapsedTime(Started).TotalMilliseconds;
+        }
+
+        private static LoadTimes? _loadTimes;
+
+        /// <summary>
+        /// Once a frame (a built game): when the scene that was read has every file it named — no file on its way —
+        /// says how long each part of its load took, from the ask: <c>[SceneLoad] key file=… prefabs=… maps=… sheets=…
+        /// sounds=… tracks=… read=… entities=… asked=… assets=… total=… bytes=… entities_made=…</c> (milliseconds).
+        /// </summary>
+        public static void TickLoadTimes()
+        {
+            if (_loadTimes is not { WaitingForAssets: true } t) return;
+            if (SFilesystem.PendingRequestCount + SFilesystem.ActiveRequestCount > 0) return;
+            _loadTimes = null;
+            double now = t.Now;
+            int made = 0;
+            foreach (var _ in ECSWorld.Instance.Entities) made++;
+            Logger.Info(System.FormattableString.Invariant(
+                $"[SceneLoad] {t.Key} file={t.File:0} prefabs={t.Prefabs - t.File:0} maps={t.Maps - t.Prefabs:0} sheets={t.Sheets - t.Maps:0} sounds={t.Sounds - t.Sheets:0} tracks={t.Tracks - t.Sounds:0} ")
+              + System.FormattableString.Invariant(
+                $"read={t.Read:0.#} entities={t.Entities:0.#} asked={t.Asked:0.#} assets={now - t.Tracks - t.Read - t.Entities - t.Asked:0} total={now:0} bytes={t.Bytes} entities_made={made}"));
+        }
+
         // Reads a scene's text from the app's files, and every file it must have read before it; then `then`
         // with the text and the keys of the prefabs read for it. `freshMaps`: the scene's maps from their files again.
         private static void ReadSceneFromAssets(string assetPath, bool freshMaps, Action<string, List<string>> then, Action? failed)
         {
+            var times = new LoadTimes { Key = assetPath };
+            _loadTimes = times;
             SFilesystem.LoadFileAsync(assetPath, (path, buffer, status) =>
             {
                 if (status == SFileLoadStatus.Success)
                 {
+                    times.File = times.Now;
+                    times.Bytes = buffer.Length;
                     string json = System.Text.Encoding.UTF8.GetString(buffer);
                     // Files are read asynchronously here, and a scene resolves its prefab instances while it is
                     // read: the prefabs it names — placed in it, or in a script's field — are read first, and
@@ -173,14 +210,19 @@ namespace GameEditor.Framework.Scene
                     // The sprite sheets the scene and those prefabs name are read next, for the same reason: a
                     // sprite's frame and an animation's clip are there from the first frame.
                     // Then the tile maps, and the sheets the maps' tiles come from; then the sounds and the tracks.
-                    Prefabs.LoadNamedIn(json, loaded => TilemapLibrary.LoadNamedIn(TextsOf(json, loaded), maps =>
+                    Prefabs.LoadNamedIn(json, loaded => { times.Prefabs = times.Now; TilemapLibrary.LoadNamedIn(TextsOf(json, loaded), maps =>
                     {
+                        times.Maps = times.Now;
                         var texts = TextsOf(json, loaded);
                         texts.AddRange(maps);
                         // And the race tracks: their roads and walls are made from them when the scene is drawn and played.
-                        SpriteLibrary.LoadNamedIn(texts, () => Sound.AudioClips.LoadNamedIn(TextsOf(json, loaded),
-                            () => TrackLibrary.LoadNamedIn(TextsOf(json, loaded), _ => then(json, loaded))));
-                    }, freshMaps));
+                        SpriteLibrary.LoadNamedIn(texts, () => { times.Sheets = times.Now; Sound.AudioClips.LoadNamedIn(TextsOf(json, loaded),
+                            () => { times.Sounds = times.Now; TrackLibrary.LoadNamedIn(TextsOf(json, loaded), _ =>
+                            {
+                                times.Tracks = times.Now;
+                                then(json, loaded);
+                            }); }); });
+                    }, freshMaps); });
                 }
                 else
                 {
@@ -416,11 +458,20 @@ namespace GameEditor.Framework.Scene
         {
             EventBus.RaiseSceneUnloaded();
             ActiveScene ??= new Scene("Untitled");
+            double before = _loadTimes?.Now ?? 0;
             SceneSerializer.Deserialize(json, ActiveScene);
+            double made = _loadTimes?.Now ?? 0;
             ActiveScene.FilePath = null; // Loaded from assets, not a file path
             ActiveScene.IsDirty = false;
             PreloadSceneMeshes();
             PreloadSceneMaterials();
+            if (_loadTimes is { } t)
+            {
+                t.Read = SceneSerializer.LastReadMs;
+                t.Entities = made - before - t.Read;
+                t.Asked = t.Now - made;
+                t.WaitingForAssets = true;     // the models and textures asked for: TickLoadTimes says when they are all in
+            }
             // A prefab that only a script places has no entity in the scene yet: its meshes and
             // materials are asked for now, so Instantiate has them.
             foreach (string key in loaded)

@@ -81,14 +81,19 @@ namespace GameEditor.Framework.Scene
             return sb.ToString();
         }
 
+        /// <summary>The milliseconds the last <see cref="Deserialize"/> spent reading the text (references resolved, JSON parsed), before making entities (G12.1).</summary>
+        public static double LastReadMs { get; private set; }
+
         public static void Deserialize(string json, Scene scene)
         {
             scene.Clear();
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
             json = AssetRefs.Resolve(json);   // the files it names, where they are now
 
             JsonDocument doc;
             try { doc = JsonDocument.Parse(json); }
             catch { return; }
+            LastReadMs = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
 
             var root = doc.RootElement;
             if (root.TryGetProperty("name", out var nameProp))
