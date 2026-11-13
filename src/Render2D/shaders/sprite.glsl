@@ -19,6 +19,7 @@ in vec4 i_color;    // instance: straight RGBA
 
 out vec2 v_uv;
 out vec4 v_color;
+flat out vec4 v_rect;   // the frame's uv rectangle, min xy and max zw: the fragment shader keeps v_uv inside it
 
 void main()
 {
@@ -26,6 +27,7 @@ void main()
     gl_Position = view_proj * vec4(world, 1.0);
     v_uv    = mix(i_uvrect.xy, i_uvrect.zw, corner);
     v_color = i_color;
+    v_rect  = vec4(min(i_uvrect.xy, i_uvrect.zw), max(i_uvrect.xy, i_uvrect.zw));
 }
 
 @end
@@ -37,11 +39,18 @@ layout(binding=0) uniform sampler   sprite_smp;
 
 in vec2 v_uv;
 in vec4 v_color;
+flat in vec4 v_rect;
 out vec4 frag_color;
 
 void main()
 {
-    frag_color = v_color * texture(sampler2D(sprite_tex, sprite_smp), v_uv);
+    // With MSAA a pixel on a quad's edge is shaded once, at its centre, even when the centre is outside the quad and only
+    // some of its samples are inside: the uv there lies past the frame's edge and took the texel of the next frame of the
+    // sheet - lines between a tile map's tiles. Kept inside the frame (by 1/256 of a texel, so that an unsmoothed frame's
+    // last texel is still its own) it cannot. (centroid interpolation does the same, but an Adreno 308 draws noise with it.)
+    vec2 d = vec2(1.0 / 256.0) / vec2(textureSize(sampler2D(sprite_tex, sprite_smp), 0));
+    vec2 uv = clamp(v_uv, v_rect.xy + d, v_rect.zw - d);
+    frag_color = v_color * texture(sampler2D(sprite_tex, sprite_smp), uv);
 }
 
 @end
