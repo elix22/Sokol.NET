@@ -329,6 +329,7 @@ namespace GameEditor.Framework.Scene
                         }
                         sb.Append('}');
                     }
+                    AppendScriptRefs(sb, world, sc.Refs);
                     sb.Append('}');
                 }
 
@@ -355,6 +356,7 @@ namespace GameEditor.Framework.Scene
                             }
                             sb.Append('}');
                         }
+                        AppendScriptRefs(sb, world, sc2.Refs);
                         sb.Append('}');
                     }
                     sb.Append(']');
@@ -469,6 +471,9 @@ namespace GameEditor.Framework.Scene
             public readonly Dictionary<Entity, int> Parent = new();
             public readonly Dictionary<Entity, (int, int)> Constraint = new();
             public readonly Dictionary<Entity, int> WheelFollow = new();
+            // A script's fields that point to an entity: (entity, which script - -1 the first, else its place in
+            // "Scripts" -, field, saved id).
+            public readonly List<(Entity, int, string, int)> ScriptRefs = new();
             // Registered extension blocks, read once every entity exists (they may reference others)
             public readonly List<(Entity, string, JsonElement)> Extensions = new();
         }
@@ -608,6 +613,7 @@ namespace GameEditor.Framework.Scene
                     foreach (var p in propsEl.EnumerateObject())
                         sc.Properties[p.Name] = p.Value.GetString() ?? "";
                 }
+                ReadScriptRefs(sEl, newId, -1, fx);
                 world.AddComponent(newId, sc);
             }
 
@@ -626,6 +632,7 @@ namespace GameEditor.Framework.Scene
                         foreach (var p in propsEl.EnumerateObject())
                             sc.Properties[p.Name] = p.Value.GetString() ?? "";
                     }
+                    ReadScriptRefs(sxEl, newId, list.Count, fx);
                     list.Add(sc);
                 }
                 if (list.Count > 0)
@@ -774,12 +781,68 @@ namespace GameEditor.Framework.Scene
                 world.AddComponent(entity, wfc);
             }
 
+            // A script's fields that point to an entity: saved ids → live Entities (none when the id is no entity of
+            // what was read - a prefab's reference to something outside it, or an entity that is gone).
+            foreach (var (entity, script, field, saved) in fx.ScriptRefs)
+            {
+                Entity target = saved > 0 ? resolve(saved) : Entity.Null;
+                if (target.IsNull) continue;     // none: not kept
+                if (script < 0)
+                {
+                    if (!world.TryGetComponent<ScriptComponent>(entity, out var sc)) continue;
+                    sc.Refs ??= new Dictionary<string, Entity>();
+                    sc.Refs[field] = target;
+                    world.AddComponent(entity, sc);
+                }
+                else if (world.TryGetComponent<ScriptCollectionComponent>(entity, out var more) && more.Scripts != null && script < more.Scripts.Count)
+                {
+                    var sc = more.Scripts[script];
+                    sc.Refs ??= new Dictionary<string, Entity>();
+                    sc.Refs[field] = target;
+                    more.Scripts[script] = sc;
+                }
+            }
+
             // Registered extensions, with saved ids resolvable to live Entities
             foreach (var (entity, key, value) in fx.Extensions)
                 _extensions[key].Read(world, entity, value, resolve);
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────
+
+        // A script's fields that point to an entity, as scene ids: "Refs":{"Target":12}. An entity that is gone, or
+        // none, is not written (the field is none when read).
+        private static void AppendScriptRefs(StringBuilder sb, ECSWorld world, Dictionary<string, Entity>? refs)
+        {
+            if (refs == null) return;
+            bool first = true;
+            foreach (var (field, target) in refs)
+            {
+                if (target.IsNull || !target.IsAlive || !InScene(world, target)) continue;
+                sb.Append(first ? ",\"Refs\":{" : ",");
+                first = false;
+                sb.Append('"').Append(Esc(field)).Append("\":").Append(world.GetSceneId(target));
+            }
+            if (!first) sb.Append('}');
+        }
+
+        // An entity that is in the scene - not one taken out of it and kept for undo. Compared in a loop:
+        // List<Entity>.Contains stops a game in the WebAssembly build ("function signature mismatch"), and a
+        // scene is written while a game runs (the snapshot Play keeps).
+        private static bool InScene(ECSWorld world, Entity e)
+        {
+            var entities = world.Entities;
+            for (int i = 0; i < entities.Count; i++)
+                if (entities[i] == e) return true;
+            return false;
+        }
+
+        private static void ReadScriptRefs(JsonElement script, Entity entity, int index, Fixups fx)
+        {
+            if (!script.TryGetProperty("Refs", out var refs) || refs.ValueKind != JsonValueKind.Object) return;
+            foreach (var r in refs.EnumerateObject())
+                fx.ScriptRefs.Add((entity, index, r.Name, r.Value.ValueKind == JsonValueKind.Number && r.Value.TryGetInt32(out int id) ? id : -1));
+        }
 
         private static void Comma(StringBuilder sb, ref bool first)
         {

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Frent;
@@ -486,7 +487,30 @@ namespace GameEditor.Framework.Scene
             bool hasOver = o.ValueKind != JsonValueKind.Undefined;
             if (b.ValueKind != JsonValueKind.Object || (hasOver && o.ValueKind != JsonValueKind.Object))
             {
-                (hasOver ? o : b).WriteTo(w);   // not a block of fields (the "Scripts" array): the instance's value, whole
+                // Not a block of fields (the "Scripts" array): the instance's value, whole - or the prefab's, with the
+                // entities its scripts point to mapped as a block's are.
+                if (!hasOver && map != null && key == "Scripts" && b.ValueKind == JsonValueKind.Array)
+                {
+                    w.WriteStartArray();
+                    foreach (var script in b.EnumerateArray())
+                    {
+                        if (script.ValueKind != JsonValueKind.Object) { script.WriteTo(w); continue; }
+                        w.WriteStartObject();
+                        foreach (var p in script.EnumerateObject())
+                        {
+                            if (p.NameEquals("Refs") && p.Value.ValueKind == JsonValueKind.Object)
+                            {
+                                var mapped = MappedRefs(p.Value, map);
+                                if (mapped.EnumerateObject().Any()) { w.WritePropertyName(p.Name); mapped.WriteTo(w); }
+                            }
+                            else p.WriteTo(w);
+                        }
+                        w.WriteEndObject();
+                    }
+                    w.WriteEndArray();
+                    return;
+                }
+                (hasOver ? o : b).WriteTo(w);
                 return;
             }
             _referenceFields.TryGetValue(key, out string[]? refs);
@@ -497,15 +521,24 @@ namespace GameEditor.Framework.Scene
             w.WriteStartObject();
             foreach (var p in b.EnumerateObject())
             {
+                bool scriptRefs = map != null && key == "Script" && p.NameEquals("Refs") && p.Value.ValueKind == JsonValueKind.Object;
                 if (hasOver && o.TryGetProperty(p.Name, out var ov))
                 {
                     if (ov.ValueKind == JsonValueKind.Null) continue;   // the instance has no such field
                     w.WritePropertyName(p.Name);
-                    if (ov.ValueKind == JsonValueKind.Object && p.Value.ValueKind == JsonValueKind.Object) WriteMergedObject(w, p.Value, ov);
+                    // The instance changed some of its script's references: the others are the prefab's, mapped.
+                    if (ov.ValueKind == JsonValueKind.Object && p.Value.ValueKind == JsonValueKind.Object)
+                        WriteMergedObject(w, scriptRefs ? MappedRefs(p.Value, map!) : p.Value, ov);
                     else ov.WriteTo(w);
                     continue;
                 }
                 if (transform && ((isRoot && p.NameEquals("Par")) || (dropQ && p.NameEquals("Q")))) continue;
+                if (scriptRefs)
+                {
+                    var mapped = MappedRefs(p.Value, map!);
+                    if (mapped.EnumerateObject().Any()) { w.WritePropertyName(p.Name); mapped.WriteTo(w); }   // none left: no "Refs"
+                    continue;
+                }
                 if (map != null && refs != null && Array.IndexOf(refs, p.Name) >= 0
                     && p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int reference) && reference > 0)
                 {
@@ -520,6 +553,25 @@ namespace GameEditor.Framework.Scene
                 foreach (var p in o.EnumerateObject())
                     if (p.Value.ValueKind != JsonValueKind.Null && !b.TryGetProperty(p.Name, out _)) p.WriteTo(w);
             w.WriteEndObject();
+        }
+
+        // A script's "Refs": each entity id mapped as a component's reference field is; one that is not in the map
+        // (an entity outside the prefab) is left out - the field points to none.
+        private static void WriteMappedRefs(Utf8JsonWriter w, JsonElement refs, Dictionary<int, int> map)
+        {
+            w.WriteStartObject();
+            foreach (var r in refs.EnumerateObject())
+                if (r.Value.ValueKind == JsonValueKind.Number && r.Value.TryGetInt32(out int id) && id > 0 && map.TryGetValue(id, out int m))
+                    w.WriteNumber(r.Name, m);
+            w.WriteEndObject();
+        }
+
+        private static JsonElement MappedRefs(JsonElement refs, Dictionary<int, int> map)
+        {
+            var buffer = new ArrayBufferWriter<byte>(128);
+            using (var w = new Utf8JsonWriter(buffer)) WriteMappedRefs(w, refs, map);
+            using var doc = JsonDocument.Parse(buffer.WrittenMemory);
+            return doc.RootElement.Clone();
         }
 
         private static void WriteMergedObject(Utf8JsonWriter w, JsonElement b, JsonElement o)

@@ -173,6 +173,20 @@ namespace GameEditor.Framework.Scripting
                     }
                     else behaviour.ApplySerializedProperties(sc.Properties);
                 }
+                if (sc.Refs != null && sc.Refs.Count > 0)
+                {
+                    // A field that points to an entity: the entity, or none when it is no longer in the scene.
+                    if (_setters.TryGetValue(sc.TypeName, out var set))
+                    {
+                        foreach (var (field, pointed) in sc.Refs)
+                        {
+                            Entity live = !pointed.IsNull && pointed.IsAlive ? pointed : default;
+                            if (set(behaviour, field, new ScriptFieldValue(live))) FieldsSetByGeneratedCode++;
+                            else Logger.Warning($"[ScriptSystem] {sc.TypeName}.{field}: no field of type Entity of that name.");
+                        }
+                    }
+                    else behaviour.ApplySerializedReferences(sc.Refs);
+                }
                 target.Add((id, behaviour));
             }
             catch (Exception ex)

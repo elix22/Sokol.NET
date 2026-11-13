@@ -219,6 +219,9 @@ namespace GameEditor.Framework.ECS.Components
         public string TypeName;
         /// <summary>Serialized public field values, keyed by field name. Null = no overrides.</summary>
         public Dictionary<string, string>? Properties;
+        /// <summary>The fields of type <see cref="Frent.Entity"/> that point to another entity of the scene, keyed by
+        /// field name ("Refs" in the scene file, as scene ids). Null = none.</summary>
+        public Dictionary<string, Frent.Entity>? Refs;
     }
 
     public struct ScriptCollectionComponent

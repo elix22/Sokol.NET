@@ -74,6 +74,21 @@ namespace GameEditor.Framework.Scripting
         }
 
 
+        /// <summary>
+        /// Sets the fields of type <see cref="Entity"/> that point to another entity of the scene, by their names. The
+        /// way of a script loaded at run time (the editor's Play, the web page); a game compiled ahead of time sets
+        /// them by the setter the builder writes for each script.
+        /// </summary>
+        public virtual void ApplySerializedReferences(Dictionary<string, Entity> references)
+        {
+            foreach (var (name, target) in references)
+            {
+                var fi = this.GetType().GetField(name, BindingFlags.Public | BindingFlags.Instance);
+                if (fi == null || fi.FieldType != typeof(Entity)) continue;
+                fi.SetValue(this, !target.IsNull && target.IsAlive ? target : default(Entity));
+            }
+        }
+
         public static object? ParseFieldValue(Type t, string s)
         {
             // Scalar numerics
