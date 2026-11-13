@@ -678,8 +678,7 @@ namespace Scene.Tests
                 Frame();
                 Assert.Equal("UIStick", Kinds()["Stick"]);
 
-                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, 116, 604);              // the pointer comes to its middle (a press takes the last move's place)
-                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, 116, 604);              // and is pressed there
+                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, 116, 604);              // pressed in its middle, no move before (a tap)
                 Frame();
                 Assert.True(GameUI.TryGetStick(stick, out float x, out float y));
                 Assert.Equal((0f, 0f), (x, y));

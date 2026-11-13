@@ -330,9 +330,13 @@ namespace GameEditor.Framework.Input
                     break;
                 }
 
+                // A press and a release are where the pointer is then (sokol says so with each): with no move before
+                // them - a tap on a touch screen's browser, the first click into the window - the last move's place
+                // would be wrong. No delta: the pointer did not move through the space between.
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN:
                 {
                     int b = (int)e->mouse_button;
+                    _mousePosition = ToGame(e->mouse_x, e->mouse_y);
                     if ((uint)b < 3) { _mousePressed[b] = true; _mouseHeld[b] = true; }
                     break;
                 }
@@ -340,6 +344,7 @@ namespace GameEditor.Framework.Input
                 case sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP:
                 {
                     int b = (int)e->mouse_button;
+                    _mousePosition = ToGame(e->mouse_x, e->mouse_y);
                     if ((uint)b < 3) { _mouseReleased[b] = true; _mouseHeld[b] = false; }
                     break;
                 }

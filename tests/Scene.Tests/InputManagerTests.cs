@@ -36,6 +36,24 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void A_press_and_a_release_are_where_the_pointer_is_with_no_move_before_them()
+        {
+            InputManager.BeginFrame();
+            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, x: 10, y: 10);
+            InputManager.BeginFrame();
+            // A tap on a touch screen's browser: the press comes at its own place, with no move to it.
+            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT, x: 300, y: 200);
+            InputManager.BeginFrame();
+            Assert.True(InputManager.GetMouseButtonDown(0));
+            Assert.Equal(new Vector2(300, 200), InputManager.MousePosition);
+            Assert.Equal(Vector2.Zero, InputManager.MouseDelta);                 // no delta: it did not move through the space between
+            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT, x: 320, y: 210);
+            InputManager.BeginFrame();
+            Assert.True(InputManager.GetMouseButtonUp(0));
+            Assert.Equal(new Vector2(320, 210), InputManager.MousePosition);
+        }
+
+        [Fact]
         public void A_finger_lifted_ends_only_itself_though_the_event_lists_every_finger()
         {
             InputManager.BeginFrame();
@@ -104,7 +122,7 @@ namespace Scene.Tests
             InputManager.BeginFrame();
             Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, x: 40, y: 30, dx: 4, dy: 3);
             Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, x: 42, y: 31, dx: 2, dy: 1);
-            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT);
+            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT, x: 42, y: 31);   // sokol gives a press its place
             Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_SCROLL, scroll: 2);
 
             InputManager.BeginFrame();
@@ -121,7 +139,7 @@ namespace Scene.Tests
             Assert.False(InputManager.GetMouseButtonDown(0));
             Assert.True(InputManager.GetMouseButton(0));
 
-            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT);
+            Send(sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP, button: sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT, x: 42, y: 31);
             InputManager.BeginFrame();
             Assert.True(InputManager.GetMouseButtonUp(0));
             Assert.False(InputManager.GetMouseButton(0));
