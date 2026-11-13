@@ -12,7 +12,7 @@ namespace GameEditor.Framework.UI
 {
     /// <summary>
     /// A game's texts by key, in each of its languages: one table, <c>Embedded/texts.json</c> in the project —
-    /// <c>{"languages": ["en", "he"], "start": "he", "texts": {"title": {"en": "Bopalop", "he": "בופלופ"}}}</c>.
+    /// <c>{"languages": ["en", "he"], "start": "he", "texts": {"title": {"en": "Hopper", "he": "הופר"}}}</c>.
     /// A <see cref="UIText"/> or a <see cref="UIButton"/> with a <c>Key</c> shows the text of the game's
     /// <see cref="Language"/> (its own <c>Text</c> when the key has none there); a script asks <see cref="Get"/> and
     /// <see cref="Format"/>. The table is part of the app (the Embedded folder), so it is there before the first frame

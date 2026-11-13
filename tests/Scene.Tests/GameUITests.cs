@@ -513,7 +513,7 @@ namespace Scene.Tests
         }
         // ── G2.4: the text table ───────────────────────────────────────────────────────
 
-        const string Table = "{\"languages\": [\"en\", \"he\"], \"texts\": {\"title\": {\"en\": \"Bopalop\", \"he\": \"\u05d1\u05d5\u05e4\u05dc\u05d5\u05e4\"}, " +
+        const string Table = "{\"languages\": [\"en\", \"he\"], \"texts\": {\"title\": {\"en\": \"Hopper\", \"he\": \"\u05d4\u05d5\u05e4\u05e8\"}, " +
                              "\"score\": {\"en\": \"Score: {0}\", \"he\": \"\u05e0\u05e7\u05d5\u05d3\u05d5\u05ea: {0}\"}, \"only\": {\"en\": \"English only\"}}}";
 
         [Fact]
@@ -522,7 +522,7 @@ namespace Scene.Tests
             Assert.Null(Texts.Read(Table));
             Assert.Equal(new[] { "en", "he" }, Texts.Languages);
             Assert.Equal(new[] { "title", "score", "only" }, Texts.Keys);
-            Assert.Equal("Bopalop", Texts.Get("title"));
+            Assert.Equal("Hopper", Texts.Get("title"));
             Assert.Equal("Score: 7", Texts.Format("score", 7));
             Assert.Equal("nothing", Texts.Format("nothing"));               // no such key: the key itself
             Assert.False(Texts.RightToLeft);
@@ -535,7 +535,7 @@ namespace Scene.Tests
             var button = UIButton.Default; button.Key = "score";
             World.AddComponent(play, button);
             GameUI.Sync(World, 1280, 720, Thickness.Zero);
-            Assert.Equal(("Bopalop", TextAlign.Left), (Label(title).Text, Label(title).Align));
+            Assert.Equal(("Hopper", TextAlign.Left), (Label(title).Text, Label(title).Align));
             Assert.Equal(("English only", TextAlign.Right), (Label(only).Text, Label(only).Align));
             Assert.Equal("Score: {0}", Label(play).Text);
 
@@ -543,7 +543,7 @@ namespace Scene.Tests
             Texts.Language = "he";
             Assert.True(Texts.RightToLeft);
             GameUI.Sync(World, 1280, 720, Thickness.Zero);
-            Assert.Equal(("\u05d1\u05d5\u05e4\u05dc\u05d5\u05e4", TextAlign.Right), (Label(title).Text, Label(title).Align));
+            Assert.Equal(("\u05d4\u05d5\u05e4\u05e8", TextAlign.Right), (Label(title).Text, Label(title).Align));
             Assert.Equal(("its own", TextAlign.Left), (Label(only).Text, Label(only).Align));
             Assert.Equal(FlowDirection.LeftToRight, Label(title).FlowDirection);
             Assert.Equal("\u05e0\u05e7\u05d5\u05d3\u05d5\u05ea: 3", Texts.Format("score", 3));
@@ -581,7 +581,7 @@ namespace Scene.Tests
         public void The_table_is_changed_and_written_as_its_file_has_it()
         {
             Assert.Equal("", Texts.Language);                                 // asked with no language yet …
-            Assert.Null(Texts.Set("title", "en", "Bopalop"));
+            Assert.Null(Texts.Set("title", "en", "Hopper"));
             Assert.Equal("en", Texts.Language);                               // … and again when the table has one
             Assert.Null(Texts.Set("title", "he", "\u05d1\u05d5\u05e4"));
             Assert.Null(Texts.Set("play", "en", "Play"));
