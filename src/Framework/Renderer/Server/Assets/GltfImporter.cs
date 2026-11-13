@@ -590,7 +590,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             // ── Nodes ────────────────────────────────────────────────────────────────────────
             private void ImportNode(
                 cgltf_node* node, Entity parent,
-                Dictionary<IntPtr, string[]> primKeysByMesh, Dictionary<IntPtr, string[]> primMatsByMesh)
+                Dictionary<IntPtr, string[]> primKeysByMesh, Dictionary<IntPtr, string[]> primMatsByMesh, bool underTurned = false)
             {
                 Vector3    pos   = Vector3.Zero;
                 Quaternion rot   = Quaternion.Identity;
@@ -611,6 +611,12 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     if (node->has_rotation    != 0) rot   = new Quaternion(node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
                     if (node->has_scale       != 0) scale = new Vector3(node->scale[0], node->scale[1], node->scale[2]);
                 }
+
+                // A light or a camera looks down its node's -Z, the engine's down their entity's +Z: the entity is turned
+                // half a turn about its Y, and what stands under it is placed so that it stays where the file has it.
+                bool turned = node->light != null || node->camera != null;
+                if (underTurned) GltfSceneParts.UnderTurned(ref pos, ref rot);
+                if (turned) rot = GltfSceneParts.Turned(rot);
 
                 string name = PtrToStr(node->name) ?? "Node";
                 Entity entity = _world.CreateEntity(name);
@@ -644,8 +650,26 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     }
                 }
 
+                if (node->light != null)
+                {
+                    cgltf_light* light = node->light;
+                    int kind = light->type == cgltf_light_type.cgltf_light_type_directional ? 0
+                             : light->type == cgltf_light_type.cgltf_light_type_point ? 1 : 2;
+                    _world.AddComponent(entity, GltfSceneParts.Light(kind, new Vector3(light->color[0], light->color[1], light->color[2]),
+                        light->intensity, light->range, light->spot_inner_cone_angle, light->spot_outer_cone_angle));
+                }
+                if (node->camera != null)
+                {
+                    cgltf_camera* camera = node->camera;
+                    if (camera->type == cgltf_camera_type.cgltf_camera_type_orthographic)
+                        _world.AddComponent(entity, GltfSceneParts.Camera(true, camera->data.orthographic.ymag, camera->data.orthographic.znear, camera->data.orthographic.zfar));
+                    else if (camera->type == cgltf_camera_type.cgltf_camera_type_perspective)
+                        _world.AddComponent(entity, GltfSceneParts.Camera(false, camera->data.perspective.yfov, camera->data.perspective.znear,
+                            camera->data.perspective.has_zfar != 0 ? camera->data.perspective.zfar : 0f));
+                }
+
                 for (int c = 0; c < (int)node->children_count; c++)
-                    ImportNode(node->children[c], entity, primKeysByMesh, primMatsByMesh);
+                    ImportNode(node->children[c], entity, primKeysByMesh, primMatsByMesh, turned);
             }
 
             private void AddMeshRenderer(Entity e, string meshKey, string matKey)
