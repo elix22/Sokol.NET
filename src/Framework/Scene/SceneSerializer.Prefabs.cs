@@ -236,6 +236,33 @@ namespace GameEditor.Framework.Scene
             return result;
         }
 
+        /// <summary>
+        /// Reads a scene's entities into the world beside the ones there (a scene added to the one that plays, G4.5):
+        /// each gets a fresh scene id, the scene's references between its own entities hold, prefab instances are
+        /// expanded as when a scene is opened. The scene's own settings are not read. Returns the entities made, in the
+        /// file's order; <paramref name="error"/> says why none were (its text is no JSON).
+        /// </summary>
+        public static List<Entity> AddScene(string json, out string? error)
+        {
+            error = null;
+            var created = new List<Entity>();
+            json = Assets.AssetRefs.Resolve(json);   // the files it names, where they are now
+            JsonDocument doc;
+            try { doc = JsonDocument.Parse(json); }
+            catch (JsonException ex) { error = "it is not a scene file: " + ex.Message; return created; }
+            using (doc)
+            {
+                if (!doc.RootElement.TryGetProperty("entities", out var entitiesEl) || entitiesEl.ValueKind != JsonValueKind.Array) return created;
+                var world = ECSWorld.Instance;
+                var notes = new List<string>();
+                var dropped = new Dictionary<int, int>();
+                var expanded = ExpandEntities(entitiesEl, world.NextSceneId, null, notes, dropped, out _);
+                foreach (string note in notes) Logger.Warning("[Prefab] " + note);
+                CreateExpanded(world, expanded, dropped, keepIds: false, created);
+            }
+            return created;
+        }
+
         private static void ReadEntitiesWithPrefabs(ECSWorld world, JsonElement entitiesEl)
         {
             var notes = new List<string>();

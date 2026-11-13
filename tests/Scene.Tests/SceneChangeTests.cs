@@ -209,5 +209,63 @@ namespace Scene.Tests
             Frame();
             Assert.Equal(A, SceneManager.CurrentSceneKey);
         }
+        // ── G4.5: a scene added to the one that plays, and taken out ────────────────────
+
+        [Fact]
+        public void A_scene_added_comes_in_whole_with_ids_of_its_own_and_goes_when_taken_out()
+        {
+            SceneManager.Play();
+            Frame();
+            Once = () => SceneManager.RequestSceneAdditive(B);
+            Frame();
+            Assert.True(SceneManager.IsSceneLoaded(B));
+            Assert.Equal(A, SceneManager.CurrentSceneKey);                      // the scene that plays is still A
+            Assert.Equal(new[] { "Ball", "Ball1", "Ball2", "Room", "VisitorA", "VisitorB" }, Names());
+            Assert.Equal(4, Physics2DWorld.BodyCount);                          // B's ball has its body
+            var ids = World.Entities.Select(e => World.GetSceneId(e)).ToArray();
+            Assert.Equal(ids.Length, ids.Distinct().Count());                   // B's saved ids were A's too: each its own now
+            Frame();
+            Assert.Contains($"start b in {A}", Did);                            // B's script started, in the scene that plays
+            Assert.Equal("update b", Did[^1]);
+
+            Once = () => SceneManager.RequestSceneAdditive(B);                  // in already
+            Frame();
+            Assert.Contains(_warnings, w => w.Contains("is in already"));
+            Assert.Equal(6, World.Entities.Count());
+
+            Entity made = SceneManager.ActiveScene!.CreateEntity("Made");       // made while it plays: not B's
+            Once = () => SceneManager.RequestUnloadScene(B);
+            Frame();
+            Assert.False(SceneManager.IsSceneLoaded(B));
+            Assert.Equal(new[] { "Ball1", "Ball2", "Made", "Room", "VisitorA" }, Names());
+            Assert.Contains("destroy b", Did);
+            Assert.Equal(3, Physics2DWorld.BodyCount);
+            Assert.True(made.IsAlive);
+
+            Once = () => SceneManager.RequestUnloadScene(B);                    // not in
+            Frame();
+            Assert.Contains(_warnings, w => w.Contains("is not in"));
+        }
+
+        [Fact]
+        public void The_scene_that_plays_is_not_added_a_missing_one_is_said_and_a_change_of_scene_leaves_the_added_ones()
+        {
+            _scenes["Scenes/C.scene.json"] = SceneText("C", scene => Ball(scene, "BallC"));
+            SceneManager.NewScene("A");                                         // A open again (making C opened C)
+            SceneSerializer.Deserialize(_scenes[A], SceneManager.ActiveScene!);
+            SceneManager.ActiveScene!.FilePath = "/project/Assets/" + A;
+            SceneManager.Play();
+            Once = () => { SceneManager.RequestSceneAdditive(A); SceneManager.RequestSceneAdditive("Scenes/Nowhere.scene.json"); SceneManager.RequestSceneAdditive("Scenes/C.scene.json"); };
+            Frame();
+            Assert.Contains(_warnings, w => w.Contains("is the scene that plays"));
+            Assert.Contains(_errors, e => e.Contains("Scenes/Nowhere.scene.json"));
+            Assert.True(SceneManager.IsSceneLoaded("Scenes/C.scene.json"));
+            GoTo = B;
+            Frame();
+            Frame();
+            Assert.Equal(B, SceneManager.CurrentSceneKey);
+            Assert.False(SceneManager.IsSceneLoaded("Scenes/C.scene.json"));    // left with the scene it was added to
+            Assert.Equal(new[] { "Ball", "VisitorB" }, Names());
+        }
     }
 }

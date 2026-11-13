@@ -228,9 +228,113 @@ namespace GameEditor.Framework.Scene
             _askedScene = key;
         }
 
+        // ── Scenes added to the one that plays (G4.5) ─────────────────────────────────
+
+        private static readonly Dictionary<string, List<Entity>> _added = new(StringComparer.Ordinal);
+        private static readonly List<(string Key, bool Add)> _addAsked = new();
+        private static readonly HashSet<string> _adding = new(StringComparer.Ordinal);   // a built game's: its files on their way
+
+        /// <summary>
+        /// Asks for a scene to be added to the one that plays (a script's LoadSceneAdditive): at the end of the frame its
+        /// entities come into the world with ids of their own and start as instantiated ones do; the scene that plays keeps
+        /// its settings. In a built game the added scene's files are read first. A scene in already is refused in the log.
+        /// </summary>
+        public static void RequestSceneAdditive(string key)
+        {
+            if (PlayMode == PlayModeState.Stopped) { Logger.Warning($"[SceneManager] LoadSceneAdditive(\"{key}\"): no game is playing."); return; }
+            _addAsked.Add((key, true));
+        }
+
+        /// <summary>Asks for an added scene to be taken out at the end of the frame (a script's UnloadScene): every entity it brought that is still alive is destroyed.</summary>
+        public static void RequestUnloadScene(string key)
+        {
+            if (PlayMode == PlayModeState.Stopped) { Logger.Warning($"[SceneManager] UnloadScene(\"{key}\"): no game is playing."); return; }
+            _addAsked.Add((key, false));
+        }
+
+        /// <summary>The scene is in, added to the one that plays.</summary>
+        public static bool IsSceneLoaded(string key) => _added.ContainsKey(key);
+
+        /// <summary>The scenes added to the one that plays, in no order.</summary>
+        public static IReadOnlyCollection<string> AddedScenes => _added.Keys;
+
+        // The end of a frame: the scenes asked to be added and taken out, in the order asked.
+        private static void AddOrTakeOutIfAsked()
+        {
+            if (_addAsked.Count == 0) return;
+            var asked = _addAsked.ToArray();
+            _addAsked.Clear();
+            foreach (var (key, add) in asked)
+            {
+                if (!add)
+                {
+                    if (!_added.Remove(key, out var brought)) { Logger.Warning($"[SceneManager] UnloadScene: '{key}' is not in."); continue; }
+                    foreach (Entity e in brought) if (e.IsAlive) Destroy(e);
+                    FlushDestroyed();    // gone in the frame that asked, as a Destroy is
+                    Logger.Info($"[SceneManager] '{key}' taken out.");
+                    continue;
+                }
+                if (_added.ContainsKey(key) || _adding.Contains(key)) { Logger.Warning($"[SceneManager] LoadSceneAdditive: '{key}' is in already."); continue; }
+                if (key == CurrentSceneKey) { Logger.Warning($"[SceneManager] LoadSceneAdditive: '{key}' is the scene that plays."); continue; }
+                if (SceneReader != null || ConfigManager.HasProject)
+                {
+                    string? json = SceneReader != null ? SceneReader(key) : ReadProjectScene(key);
+                    if (json == null) { Logger.Error($"[SceneManager] LoadSceneAdditive: there is no scene '{key}' in the project's Assets."); continue; }
+                    TilemapLibrary.LoadNamedIn(new[] { json }, static _ => { }, again: false);
+                    AddScene(key, json);
+                    continue;
+                }
+                // A built game: the scene that plays goes on until the added one's files have arrived.
+                _adding.Add(key);
+                ReadSceneFromAssets(key, false,
+                    (json, loaded) =>
+                    {
+                        _adding.Remove(key);
+                        if (PlayMode == PlayModeState.Stopped) return;
+                        foreach (string prefab in loaded)
+                            if (PrefabLibrary.Get(prefab) is { } p) PreloadPrefabAssets(p);
+                        AddScene(key, json);
+                    },
+                    () =>
+                    {
+                        _adding.Remove(key);
+                        Logger.Error($"[SceneManager] LoadSceneAdditive: there is no scene '{key}' among the game's files.");
+                    });
+            }
+        }
+
+        private static void AddScene(string key, string json)
+        {
+            var created = SceneSerializer.AddScene(json, out string? error);
+            if (error != null) { Logger.Error($"[SceneManager] LoadSceneAdditive: '{key}' {error}"); return; }
+            _added[key] = created;
+            StartEntities(ECS.ECSWorld.Instance, created);
+            Logger.Info($"[SceneManager] '{key}' added: {created.Count} entities.");
+        }
+
+        // Entities that came into the running world (an instance of a prefab, an added scene): their assets asked for,
+        // and while the game plays their bodies, 2D bodies, sounds and scripts started.
+        private static void StartEntities(ECS.ECSWorld world, List<Entity> created)
+        {
+            foreach (Entity e in created) PreloadEntityAssets(world, e);
+            if (PlayMode == PlayModeState.Stopped) return;
+            if (_physics != null)
+            {
+                // In Play's order: every body before the constraints that join them.
+                foreach (Entity e in created) CreateBody(world, e);
+                foreach (Entity e in created) CreateConstraint(world, e);
+                foreach (Entity e in created) CreateCharacter(world, e);
+                foreach (Entity e in created) CreateVehicle(world, e);
+            }
+            foreach (Entity e in created) Physics2D.Physics2DWorld.AddEntity(world, e);
+            foreach (Entity e in created) Sound.Audio.AddEntity(world, e);
+            ScriptSystem.AddEntities(world, created);
+        }
+
         /// <summary>The end of a frame of play: the change of scene a script asked for. Called by the script system.</summary>
         internal static void ChangeSceneIfAsked()
         {
+            AddOrTakeOutIfAsked();
             if (_askedScene is not { } key || _readingScene || PlayMode == PlayModeState.Stopped) return;
             _askedScene = null;
 
@@ -285,6 +389,8 @@ namespace GameEditor.Framework.Scene
 
         private static void LeaveScene()
         {
+            _added.Clear();          // the scenes added to the one left go with it
+            _addAsked.Clear();
             Race.Reset();
             DriverSystem.Reset();
             ItemSystem.Reset();
@@ -430,6 +536,7 @@ namespace GameEditor.Framework.Scene
             _destroyQueue.Clear();   // the whole scene goes back to the snapshot
             Sound.Audio.StopAll();
             _askedScene = null;
+            _added.Clear(); _addAsked.Clear(); _adding.Clear();
             CurrentSceneKey = null;
             SaveData.Save();         // as when the app quits
 
@@ -490,22 +597,7 @@ namespace GameEditor.Framework.Scene
             tr.Parent = parent is { IsNull: false } p && p.IsAlive ? p : null;
             world.AddComponent(root, tr);
 
-            foreach (Entity e in created) PreloadEntityAssets(world, e);
-
-            if (PlayMode != PlayModeState.Stopped)
-            {
-                if (_physics != null)
-                {
-                    // In Play's order: every body before the constraints that join them.
-                    foreach (Entity e in created) CreateBody(world, e);
-                    foreach (Entity e in created) CreateConstraint(world, e);
-                    foreach (Entity e in created) CreateCharacter(world, e);
-                    foreach (Entity e in created) CreateVehicle(world, e);
-                }
-                foreach (Entity e in created) Physics2D.Physics2DWorld.AddEntity(world, e);
-                foreach (Entity e in created) Sound.Audio.AddEntity(world, e);
-                ScriptSystem.AddEntities(world, created);
-            }
+            StartEntities(world, created);
             return root;
         }
 

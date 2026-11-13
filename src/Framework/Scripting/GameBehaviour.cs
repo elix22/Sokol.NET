@@ -265,6 +265,19 @@ namespace GameEditor.Framework.Scripting
         /// </summary>
         protected static void LoadScene(string key) => Scene.SceneManager.RequestScene(key);
 
+        /// <summary>
+        /// Adds a scene to the one that plays, at the end of this frame: its entities come in with ids of their own and
+        /// start (OnStart before their first OnUpdate); the scene that plays keeps its settings. A HUD, a pause menu, a
+        /// part of a level. In a built game its files are read first: it is in when <see cref="IsSceneLoaded"/> says so.
+        /// </summary>
+        protected static void LoadSceneAdditive(string key) => Scene.SceneManager.RequestSceneAdditive(key);
+
+        /// <summary>Takes an added scene out at the end of this frame: every entity it brought that is still alive is destroyed (OnDestroy).</summary>
+        protected static void UnloadScene(string key) => Scene.SceneManager.RequestUnloadScene(key);
+
+        /// <summary>The scene has been added to the one that plays, and not taken out.</summary>
+        protected static bool IsSceneLoaded(string key) => Scene.SceneManager.IsSceneLoaded(key);
+
         /// <summary>Starts the scene the game is in again, from its file.</summary>
         protected static void ReloadScene()
         {
