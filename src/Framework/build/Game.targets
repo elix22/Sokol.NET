@@ -5,6 +5,13 @@
     that has none), so that engine parts added later reach it without its files being edited again.
   -->
 
+  <!-- A package of the project (Plugins/<id>/) may carry an extension of the editor in its Editor folder: sources the
+       editor builds and loads itself. They are no part of the game. A package's other sources (its Runtime folder)
+       are compiled with the project's own, on every target. -->
+  <ItemGroup>
+    <Compile Remove="Plugins/**/Editor/**" />
+  </ItemGroup>
+
   <!-- Web: the Framework is compiled into the game as source (see the project's Directory.Build.props), and the
        2D renderer's sources go with it. On the desktop and on phones they are inside GameEditor.Framework.dll. -->
   <ItemGroup Condition="'$(TargetOS)' == 'browser'">
