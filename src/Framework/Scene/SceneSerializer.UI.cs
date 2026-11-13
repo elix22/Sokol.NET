@@ -17,6 +17,7 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("UIButton", WriteUIButton, ReadUIButton, static (w, e) => w.RemoveComponent<UIButton>(e));
             RegisterComponentExtension("UIMiniMap", WriteUIMiniMap, ReadUIMiniMap, static (w, e) => w.RemoveComponent<UIMiniMap>(e));
             RegisterComponentExtension("UIPanel", WriteUIPanel, ReadUIPanel, static (w, e) => w.RemoveComponent<UIPanel>(e));
+            RegisterComponentExtension("UIStick", WriteUIStick, ReadUIStick, static (w, e) => w.RemoveComponent<UIStick>(e));
             RegisterComponentExtension("UILayout", WriteUILayout, ReadUILayout, static (w, e) => w.RemoveComponent<UILayout>(e));
         }
 
@@ -79,6 +80,20 @@ namespace GameEditor.Framework.Scene
             t.Wrap = el.TryGetProperty("Wrap", out var wrap) && wrap.ValueKind == JsonValueKind.True;
             t.Key = Text(el, "Key", "");
             world.AddComponent(e, t);
+        }
+
+        private static string? WriteUIStick(ECSWorld world, Frent.Entity e)
+            => world.TryGetComponent<UIStick>(e, out var s)
+                ? "{\"X\":\"" + Esc(s.X ?? "") + "\",\"Y\":\"" + Esc(s.Y ?? "") + "\",\"Dead\":" + F(s.DeadZone) + ",\"Color\":" + Four(s.Color) + "}" : null;
+
+        private static void ReadUIStick(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var s = UIStick.Default;
+            s.X = Text(el, "X", s.X);
+            s.Y = Text(el, "Y", s.Y);
+            s.DeadZone = Math.Clamp(Number(el, "Dead", s.DeadZone), 0f, 0.9f);
+            Four(el, "Color", ref s.Color);
+            world.AddComponent(e, s);
         }
 
         // A text table's key, written only when there is one (scenes made before keys stay as they were).

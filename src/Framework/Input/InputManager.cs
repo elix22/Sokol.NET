@@ -382,6 +382,14 @@ namespace GameEditor.Framework.Input
 
                 int slot = FindTouchSlot(id);
 
+                // An event lists every finger on the screen; only those marked changed began, moved or ended. The others
+                // keep their phase (a second finger lifted does not end the first).
+                if (!tp.changed)
+                {
+                    if (slot >= 0) _touches[slot] = _touches[slot] with { Position = pos };
+                    continue;
+                }
+
                 if (slot < 0)
                 {
                     // Only allocate a new slot for BEGAN

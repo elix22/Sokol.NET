@@ -3,6 +3,7 @@ using System.Numerics;
 using Frent;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
+using GameEditor.Framework.Input;
 using GameEditor.Framework.Scene;
 using GameEditor.Framework.Scripting;
 using GameEditor.Framework.UI;
@@ -625,6 +626,104 @@ namespace Scene.Tests
             Entity plain = Element("Plain", At(UIAnchor.Top, 0, 90, 400, 60));
             World.AddComponent(plain, UIText.Default);
             Assert.DoesNotContain("\"Key\"", SceneSerializer.SerializeEntity(plain));   // no key: the block as it was
+        }
+        // ── G7.2: an on-screen stick ───────────────────────────────────────────────────
+
+        [Fact]
+        public void A_stick_gives_nothing_in_its_dead_zone_and_one_at_its_ring()
+        {
+            Assert.Equal((0f, 0f, 5f, 0f), GameUI.StickAxes(5, 0, 100, 0.15f));                   // inside the dead zone: 0, the knob where the finger is
+            var (x, y, kx, ky) = GameUI.StickAxes(100, 0, 100, 0.15f);
+            Assert.Equal((1f, 0f), (x, y));
+            (x, y, kx, ky) = GameUI.StickAxes(0, -300, 100, 0.15f);                                // far above: clamped to the ring, up is +1
+            Assert.Equal((0f, 1f, 0f, -100f), (x, y, kx, ky));
+            (x, _, _, _) = GameUI.StickAxes(-57.5f, 0, 100, 0.15f);                                // halfway between the dead zone and the edge
+            Assert.Equal(-0.5f, x, 3);
+            Assert.Equal((0f, 0f, 0f, 0f), GameUI.StickAxes(10, 10, 0, 0.15f));                    // no ring: nothing
+        }
+
+        static unsafe void Mouse(Sokol.SApp.sapp_event_type type, float x, float y)
+        {
+            var e = new Sokol.SApp.sapp_event { type = type, mouse_button = Sokol.SApp.sapp_mousebutton.SAPP_MOUSEBUTTON_LEFT, mouse_x = x, mouse_y = y };
+            InputManager.ProcessEvent(&e);
+        }
+
+        static unsafe void Finger(Sokol.SApp.sapp_event_type type, int id, float x, float y)
+        {
+            var e = new Sokol.SApp.sapp_event { type = type, num_touches = 1 };
+            e.touches[0].identifier = (nuint)id;
+            e.touches[0].pos_x = x;
+            e.touches[0].pos_y = y;
+            e.touches[0].changed = true;
+            InputManager.ProcessEvent(&e);
+        }
+
+        static void Frame()
+        {
+            InputManager.BeginFrame();
+            GameUI.Sync(World, 1280, 720, Thickness.Zero);   // a built game's frame: the sticks moved at its end
+        }
+
+        [Fact]
+        public void A_stick_is_taken_by_the_finger_pressed_on_it_and_gives_its_axes_until_it_is_lifted()
+        {
+            InputManager.SetScreenSize(1280, 720);
+            try
+            {
+                // A stick 200 units across at the bottom left: its middle at (116, 604).
+                Entity stick = Element("Stick", At(UIAnchor.BottomLeft, 16, 16, 200, 200));
+                World.AddComponent(stick, UIStick.Default);
+                Entity other = Element("Look", At(UIAnchor.BottomRight, 16, 16, 200, 200));
+                World.AddComponent(other, new UIStick { X = "Look X", Y = "", DeadZone = 0f, Color = Vector4.One });
+                Frame();
+                Assert.Equal("UIStick", Kinds()["Stick"]);
+
+                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, 116, 604);              // the pointer comes to its middle (a press takes the last move's place)
+                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_DOWN, 116, 604);              // and is pressed there
+                Frame();
+                Assert.True(GameUI.TryGetStick(stick, out float x, out float y));
+                Assert.Equal((0f, 0f), (x, y));
+                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_MOVE, 116 + 300, 604);       // dragged far to the right, off the stick
+                Frame();
+                GameUI.TryGetStick(stick, out x, out y);
+                Assert.Equal((1f, 0f), (x, y));
+                Assert.Equal(1f, InputManager.GetAxis("Horizontal"));
+                Assert.Equal(0f, InputManager.GetAxis("Look X"));                                  // the other stick is not taken by it
+                Mouse(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_MOUSE_UP, 116 + 300, 604);
+                Frame();
+                GameUI.TryGetStick(stick, out x, out y);
+                Assert.Equal((0f, 0f), (x, y));                                                     // let go: back in the middle
+                Assert.Equal(0f, InputManager.GetAxis("Horizontal"));
+
+                // Two fingers, a stick each: a finger that lands outside a stick takes none.
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN, 7, 116, 604 - 100);  // the left stick's top edge
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN, 8, 1280 - 116 - 100, 604);   // the right stick's left edge
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN, 9, 640, 300);        // nothing there
+                Frame();
+                Assert.Equal(1f, InputManager.GetAxis("Vertical"), 3);
+                Assert.Equal(-1f, InputManager.GetAxis("Look X"), 3);
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED, 7, 116, 504);
+                Frame();
+                Assert.Equal(0f, InputManager.GetAxis("Vertical"));
+                Assert.Equal(-1f, InputManager.GetAxis("Look X"), 3);                               // the other finger still holds its own
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED, 8, 1064, 604);
+                Finger(Sokol.SApp.sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED, 9, 640, 300);
+                Frame();
+
+                string json = SceneSerializer.SerializeEntity(other);
+                Assert.Contains("\"UIStick\":{\"X\":\"Look X\",\"Y\":\"\",\"Dead\":0,", json);
+                World.RemoveComponent<UIStick>(other);
+                SceneSerializer.ReadComponents(other, System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("c"));
+                Assert.Equal(("Look X", "", 0f), (World.GetComponent<UIStick>(other).X, World.GetComponent<UIStick>(other).Y, World.GetComponent<UIStick>(other).DeadZone));
+            }
+            finally { InputManager.SetScreenSize(0, 0); }
+        }
+
+        static System.Collections.Generic.Dictionary<string, string> Kinds()
+        {
+            var kinds = new System.Collections.Generic.Dictionary<string, string>();
+            GameUI.Describe((e, kind, text, x, y, w, h, seen) => kinds[World.GetComponent<NameTag>(e).Name] = kind);
+            return kinds;
         }
     }
 }

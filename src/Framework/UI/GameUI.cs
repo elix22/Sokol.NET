@@ -254,7 +254,7 @@ namespace GameEditor.Framework.UI
                 foreach (var pair in _items)
                 {
                     if (!ReferenceEquals(pair.Value.Widget, w)) continue;
-                    string kind = pair.Value.Kind switch { 1 => "UIText", 2 => "UIImage", 3 => "UIButton", 4 => "UIPanel", _ => "UI" };
+                    string kind = pair.Value.Kind switch { 1 => "UIText", 2 => "UIImage", 3 => "UIButton", 4 => "UIPanel", 6 => "UIStick", _ => "UI" };
                     string text = w is Label label ? label.Text : "";
                     each(pair.Key, kind, text, w.Bounds.X, w.Bounds.Y, w.Bounds.Width, w.Bounds.Height, w.Visible);
                     break;
@@ -312,6 +312,7 @@ namespace GameEditor.Framework.UI
             _above.Clear();
             _parents.Clear();
             _holders.Clear();
+            _sticks.Clear();
             _holdWidth = width;
             bool order = false;
 
@@ -319,7 +320,7 @@ namespace GameEditor.Framework.UI
             {
                 if (!world.TryGetComponent<UIElement>(e, out var element)) continue;
                 int kind = world.HasComponent<UIText>(e) ? 1 : world.HasComponent<UIPicture>(e) ? 2 : world.HasComponent<UIButton>(e) ? 3
-                         : world.HasComponent<UIPanel>(e) ? 4 : world.HasComponent<UIMiniMap>(e) ? 5 : 0;
+                         : world.HasComponent<UIPanel>(e) ? 4 : world.HasComponent<UIMiniMap>(e) ? 5 : world.HasComponent<UIStick>(e) ? 6 : 0;
                 if (!_items.TryGetValue(e, out Item? item) || item.Kind != kind)
                 {
                     if (item != null) item.Widget.RemoveFromParent();
@@ -344,6 +345,8 @@ namespace GameEditor.Framework.UI
                 Apply(world, e, item);
                 if (kind == 3 && w.Visible && world.TryGetComponent<UIButton>(e, out var held) && !string.IsNullOrEmpty(held.Holds))
                     _holders.Add((rect, held.Holds));
+                if (kind == 6 && w.Visible && world.TryGetComponent<UIStick>(e, out var stick))
+                    _sticks.Add((e, rect, stick));
             }
             if (holds) ApplyHolds();
 
@@ -495,6 +498,93 @@ namespace GameEditor.Framework.UI
         private static readonly Dictionary<string, float> _holdAxes = new(StringComparer.Ordinal);
         private static readonly HashSet<string> _holdButtons = new(StringComparer.Ordinal);
         private static readonly List<(Rect Rect, string Holds)> _holders = new();   // the buttons that hold, where the last Sync placed them
+
+        // ── On-screen sticks (G7.2) ─────────────────────────────────────────────────────
+
+        private const int NoFinger = -1, MouseFinger = -2;
+
+        private sealed class StickState
+        {
+            public int Finger = NoFinger;      // the touch's finger that holds it, the mouse, or none
+            public GVec2 Knob;                 // the knob's offset from the ring's middle, in the root's units
+            public float X, Y;                 // the axes it gives now
+        }
+
+        private static readonly List<(Entity Entity, Rect Rect, UIStick Stick)> _sticks = new();   // where the last Sync placed them
+        private static readonly Dictionary<Entity, StickState> _stickState = new();
+
+        /// <summary>The axes an on-screen stick gives now (x right, y up, each −1 … 1). False for an entity that is no stick.</summary>
+        public static bool TryGetStick(Entity entity, out float x, out float y)
+        {
+            bool found = _stickState.TryGetValue(entity, out var st);
+            (x, y) = found ? (st!.X, st.Y) : (0f, 0f);
+            return found;
+        }
+
+        /// <summary>
+        /// What a stick gives for a knob <paramref name="dx"/>, <paramref name="dy"/> from the ring's middle (screen units,
+        /// y down) on a ring of <paramref name="radius"/>: the knob clamped to the ring, each axis 0 inside the dead zone and
+        /// 1 at the ring's edge, y up.
+        /// </summary>
+        public static (float X, float Y, float KnobX, float KnobY) StickAxes(float dx, float dy, float radius, float deadZone)
+        {
+            if (radius <= 0f) return (0f, 0f, 0f, 0f);
+            float len = MathF.Sqrt(dx * dx + dy * dy);
+            if (len > radius) { dx *= radius / len; dy *= radius / len; len = radius; }
+            float m = len / radius, dz = Math.Clamp(deadZone, 0f, 0.9f);
+            if (m <= dz) return (0f, 0f, dx, dy);
+            float k = (m - dz) / (1f - dz) / m;
+            return (Math.Clamp(dx / radius * k, -1f, 1f), Math.Clamp(-dy / radius * k, -1f, 1f), dx, dy);
+        }
+
+        // Each frame: a finger pressed on a stick takes it until it is lifted (the mouse's left button is a finger); the
+        // knob follows it, and the stick's axes are held as a button's Holds are.
+        private static void MoveSticks()
+        {
+            if (_sticks.Count == 0 && _stickState.Count == 0) return;
+            var size = Input.InputManager.ScreenSize;
+            float k = size.X > 0f ? _holdWidth / size.X : 1f;
+            foreach (var (e, rect, stick) in _sticks)
+            {
+                if (!_stickState.TryGetValue(e, out var st)) _stickState[e] = st = new StickState();
+                if (st.Finger == NoFinger)
+                {
+                    for (int i = 0; i < Input.InputManager.TouchCount && st.Finger == NoFinger; i++)
+                    {
+                        var t = Input.InputManager.GetTouch(i);
+                        if (t.Phase == Input.TouchPhase.Began && Inside(rect, t.Position.X * k, t.Position.Y * k) && !Taken(t.FingerId)) st.Finger = t.FingerId;
+                    }
+                    var m = Input.InputManager.MousePosition;
+                    if (st.Finger == NoFinger && Input.InputManager.GetMouseButtonDown(0) && Inside(rect, m.X * k, m.Y * k) && !Taken(MouseFinger)) st.Finger = MouseFinger;
+                }
+                GVec2? at = null;
+                if (st.Finger == MouseFinger)
+                {
+                    if (Input.InputManager.GetMouseButton(0)) at = new GVec2(Input.InputManager.MousePosition.X * k, Input.InputManager.MousePosition.Y * k);
+                }
+                else if (st.Finger != NoFinger)
+                    for (int i = 0; i < Input.InputManager.TouchCount; i++)
+                    {
+                        var t = Input.InputManager.GetTouch(i);
+                        if (t.FingerId == st.Finger && t.Phase != Input.TouchPhase.Ended && t.Phase != Input.TouchPhase.Cancelled) at = new GVec2(t.Position.X * k, t.Position.Y * k);
+                    }
+                if (at is not { } p) { st.Finger = NoFinger; st.Knob = default; st.X = st.Y = 0f; continue; }
+                float cx = rect.X + rect.Width * 0.5f, cy = rect.Y + rect.Height * 0.5f;
+                var (x, y, kx, ky) = StickAxes(p.X - cx, p.Y - cy, MathF.Min(rect.Width, rect.Height) * 0.5f, stick.DeadZone);
+                st.Knob = new GVec2(kx, ky);
+                st.X = x; st.Y = y;
+                if (!string.IsNullOrEmpty(stick.X)) Input.InputManager.SetVirtualAxis(stick.X, x);
+                if (!string.IsNullOrEmpty(stick.Y)) Input.InputManager.SetVirtualAxis(stick.Y, y);
+            }
+
+            static bool Inside(Rect r, float x, float y) => x >= r.X && y >= r.Y && x <= r.X + r.Width && y <= r.Y + r.Height;
+        }
+
+        private static bool Taken(int finger)
+        {
+            foreach (var st in _stickState.Values) if (st.Finger == finger) return true;
+            return false;
+        }
         private static float _holdWidth;
 
         /// <summary>
@@ -505,6 +595,7 @@ namespace GameEditor.Framework.UI
         /// </summary>
         public static void ApplyHolds()
         {
+            MoveSticks();
             if (_holders.Count == 0) return;
             _holdAxes.Clear();
             _holdButtons.Clear();
@@ -555,6 +646,7 @@ namespace GameEditor.Framework.UI
                     return button;
                 case 4: return new PanelWidget();
                 case 5: return new MiniMapWidget();
+                case 6: return new StickWidget();
                 default: return new PlaceWidget();
             }
         }
@@ -588,6 +680,10 @@ namespace GameEditor.Framework.UI
                 case 4 when item.Widget is PanelWidget panel && world.TryGetComponent<UIPanel>(e, out var p):
                     panel.Face = Colour(p.Color);
                     panel.Radius = p.Radius * Scale;
+                    break;
+                case 6 when item.Widget is StickWidget stickWidget && world.TryGetComponent<UIStick>(e, out var st):
+                    stickWidget.Ring = Colour(st.Color);
+                    stickWidget.Knob = _stickState.TryGetValue(e, out var held) ? held.Knob : default;
                     break;
                 case 5 when item.Widget is MiniMapWidget map && world.TryGetComponent<UIMiniMap>(e, out var mm):
                     map.Road = Colour(mm.Road); map.Kart = Colour(mm.Kart); map.Player = Colour(mm.Player);
@@ -712,6 +808,8 @@ namespace GameEditor.Framework.UI
             _rects.Clear();
             _clicked.Clear();
             _clickedNow.Clear();
+            _sticks.Clear();
+            _stickState.Clear();
             _holders.Clear();
         }
 
@@ -850,6 +948,28 @@ namespace GameEditor.Framework.UI
                     renderer.SetFillColor(Player);
                     renderer.FillCircle(Map(at), dot * 1.3f);
                 }
+                base.Draw(renderer);
+            }
+        }
+
+        // A ring filling the element and a knob where the finger holds it (in the middle when none does).
+        private sealed class StickWidget : Widget
+        {
+            public UIColor Ring;
+            public GVec2 Knob;
+
+            public override void Draw(Sokol.GUI.Renderer renderer)
+            {
+                if (!Visible) return;
+                float r = MathF.Min(Bounds.Width, Bounds.Height) * 0.5f;
+                var c = new GVec2(Bounds.Width * 0.5f, Bounds.Height * 0.5f);
+                renderer.SetFillColor(new UIColor(Ring.R, Ring.G, Ring.B, Ring.A * 0.5f));
+                renderer.FillCircle(c, r);
+                renderer.SetStrokeColor(Ring);
+                renderer.SetStrokeWidth(MathF.Max(1.5f, r * 0.04f));
+                renderer.StrokeCircle(c, r - 1f);
+                renderer.SetFillColor(new UIColor(Ring.R, Ring.G, Ring.B, MathF.Min(1f, Ring.A * 2.2f)));
+                renderer.FillCircle(new GVec2(c.X + Knob.X, c.Y + Knob.Y), r * 0.42f);
                 base.Draw(renderer);
             }
         }

@@ -31,7 +31,35 @@ namespace Scene.Tests
             e.touches[0].identifier = (nuint)id;
             e.touches[0].pos_x = x;
             e.touches[0].pos_y = y;
+            e.touches[0].changed = true;
             InputManager.ProcessEvent(&e);
+        }
+
+        [Fact]
+        public void A_finger_lifted_ends_only_itself_though_the_event_lists_every_finger()
+        {
+            InputManager.BeginFrame();
+            Touch(sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN, 1, 10, 10);
+            InputManager.BeginFrame();
+            // The second finger lands: sokol's event has both, the first not changed.
+            var e = new sapp_event { type = sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN, num_touches = 2 };
+            e.touches[0].identifier = 1; e.touches[0].pos_x = 10; e.touches[0].pos_y = 10;
+            e.touches[1].identifier = 2; e.touches[1].pos_x = 50; e.touches[1].pos_y = 50; e.touches[1].changed = true;
+            InputManager.ProcessEvent(&e);
+            InputManager.BeginFrame();
+            Assert.Equal(2, InputManager.TouchCount);
+            Assert.Equal(TouchPhase.Stationary, InputManager.GetTouch(0).Phase);   // the first did not begin again
+            Assert.Equal(TouchPhase.Began, InputManager.GetTouch(1).Phase);
+            // The second is lifted: the event lists both again.
+            e.type = sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED;
+            InputManager.ProcessEvent(&e);
+            InputManager.BeginFrame();
+            Assert.Equal(1, InputManager.TouchCount);
+            Assert.Equal(1, InputManager.GetTouch(0).FingerId);                  // the first is still down
+            Touch(sapp_event_type.SAPP_EVENTTYPE_TOUCHES_ENDED, 1, 10, 10);
+            InputManager.BeginFrame();
+            InputManager.BeginFrame();
+            Assert.Equal(0, InputManager.TouchCount);
         }
 
         [Fact]

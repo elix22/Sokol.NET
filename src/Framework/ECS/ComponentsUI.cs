@@ -117,6 +117,24 @@ namespace GameEditor.Framework.ECS.Components
     }
 
     /// <summary>Which way a layout puts its elements.</summary>
+    /// <summary>
+    /// An on-screen stick (scene block "UIStick"): a ring filling its element and a knob a finger drags, giving two axes
+    /// (UI.GameUI holds them each frame, as a button's Holds, so GetAxis reads them).
+    /// </summary>
+    public struct UIStick
+    {
+        /// <summary>The axis the knob's left and right give (-1 … 1); empty: none.</summary>
+        public string X;
+        /// <summary>The axis the knob's down and up give (-1 … 1, up positive); empty: none.</summary>
+        public string Y;
+        /// <summary>The part of the ring's radius (0 … 0.9) that gives 0; beyond it the axes grow to 1 at the ring's edge.</summary>
+        public float DeadZone;
+        /// <summary>The ring's colour; the knob is drawn lighter.</summary>
+        public Vector4 Color;
+
+        public static UIStick Default => new() { X = "Horizontal", Y = "Vertical", DeadZone = 0.15f, Color = new Vector4(1f, 1f, 1f, 0.35f) };
+    }
+
     public enum UILayoutDir { Column, Row }
 
     /// <summary>Where a layout's elements lie across its direction.</summary>
