@@ -99,14 +99,21 @@ namespace GameEditor.Framework.UI
         /// the host's own units; <paramref name="dpi"/>: pixels to one of them). <paramref name="playing"/>
         /// false: a button pressed now tells no script later.
         /// </summary>
-        public static void HostFrame(float width, float height, float dpi, bool playing)
+        public static void HostFrame(float width, float height, float dpi, bool playing,
+                                     float safeLeft = 0f, float safeTop = 0f, float safeRight = 0f, float safeBottom = 0f)
         {
             if (_hostScreen == null) return;
             if (!playing) _clicked.Clear();
+            // The safe area a phone would have (an editor's preview of one): kept out of, and shown as a faint band.
+            _hostSafe = new Thickness(safeLeft, safeTop, safeRight, safeBottom);
+            _hostWidth = width; _hostHeight = height;
             // The buttons that hold are held at the start of each game frame (ApplyHolds), not here at the end of the editor's.
-            Sync(ECSWorld.Instance, width, height, Thickness.Zero, holds: false);
+            Sync(ECSWorld.Instance, width, height, _hostSafe, holds: false);
             _hostScreen.Update(width, height, dpi);
         }
+
+        private static Thickness _hostSafe = Thickness.Zero;
+        private static float _hostWidth, _hostHeight;
 
         /// <summary>Draws the game's UI. Inside a pass, with the viewport on the game's picture.</summary>
         public static void HostDraw(float width, float height, float dpi) => _hostScreen?.Draw(width, height, dpi);
@@ -350,7 +357,7 @@ namespace GameEditor.Framework.UI
             }
 
             // On the screen while there is something to show (see ShowOn).
-            bool wanted = _items.Count > 0 || _outlined.Count > 0 || !_canvas.IsNull;
+            bool wanted = _items.Count > 0 || _outlined.Count > 0 || !_canvas.IsNull || _hostSafe.Horizontal + _hostSafe.Vertical > 0f;
             if (_host != null && wanted != (Root.Parent == _host))
             {
                 if (wanted) _host.AddChild(Root);
@@ -626,8 +633,16 @@ namespace GameEditor.Framework.UI
             // allocated in every frame).
             public override void PerformLayout(Sokol.GUI.Renderer renderer, bool force = false) { }
 
+            private static readonly UIColor Unsafe = new(1f, 1f, 1f, 0.08f);
+
             public override void Draw(Sokol.GUI.Renderer renderer)
             {
+                // A host's preview of a phone: its notch and home bar as faint bands, under the UI.
+                var safe = _hostSafe;
+                if (safe.Left > 0f) renderer.FillRect(new Rect(0f, 0f, safe.Left, _hostHeight), Unsafe);
+                if (safe.Right > 0f) renderer.FillRect(new Rect(_hostWidth - safe.Right, 0f, safe.Right, _hostHeight), Unsafe);
+                if (safe.Top > 0f) renderer.FillRect(new Rect(0f, 0f, _hostWidth, safe.Top), Unsafe);
+                if (safe.Bottom > 0f) renderer.FillRect(new Rect(0f, _hostHeight - safe.Bottom, _hostWidth, safe.Bottom), Unsafe);
                 base.Draw(renderer);
                 foreach (Entity e in _outlined)
                 {
