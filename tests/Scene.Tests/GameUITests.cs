@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using Frent;
 using GameEditor.Framework.ECS;
@@ -177,6 +178,88 @@ namespace Scene.Tests
             Same(new Rect(100, 100, 400, 300), inside);              // a child is placed in its parent's rectangle
             Assert.True(GameUI.TryGetParentRect(panel, out var screen));
             Same(new Rect(0, 0, 1280, 720), screen);
+        }
+
+        // ── Layouts (Phase G2.3) ────────────────────────────────────────────────────────────────────────────────
+
+        static List<(Vector2, bool)> Sizes(params (float w, float h, bool seen)[] items) => items.Select(i => (new Vector2(i.w, i.h), i.seen)).ToList();
+
+        [Fact]
+        public void A_column_puts_its_elements_one_under_another_with_spacing_and_padding()
+        {
+            var layout = new UILayout { Dir = UILayoutDir.Column, Spacing = 10, Padding = new Vector4(20, 30, 20, 30), Align = UILayoutAlign.Start };
+            var r = GameUI.Arrange(layout, new Rect(100, 50, 300, 400), 1f, Sizes((200, 60, true), (150, 40, true), (100, 50, true)));
+            Same(new Rect(120, 80, 200, 60), r[0]);
+            Same(new Rect(120, 150, 150, 40), r[1]);
+            Same(new Rect(120, 200, 100, 50), r[2]);
+        }
+
+        [Theory]
+        [InlineData(UILayoutAlign.Start, 120, 200)]
+        [InlineData(UILayoutAlign.Center, 150, 200)]     // across 260 from x 120: (260 - 200) / 2 in from the padding
+        [InlineData(UILayoutAlign.End, 180, 200)]
+        [InlineData(UILayoutAlign.Stretch, 120, 260)]
+        public void Across_its_direction_an_element_lies_as_the_alignment_says(UILayoutAlign align, float x, float width)
+        {
+            var layout = new UILayout { Dir = UILayoutDir.Column, Spacing = 0, Padding = new Vector4(20, 0, 20, 0), Align = align };
+            var r = GameUI.Arrange(layout, new Rect(100, 50, 300, 400), 1f, Sizes((200, 60, true)));
+            Same(new Rect(x, 50, width, 60), r[0]);
+        }
+
+        [Fact]
+        public void A_row_goes_left_to_right_a_hidden_element_takes_no_place_and_Fit_shares_the_length()
+        {
+            var row = new UILayout { Dir = UILayoutDir.Row, Spacing = 8, Align = UILayoutAlign.Center };
+            var r = GameUI.Arrange(row, new Rect(0, 0, 300, 60), 1f, Sizes((40, 40, true), (40, 40, false), (40, 40, true)));
+            Same(new Rect(0, 10, 40, 40), r[0]);
+            Assert.Equal(0f, r[1].Width);
+            Same(new Rect(48, 10, 40, 40), r[2]);                  // after the first, as if the hidden one were not there
+
+            var fit = new UILayout { Dir = UILayoutDir.Row, Spacing = 10, Align = UILayoutAlign.Stretch, Fit = true };
+            var f = GameUI.Arrange(fit, new Rect(0, 0, 320, 60), 1f, Sizes((40, 40, true), (999, 40, true), (1, 40, true)));
+            Same(new Rect(0, 0, 100, 60), f[0]);                    // (320 - 2 x 10) / 3 each, whatever their own widths
+            Same(new Rect(110, 0, 100, 60), f[1]);
+            Same(new Rect(220, 0, 100, 60), f[2]);
+
+            var half = GameUI.Arrange(new UILayout { Dir = UILayoutDir.Column, Spacing = 10 }, new Rect(0, 0, 300, 400), 0.5f, Sizes((200, 60, true), (200, 60, true)));
+            Same(new Rect(0, 35, 100, 30), half[1]);               // half the scale: everything halved, the spacing too
+        }
+
+        [Fact]
+        public void A_layout_places_the_elements_under_it_in_order_whatever_their_own_anchor()
+        {
+            Entity menu = Element("Menu", At(UIAnchor.Center, 0, 0, 300, 400));
+            World.AddComponent(menu, new UILayout { Dir = UILayoutDir.Column, Spacing = 10, Padding = new Vector4(20, 20, 20, 20), Align = UILayoutAlign.Center });
+            Entity third = Element("Third", At(UIAnchor.BottomRight, 99, 99, 200, 60, order: 2), menu);
+            Entity first = Element("First", At(UIAnchor.TopLeft, 5, 5, 200, 60, order: 0), menu);
+            Entity second = Element("Second", At(UIAnchor.Center, 0, 0, 200, 60, order: 1), menu);
+            GameUI.Sync(World, 1280, 720, Thickness.Zero);
+
+            Assert.True(GameUI.TryGetRect(menu, out Rect box));
+            Assert.True(GameUI.TryGetRect(first, out Rect a));
+            Assert.True(GameUI.TryGetRect(second, out Rect b));
+            Assert.True(GameUI.TryGetRect(third, out Rect c));
+            Same(new Rect(box.X + 50, box.Y + 20, 200, 60), a);
+            Same(new Rect(box.X + 50, box.Y + 90, 200, 60), b);
+            Same(new Rect(box.X + 50, box.Y + 160, 200, 60), c);
+            Assert.True(GameUI.IsLaidOut(World, first));
+            Assert.False(GameUI.IsLaidOut(World, menu));
+            Assert.True(GameUI.TryGetParentRect(first, out Rect inside));
+            Same(box, inside);
+        }
+
+        [Fact]
+        public void A_layout_is_written_and_read_back()
+        {
+            Entity menu = Element("Menu", At(UIAnchor.Center, 0, 0, 300, 400));
+            World.AddComponent(menu, new UILayout { Dir = UILayoutDir.Row, Spacing = 12.5f, Padding = new Vector4(1, 2, 3, 4), Align = UILayoutAlign.End, Fit = true });
+            string json = SceneSerializer.SerializeEntity(menu);
+            Assert.Contains("\"UILayout\":{\"Dir\":\"Row\",\"Spacing\":12.5,\"Pad\":[1,2,3,4],\"Align\":\"End\",\"Fit\":true}", json);
+            World.RemoveComponent<UILayout>(menu);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            SceneSerializer.ReadComponents(menu, doc.RootElement.GetProperty("c"));
+            var l = World.GetComponent<UILayout>(menu);
+            Assert.Equal((UILayoutDir.Row, 12.5f, new Vector4(1, 2, 3, 4), UILayoutAlign.End, true), (l.Dir, l.Spacing, l.Padding, l.Align, l.Fit));
         }
 
         [Fact]

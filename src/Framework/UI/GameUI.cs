@@ -404,12 +404,78 @@ namespace GameEditor.Framework.UI
             {
                 parent = RectOf(world, p, in parentElement, screen, guard + 1);
                 _above[e] = p;
+                // Under a layout: placed with its brothers, one after another (Phase G2.3).
+                if (world.TryGetComponent<UILayout>(p, out var layout))
+                {
+                    LayOut(world, p, in layout, parent);
+                    if (_rects.TryGetValue(e, out Rect laid)) return laid;
+                }
             }
             Rect rect = Place(in element, parent, Scale);
             _rects[e] = rect;
             _parents[e] = parent;
             return rect;
         }
+
+        private static readonly List<(Entity E, int Order, int Index, UIElement Element)> _laying = new();
+
+        // The elements under a layout, placed one after another inside it; each also given its parent's rectangle.
+        private static void LayOut(ECSWorld world, Entity parent, in UILayout layout, Rect box)
+        {
+            _laying.Clear();
+            int index = 0;
+            foreach (Entity child in world.GetChildren(parent))
+            {
+                index++;
+                if (world.TryGetComponent<UIElement>(child, out var el)) _laying.Add((child, el.Order, index, el));
+            }
+            _laying.Sort(static (a, b) => a.Order != b.Order ? a.Order.CompareTo(b.Order) : a.Index.CompareTo(b.Index));
+            var placed = Arrange(in layout, box, Scale, _laying.ConvertAll(x => (x.Element.Size, x.Element.Visible)));
+            for (int i = 0; i < _laying.Count; i++)
+            {
+                _rects[_laying[i].E] = placed[i];
+                _parents[_laying[i].E] = box;
+            }
+        }
+
+        /// <summary>
+        /// Where a layout puts its elements, in order: their sizes (design units) and whether each is seen, inside
+        /// <paramref name="box"/> (the root's units), <paramref name="scale"/> root units to a design unit. A hidden one
+        /// takes no place (it is given an empty rectangle where it would begin).
+        /// </summary>
+        public static List<Rect> Arrange(in UILayout layout, Rect box, float scale, List<(System.Numerics.Vector2 Size, bool Visible)> elements)
+        {
+            bool row = layout.Dir == UILayoutDir.Row;
+            float padL = layout.Padding.X * scale, padT = layout.Padding.Y * scale, padR = layout.Padding.Z * scale, padB = layout.Padding.W * scale;
+            float x0 = box.X + padL, y0 = box.Y + padT;
+            float along = row ? box.Width - padL - padR : box.Height - padT - padB;     // the length the elements go along
+            float across = row ? box.Height - padT - padB : box.Width - padL - padR;
+            float spacing = layout.Spacing * scale;
+            int seen = 0;
+            foreach (var el in elements) if (el.Visible) seen++;
+            float share = seen > 0 ? (along - spacing * (seen - 1)) / seen : 0f;
+            var result = new List<Rect>(elements.Count);
+            float at = 0f;
+            foreach (var el in elements)
+            {
+                if (!el.Visible) { result.Add(row ? new Rect(x0 + at, y0, 0f, 0f) : new Rect(x0, y0 + at, 0f, 0f)); continue; }
+                float length = layout.Fit ? MathF.Max(0f, share) : (row ? el.Size.X : el.Size.Y) * scale;
+                float thick = layout.Align == UILayoutAlign.Stretch ? across : (row ? el.Size.Y : el.Size.X) * scale;
+                float offset = layout.Align switch
+                {
+                    UILayoutAlign.Center => (across - thick) * 0.5f,
+                    UILayoutAlign.End => across - thick,
+                    _ => 0f,
+                };
+                result.Add(row ? new Rect(x0 + at, y0 + offset, length, thick) : new Rect(x0 + offset, y0 + at, thick, length));
+                at += length + spacing;
+            }
+            return result;
+        }
+
+        /// <summary>The element lies under a layout (its own anchor and offset are not used).</summary>
+        public static bool IsLaidOut(ECSWorld world, Entity e) =>
+            world.TryGetComponent<Transform>(e, out var tr) && tr.Parent is { } p && world.HasComponent<UILayout>(p) && world.HasComponent<UIElement>(p);
 
         // An element is seen when every element above it is.
         private static bool Shown(ECSWorld world, Entity e)

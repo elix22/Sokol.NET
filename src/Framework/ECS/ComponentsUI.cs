@@ -111,4 +111,29 @@ namespace GameEditor.Framework.ECS.Components
 
         public static UIPanel Default => new() { Color = new Vector4(0f, 0f, 0f, 0.6f), Radius = 12f };
     }
+
+    /// <summary>Which way a layout puts its elements.</summary>
+    public enum UILayoutDir { Column, Row }
+
+    /// <summary>Where a layout's elements lie across its direction.</summary>
+    public enum UILayoutAlign { Start, Center, End, Stretch }
+
+    /// <summary>
+    /// A layout (scene block "UILayout"), on an element: the elements under it are placed one after another inside
+    /// it — in a column or a row, by <see cref="UIElement.Order"/> and then as they were made — and their own anchor
+    /// and offset are not used. A hidden one takes no place. Lengths are in design units.
+    /// </summary>
+    public struct UILayout
+    {
+        public UILayoutDir Dir;
+        /// <summary>Between two elements.</summary>
+        public float Spacing;
+        /// <summary>Inside the element's edges: left, top, right, bottom.</summary>
+        public Vector4 Padding;
+        public UILayoutAlign Align;
+        /// <summary>The elements share the length (each keeps its size across); false: each keeps its own size.</summary>
+        public bool Fit;
+
+        public static UILayout Default => new() { Dir = UILayoutDir.Column, Spacing = 8f, Align = UILayoutAlign.Start };
+    }
 }

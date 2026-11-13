@@ -17,6 +17,7 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("UIButton", WriteUIButton, ReadUIButton, static (w, e) => w.RemoveComponent<UIButton>(e));
             RegisterComponentExtension("UIMiniMap", WriteUIMiniMap, ReadUIMiniMap, static (w, e) => w.RemoveComponent<UIMiniMap>(e));
             RegisterComponentExtension("UIPanel", WriteUIPanel, ReadUIPanel, static (w, e) => w.RemoveComponent<UIPanel>(e));
+            RegisterComponentExtension("UILayout", WriteUILayout, ReadUILayout, static (w, e) => w.RemoveComponent<UILayout>(e));
         }
 
         private static string Pair(Vector2 v) => "[" + F(v.X) + "," + F(v.Y) + "]";
@@ -140,6 +141,24 @@ namespace GameEditor.Framework.Scene
             Four(el, "Color", ref p.Color);
             p.Radius = Number(el, "Radius", p.Radius);
             world.AddComponent(e, p);
+        }
+
+        private static string? WriteUILayout(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<UILayout>(e, out var l)) return null;
+            return "{\"Dir\":\"" + l.Dir + "\",\"Spacing\":" + F(l.Spacing) + ",\"Pad\":" + Four(l.Padding) + ",\"Align\":\"" + l.Align
+                 + "\",\"Fit\":" + (l.Fit ? "true" : "false") + "}";
+        }
+
+        private static void ReadUILayout(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var l = UILayout.Default;
+            if (Enum.TryParse(Text(el, "Dir", ""), true, out UILayoutDir dir)) l.Dir = dir;
+            l.Spacing = Number(el, "Spacing", l.Spacing);
+            Four(el, "Pad", ref l.Padding);
+            if (Enum.TryParse(Text(el, "Align", ""), true, out UILayoutAlign align)) l.Align = align;
+            l.Fit = el.TryGetProperty("Fit", out var fit) && fit.ValueKind == JsonValueKind.True;
+            world.AddComponent(e, l);
         }
     }
 }
