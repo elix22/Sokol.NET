@@ -452,6 +452,10 @@ namespace SokolApplicationBuilder
                 // Publish .NET assemblies for different architectures
                 PublishAssemblies(buildType);
 
+                // What a model is made from is not packed: out of the assets the publish steps copied, before Gradle packs them.
+                int sourceOnly = Utils.RemoveSourceOnlyAssets(Path.Combine(opts.ProjectPath, "Android", "native-activity", "app", "src", "main", "assets"));
+                if (sourceOnly > 0) Log.LogMessage(MessageImportance.High, $"📁 Left out {sourceOnly} source file(s) (.blend): the app reads the models exported beside them");
+
                 // Copy additional native libraries before Gradle build
                 CopyNativeLibraries(buildType);
 

@@ -416,6 +416,38 @@ namespace SokolApplicationBuilder
         }
 
 
+        /// <summary>
+        /// A file an app does not read and a package does not carry: what a model is made from - a Blender file (.blend)
+        /// and the backups Blender leaves beside it (.blend1, .blend2 ...). The app reads the model exported beside it
+        /// (ship.blend.glb), which is packed.
+        /// </summary>
+        public static bool IsSourceOnlyAsset(string path)
+        {
+            string name = Path.GetFileName(path);
+            int at = name.LastIndexOf(".blend", StringComparison.OrdinalIgnoreCase);
+            if (at < 0) return false;
+            for (int i = at + 6; i < name.Length; i++)
+                if (name[i] < '0' || name[i] > '9') return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Removes the source-only files (<see cref="IsSourceOnlyAsset"/>) from a folder that was packed for an app -
+        /// never from a project's own Assets. Returns how many were removed.
+        /// </summary>
+        public static int RemoveSourceOnlyAssets(string packedDir)
+        {
+            if (!Directory.Exists(packedDir)) return 0;
+            int removed = 0;
+            foreach (string file in Directory.GetFiles(packedDir, "*.blend*", SearchOption.AllDirectories))
+            {
+                if (!IsSourceOnlyAsset(file)) continue;
+                File.Delete(file);
+                removed++;
+            }
+            return removed;
+        }
+
         public static void CopyDirectoryIfDifferent(this string sourceDir, string destinationDir, bool recursive = true)
         {
             // Get information about the source directory

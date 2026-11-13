@@ -106,6 +106,17 @@ foreach(LPROJ ${LOCALIZATION_DIRS})
     )
 endforeach()
 
+# What a model is made from is not packed: a project's Blender files (.blend, and the backups Blender leaves beside
+# them) leave the bundle after its resources are copied and before it is signed. The app reads the model exported
+# beside each (ship.blend.glb). A project with no such file gets no step.
+file(GLOB_RECURSE SOURCE_ONLY_ASSETS "${ASSETS_DIR}/*.blend" "${ASSETS_DIR}/*.blend[0-9]" "${ASSETS_DIR}/*.blend[0-9][0-9]")
+if(SOURCE_ONLY_ASSETS)
+    add_custom_command(TARGET TEMPLATE_PROJECT_NAME-ios-app POST_BUILD
+        COMMAND find "$<TARGET_BUNDLE_CONTENT_DIR:TEMPLATE_PROJECT_NAME-ios-app>" -type f "(" -name "*.blend" -o -name "*.blend[0-9]" -o -name "*.blend[0-9][0-9]" ")" -delete
+        COMMENT "Leaving Blender source files out of the app"
+        VERBATIM)
+endif()
+
 # Set development team if provided
 if(DEFINED DEVELOPMENT_TEAM)
     set_target_properties(TEMPLATE_PROJECT_NAME-ios-app PROPERTIES

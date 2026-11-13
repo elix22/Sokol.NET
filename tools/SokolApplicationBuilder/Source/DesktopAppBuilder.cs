@@ -134,6 +134,9 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.Normal, "📁 Copying Assets folder...");
                     assetsPath.CopyDirectoryIfDifferent(outputPath, true);
                 }
+                // What a model is made from is not packed (the project's own copy step put it here too).
+                int sourceOnly = Utils.RemoveSourceOnlyAssets(outputPath);
+                if (sourceOnly > 0) Log.LogMessage(MessageImportance.High, $"📁 Left out {sourceOnly} source file(s) (.blend): the app reads the models exported beside them");
 
                 // Process desktop icon if specified
                 string? iconPath = ProcessDesktopIcon(opts.ProjectPath, outputPath);
