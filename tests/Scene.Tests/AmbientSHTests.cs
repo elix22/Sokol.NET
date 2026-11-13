@@ -97,7 +97,7 @@ namespace Scene.Tests
                 for (int i = 0; i < Size * Size; i++) { faces[f][i * 4] = 255; faces[f][i * 4 + 1] = 51; faces[f][i * 4 + 2] = (byte)(f == 2 ? 255 : 0); }
             }
             var sh = AmbientSH.FromRgba8Faces(faces, Size);
-            Near(new Vector3(1f, 0.2f, 0f), sh.Evaluate(-Vector3.UnitY), 0.08f);   // the +Y face is the only blue one
+            Near(new Vector3(1f, 0.0331f, 0f), sh.Evaluate(-Vector3.UnitY), 0.08f);   // sRGB 51 is linear 0.0331; the +Y face is the only blue one
             Assert.True(sh.Evaluate(Vector3.UnitY).Z > sh.Evaluate(-Vector3.UnitY).Z + 0.2f);
         }
 

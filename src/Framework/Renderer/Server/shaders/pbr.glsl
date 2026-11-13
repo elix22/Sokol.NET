@@ -501,15 +501,9 @@ void main()
 #endif
 
     if (use_ibl > 0) {
-        if (metallic < 0.3) {
-#ifdef TRANSMISSION
-            color = f_diffuse_ibl + f_specular_ibl;
-#else
-            color = mix(diffuseColor, baseColor.rgb, metallic) * ambient_strength + f_specular_ibl;
-#endif
-        } else {
-            color = f_diffuse_ibl + f_specular_ibl;
-        }
+        // The sky's light and reflection, as Unity's ambient from the skybox. (A dielectric had a flat
+        // ambient_strength instead, the same on every face, whatever the sky.)
+        color = f_diffuse_ibl + f_specular_ibl;
     } else {
 #ifdef TRANSMISSION
         color = f_diffuse_ibl;
@@ -576,7 +570,8 @@ void main()
                 float D   = D_GGX(NdotH, alphaRoughness);
                 vec3 f_spec = F * Vis * D;
                 vec3 f_diff = (vec3(1.0) - F) * (diffuseColor / M_PI);
-                color += NdotL * att * shadow * lightIntensity * lightColor * (f_diff + f_spec);
+                // × π: a light's intensity in Unity's (and Godot's) units — 1 lights a white face square on fully.
+                color += NdotL * att * shadow * lightIntensity * M_PI * lightColor * (f_diff + f_spec);
             }
 
             // ── Clearcoat ─────────────────────────────────────────────────
@@ -588,7 +583,7 @@ void main()
                     vec3  F_cc  = F_Schlick(clearcoatF0, clearcoatF90, VdotH);
                     float Vis_cc= V_GGX(NdotL_cc, NdotV_cc, clearcoatAlphaRoughness);
                     float D_cc  = D_GGX(NdotH_cc, clearcoatAlphaRoughness);
-                    clearcoat_punctual += NdotL_cc * att * shadow * lightIntensity * lightColor
+                    clearcoat_punctual += NdotL_cc * att * shadow * lightIntensity * M_PI * lightColor
                                         * (F_cc * Vis_cc * D_cc);
                 }
             }
@@ -668,9 +663,9 @@ void main()
     // keeps the colour linear HDR for a downstream TonemapPass.  Debug views are
     // already display-ready, so they bypass this.
     if (linear_output == 0 && debug_view_enabled <= 0.5) {
-        // ACES Narkowicz filmic operator.
-        const float tmA = 2.51, tmB = 0.03, tmC = 2.43, tmD = 0.59, tmE = 0.14;
-        color = clamp((color * (tmA * color + tmB)) / (color * (tmC * color + tmD) + tmE), 0.0, 1.0);
+        // No tone curve (Unity's default): clamped, then linear → sRGB. ACES (Narkowicz, without its 0.6
+        // exposure) lifted mid-grey 1.5× and washed every picture out (docs: ENVIRONMENT_DESIGN.md).
+        color = clamp(color, 0.0, 1.0);
         color = pow(color, vec3(1.0 / 2.2)); // linear → sRGB
     }
 

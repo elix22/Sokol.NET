@@ -64,13 +64,25 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             return a;
         }
 
-        /// <summary>Projects 6 RGBA8 faces (size² × 4 bytes each, values read as linear 0..1).</summary>
+        /// <summary>Projects 6 8-bit sRGB faces (size² × 4 bytes each: pictures, turned linear here).</summary>
         public static AmbientSH FromRgba8Faces(byte[][] faces, int size)
             => FromCube(size, (f, x, y) =>
             {
                 int i = (y * size + x) * 4;
-                return new Vector3(faces[f][i], faces[f][i + 1], faces[f][i + 2]) * (1f / 255f);
+                return SrgbToLinear(new Vector3(faces[f][i], faces[f][i + 1], faces[f][i + 2]) * (1f / 255f));
             });
+
+        /// <summary>A display (sRGB) colour, 0..1 a channel, as linear light — the GPU's own sRGB decode.</summary>
+        public static Vector3 SrgbToLinear(Vector3 c) => new(SrgbToLinear(c.X), SrgbToLinear(c.Y), SrgbToLinear(c.Z));
+
+        public static float SrgbToLinear(float c)
+            => c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
+
+        /// <summary>Linear light as a display (sRGB) colour, 0..1 a channel — what an sRGB texture stores.</summary>
+        public static Vector3 LinearToSrgb(Vector3 c) => new(LinearToSrgb(c.X), LinearToSrgb(c.Y), LinearToSrgb(c.Z));
+
+        public static float LinearToSrgb(float c)
+            => c <= 0.0031308f ? c * 12.92f : 1.055f * MathF.Pow(c, 1f / 2.4f) - 0.055f;
 
         /// <summary>Irradiance / π for the unit normal <paramref name="n"/>.</summary>
         public Vector3 Evaluate(Vector3 n)

@@ -118,7 +118,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 vertex_buffers = { [0] = _vbuf },
                 index_buffer   = _ibuf,
-                views    = { [VIEW_cubemap_u_GGXEnvTexture] = env.SpecularCubeView },
+                views    = { [VIEW_cubemap_u_GGXEnvTexture] = env.BackgroundCubeView },
                 samplers = { [SMP_cubemap_u_GGXEnvSampler]  = env.CubeSampler },
             };
             sg_apply_bindings(b);

@@ -31,14 +31,19 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         private const int DiffuseSize  = 64;   // low-res irradiance
         private const int SpecularSize = 128;  // base radiance; mips → roughness levels
         private const int LutSize      = 256;
+        private const int BackgroundSize = 256; // the procedural sky drawn behind the scene (docs: ENVIRONMENT_DESIGN.md)
 
         public sg_image DiffuseCube  { get; private set; }
         public sg_image SpecularCube { get; private set; }
         public sg_image GgxLut       { get; private set; }
+        /// <summary>What the skybox draws: the procedural sky at <see cref="BackgroundSize"/>²; none for six pictures (the specular cube's own level 0 is them).</summary>
+        public sg_image BackgroundCube { get; private set; }
 
         public sg_view DiffuseCubeView  { get; private set; }
         public sg_view SpecularCubeView { get; private set; }
         public sg_view GgxLutView       { get; private set; }
+        public sg_view BackgroundCubeView => _backgroundView.id != 0 ? _backgroundView : SpecularCubeView;
+        private sg_view _backgroundView;
 
         public sg_sampler CubeSampler { get; private set; }
         public sg_sampler LutSampler  { get; private set; }
@@ -62,28 +67,28 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         /// </summary>
         public static EnvironmentMap CreateProcedural(string name = "default-ibl")
         {
-            var env = new EnvironmentMap { Name = name };
-            // RGBA8 stores 0..1; lift into HDR range so metal reflections read bright
-            // (the shader multiplies sampled radiance/irradiance by EnvIntensity).
-            env.Intensity = 2.2f;
-            env.DiffuseCube  = BakeDiffuseCube(name);
+            // Intensity 1 (Unity's multipliers for the skybox's light and reflections). The sky's colours are
+            // display (sRGB) colours, kept in sRGB cubes: sampling gives them linear, as lighting needs.
+            var env = new EnvironmentMap { Name = name, Intensity = 1f };
             // From the sharp sky (blur 0), like a cubemap's faces: the SH projection does the cosine
             // convolution itself; the pre-blurred diffuse cube would flatten the up/down contrast twice.
             env.Ambient      = AmbientSH.FromCube(DiffuseSize, (f, x, y) =>
-                SampleSky(CubeDirection(f, (x + 0.5f) / DiffuseSize, (y + 0.5f) / DiffuseSize), 0f));
+                AmbientSH.SrgbToLinear(SampleSky(CubeDirection(f, (x + 0.5f) / DiffuseSize, (y + 0.5f) / DiffuseSize), 0f)));
+            env.DiffuseCube  = BakeDiffuseCube(env.Ambient, $"ibl-{name}-diffuse");
             (env.SpecularCube, env.MipCount) = BakeSpecularCube(name);
+            env.BackgroundCube = BakeBackgroundCube(name);
             env.GgxLut       = BakeGgxLut(name);
             env.CreateViewsAndSamplers();
             Logger.Info(
                 $"[IBL] Procedural env '{name}' baked: diffuse {DiffuseSize}², " +
-                $"specular {SpecularSize}²×{env.MipCount} mips, lut {LutSize}². " +
+                $"specular {SpecularSize}²×{env.MipCount} mips, background {(env.BackgroundCube.id != 0 ? BackgroundSize : 0)}², lut {LutSize}². " +
                 $"IsLoaded={env.IsLoaded} (diffuse.id={env.DiffuseCube.id}, " +
                 $"specular.id={env.SpecularCube.id}, lut.id={env.GgxLut.id})");
             return env;
         }
 
         /// <summary>
-        /// Builds an environment from 6 pre-baked cubemap face images (RGBA8, all <paramref
+        /// Builds an environment from 6 pre-baked cubemap face images (8-bit sRGB pictures, all <paramref
         /// name="faceSize"/>², order +X,-X,+Y,-Y,+Z,-Z). The faces become the diffuse cube
         /// directly and a box-filter-mipped specular cube; the BRDF LUT is procedural.
         /// Mirrors CGltfViewer's <c>CreateCubemapEnvironment</c> — real sky content, so
@@ -92,8 +97,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         public static EnvironmentMap CreateFromFaces(byte[][] faces, int faceSize, string name = "skybox-ibl")
         {
             var env = new EnvironmentMap { Name = name, Intensity = 1.0f };
-            env.DiffuseCube  = BuildCubeFromFaces(faces, faceSize, $"ibl-{name}-diffuse");
             env.Ambient      = AmbientSH.FromRgba8Faces(faces, faceSize);
+            env.DiffuseCube  = BakeDiffuseCube(env.Ambient, $"ibl-{name}-diffuse");
             (env.SpecularCube, env.MipCount) = BuildMippedCubeFromFaces(faces, faceSize, $"ibl-{name}-specular");
             env.GgxLut       = BakeGgxLut(name);
             env.CreateViewsAndSamplers();
@@ -101,34 +106,6 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                 $"[IBL] Skybox env '{name}' built from 6×{faceSize}² faces: " +
                 $"specular {faceSize}²×{env.MipCount} mips. IsLoaded={env.IsLoaded}");
             return env;
-        }
-
-        // Single-mip cube: concatenate the 6 RGBA8 faces into one upload.
-        private static sg_image BuildCubeFromFaces(byte[][] faces, int faceSize, string label)
-        {
-            int   faceBytes = faceSize * faceSize * 4;
-            nuint total     = (nuint)(faceBytes * 6);
-            byte* buf       = (byte*)NativeMemory.Alloc(total);
-            try
-            {
-                for (int f = 0; f < 6; f++)
-                    fixed (byte* src = faces[f])
-                        Buffer.MemoryCopy(src, buf + f * faceBytes, faceBytes, faceBytes);
-
-                var desc = new sg_image_desc
-                {
-                    type         = sg_image_type.SG_IMAGETYPE_CUBE,
-                    width        = faceSize,
-                    height       = faceSize,
-                    num_slices   = 6,
-                    num_mipmaps  = 1,
-                    pixel_format = SG_PIXELFORMAT_RGBA8,
-                    label        = label
-                };
-                desc.data.mip_levels[0] = new sg_range { ptr = buf, size = total };
-                return sg_make_image(desc);
-            }
-            finally { NativeMemory.Free(buf); }
         }
 
         // Mipped cube: mip 0 = the faces; higher mips = 2×2 box-filter downsamples
@@ -154,7 +131,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                     height       = baseSize,
                     num_slices   = 6,
                     num_mipmaps  = mipCount,
-                    pixel_format = SG_PIXELFORMAT_RGBA8,
+                    pixel_format = SG_PIXELFORMAT_SRGB8A8,
                     label        = label
                 };
 
@@ -221,6 +198,12 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                 texture = new sg_texture_view_desc { image = SpecularCube },
                 label   = $"{Name}-specular-view"
             });
+            if (BackgroundCube.id != 0)
+                _backgroundView = sg_make_view(new sg_view_desc
+                {
+                    texture = new sg_texture_view_desc { image = BackgroundCube },
+                    label   = $"{Name}-background-view"
+                });
             GgxLutView = sg_make_view(new sg_view_desc
             {
                 texture = new sg_texture_view_desc { image = GgxLut },
@@ -252,8 +235,10 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
         // ── Baking (CPU, init-time only) ─────────────────────────────────────────────
 
-        // Single-mip irradiance cube: one neutral gradient per face.
-        private static sg_image BakeDiffuseCube(string name)
+        // Single-mip irradiance cube: the sky's light gathered over the half-sphere round each normal (irradiance / π,
+        // from its spherical harmonics), what a matte surface facing that way receives. It was the sky itself, blurred,
+        // at the normal: about twice too bright at the horizon, with nothing of the darker ground below.
+        private static sg_image BakeDiffuseCube(AmbientSH sh, string label)
         {
             int  s         = DiffuseSize;
             int  faceBytes = s * s * 4;
@@ -262,9 +247,17 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             byte* buf = (byte*)NativeMemory.Alloc(total);
             try
             {
-                // Irradiance ≈ broad average of the sky → bake with full blur (no sharp sun).
                 for (int face = 0; face < 6; face++)
-                    FillFace(buf + face * faceBytes, s, face, blur: 1.0f);
+                for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    Vector3 c = AmbientSH.LinearToSrgb(Vector3.Max(sh.Evaluate(CubeDirection(face, (x + 0.5f) / s, (y + 0.5f) / s)), Vector3.Zero));
+                    byte* p = buf + face * faceBytes + (y * s + x) * 4;
+                    p[0] = (byte)Math.Clamp(c.X * 255f + 0.5f, 0f, 255f);
+                    p[1] = (byte)Math.Clamp(c.Y * 255f + 0.5f, 0f, 255f);
+                    p[2] = (byte)Math.Clamp(c.Z * 255f + 0.5f, 0f, 255f);
+                    p[3] = 255;
+                }
 
                 var desc = new sg_image_desc
                 {
@@ -273,8 +266,35 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                     height       = s,
                     num_slices   = 6,
                     num_mipmaps  = 1,
-                    pixel_format = SG_PIXELFORMAT_RGBA8,
-                    label        = $"ibl-{name}-diffuse"
+                    pixel_format = SG_PIXELFORMAT_SRGB8A8,
+                    label        = label
+                };
+                desc.data.mip_levels[0] = new sg_range { ptr = buf, size = total };
+                return sg_make_image(desc);
+            }
+            finally { NativeMemory.Free(buf); }
+        }
+
+        // The sky as drawn behind the scene: sharp (blur 0), one level, larger than the specular cube's level 0.
+        private static sg_image BakeBackgroundCube(string name)
+        {
+            int   s         = BackgroundSize;
+            int   faceBytes = s * s * 4;
+            nuint total     = (nuint)(faceBytes * 6);
+            byte* buf       = (byte*)NativeMemory.Alloc(total);
+            try
+            {
+                for (int face = 0; face < 6; face++)
+                    FillFace(buf + face * faceBytes, s, face, blur: 0f);
+                var desc = new sg_image_desc
+                {
+                    type         = sg_image_type.SG_IMAGETYPE_CUBE,
+                    width        = s,
+                    height       = s,
+                    num_slices   = 6,
+                    num_mipmaps  = 1,
+                    pixel_format = SG_PIXELFORMAT_SRGB8A8,
+                    label        = $"ibl-{name}-background"
                 };
                 desc.data.mip_levels[0] = new sg_range { ptr = buf, size = total };
                 return sg_make_image(desc);
@@ -307,7 +327,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                     height       = baseSize,
                     num_slices   = 6,
                     num_mipmaps  = mipCount,
-                    pixel_format = SG_PIXELFORMAT_RGBA8,
+                    pixel_format = SG_PIXELFORMAT_SRGB8A8,
                     label        = $"ibl-{name}-specular"
                 };
 
@@ -372,8 +392,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             finally { NativeMemory.Free(buf); }
         }
 
-        // Sun direction (world space) — high and to one side so reflections read clearly.
-        private static readonly Vector3 SunDir = Vector3.Normalize(new Vector3(0.5f, 0.7f, 0.35f));
+        // Sun direction (world space, towards the sun): where a new scene's Directional Light shines from — Unity's
+        // default sun, rotated 50° down and −30° round (it travels along (−0.32, −0.77, 0.56)).
+        private static readonly Vector3 SunDir = Vector3.Normalize(new Vector3(0.32f, 0.77f, -0.56f));
 
         // Bakes one cube face by sampling a direction-based sky per texel. `blur` (0=sharp
         // mip0 … 1=roughest) broadens the sun disc and flattens contrast, standing in for
@@ -397,15 +418,16 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             }
         }
 
-        // Analytic sky: blue zenith → near-white horizon → dark ground, plus a sun
-        // highlight whose tightness/intensity falls off with `blur` (roughness).
-        // Stored RGBA8 (0..1); the EnvIntensity multiplier in the shader lifts it into
-        // HDR range so reflections read bright through dark metal F0.
-        private static Vector3 SampleSky(Vector3 dir, float blur)
+        // Analytic sky in display (sRGB) colours, the look of Unity's default skybox: a blue zenith, a light
+        // blue-grey horizon, a grey-brown ground, plus a sun highlight whose tightness/intensity falls off with
+        // `blur` (roughness). Kept in sRGB cubes, so it is sampled linear.
+        internal static readonly Vector3 Zenith  = new(0.32f, 0.50f, 0.78f);
+        internal static readonly Vector3 Horizon = new(0.80f, 0.85f, 0.90f);
+        internal static readonly Vector3 Ground  = new(0.40f, 0.38f, 0.36f);
+
+        internal static Vector3 SampleSky(Vector3 dir, float blur)
         {
-            var zenith  = new Vector3(0.30f, 0.55f, 1.00f);
-            var horizon = new Vector3(0.92f, 0.96f, 1.00f);
-            var ground  = new Vector3(0.12f, 0.10f, 0.08f);
+            Vector3 zenith = Zenith, horizon = Horizon, ground = Ground;
 
             float up = dir.Y;
             Vector3 col;
@@ -418,11 +440,11 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             float sunDot    = MathF.Max(Vector3.Dot(dir, SunDir), 0f);
             float sharpness = float.Lerp(900f, 12f, blur);
             float sun       = MathF.Pow(sunDot, sharpness);
-            col += new Vector3(1.0f, 0.97f, 0.90f) * sun * (1f - 0.4f * blur);
+            col += new Vector3(1.0f, 0.96f, 0.86f) * sun * (1f - 0.4f * blur);
 
             // Flatten contrast toward the mid sky tone as roughness rises.
             float contrast = 1f - 0.5f * blur;
-            var   mid      = new Vector3(0.55f, 0.62f, 0.72f);
+            var   mid      = new Vector3(0.55f, 0.60f, 0.66f);
             col = mid + (col - mid) * contrast;
 
             return Vector3.Clamp(col, Vector3.Zero, Vector3.One);
@@ -452,6 +474,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             if (DiffuseCubeView.id  != 0) { sg_destroy_view(DiffuseCubeView);  DiffuseCubeView  = default; }
             if (SpecularCubeView.id != 0) { sg_destroy_view(SpecularCubeView); SpecularCubeView = default; }
             if (GgxLutView.id       != 0) { sg_destroy_view(GgxLutView);       GgxLutView       = default; }
+            if (_backgroundView.id  != 0) { sg_destroy_view(_backgroundView);  _backgroundView  = default; }
+            if (BackgroundCube.id   != 0) { sg_destroy_image(BackgroundCube);  BackgroundCube   = default; }
             if (DiffuseCube.id      != 0) { sg_destroy_image(DiffuseCube);     DiffuseCube      = default; }
             if (SpecularCube.id     != 0) { sg_destroy_image(SpecularCube);    SpecularCube     = default; }
             if (GgxLut.id           != 0) { sg_destroy_image(GgxLut);          GgxLut           = default; }

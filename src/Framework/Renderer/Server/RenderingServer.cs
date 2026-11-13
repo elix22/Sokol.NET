@@ -540,7 +540,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             if (!_initialized || !ShowSkybox) return;
             if (_environment is { IsLoaded: true } env)
-                _skyboxPass.Render(in viewProj, env, offscreen, exposure: 1f, tonemapType: 1);
+                _skyboxPass.Render(in viewProj, env, offscreen, exposure: 1f, tonemapType: 0);   // no tone curve, as the meshes (Unity's default)
         }
 
         // ── Environment authoring ─────────────────────────────────────────────────────────
