@@ -393,6 +393,7 @@ public class MenuBar : Widget
 
     private float MenuHeaderX(int idx, Renderer renderer)
     {
+        ApplyFont(renderer, ThemeManager.Current);   // the headers are measured in the font they are drawn in
         float x = 4f;
         for (int i = 0; i < idx; i++)
         {
@@ -407,6 +408,7 @@ public class MenuBar : Widget
         var   local = ToLocal(screenPos);
         var   renderer = Screen.Instance?.Renderer;
         if (renderer == null) return -1;
+        ApplyFont(renderer, ThemeManager.Current);   // the headers are measured in the font they are drawn in
 
         float x = 4f;
         float h = Bounds.Height;
