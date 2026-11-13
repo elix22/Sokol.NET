@@ -11,6 +11,9 @@
   <ItemGroup>
     <Compile Remove="Plugins/**/Editor/**" />
   </ItemGroup>
+  <!-- A package that is switched off for the project stays in Plugins/ and is no part of the game: the editor
+       writes its sources' folder into Plugins/Plugins.g.props (one Compile Remove for each). -->
+  <Import Project="$(MSBuildProjectDirectory)/Plugins/Plugins.g.props" Condition="Exists('$(MSBuildProjectDirectory)/Plugins/Plugins.g.props')" />
 
   <!-- Web: the Framework is compiled into the game as source (see the project's Directory.Build.props), and the
        2D renderer's sources go with it. On the desktop and on phones they are inside GameEditor.Framework.dll. -->
