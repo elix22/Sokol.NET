@@ -571,6 +571,7 @@ namespace GameEditor.Framework.Input
         {
             if (_axisOverride.TryGetValue(name, out float ov))
                 return Math.Clamp(ov, -1f, 1f);
+            if (InputMap.TryAxis(name, out float mapped)) return mapped;   // the game's own action of that name
 
             return name switch
             {
@@ -607,6 +608,7 @@ namespace GameEditor.Framework.Input
         public static bool GetButton(string name)
         {
             if (_buttonOverride.TryGetValue(name, out bool b)) return b;
+            if (InputMap.TryButton(name, out bool mapped)) return mapped;
             return name switch
             {
                 "Fire1"  => GetKey(Key.LeftControl) || _mouseHeld[0] || _gamepad.South,
@@ -621,7 +623,8 @@ namespace GameEditor.Framework.Input
 
         /// <summary>True only during the first frame the named button is pressed.</summary>
         public static bool GetButtonDown(string name)
-            => (_buttonOverride.TryGetValue(name, out bool held) && held && !_buttonOverrideBefore.Contains(name)) || KeyButtonDown(name);
+            => (_buttonOverride.TryGetValue(name, out bool held) && held && !_buttonOverrideBefore.Contains(name))
+               || (InputMap.TryButtonDown(name, out bool down) ? down : KeyButtonDown(name));
 
         private static bool KeyButtonDown(string name) => name switch
         {
@@ -635,7 +638,7 @@ namespace GameEditor.Framework.Input
         };
 
         /// <summary>True only during the frame the named button is released.</summary>
-        public static bool GetButtonUp(string name) => name switch
+        public static bool GetButtonUp(string name) => InputMap.TryButtonUp(name, out bool up) ? up : name switch
         {
             "Fire1"  => GetKeyUp(Key.LeftControl) || GetMouseButtonUp(0),
             "Fire2"  => GetKeyUp(Key.LeftAlt)     || GetMouseButtonUp(1),
