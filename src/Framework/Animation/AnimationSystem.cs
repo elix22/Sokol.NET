@@ -1,6 +1,6 @@
 // AnimationSystem.cs — plays the AnimationPlayers of the world (docs: ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §18).
 //
-// Once a game frame, after the scripts (Unity animates after Update), only while the game plays, in game time: each
+// Once a game frame, after the scripts (animation comes after their update), only while the game plays, in game time: each
 // player's clip bound once to its entity's hierarchy, its time advanced by its speed, the pose of the clip at that time
 // (wrapped by the clip's wrap mode) written, and the events passed this frame given to the entity's scripts.
 
@@ -100,7 +100,7 @@ namespace GameEditor.Framework.Animation
                 float a = Math.Clamp(from, 0f, length), z = Math.Clamp(to, 0f, length);
                 bool reachesEnd = to >= from ? to >= length : to <= 0f;
                 Events(e, clip, a, z, includeStart: false);
-                if (reachesEnd && clip.Wrap == WrapMode.Once) p.Playing = false;   // Unity's Once: it stops; the last pose stays
+                if (reachesEnd && clip.Wrap == WrapMode.Once) p.Playing = false;   // Once: it stops; the last pose stays
                 return;
             }
             // Loop and PingPong: the span walked leg by leg — a leg is one pass through the clip, forwards or (a PingPong's
@@ -123,7 +123,7 @@ namespace GameEditor.Framework.Animation
         }
 
         // The events passed going from clip time `a` (not included, unless includeStart) to `b` (included): an event fires
-        // on the frame that reaches its time, as Unity's.
+        // on the frame that reaches its time.
         private static void Events(Entity e, AnimationClip clip, float a, float b, bool includeStart)
         {
             var sink = EventSink;

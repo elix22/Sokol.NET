@@ -47,7 +47,7 @@ namespace GameEditor.Framework.Scene
             if (el.TryGetProperty("Clip", out var clip)) a.Clip = clip.GetString() ?? "";
             a.PlayAutomatically = !el.TryGetProperty("Auto", out var auto) || auto.ValueKind != JsonValueKind.False;
             if (el.TryGetProperty("Speed", out var speed) && speed.ValueKind == JsonValueKind.Number) a.Speed = speed.GetSingle();
-            a.Playing = a.PlayAutomatically;       // Unity's Play Automatically: it plays from the game's start
+            a.Playing = a.PlayAutomatically;       // Play Automatically: it plays from the game's start
             world.AddComponent(e, a);
         }
 

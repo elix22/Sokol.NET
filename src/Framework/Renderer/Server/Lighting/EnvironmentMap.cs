@@ -67,7 +67,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         /// </summary>
         public static EnvironmentMap CreateProcedural(string name = "default-ibl")
         {
-            // Intensity 1 (Unity's multipliers for the skybox's light and reflections). The sky's colours are
+            // Intensity 1 (the usual multipliers for the sky's light and reflections). The sky's colours are
             // display (sRGB) colours, kept in sRGB cubes: sampling gives them linear, as lighting needs.
             var env = new EnvironmentMap { Name = name, Intensity = 1f };
             // From the sharp sky (blur 0), like a cubemap's faces: the SH projection does the cosine
@@ -392,8 +392,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             finally { NativeMemory.Free(buf); }
         }
 
-        // Sun direction (world space, towards the sun): where a new scene's Directional Light shines from — Unity's
-        // default sun, rotated 50° down and −30° round (it travels along (−0.32, −0.77, 0.56)).
+        // Sun direction (world space, towards the sun): where a new scene's Directional Light shines from — the
+        // template's sun, rotated 50° down and −30° round (it travels along (−0.32, −0.77, 0.56)).
         private static readonly Vector3 SunDir = Vector3.Normalize(new Vector3(0.32f, 0.77f, -0.56f));
 
         // Bakes one cube face by sampling a direction-based sky per texel. `blur` (0=sharp
@@ -418,7 +418,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             }
         }
 
-        // Analytic sky in display (sRGB) colours, the look of Unity's default skybox: a blue zenith, a light
+        // Analytic sky in display (sRGB) colours, the usual default sky's look: a blue zenith, a light
         // blue-grey horizon, a grey-brown ground, plus a sun highlight whose tightness/intensity falls off with
         // `blur` (roughness). Kept in sRGB cubes, so it is sampled linear.
         internal static readonly Vector3 Zenith  = new(0.32f, 0.50f, 0.78f);

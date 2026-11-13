@@ -501,7 +501,7 @@ void main()
 #endif
 
     if (use_ibl > 0) {
-        // The sky's light and reflection, as Unity's ambient from the skybox. (A dielectric had a flat
+        // The sky's light and reflection: the ambient light comes from the sky. (A dielectric had a flat
         // ambient_strength instead, the same on every face, whatever the sky.)
         color = f_diffuse_ibl + f_specular_ibl;
     } else {
@@ -570,7 +570,7 @@ void main()
                 float D   = D_GGX(NdotH, alphaRoughness);
                 vec3 f_spec = F * Vis * D;
                 vec3 f_diff = (vec3(1.0) - F) * (diffuseColor / M_PI);
-                // × π: a light's intensity in Unity's (and Godot's) units — 1 lights a white face square on fully.
+                // × π: a light's intensity in the common engines' units — 1 lights a white face square on fully.
                 color += NdotL * att * shadow * lightIntensity * M_PI * lightColor * (f_diff + f_spec);
             }
 
@@ -663,7 +663,7 @@ void main()
     // keeps the colour linear HDR for a downstream TonemapPass.  Debug views are
     // already display-ready, so they bypass this.
     if (linear_output == 0 && debug_view_enabled <= 0.5) {
-        // No tone curve (Unity's default): clamped, then linear → sRGB. ACES (Narkowicz, without its 0.6
+        // No tone curve (the common engines' default): clamped, then linear → sRGB. ACES (Narkowicz, without its 0.6
         // exposure) lifted mid-grey 1.5× and washed every picture out (docs: ENVIRONMENT_DESIGN.md).
         color = clamp(color, 0.0, 1.0);
         color = pow(color, vec3(1.0 / 2.2)); // linear → sRGB

@@ -1,4 +1,4 @@
-// AnimationCurve.cs — a float curve of keyframes, as Unity's (docs: ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17).
+// AnimationCurve.cs — a float curve of keyframes (docs: ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17).
 //
 // Keys sorted by time; between two keys a cubic Hermite on (value, out tangent) → (value, in tangent), the tangents
 // slopes (value per second) scaled by the segment's length — the basis of CGltfBone's cubic spline. An infinite
@@ -9,10 +9,10 @@ using System;
 
 namespace GameEditor.Framework.Animation
 {
-    /// <summary>How a key's tangent on one side is set — Unity's five modes; ClampedAuto is a new key's.</summary>
+    /// <summary>How a key's tangent on one side is set — five modes; ClampedAuto is a new key's.</summary>
     public enum TangentMode : byte
     {
-        /// <summary>Smooth through the neighbours, flattened so the curve never goes past them (Unity's default).</summary>
+        /// <summary>Smooth through the neighbours, flattened so the curve never goes past them (the default).</summary>
         ClampedAuto,
         /// <summary>Smooth through the neighbours (Catmull-Rom); may overshoot.</summary>
         Auto,
@@ -24,7 +24,7 @@ namespace GameEditor.Framework.Animation
         Free,
     }
 
-    /// <summary>What a curve does before its first key / after its last; what a clip does at its end (Unity's WrapMode).</summary>
+    /// <summary>What a curve does before its first key / after its last; what a clip does at its end.</summary>
     public enum WrapMode : byte { Once, Loop, PingPong, ClampForever }
 
     /// <summary>One key of a curve.</summary>
@@ -38,7 +38,7 @@ namespace GameEditor.Framework.Animation
         public float OutTangent;
         public TangentMode ModeIn;
         public TangentMode ModeOut;
-        /// <summary>The two sides edited apart (Unity's "Broken").</summary>
+        /// <summary>The two sides edited apart ("Broken").</summary>
         public bool Broken;
 
         public Keyframe(float time, float value)
@@ -165,10 +165,10 @@ namespace GameEditor.Framework.Animation
 
         // ── Editing ────────────────────────────────────────────────────────────────────
 
-        /// <summary>Adds a key with Unity's default tangents (ClampedAuto); −1 when a key is at that time already.</summary>
+        /// <summary>Adds a key with the default tangents (ClampedAuto); −1 when a key is at that time already.</summary>
         public int AddKey(float time, float value) => AddKey(new Keyframe(time, value));
 
-        /// <summary>Adds the key; its index, or −1 when a key is at that time already (Unity's rule).</summary>
+        /// <summary>Adds the key; its index, or −1 when a key is at that time already.</summary>
         public int AddKey(in Keyframe key)
         {
             int at = Find(key.Time, out bool exists);
@@ -180,7 +180,7 @@ namespace GameEditor.Framework.Animation
 
         /// <summary>
         /// Puts <paramref name="key"/> in the place of the key at <paramref name="index"/>; the keys are sorted again, so
-        /// the key's index may change — the new one is returned. On another key's time the old time is kept (Unity's rule).
+        /// the key's index may change — the new one is returned. On another key's time the old time is kept.
         /// </summary>
         public int MoveKey(int index, in Keyframe key)
         {

@@ -5,8 +5,8 @@
 // 6 JPG faces decoded with stb_image (cross-platform, Web included — no TinyEXR / no
 // HDR-panorama prefilter), assembled into a cube + box-filter mips + BRDF LUT.
 //
-// File access matches the glTF importer: the editor runs an external project (Unity/
-// Godot style), so runtime assets live in the OPEN PROJECT's Assets folder, read
+// File access matches the glTF importer: the editor runs an external project (as the
+// common editors do), so runtime assets live in the OPEN PROJECT's Assets folder, read
 // directly on desktop. On Web/mobile assets are bundled flat and SFilesystem resolves
 // them. On any failure the caller keeps the procedural EnvironmentMap fallback.
 

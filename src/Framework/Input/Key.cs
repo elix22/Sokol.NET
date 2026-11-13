@@ -3,7 +3,7 @@ namespace GameEditor.Framework.Input
     /// <summary>
     /// Key codes for use with <see cref="InputManager"/>.
     /// Integer values match <c>Sokol.SApp.sapp_keycode</c> exactly so that casting is free.
-    /// Names follow Unity's KeyCode convention for easy migration.
+    /// Names follow the common key-code naming, familiar to game developers.
     /// </summary>
     public enum Key
     {

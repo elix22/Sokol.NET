@@ -12,7 +12,7 @@ using Xunit;
 namespace Scene.Tests
 {
     /// <summary>
-    /// G6 A1 (ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17): Unity's animation data — keyframes with tangent modes, a float
+    /// G6 A1 (ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17): the animation data — keyframes with tangent modes, a float
     /// curve evaluated by cubic Hermite with wrap modes, a clip of curves bound by (path, component, property), events, the
     /// `.anim.json` file, and the binder writing a clip into an entity's hierarchy.
     /// </summary>
@@ -262,7 +262,7 @@ namespace Scene.Tests
             Near(1.5f, t.Position.X);
             var l = World.GetComponent<LightComponent>(root);
             Near(0.25f, l.Color.Y);
-            Near(40, l.OuterAngle);                                       // Unity's full cone angle, kept as a half-angle
+            Near(40, l.OuterAngle);                                       // a full cone angle, kept as a half-angle
             Near(0, l.Intensity);
             PropertyBinder.Apply(bound, 1f);
             Near(3, World.GetComponent<LightComponent>(root).Intensity);

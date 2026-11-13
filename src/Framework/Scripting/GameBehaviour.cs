@@ -14,7 +14,7 @@ using Input = GameEditor.Framework.Input;
 namespace GameEditor.Framework.Scripting
 {
     /// <summary>
-    /// Base class for all game scripts (analogous to Unity's MonoBehaviour).
+    /// Base class for all game scripts (a script on an entity, with its callbacks).
     /// Subclasses are discovered by the ScriptSystem and run during play mode.
     ///
     /// Attach to entities via a <see cref="ScriptComponent"/> whose TypeName matches
@@ -215,8 +215,8 @@ namespace GameEditor.Framework.Scripting
         public virtual void OnDestroy() { }
 
         /// <summary>
-        /// An event of the clip this entity's AnimationPlayer plays was passed (G6 A2). Unity calls the method named
-        /// by the event; a built game cannot look a method up by name, so the name comes with the event:
+        /// An event of the clip this entity's AnimationPlayer plays was passed (G6 A2). Calling a method by the event's
+        /// name would need reflection: a built game cannot look a method up by name, so the name comes with the event:
         /// <c>if (e.FunctionName == "OnFootstep") …</c>, its parameters in <see cref="Animation.AnimationEvent.StringParameter"/>,
         /// <c>FloatParameter</c>, <c>IntParameter</c>.
         /// </summary>
@@ -320,7 +320,7 @@ namespace GameEditor.Framework.Scripting
         /// </summary>
         protected void Destroy(Entity entity) => SceneManager.Destroy(entity);
 
-        // ── Physics helpers (Unity/Godot-style convenience) ────────────────
+        // ── Physics helpers (the usual conveniences) ────────────────
 
         protected bool TryGetLinearVelocity(out Vector3 velocity)
             => SceneManager.TryGetLinearVelocity(EntityId, out velocity);

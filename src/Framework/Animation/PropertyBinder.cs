@@ -2,7 +2,7 @@
 // time the clip is applied (docs: ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17). An explicit table, no reflection: a built
 // game is NativeAOT.
 //
-// The properties (Unity's names and units where Unity has them):
+// The properties (the usual names and units):
 //   Transform  LocalPosition.x/y/z, LocalEulerAngles.x/y/z (degrees, the editor's Euler order), LocalScale.x/y/z
 //   Light      Intensity, Color.r/g/b, Range, SpotAngle, InnerSpotAngle (full cone angles, degrees: the component
 //              keeps half-angles)

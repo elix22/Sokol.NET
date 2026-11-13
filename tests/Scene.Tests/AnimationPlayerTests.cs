@@ -13,7 +13,7 @@ using Xunit;
 namespace Scene.Tests
 {
     /// <summary>
-    /// G6 A2 (ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §18): Unity's Animation component — a clip played after the scripts,
+    /// G6 A2 (ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §18): an animation player — a clip played after the scripts,
     /// in game time, wrapped by the clip's wrap mode, its events given to the entity's scripts; the scene block.
     /// </summary>
     [Collection("ClipLibrary")]
@@ -116,7 +116,7 @@ namespace Scene.Tests
             AnimationSystem.Update(World, 0.1f);
             Run(1.7f);
             Near(0.4f, X(door));                                      // 1.7 s: 0.2 s into the second round
-            Near(1.7f, P(door).Time);                                 // Unity's state time keeps counting
+            Near(1.7f, P(door).Time);                                 // the player's time keeps counting
             Assert.Single(_events);
             AnimationSystem.Update(World, 3.1f);                      // one long frame: 1.7 → 4.8, past 2.0 and 3.5
             Assert.Equal(3, _events.Count);

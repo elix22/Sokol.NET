@@ -1,4 +1,4 @@
-// AnimationClip.cs — a clip of float curves bound by (path, component, property), and its events: Unity's model
+// AnimationClip.cs — a clip of float curves bound by (path, component, property), and its events
 // (docs: ANIMATION_SYSTEM_IMPLEMENTATION_PLAN.md §17).
 
 using System.Collections.Generic;
@@ -43,7 +43,7 @@ namespace GameEditor.Framework.Animation
         public string Name = "";
         /// <summary>Seconds; at least the last key's time.</summary>
         public float Length;
-        /// <summary>The editor's grid of frames (Unity's 60 by default) — curves are evaluated at any time, not sampled.</summary>
+        /// <summary>The editor's grid of frames (60 by default) — curves are evaluated at any time, not sampled.</summary>
         public float FrameRate = 60f;
         /// <summary>What a player does at the end: stop (Once), go round (Loop), back and forth (PingPong), hold (ClampForever).</summary>
         public WrapMode Wrap = WrapMode.Once;

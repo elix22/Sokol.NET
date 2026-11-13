@@ -8,7 +8,7 @@ namespace GameEditor.Framework.Input
 {
     // ── Touch ─────────────────────────────────────────────────────────────────
 
-    /// <summary>Lifecycle phase of a touch point (matches Unity's TouchPhase).</summary>
+    /// <summary>Lifecycle phase of a touch point (began, moved, stationary, ended, cancelled).</summary>
     public enum TouchPhase { Began, Moved, Stationary, Ended, Cancelled }
 
     /// <summary>Data for a single active touch point.</summary>
@@ -73,7 +73,7 @@ namespace GameEditor.Framework.Input
     ///   • Keyboard  — GetKey / GetKeyDown / GetKeyUp by <see cref="Key"/>
     ///   • Mouse     — position, delta, scroll, three buttons
     ///   • Touch     — up to 8 simultaneous fingers via GetTouch / TouchCount
-    ///   • Named axes / buttons — Unity-compatible "Horizontal", "Vertical", "Jump", …
+    ///   • Named axes / buttons — the familiar "Horizontal", "Vertical", "Jump", …
     ///   • Virtual injection — SetVirtualKey / SetVirtualAxis for on-screen joysticks and
     ///                         gamepad-to-key mapping on mobile
     ///   • Gamepad   — injectable GamepadState (platform-bridge fills it each frame)
@@ -133,7 +133,7 @@ namespace GameEditor.Framework.Input
         /// <summary>Mouse movement delta accumulated this frame.</summary>
         public static Vector2 MouseDelta    => _cbMouseDelta    != null ? _cbMouseDelta()    : _mouseDelta;
 
-        /// <summary>Vertical scroll delta this frame (positive = up, matches Unity).</summary>
+        /// <summary>Vertical scroll delta this frame (positive = up).</summary>
         public static float   ScrollDelta   => _cbScrollDelta   != null ? _cbScrollDelta()   : _scrollDelta;
 
         /// <summary>Horizontal scroll delta this frame.</summary>
@@ -446,7 +446,7 @@ namespace GameEditor.Framework.Input
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// True while the key is held down (equivalent to Unity's <c>Input.GetKey</c>).
+        /// True while the key is held down (the usual GetKey).
         /// </summary>
         public static bool GetKey(Key key)
         {
@@ -456,8 +456,8 @@ namespace GameEditor.Framework.Input
         }
 
         /// <summary>
-        /// True only during the first frame the key is pressed (equivalent to Unity's
-        /// <c>Input.GetKeyDown</c>).
+        /// True only during the first frame the key is pressed (the usual
+        /// GetKeyDown).
         /// </summary>
         public static bool GetKeyDown(Key key)
         {
@@ -467,8 +467,8 @@ namespace GameEditor.Framework.Input
         }
 
         /// <summary>
-        /// True only during the frame the key is released (equivalent to Unity's
-        /// <c>Input.GetKeyUp</c>).
+        /// True only during the frame the key is released (the usual
+        /// GetKeyUp).
         /// </summary>
         public static bool GetKeyUp(Key key)
         {
@@ -494,7 +494,7 @@ namespace GameEditor.Framework.Input
             => _cbGetMouseButtonUp != null ? _cbGetMouseButtonUp(button) : (uint)button < 3 && _mouseReleased[button];
 
         // ─────────────────────────────────────────────────────────────────────
-        // Named axes (Unity-style)
+        // Named axes
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
