@@ -40,6 +40,7 @@ public class TextArea : Widget
 
     // ── Scroll state ──────────────────────────────────────────────────────────
     private float _scrollY;
+    private float _maxScrollY;            // from the last Draw: how far the text can scroll
     private bool  _sbDragging;
     private float _sbDragStartY;
     private float _sbDragStartScroll;
@@ -138,6 +139,7 @@ public class TextArea : Widget
         bool  showSb    = effectiveMeasH > inner.Height;
         float maxScroll = MathF.Max(0f, effectiveMeasH - inner.Height);
         _scrollY        = Math.Clamp(_scrollY, 0f, maxScroll);
+        _maxScrollY     = maxScroll;
 
         if (IsEditable) ScrollCaretIntoView(inner.Height, effectiveMeasH);
 
@@ -268,10 +270,14 @@ public class TextArea : Widget
     public override bool OnMouseEnter(MouseEvent e) { return true; }
     public override bool OnMouseLeave(MouseEvent e) { _sbHovered = false; return true; }
 
+    // The wheel is kept only when it moves the text: a text area with nothing to scroll, or at its end in the wheel's
+    // direction, passes it on, so the ScrollView around it scrolls (as a browser does).
     public override bool OnMouseScroll(MouseEvent e)
     {
-        float spd = ThemeManager.Current.ScrollSpeed;
-        _scrollY  = MathF.Max(0f, _scrollY - e.Scroll.Y * spd);
+        float spd  = ThemeManager.Current.ScrollSpeed;
+        float next = Math.Clamp(_scrollY - e.Scroll.Y * spd, 0f, _maxScrollY);
+        if (next == _scrollY) return false;
+        _scrollY = next;
         return true;
     }
 
