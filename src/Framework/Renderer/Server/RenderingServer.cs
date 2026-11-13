@@ -411,6 +411,19 @@ namespace GameEditor.Framework.Renderer.Server
                 () => { onComplete?.Invoke(); AttachSceneNodeAnimations(); });
         }
 
+        /// <summary>
+        /// Reads a glTF/GLB again and replaces, key for key, the meshes, materials and textures loaded from it
+        /// (<see cref="GameEditor.Framework.Assets.AssetLibrary.ReimportGltf"/>). <paramref name="onComplete"/>:
+        /// whether the file was read, and the mesh keys it no longer has.
+        /// </summary>
+        public static void ReimportGltfAsync(string assetsRelativePath, Action<bool, IReadOnlyList<string>>? onComplete = null)
+        {
+            if (!_initialized) { onComplete?.Invoke(false, Array.Empty<string>()); return; }
+            GameEditor.Framework.Renderer.Server.Assets.GltfImporter.ReimportAsync(
+                assetsRelativePath, _meshReg, _matReg, _texCache, ECSWorld.Instance,
+                (ok, lost) => { onComplete?.Invoke(ok, lost); AttachSceneNodeAnimations(); });
+        }
+
         // ── Frame loop ───────────────────────────────────────────────────────────────────
 
         public static void BeginFrame()

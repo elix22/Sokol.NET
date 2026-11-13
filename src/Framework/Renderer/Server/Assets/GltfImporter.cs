@@ -67,6 +67,24 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             => Start(assetsRelativePath, meshReg, matReg, texCache, world, buildEntities: false,
                      _ => onComplete?.Invoke());
 
+        /// <summary>
+        /// Reads a model's file again and replaces what was registered from it, key for key, without creating
+        /// entities: a mesh and a material keep their id, the file's textures are made anew, and a mesh key the
+        /// new file no longer has is removed. When the file cannot be read or parsed, nothing is touched.
+        /// <paramref name="onComplete"/>: whether it was read, and the mesh keys that were removed.
+        /// </summary>
+        public static void ReimportAsync(
+            string assetsRelativePath,
+            MeshRegistry meshReg, MaterialRegistry matReg, TextureCache texCache, ECSWorld world,
+            Action<bool, IReadOnlyList<string>>? onComplete = null)
+        {
+            Logger.Info($"[glTF] reading '{assetsRelativePath}' again");
+            ImportJob? job = null;
+            job = new ImportJob(assetsRelativePath, meshReg, matReg, texCache, world, buildEntities: false,
+                                _ => onComplete?.Invoke(job!.Succeeded, job.Lost)) { Replace = true };
+            LoadFile(GameEditor.Framework.Assets.AssetLibrary.FileOf(assetsRelativePath), job.OnMainFileLoaded);
+        }
+
         private static void Start(
             string assetsRelativePath,
             MeshRegistry meshReg, MaterialRegistry matReg, TextureCache texCache, ECSWorld world,
@@ -74,7 +92,8 @@ namespace GameEditor.Framework.Renderer.Server.Assets
         {
             Logger.Info($"[glTF] {(buildEntities ? "importing" : "preloading")} '{assetsRelativePath}' (project: {ConfigManager.ProjectFolder ?? "<none>"})");
             var job = new ImportJob(assetsRelativePath, meshReg, matReg, texCache, world, buildEntities, onComplete);
-            LoadFile(assetsRelativePath, job.OnMainFileLoaded);
+            // The keys are the model's own ("Models/ship.blend#m0p0"); a .blend's bytes are in the GLB beside it.
+            LoadFile(GameEditor.Framework.Assets.AssetLibrary.FileOf(assetsRelativePath), job.OnMainFileLoaded);
         }
 
         // Loads an Assets-relative file cross-platform. On DESKTOP the editor targets an external
@@ -122,6 +141,13 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             private int  _pending;
             private bool _failed;
             private bool _done;
+
+            /// <summary>Replace what is registered under this file's keys (a file read again), not keep it.</summary>
+            public bool Replace;
+            /// <summary>The scene was built: the file was read and parsed and its resources are registered.</summary>
+            public bool Succeeded;
+            /// <summary>With <see cref="Replace"/>: mesh keys that were registered from the file and are not in it now.</summary>
+            public readonly List<string> Lost = new();
 
             public ImportJob(string path, MeshRegistry meshReg, MaterialRegistry matReg,
                              TextureCache texCache, ECSWorld world, bool buildEntities, Action<Entity?>? onComplete)
@@ -235,7 +261,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             {
                 bool ok = false;
                 Entity? result = null;
-                try { result = BuildScene(); ok = true; }
+                try { result = BuildScene(); ok = true; Succeeded = true; }
                 catch (Exception ex) { Logger.Error($"[glTF] {(_buildEntities ? "import" : "preload")} of '{_path}' failed: {ex}"); }
                 Cleanup();
                 if (ok) Logger.Info($"[glTF] {(_buildEntities ? "imported" : "preloaded resources for")} '{_path}'");
@@ -339,14 +365,23 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             {
                 cgltf_data* data = _data;
 
+                // A file read again: its images are made anew (a cached one would be handed back as it was), and
+                // every material of the file is replaced below, so none keeps a view of an image that is gone.
+                if (Replace) _texCache.DropPrefix($"{_path}#img");
+
                 var matKeyByPtr = new Dictionary<IntPtr, string>();
                 for (int i = 0; i < (int)data->materials_count; i++)
                 {
                     cgltf_material* mat = &data->materials[i];
                     string key = $"{_path}#mat{i}";
-                    _matReg.RegisterPbr(key, BuildMaterial(mat, i));
+                    if (Replace) _matReg.RegisterOrReplacePbr(key, BuildMaterial(mat, i));
+                    else _matReg.RegisterPbr(key, BuildMaterial(mat, i));
                     matKeyByPtr[(IntPtr)mat] = key;
                 }
+                if (Replace)   // a material the file had and has no more: plain, under its key and id
+                    for (int i = (int)data->materials_count; _matReg.GetByKey($"{_path}#mat{i}") != null; i++)
+                        _matReg.RegisterOrReplacePbr($"{_path}#mat{i}", new PbrMaterial { Name = $"mat{i}" });
+                var meshKeys = Replace ? new HashSet<string>(StringComparer.Ordinal) : null;
 
                 primKeysByMesh = new Dictionary<IntPtr, string[]>();
                 primMatsByMesh = new Dictionary<IntPtr, string[]>();
@@ -373,7 +408,9 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
                         string key = $"{_path}#m{mi}p{pi}";
                         var sub = new ObjSubMesh { MaterialName = "", Vertices = verts, Indices = indices };
-                        if (_meshReg.RegisterMesh(key, new[] { sub }, in bounds) == 0) continue;
+                        if ((Replace ? _meshReg.RegisterOrReplaceMesh(key, new[] { sub }, in bounds)
+                                     : _meshReg.RegisterMesh(key, new[] { sub }, in bounds)) == 0) continue;
+                        meshKeys?.Add(key);
 
                         keys.Add(key);
                         mats.Add(prim->material != null && matKeyByPtr.TryGetValue((IntPtr)prim->material, out var mk)
@@ -382,6 +419,18 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
                     primKeysByMesh[(IntPtr)mesh] = keys.ToArray();
                     primMatsByMesh[(IntPtr)mesh] = mats.ToArray();
+                }
+
+                if (meshKeys != null)   // mesh keys of this file ("<file>#m{i}p{j}") that the new file does not have
+                {
+                    string prefix = $"{_path}#m";
+                    foreach (string key in _meshReg.KeysWithPrefix(prefix))
+                    {
+                        if (meshKeys.Contains(key) || key.Length == prefix.Length || !char.IsAsciiDigit(key[prefix.Length])) continue;
+                        _meshReg.Remove(key);
+                        Lost.Add(key);
+                    }
+                    Lost.Sort(StringComparer.Ordinal);
                 }
 
                 // Rigid/node animation (e.g. ChronographWatch hands). Done here — in BOTH import and

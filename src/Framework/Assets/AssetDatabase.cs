@@ -248,6 +248,7 @@ namespace GameEditor.Framework.Assets
         {
             string name = path.Substring(path.LastIndexOf('/') + 1);
             if (name.Length == 0 || name[0] == '.' || name.EndsWith(MetaExtension, StringComparison.OrdinalIgnoreCase)) return false;
+            if (AssetLibrary.IsBesideBlend(name)) return false;   // a .blend's exported GLB, Blender's backups: not assets of their own
             foreach (string part in path.Split('/'))
                 if (part.Length > 0 && part[0] == '.') return false;   // inside a hidden folder
             if (path.StartsWith(AssetsPrefix, StringComparison.Ordinal))

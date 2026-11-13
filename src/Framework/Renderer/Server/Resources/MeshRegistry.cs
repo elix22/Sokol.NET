@@ -155,6 +155,51 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             return id;
         }
 
+        /// <summary>
+        /// As <see cref="RegisterMesh"/>, but a mesh already under <paramref name="key"/> is replaced where it is:
+        /// its buffers are made anew and it keeps its id, so what draws it by key or by id draws the new mesh.
+        /// For a model file that changed and is read again.
+        /// </summary>
+        public ushort RegisterOrReplaceMesh(string key, ObjSubMesh[] subMeshes, in Aabb bounds)
+        {
+            if (!_byPath.TryGetValue(key, out var existing)) return RegisterMesh(key, subMeshes, in bounds);
+            if (subMeshes.Length == 0) return 0;
+
+            foreach (var old in existing.SubMeshes) old.Destroy();
+            var subResources = new MeshSubResource[subMeshes.Length];
+            for (int i = 0; i < subMeshes.Length; i++)
+            {
+                subResources[i] = new MeshSubResource
+                {
+                    VertexBuffer = UploadVertexBuffer(subMeshes[i], key, i),
+                    IndexBuffer  = UploadIndexBuffer(subMeshes[i], key, i),
+                    IndexCount   = subMeshes[i].Indices.Length,
+                    MaterialName = subMeshes[i].MaterialName,
+                    MaterialKey  = ""
+                };
+            }
+            existing.SubMeshes   = subResources;
+            existing.LocalBounds = bounds;
+            return existing.Id;
+        }
+
+        /// <summary>The keys of the registered meshes that start with <paramref name="prefix"/> ("Models/ship.glb#m").</summary>
+        public List<string> KeysWithPrefix(string prefix)
+        {
+            var keys = new List<string>();
+            foreach (string key in _byPath.Keys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal)) keys.Add(key);
+            return keys;
+        }
+
+        /// <summary>Removes a mesh whatever its count, and destroys its buffers: its file no longer has it.</summary>
+        public void Remove(string path)
+        {
+            if (!_byPath.Remove(path, out var res)) return;
+            _byId[res.Id] = null;
+            res.Destroy();
+        }
+
         /// <summary>Decrement ref-count; destroys GPU buffers when count reaches zero.</summary>
         public void Release(string path)
         {

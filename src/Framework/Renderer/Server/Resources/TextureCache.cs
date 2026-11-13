@@ -144,6 +144,24 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             _map.Remove(key);
         }
 
+        /// <summary>
+        /// Destroys every texture whose key starts with <paramref name="prefix"/> ("Models/ship.glb#img"), whatever
+        /// its count: the images of a model file that is read again. What still held one of their views must be
+        /// given the new one (the file's materials are replaced with it).
+        /// </summary>
+        public void DropPrefix(string prefix)
+        {
+            List<string>? keys = null;
+            foreach (string key in _map.Keys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal)) (keys ??= new List<string>()).Add(key);
+            if (keys == null) return;
+            foreach (string key in keys)
+            {
+                _map[key].Destroy();
+                _map.Remove(key);
+            }
+        }
+
         /// <summary>Look up a view by cache key. Returns PlaceholderWhite if not found.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sg_view Get(string key)

@@ -44,6 +44,50 @@ namespace GameEditor.Framework.Assets
             else if (key.EndsWith(".mtl", StringComparison.OrdinalIgnoreCase) && RenderingServer.Materials.GetFirstIdByMtlFile(key) == 0) LoadMtl(key);
         }
 
+        // ── Blender files ───────────────────────────────────────────────────────────────────
+
+        /// <summary>The ending of a Blender file. Under Assets it is a model: its key is its own, and what is read is
+        /// the GLB an editor exported beside it (<see cref="FileOf"/>).</summary>
+        public const string BlendExtension = ".blend";
+
+        /// <summary>True for a key whose model is read as glTF: a <c>.glb</c>, a <c>.gltf</c>, or a <c>.blend</c>.</summary>
+        public static bool IsGltf(string key)
+            => key.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) || key.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase) ||
+               key.EndsWith(BlendExtension, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The file a model's key is read from: for a <c>.blend</c> the GLB beside it (<c>Models/ship.blend.glb</c>),
+        /// for every other key the key itself. The same in an editor and in a built game, on every target.
+        /// </summary>
+        public static string FileOf(string key)
+            => key.EndsWith(BlendExtension, StringComparison.OrdinalIgnoreCase) ? key + ".glb" : key;
+
+        /// <summary>
+        /// True for a file that is beside a <c>.blend</c> and is not an asset of its own: the GLB exported from it
+        /// (<c>ship.blend.glb</c>) and Blender's backups of it (<c>ship.blend1</c>, <c>ship.blend2</c> …).
+        /// Such a file has no id and no row in an editor's panels.
+        /// </summary>
+        public static bool IsBesideBlend(string path)
+        {
+            if (path.EndsWith(BlendExtension + ".glb", StringComparison.OrdinalIgnoreCase)) return true;
+            int end = path.Length;
+            while (end > 0 && char.IsAsciiDigit(path[end - 1])) end--;
+            return end < path.Length && end >= BlendExtension.Length &&
+                   string.Compare(path, end - BlendExtension.Length, BlendExtension, 0, BlendExtension.Length, StringComparison.OrdinalIgnoreCase) == 0;
+        }
+
+        /// <summary>
+        /// Reads a glTF / GLB / <c>.blend</c> model's file again and puts what it holds in the place of what was
+        /// loaded from it: a mesh and a material keep their key, so every entity that names one draws the new one,
+        /// and nothing in a scene is written. <paramref name="done"/> is told whether the file was read, and the mesh
+        /// keys the new file no longer has (they draw nothing now). For an editor, after the file changed.
+        /// </summary>
+        public static void ReimportGltf(string file, Action<bool, IReadOnlyList<string>>? done = null)
+        {
+            _pendingGltfPreloads.Add(file);
+            RenderingServer.ReimportGltfAsync(file, (ok, lost) => { _pendingGltfPreloads.Remove(file); done?.Invoke(ok, lost); });
+        }
+
         // Async mesh loads in flight (keyed by MeshPath); avoids duplicate SFilesystem requests.
         private static readonly HashSet<string> _pendingMeshLoads = new(StringComparer.Ordinal);
         // glTF/GLB files whose resources are currently being (re-)registered — dedupes the
@@ -92,8 +136,7 @@ namespace GameEditor.Framework.Assets
             if (hashIdx > 0)
             {
                 string gltfFile = path.Substring(0, hashIdx);
-                if (gltfFile.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ||
-                    gltfFile.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase))
+                if (IsGltf(gltfFile))
                 {
                     Gltf(gltfFile);
                     return;
