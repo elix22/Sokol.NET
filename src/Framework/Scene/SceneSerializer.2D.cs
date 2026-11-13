@@ -18,6 +18,8 @@ namespace GameEditor.Framework.Scene
             RegisterComponentExtension("Tilemap", WriteTilemap, ReadTilemap, static (w, e) => w.RemoveComponent<TilemapRenderer>(e));
             RegisterComponentExtension("Body2D", WriteBody2D, ReadBody2D, static (w, e) => w.RemoveComponent<Body2D>(e));
             RegisterComponentExtension("AudioSource", WriteAudioSource, ReadAudioSource, static (w, e) => w.RemoveComponent<AudioSource>(e));
+            RegisterComponentExtension("AudioListener", static (w, e) => w.HasComponent<AudioListener>(e) ? "{}" : null,
+                static (w, e, el, resolve) => w.AddComponent(e, new AudioListener()), static (w, e) => w.RemoveComponent<AudioListener>(e));
             RegisterUI();
             RegisterKart();
             RegisterTrack();
@@ -32,7 +34,9 @@ namespace GameEditor.Framework.Scene
         {
             if (!world.TryGetComponent<AudioSource>(e, out var a)) return null;
             return "{\"Clip\":\"" + Esc(a.Clip ?? "") + "\",\"Volume\":" + F(a.Volume) + ",\"Pitch\":" + F(a.Pitch)
-                 + ",\"Loop\":" + (a.Loop ? "true" : "false") + ",\"PlayOnStart\":" + (a.PlayOnStart ? "true" : "false") + "}";
+                 + ",\"Loop\":" + (a.Loop ? "true" : "false") + ",\"PlayOnStart\":" + (a.PlayOnStart ? "true" : "false")
+                 // In space: written only when it is (a scene made before stays as it was).
+                 + (a.Spatial ? ",\"Spatial\":true,\"Min\":" + F(a.MinDistance) + ",\"Max\":" + F(a.MaxDistance) + ",\"Rolloff\":\"" + a.Rolloff + "\"" : "") + "}";
         }
 
         private static void ReadAudioSource(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
@@ -43,6 +47,10 @@ namespace GameEditor.Framework.Scene
             if (el.TryGetProperty("Pitch", out var pitch) && pitch.ValueKind == JsonValueKind.Number) a.Pitch = pitch.GetSingle();
             a.Loop = el.TryGetProperty("Loop", out var loop) && loop.ValueKind == JsonValueKind.True;
             a.PlayOnStart = !el.TryGetProperty("PlayOnStart", out var start) || start.ValueKind != JsonValueKind.False;
+            a.Spatial = el.TryGetProperty("Spatial", out var spatial) && spatial.ValueKind == JsonValueKind.True;
+            if (el.TryGetProperty("Min", out var min) && min.ValueKind == JsonValueKind.Number) a.MinDistance = MathF.Max(0.001f, min.GetSingle());
+            if (el.TryGetProperty("Max", out var max) && max.ValueKind == JsonValueKind.Number) a.MaxDistance = MathF.Max(a.MinDistance, max.GetSingle());
+            if (el.TryGetProperty("Rolloff", out var roll) && Enum.TryParse(roll.GetString(), true, out AudioRolloff rolloff)) a.Rolloff = rolloff;
             world.AddComponent(e, a);
         }
 

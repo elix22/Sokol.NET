@@ -42,8 +42,24 @@ namespace GameEditor.Framework.ECS.Components
         public bool Loop;
         /// <summary>It plays when its scene starts, or when its entity is placed in a playing scene.</summary>
         public bool PlayOnStart;
+        /// <summary>Heard from where its entity is: quieter with distance from the listener, panned to its side.</summary>
+        public bool Spatial;
+        /// <summary>A spatial source's full volume inside this distance (world units).</summary>
+        public float MinDistance;
+        /// <summary>A spatial source is silent beyond this distance (world units).</summary>
+        public float MaxDistance;
+        /// <summary>How a spatial source falls off between the two distances.</summary>
+        public AudioRolloff Rolloff;
 
-        public static AudioSource Default => new() { Clip = "", Volume = 1f, Pitch = 1f, PlayOnStart = true };
+        public static AudioSource Default => new() { Clip = "", Volume = 1f, Pitch = 1f, PlayOnStart = true, MinDistance = 1f, MaxDistance = 50f, Rolloff = AudioRolloff.Inverse };
+    }
+
+    /// <summary>How a spatial sound falls off with distance: Linear from 1 at MinDistance to 0 at MaxDistance; Inverse, MinDistance ÷ distance (as sound in the open), cut to 0 at MaxDistance.</summary>
+    public enum AudioRolloff { Linear, Inverse }
+
+    /// <summary>The ears of a game (scene block "AudioListener"): spatial sounds are heard from its entity. With none, the main camera's.</summary>
+    public struct AudioListener
+    {
     }
 
     /// <summary>

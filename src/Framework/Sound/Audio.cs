@@ -29,6 +29,7 @@ namespace GameEditor.Framework.Sound
             public Entity Entity;
             public bool HasEntity, Music;
             public float Volume = 1f, Pitch = 1f;
+            public float Gain = 1f, Pan;          // a spatial source's, from the listener (G3.1)
         }
 
         private struct Wanted
@@ -67,6 +68,10 @@ namespace GameEditor.Framework.Sound
         /// to 1 — what a loudspeaker would have been given. 0 with a sound device (the device takes the sound itself).
         /// </summary>
         public static float Peak { get; private set; }
+
+        /// <summary>The loudest sample of the left and of the right channel in the last frame a silent mixer was read.</summary>
+        public static float PeakLeft { get; private set; }
+        public static float PeakRight { get; private set; }
 
         /// <summary>
         /// The mixer's time moves: its sound goes to a device (or, with a <see cref="Silent"/> mixer, nowhere).
@@ -174,7 +179,7 @@ namespace GameEditor.Framework.Sound
             _failed = false;
             _paused = false;
             _owed = 0;
-            Peak = 0f;
+            Peak = PeakLeft = PeakRight = 0f;
             Running = false;
             _everRan = false;
             _lastTime = 0;
@@ -305,6 +310,7 @@ namespace GameEditor.Framework.Sound
             }
             var voice = new Voice { Sound = sound, Clip = clip.Key, Entity = wanted.Entity, HasEntity = wanted.HasEntity, Music = wanted.Music };
             ma_sound_set_looping(sound, wanted.Loop ? 1u : 0u);
+            if (wanted.HasEntity) Place(ECSWorld.Instance, voice);    // a spatial source starts where it is heard, not loud
             SetVolume(voice, wanted.Volume);
             SetPitch(voice, wanted.Pitch);
             ma_sound_start(sound);
@@ -316,7 +322,81 @@ namespace GameEditor.Framework.Sound
         private static void SetVolume(Voice voice, float volume)
         {
             voice.Volume = volume;
-            ma_sound_set_volume(voice.Sound, MathF.Max(volume, 0f));
+            ma_sound_set_volume(voice.Sound, MathF.Max(volume * voice.Gain, 0f));
+        }
+
+        // ── Sound in space (G3.1) ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// A spatial sound's gain at <paramref name="distance"/>: 1 inside <paramref name="min"/>, 0 beyond
+        /// <paramref name="max"/>; between, Linear falls from 1 to 0 and Inverse is min ÷ distance.
+        /// </summary>
+        public static float Rolloff(float distance, float min, float max, AudioRolloff rolloff)
+        {
+            min = MathF.Max(min, 0.001f);
+            if (distance <= min) return 1f;
+            if (distance >= max) return 0f;
+            return rolloff == AudioRolloff.Linear ? (max - distance) / MathF.Max(max - min, 0.001f) : min / distance;
+        }
+
+        /// <summary>
+        /// Where a game listens: its <see cref="AudioListener"/>'s entity, else its main camera's, else the origin facing −Z.
+        /// The listener's position and its right: the right of its facing, as a camera's — its entity's +Z is where it faces
+        /// and +Y its up (SceneManager.GetCameraMatrices), so on a camera the right is the screen's.
+        /// </summary>
+        public static (System.Numerics.Vector3 Position, System.Numerics.Vector3 Right) Listener(ECSWorld world)
+        {
+            Entity? camera = null;
+            foreach (Entity e in world.Entities)
+            {
+                if (world.HasComponent<AudioListener>(e) && world.TryGetComponent<Transform>(e, out var tl)) return Ears(world, tl);
+                if (camera == null && world.TryGetComponent<CameraComponent>(e, out var cam) && cam.IsMain) camera = e;
+            }
+            if (camera is { } c && world.TryGetComponent<Transform>(c, out var tc)) return Ears(world, tc);
+            return (System.Numerics.Vector3.Zero, System.Numerics.Vector3.UnitX);
+
+            static (System.Numerics.Vector3, System.Numerics.Vector3) Ears(ECSWorld world, in Transform t)
+            {
+                var m = Transform.GetWorldMatrix(world, t);
+                var forward = System.Numerics.Vector3.TransformNormal(System.Numerics.Vector3.UnitZ, m);
+                var up = System.Numerics.Vector3.TransformNormal(System.Numerics.Vector3.UnitY, m);
+                var right = System.Numerics.Vector3.Cross(forward, up);
+                return (m.Translation, right.LengthSquared() > 1e-12f ? System.Numerics.Vector3.Normalize(right) : System.Numerics.Vector3.UnitX);
+            }
+        }
+
+        /// <summary>
+        /// A spatial source's gain and pan heard from <paramref name="listener"/> (its position and right): the rolloff of the
+        /// distance, and the offset onto the listener's right over the distance (−1 left … 1 right; 0 at the listener).
+        /// </summary>
+        public static (float Gain, float Pan) Heard(System.Numerics.Vector3 source, System.Numerics.Vector3 listener, System.Numerics.Vector3 right,
+                                                    float min, float max, AudioRolloff rolloff)
+        {
+            var offset = source - listener;
+            float distance = offset.Length();
+            float pan = distance > 1e-5f ? Math.Clamp(System.Numerics.Vector3.Dot(offset, right) / distance, -1f, 1f) : 0f;
+            return (Rolloff(distance, min, max, rolloff), pan);
+        }
+
+        /// <summary>An entity's sound as it is heard now: the gain its distance gives and its pan. False when it plays no sound.</summary>
+        public static bool GainOf(Entity entity, out float gain, out float pan)
+        {
+            int i = VoiceOf(entity);
+            (gain, pan) = i >= 0 ? (_voices[i].Gain, _voices[i].Pan) : (0f, 0f);
+            return i >= 0;
+        }
+
+        // A voice of an entity, placed: its gain and pan from the listener when its source is spatial, else 1 and 0.
+        private static void Place(ECSWorld world, Voice voice)
+        {
+            float gain = 1f, pan = 0f;
+            if (world.TryGetComponent<AudioSource>(voice.Entity, out var source) && source.Spatial && world.TryGetComponent<Transform>(voice.Entity, out var t))
+            {
+                var (at, right) = Listener(world);
+                (gain, pan) = Heard(Transform.GetWorldMatrix(world, t).Translation, at, right, source.MinDistance, source.MaxDistance, source.Rolloff);
+            }
+            if (gain != voice.Gain) { voice.Gain = gain; ma_sound_set_volume(voice.Sound, MathF.Max(voice.Volume * gain, 0f)); }
+            if (pan != voice.Pan) { voice.Pan = pan; ma_sound_set_pan(voice.Sound, pan); }
         }
 
         private static void SetPitch(Voice voice, float pitch)
@@ -402,6 +482,7 @@ namespace GameEditor.Framework.Sound
                     if (!world.TryGetComponent<AudioSource>(voice.Entity, out var source)) { End(i); continue; }
                     if (source.Volume != voice.Volume) SetVolume(voice, source.Volume);
                     if (source.Pitch != voice.Pitch) SetPitch(voice, source.Pitch);
+                    Place(world, voice);
                 }
                 else if (!voice.Music && ma_sound_at_end(in *voice.Sound) != 0) End(i);
             }
@@ -420,15 +501,22 @@ namespace GameEditor.Framework.Sound
                 // No device asks for the mixed sound: it is asked for here, as much as the frame is long.
                 _owed += (double)deltaTime * Rate;
                 float* scratch = stackalloc float[1024 * (int)Channels];
-                float peak = 0f;
+                float peak = 0f, left = 0f, right = 0f;
                 while (_owed >= 1.0)
                 {
                     ulong frames = (ulong)Math.Min(_owed, 1024.0), read = 0;
                     ma_engine_read_pcm_frames(_engine, scratch, frames, ref read);
-                    for (int i = 0; i < (int)read * (int)Channels; i++) peak = MathF.Max(peak, MathF.Abs(scratch[i]));
+                    for (int i = 0; i < (int)read * (int)Channels; i++)
+                    {
+                        float v = MathF.Abs(scratch[i]);
+                        peak = MathF.Max(peak, v);
+                        if ((i & 1) == 0) left = MathF.Max(left, v); else right = MathF.Max(right, v);
+                    }
                     _owed -= frames;
                 }
                 Peak = peak;
+                PeakLeft = left;
+                PeakRight = right;
             }
         }
 

@@ -276,5 +276,103 @@ namespace Scene.Tests
             Assert.True(AudioClips.IsClipKey("a.WAV"));
             Assert.False(AudioClips.IsClipKey("wav"));
         }
+        // ── G3.1: sound in space ───────────────────────────────────────────────────────
+
+        [Fact]
+        public void A_spatial_sound_falls_off_with_distance_by_its_rolloff_and_is_panned_to_its_side()
+        {
+            Assert.Equal(1f, Audio.Rolloff(0.5f, 1, 21, AudioRolloff.Linear));
+            Assert.Equal(0.5f, Audio.Rolloff(11, 1, 21, AudioRolloff.Linear), 4);
+            Assert.Equal(0.25f, Audio.Rolloff(4, 1, 21, AudioRolloff.Inverse), 4);
+            Assert.Equal(0f, Audio.Rolloff(30, 1, 21, AudioRolloff.Inverse));
+            var (gain, pan) = Audio.Heard(new Vector3(3, 0, 4), Vector3.Zero, Vector3.UnitX, 1, 50, AudioRolloff.Inverse);
+            Assert.Equal(0.2f, gain, 4);                                  // 5 away: 1 / 5
+            Assert.Equal(0.6f, pan, 4);                                   // 3 of its 5 to the right
+            Assert.Equal((1f, 0f), Audio.Heard(Vector3.Zero, Vector3.Zero, Vector3.UnitX, 1, 50, AudioRolloff.Linear));
+        }
+
+        [Fact]
+        public void A_spatial_source_is_heard_from_the_listener_quieter_away_and_from_its_side()
+        {
+            _files["Audio/hum.wav"] = Wav(2f, 0.5f);
+            // The main camera listens when there is no listener: at the origin, turned to face −Z, so +X is its right (the
+            // engine's cameras face their entity's +Z: unturned, +X would be its left).
+            Entity cam = SceneManager.ActiveScene!.CreateEntity("Camera");
+            World.AddComponent(cam, new CameraComponent { IsMain = true, NearZ = 0.1f, FarZ = 100f, Fov = 60f });
+            var ct = World.GetComponent<Transform>(cam);
+            ct.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI);
+            World.AddComponent(cam, ct);
+            var hum = AudioSource.Default; hum.Clip = "Audio/hum.wav"; hum.Loop = true; hum.Spatial = true; hum.MinDistance = 1f; hum.MaxDistance = 21f; hum.Rolloff = AudioRolloff.Linear;
+            Entity source = Source("Hum", hum);
+            Assert.True(Audio.Play(source));
+            Run(0.1f);
+            Assert.True(Audio.GainOf(source, out float gain, out float pan));
+            Assert.Equal((1f, 0f), (gain, pan));                           // at the listener: full, both sides
+            Assert.Equal(0.5f, Audio.PeakLeft, 2);
+            Assert.Equal(0.5f, Audio.PeakRight, 2);
+
+            Move(source, new Vector3(11, 0, 0));                           // 11 to the right: half by Linear, all on the right
+            Run(0.1f);
+            Audio.GainOf(source, out gain, out pan);
+            Assert.Equal((0.5f, 1f), (gain, pan));
+            Assert.Equal(0f, Audio.PeakLeft, 2);
+            Assert.Equal(0.25f, Audio.PeakRight, 2);
+
+            Move(source, new Vector3(-11, 0, 0));                          // to the left
+            Run(0.1f);
+            Audio.GainOf(source, out gain, out pan);
+            Assert.Equal(-1f, pan);
+            Assert.Equal(0.25f, Audio.PeakLeft, 2);
+            Assert.Equal(0f, Audio.PeakRight, 2);
+
+            // A listener of its own wins over the camera: placed beside the source, the source is full again and ahead.
+            Entity ears = SceneManager.ActiveScene!.CreateEntity("Ears");
+            World.AddComponent(ears, new AudioListener());
+            Move(ears, new Vector3(-11, 0, 0.5f));
+            Run(0.1f);
+            Audio.GainOf(source, out gain, out pan);
+            Assert.Equal(1f, gain);
+            Assert.Equal(0f, pan, 3);
+
+            Move(source, new Vector3(-11, 0, 40));                         // beyond its Max: silent, still playing
+            Run(0.1f);
+            Audio.GainOf(source, out gain, out _);
+            Assert.Equal(0f, gain);
+            Assert.Equal(0f, Audio.Peak, 3);
+            Assert.Equal(1, Audio.PlayingCount);
+
+            hum.Spatial = false; World.AddComponent(source, hum);         // not spatial: as it was, wherever it is
+            Run(0.1f);
+            Audio.GainOf(source, out gain, out pan);
+            Assert.Equal((1f, 0f), (gain, pan));
+            Assert.Equal(0.5f, Audio.Peak, 2);
+        }
+
+        static void Move(Entity e, Vector3 at)
+        {
+            var t = World.GetComponent<Transform>(e);
+            t.Position = at;
+            World.AddComponent(e, t);
+        }
+
+        [Fact]
+        public void A_spatial_source_and_a_listener_are_written_in_their_blocks_and_read_back()
+        {
+            var a = AudioSource.Default; a.Clip = "Audio/hum.wav";
+            Entity plain = Source("Plain", a);
+            Assert.DoesNotContain("Spatial", SceneSerializer.SerializeEntity(plain));   // not spatial: the block as it was
+            a.Spatial = true; a.MinDistance = 2f; a.MaxDistance = 30f; a.Rolloff = AudioRolloff.Linear;
+            Entity spatial = Source("Spatial", a);
+            World.AddComponent(spatial, new AudioListener());
+            string json = SceneSerializer.SerializeEntity(spatial);
+            Assert.Contains("\"Spatial\":true,\"Min\":2,\"Max\":30,\"Rolloff\":\"Linear\"", json);
+            Assert.Contains("\"AudioListener\":{}", json);
+            World.RemoveComponent<AudioSource>(spatial);
+            World.RemoveComponent<AudioListener>(spatial);
+            SceneSerializer.ReadComponents(spatial, System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("c"));
+            var back = World.GetComponent<AudioSource>(spatial);
+            Assert.Equal((true, 2f, 30f, AudioRolloff.Linear), (back.Spatial, back.MinDistance, back.MaxDistance, back.Rolloff));
+            Assert.True(World.HasComponent<AudioListener>(spatial));
+        }
     }
 }
