@@ -500,6 +500,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     ent.Animator  = ex.HasAnimations
                         ? new CGltfAnimator(ex.Animations[0], ex.Nodes, ex.BoneCount, ex.BoneInfoMap)
                         : null;
+                    ent.SetClips(ex.Animations);       // every clip kept, the first playing (G6 A0)
                     var nim = new Dictionary<string, int>();
                     foreach (var rn in ex.Nodes)
                         if (!string.IsNullOrEmpty(rn.NodeName)) nim.TryAdd(rn.NodeName!, rn.NodeIndex);
@@ -579,6 +580,10 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                             Visible         = true,
                             ReceivesShadows = true,
                             CastsShadows    = true,
+                            Clip            = "",          // the first clip, as made, round and round (G6 A0)
+                            Speed           = 1f,
+                            Playing         = true,
+                            Loop            = true,
                         });
                     }
                 }

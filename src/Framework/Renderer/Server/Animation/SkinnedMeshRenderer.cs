@@ -23,5 +23,16 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         public bool Visible;
         public bool ReceivesShadows;
         public bool CastsShadows;
+
+        // ── Playback (G6 A0): the character's animator follows its first skinned mesh's settings ──────────────
+        /// <summary>The clip it plays, by its name in the character's file (SkinnedCharacterRegistry.Entry.Clips); "" = the first.</summary>
+        public string Clip;
+        /// <summary>1 = the clip as made; 2 = twice as fast.</summary>
+        public float Speed;
+        /// <summary>Time moves; off, the pose holds.</summary>
+        public bool Playing;
+        /// <summary>Round and round; off, it stops on the clip's last pose.</summary>
+        public bool Loop;
+
     }
 }

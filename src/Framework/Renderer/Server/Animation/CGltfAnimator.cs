@@ -33,6 +33,9 @@ namespace GameEditor.Framework.Renderer.Server.Animation
 
         public float PlaybackSpeed { get; set; } = 1.0f;
 
+        /// <summary>Round and round (the default); off, time stops at the clip's end and the last pose holds (G6 A0).</summary>
+        public bool Loop { get; set; } = true;
+
         /// <summary>Renderer bookkeeping: the frame this animator last advanced, so a shared
         /// animator (multiple primitives / multiple views) ticks exactly once per frame.</summary>
         public int LastUpdatedFrame = -1;
@@ -104,7 +107,8 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             if (_currentAnimation == null) return;
 
             _currentTime += _currentAnimation.GetTicksPerSecond() * dt * PlaybackSpeed;
-            _currentTime = _currentTime % _currentAnimation.GetDuration();
+            float duration = _currentAnimation.GetDuration();
+            _currentTime = Loop ? _currentTime % duration : MathF.Min(_currentTime, duration);
 
             // Batch-update all bones
             foreach (var bone in _currentAnimation.GetBones())

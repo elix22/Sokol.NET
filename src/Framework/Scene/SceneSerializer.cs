@@ -251,7 +251,13 @@ namespace GameEditor.Framework.Scene
                         .Append(",\"Mat\":\"").Append(Esc(skmr.MaterialKey ?? ""))
                         .Append("\",\"Vis\":").Append(skmr.Visible ? "true" : "false")
                         .Append(",\"RecvSh\":").Append(skmr.ReceivesShadows ? "true" : "false")
-                        .Append(",\"CastSh\":").Append(skmr.CastsShadows ? "true" : "false").Append('}');
+                        .Append(",\"CastSh\":").Append(skmr.CastsShadows ? "true" : "false");
+                    // Playback (G6 A0): written only when not the defaults (the first clip, as made, round and round).
+                    if (!string.IsNullOrEmpty(skmr.Clip)) sb.Append(",\"Clip\":\"").Append(Esc(skmr.Clip)).Append('"');
+                    if (skmr.Speed != 1f && skmr.Speed != 0f) sb.Append(",\"Speed\":").Append(F(skmr.Speed));
+                    if (!skmr.Playing) sb.Append(",\"Playing\":false");
+                    if (!skmr.Loop) sb.Append(",\"Loop\":false");
+                    sb.Append('}');
                 }
 
                 if (world.TryGetComponent<CameraComponent>(id, out var cam))
@@ -527,6 +533,10 @@ namespace GameEditor.Framework.Scene
                     Visible         = !skEl.TryGetProperty("Vis", out var svisEl) || svisEl.GetBoolean(),
                     ReceivesShadows = !skEl.TryGetProperty("RecvSh", out var srecvEl) || srecvEl.GetBoolean(),
                     CastsShadows    = !skEl.TryGetProperty("CastSh", out var scastEl) || scastEl.GetBoolean(),
+                    Clip            = skEl.TryGetProperty("Clip", out var sclipEl) ? (sclipEl.GetString() ?? "") : "",
+                    Speed           = skEl.TryGetProperty("Speed", out var sspeedEl) && sspeedEl.ValueKind == JsonValueKind.Number ? sspeedEl.GetSingle() : 1f,
+                    Playing         = !skEl.TryGetProperty("Playing", out var splayEl) || splayEl.ValueKind != JsonValueKind.False,
+                    Loop            = !skEl.TryGetProperty("Loop", out var sloopEl) || sloopEl.ValueKind != JsonValueKind.False,
                 });
 
             if (c.TryGetProperty("Camera", out var camEl))

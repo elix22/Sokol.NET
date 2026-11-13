@@ -19,6 +19,75 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             /// <summary>Shared animator for the whole character (drives every primitive's bones).</summary>
             public CGltfAnimator? Animator;
             public int BoneCount;
+
+            /// <summary>
+            /// Every clip of the character's file, in the file's order, by a name that does not move between imports (G6 A0):
+            /// its own, or <c>clip&lt;N&gt;</c> by its index when it has none; a repeated name gets <c>~2</c>, <c>~3</c>.
+            /// Scenes store these names (<see cref="SkinnedMeshRenderer.Clip"/>).
+            /// </summary>
+            public readonly List<(string Name, CGltfAnimation Clip)> Clips = new();
+
+            /// <summary>The clips' names, in the file's order.</summary>
+            public IEnumerable<string> ClipNames { get { foreach (var c in Clips) yield return c.Name; } }
+
+            /// <summary>A clip by its name, or null.</summary>
+            public CGltfAnimation? FindClip(string name)
+            {
+                foreach (var c in Clips) if (c.Name == name) return c.Clip;
+                return null;
+            }
+
+            /// <summary>The name of the clip the animator plays now ("" for none).</summary>
+            public string CurrentClipName
+            {
+                get
+                {
+                    var now = Animator?.GetCurrentAnimation();
+                    foreach (var c in Clips) if (ReferenceEquals(c.Clip, now)) return c.Name;
+                    return "";
+                }
+            }
+
+            /// <summary>
+            /// Names the file's clips (unnamed → clip&lt;N&gt;, repeated → name~2 …) and keeps them, the first one playing.
+            /// </summary>
+            public void SetClips(IReadOnlyList<CGltfAnimation> clips)
+            {
+                Clips.Clear();
+                var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int i = 0; i < clips.Count; i++)
+                {
+                    string name = string.IsNullOrEmpty(clips[i].Name) ? $"clip{i}" : clips[i].Name;
+                    if (seen.TryGetValue(name, out int n)) { seen[name] = n + 1; name = $"{name}~{n + 1}"; }
+                    else seen[name] = 1;
+                    Clips.Add((name, clips[i]));
+                }
+            }
+
+            // The settings last applied from the character's SkinnedMeshRenderer (Apply): a clip asked for that is not one of
+            // its clips is said once.
+            private string? _askedClip;
+
+            /// <summary>
+            /// Brings the animator in line with a SkinnedMeshRenderer's playback settings (once a frame, before it is advanced):
+            /// another clip plays from its start ("" = the first), the speed, the loop. False when it is not to move this
+            /// frame (not playing: the pose holds).
+            /// </summary>
+            public bool Apply(in SkinnedMeshRenderer smr)
+            {
+                var anim = Animator;
+                if (anim == null) return false;
+                string want = string.IsNullOrEmpty(smr.Clip) ? (Clips.Count > 0 ? Clips[0].Name : "") : smr.Clip;
+                if (want.Length > 0 && want != CurrentClipName)
+                {
+                    if (FindClip(want) is { } clip) anim.PlayAnimation(clip);
+                    else if (_askedClip != want) Core.Logger.Warning($"[Animation] '{smr.CharacterKey}' has no clip '{want}' (it has {string.Join(", ", ClipNames)}).");
+                    _askedClip = want;
+                }
+                anim.PlaybackSpeed = smr.Speed;
+                anim.Loop = smr.Loop;
+                return smr.Playing;
+            }
             /// <summary>Skinned GPU mesh per running primitive index.</summary>
             public readonly Dictionary<int, SkinnedMesh> Meshes = new();
 
