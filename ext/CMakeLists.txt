@@ -172,6 +172,7 @@ elseif (APPLE)
             "-framework MetalKit"
             "-framework AudioToolbox"
             "-framework AVFoundation"
+            "-framework CoreMotion"
             "-framework Foundation")
         set_target_properties(sokol PROPERTIES 
             FRAMEWORK TRUE

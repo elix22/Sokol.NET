@@ -184,6 +184,7 @@ namespace GameEditor.Framework.Input
         /// </summary>
         public static void BeginFrame()
         {
+            ReadTilt();
             // A Back key that was made an Escape press: let go in the frame after the one that saw it.
             if (_backFrames > 0 && --_backFrames == 0) SetVirtualKey(Key.Escape, false);
 
@@ -504,6 +505,68 @@ namespace GameEditor.Framework.Input
         ///
         /// Virtual override: SetVirtualAxis overrides a named axis for the current frame.
         /// </summary>
+        // ─────────────────────────────────────────────────────────────────────
+        // Tilt (docs/H5_DESIGN.md §12, step K7): one axis of the operating system's gravity vector
+        // (ext/sokol_sensors.h), a dead zone and a clamp - nothing else (no filtering, no averaging).
+        // ─────────────────────────────────────────────────────────────────────
+
+        private static bool _tiltOn, _tiltSensor;
+
+        /// <summary>
+        /// Tilt steering, a setting the player switches (off by default): while on, the phone's tilt - the screen's
+        /// right side down steers right - is <see cref="Tilt"/>, and GetAxis("Horizontal") takes it when no key, stick or
+        /// held button steers. Turning it on starts the sensor, off stops it (the battery). A device with none: Tilt stays 0.
+        /// </summary>
+        public static bool TiltEnabled
+        {
+            get => _tiltOn;
+            set
+            {
+                if (value == _tiltOn) return;
+                _tiltOn = value;
+                // A stand-in (TiltOverride: a check, an editor) needs no sensor.
+                if (value) _tiltSensor = TiltOverride == null && SSens.ssens_start();
+                else { if (_tiltSensor) SSens.ssens_stop(); _tiltSensor = false; Tilt = 0f; }
+            }
+        }
+
+        /// <summary>True when the device has a gravity sensor that was started (TiltEnabled on a phone).</summary>
+        public static bool TiltAvailable => _tiltOn && _tiltSensor;
+
+        /// <summary>How far the phone is turned for a full steer, degrees (default 30).</summary>
+        public static float TiltFullAngle { get; set; } = 30f;
+
+        /// <summary>The share of a full steer that counts as none (default 0.1): a phone held almost level steers straight.</summary>
+        public static float TiltDeadZone { get; set; } = 0.1f;
+
+        /// <summary>The steer from the tilt this frame, -1 (left) to 1 (right); 0 while tilt is off.</summary>
+        public static float Tilt { get; private set; }
+
+        /// <summary>Stands for the sensor: the gravity's x in the screen's frame (m/s²), as a check or an editor gives it; null: the sensor.</summary>
+        public static float? TiltOverride { get; set; }
+
+        /// <summary>The steer for a gravity whose x (the screen's right) is <paramref name="gravityX"/> m/s²: scaled so that
+        /// <see cref="TiltFullAngle"/> is a full steer, the dead zone taken out, clamped to -1…1.</summary>
+        public static float TiltFrom(float gravityX)
+        {
+            float full = 9.80665f * MathF.Sin(Math.Clamp(TiltFullAngle, 1f, 90f) * MathF.PI / 180f);
+            float s = Math.Clamp(gravityX / full, -1f, 1f);
+            float dz = Math.Clamp(TiltDeadZone, 0f, 0.9f);
+            float a = MathF.Abs(s);
+            return a <= dz ? 0f : MathF.Sign(s) * (a - dz) / (1f - dz);
+        }
+
+        private static unsafe void ReadTilt()
+        {
+            if (!_tiltOn) { Tilt = 0f; return; }
+            if (TiltOverride is float gx) { Tilt = TiltFrom(gx); return; }
+            if (!_tiltSensor) { Tilt = 0f; return; }
+            float* g = stackalloc float[3];
+            Tilt = SSens.ssens_gravity(ref g[0]) != 0 ? TiltFrom(g[0]) : 0f;
+        }
+
+        private static float HorizontalWithTilt(float keys) => keys != 0f || !_tiltOn ? keys : Tilt;
+
         public static float GetAxis(string name)
         {
             if (_axisOverride.TryGetValue(name, out float ov))
@@ -511,10 +574,10 @@ namespace GameEditor.Framework.Input
 
             return name switch
             {
-                "Horizontal"        => Math.Clamp(
+                "Horizontal"        => HorizontalWithTilt(Math.Clamp(
                                          DigitalAxis(Key.A, Key.D, Key.LeftArrow, Key.RightArrow)
                                          + _gamepad.LeftStick.X,
-                                         -1f, 1f),
+                                         -1f, 1f)),
                 "Vertical"          => Math.Clamp(
                                          DigitalAxis(Key.S, Key.W, Key.DownArrow, Key.UpArrow)
                                          + _gamepad.LeftStick.Y,

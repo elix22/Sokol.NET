@@ -131,6 +131,8 @@ extern "C"
 #include "sokol_capture.h"
 #define SOKOL_SAFEAREA_IMPL
 #include "sokol_safearea.h"
+#define SOKOL_SENSORS_IMPL
+#include "sokol_sensors.h"
 
 
 // nanovg.h declarations only; implementation is compiled in nanovg_impl.c
