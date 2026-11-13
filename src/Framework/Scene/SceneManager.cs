@@ -164,7 +164,7 @@ namespace GameEditor.Framework.Scene
         {
             public string Key = "";
             public long Started = System.Diagnostics.Stopwatch.GetTimestamp();
-            public double File, Prefabs, Maps, Sheets, Sounds, Tracks, Read, Entities, Asked;
+            public double File, Prefabs, Maps, Sheets, Sounds, Tracks, Clips, Read, Entities, Asked;
             public int Bytes;
             public bool WaitingForAssets;
             public double Now => System.Diagnostics.Stopwatch.GetElapsedTime(Started).TotalMilliseconds;
@@ -175,7 +175,7 @@ namespace GameEditor.Framework.Scene
         /// <summary>
         /// Once a frame (a built game): when the scene that was read has every file it named — no file on its way —
         /// says how long each part of its load took, from the ask: <c>[SceneLoad] key file=… prefabs=… maps=… sheets=…
-        /// sounds=… tracks=… read=… entities=… asked=… assets=… total=… bytes=… entities_made=…</c> (milliseconds).
+        /// sounds=… tracks=… clips=… read=… entities=… asked=… assets=… total=… bytes=… entities_made=…</c> (milliseconds).
         /// </summary>
         public static void TickLoadTimes()
         {
@@ -186,9 +186,9 @@ namespace GameEditor.Framework.Scene
             int made = 0;
             foreach (var _ in ECSWorld.Instance.Entities) made++;
             Logger.Info(System.FormattableString.Invariant(
-                $"[SceneLoad] {t.Key} file={t.File:0} prefabs={t.Prefabs - t.File:0} maps={t.Maps - t.Prefabs:0} sheets={t.Sheets - t.Maps:0} sounds={t.Sounds - t.Sheets:0} tracks={t.Tracks - t.Sounds:0} ")
+                $"[SceneLoad] {t.Key} file={t.File:0} prefabs={t.Prefabs - t.File:0} maps={t.Maps - t.Prefabs:0} sheets={t.Sheets - t.Maps:0} sounds={t.Sounds - t.Sheets:0} tracks={t.Tracks - t.Sounds:0} clips={t.Clips - t.Tracks:0} ")
               + System.FormattableString.Invariant(
-                $"read={t.Read:0.#} entities={t.Entities:0.#} asked={t.Asked:0.#} assets={now - t.Tracks - t.Read - t.Entities - t.Asked:0} total={now:0} bytes={t.Bytes} entities_made={made}"));
+                $"read={t.Read:0.#} entities={t.Entities:0.#} asked={t.Asked:0.#} assets={now - t.Clips - t.Read - t.Entities - t.Asked:0} total={now:0} bytes={t.Bytes} entities_made={made}"));
         }
 
         // Reads a scene's text from the app's files, and every file it must have read before it; then `then`
@@ -209,7 +209,7 @@ namespace GameEditor.Framework.Scene
                     // the prefabs those hold. A scene that names none goes on at once.
                     // The sprite sheets the scene and those prefabs name are read next, for the same reason: a
                     // sprite's frame and an animation's clip are there from the first frame.
-                    // Then the tile maps, and the sheets the maps' tiles come from; then the sounds and the tracks.
+                    // Then the tile maps, and the sheets the maps' tiles come from; then the sounds, the tracks and the clips.
                     Prefabs.LoadNamedIn(json, loaded => { times.Prefabs = times.Now; TilemapLibrary.LoadNamedIn(TextsOf(json, loaded), maps =>
                     {
                         times.Maps = times.Now;
@@ -220,7 +220,12 @@ namespace GameEditor.Framework.Scene
                             () => { times.Sounds = times.Now; TrackLibrary.LoadNamedIn(TextsOf(json, loaded), _ =>
                             {
                                 times.Tracks = times.Now;
-                                then(json, loaded);
+                                // And the animation clips its players name: a clip plays from the game's first frame.
+                                Assets.ClipLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
+                                {
+                                    times.Clips = times.Now;
+                                    then(json, loaded);
+                                });
                             }); }); });
                     }, freshMaps); });
                 }

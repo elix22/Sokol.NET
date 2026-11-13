@@ -248,6 +248,9 @@ namespace GameEditor.Framework.Scripting
 
             // After the scripts: sprite animations show the frame for this moment, a clip a script just chose too.
             Scene.SpriteAnimSystem.Update(ECS.ECSWorld.Instance, deltaTime);
+            // And the animation players: a clip's pose for this moment (Unity animates after Update), its events to the scripts.
+            Animation.AnimationSystem.EventSink ??= DispatchAnimationEvent;
+            Animation.AnimationSystem.Update(ECS.ECSWorld.Instance, deltaTime);
             Sound.Audio.Update(ECS.ECSWorld.Instance, realTime);     // sound goes on while the game's time stands
 
             // The end of the frame for scripts: entities handed to Destroy leave now, and a scene that was
@@ -264,6 +267,7 @@ namespace GameEditor.Framework.Scripting
             _running.Clear();
             _pendingStart.Clear();
             _started = false;
+            Animation.AnimationSystem.Reset();      // its bindings name this game's entities
             Logger.Info("[ScriptSystem] Stopped — all behaviours destroyed.");
         }
 
@@ -376,6 +380,16 @@ namespace GameEditor.Framework.Scripting
         }
 
         // ── Physics event dispatch ────────────────────────────────────────────
+
+        /// <summary>An animation event the entity's clip passed: to each of its scripts (Unity sends it to the animated object).</summary>
+        internal static void DispatchAnimationEvent(Entity entity, Animation.AnimationEvent ev)
+        {
+            foreach (var entry in _running)
+            {
+                if (entry.EntityId != entity) continue;
+                SafeCall(entry.Behaviour, b => b.OnAnimationEvent(ev), nameof(GameBehaviour.OnAnimationEvent));
+            }
+        }
 
         internal static void DispatchCollisionEnter(Entity entity, Entity other)
         {

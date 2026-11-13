@@ -123,23 +123,31 @@ namespace GameEditor.Framework.Animation
             {
                 ref var t = ref targets[i];
                 float v = t.Curve.Evaluate(time, ref t.Hint);
+                // TryGetComponentRef: an entity a script destroyed while the clip plays is passed over, not an exception.
                 switch (t.Field)
                 {
-                    case Field.Position: Set(ref world.GetComponent<Transform>(t.Entity).Position, t.Axis, v); break;
-                    case Field.Scale: Set(ref world.GetComponent<Transform>(t.Entity).Scale, t.Axis, v); break;
+                    case Field.Position: if (world.TryGetComponentRef<Transform>(t.Entity, out var tp)) Set(ref tp.Value.Position, t.Axis, v); break;
+                    case Field.Scale: if (world.TryGetComponentRef<Transform>(t.Entity, out var ts)) Set(ref ts.Value.Scale, t.Axis, v); break;
                     case Field.EulerAngles: Set(ref bound.Eulers[t.Euler].Angles, t.Axis, v); break;
-                    case Field.LightIntensity: world.GetComponent<LightComponent>(t.Entity).Intensity = v; break;
-                    case Field.LightColor: Set(ref world.GetComponent<LightComponent>(t.Entity).Color, t.Axis, v); break;
-                    case Field.LightRange: world.GetComponent<LightComponent>(t.Entity).Range = v; break;
-                    case Field.LightSpotAngle: world.GetComponent<LightComponent>(t.Entity).OuterAngle = v * 0.5f; break;
-                    case Field.LightInnerSpotAngle: world.GetComponent<LightComponent>(t.Entity).InnerAngle = v * 0.5f; break;
-                    case Field.CameraFov: world.GetComponent<CameraComponent>(t.Entity).Fov = v; break;
-                    case Field.CameraOrthoSize: world.GetComponent<CameraComponent>(t.Entity).OrthoSize = v; break;
+                    case Field.CameraFov: if (world.TryGetComponentRef<CameraComponent>(t.Entity, out var cf)) cf.Value.Fov = v; break;
+                    case Field.CameraOrthoSize: if (world.TryGetComponentRef<CameraComponent>(t.Entity, out var co)) co.Value.OrthoSize = v; break;
+                    default:
+                        if (!world.TryGetComponentRef<LightComponent>(t.Entity, out var lr)) break;
+                        ref LightComponent l = ref lr.Value;
+                        switch (t.Field)
+                        {
+                            case Field.LightIntensity: l.Intensity = v; break;
+                            case Field.LightColor: Set(ref l.Color, t.Axis, v); break;
+                            case Field.LightRange: l.Range = v; break;
+                            case Field.LightSpotAngle: l.OuterAngle = v * 0.5f; break;
+                            case Field.LightInnerSpotAngle: l.InnerAngle = v * 0.5f; break;
+                        }
+                        break;
                 }
             }
             // The Euler angles of each entity, all three set: one rotation.
             foreach (var (e, angles) in bound.Eulers)
-                world.GetComponent<Transform>(e).EulerAngles = angles;
+                if (world.TryGetComponentRef<Transform>(e, out var tr)) tr.Value.EulerAngles = angles;
         }
 
         private static void Set(ref Vector3 v, int axis, float value)

@@ -214,6 +214,14 @@ namespace GameEditor.Framework.Scripting
         /// <summary>Called when play mode stops or the entity is destroyed.</summary>
         public virtual void OnDestroy() { }
 
+        /// <summary>
+        /// An event of the clip this entity's AnimationPlayer plays was passed (G6 A2). Unity calls the method named
+        /// by the event; a built game cannot look a method up by name, so the name comes with the event:
+        /// <c>if (e.FunctionName == "OnFootstep") …</c>, its parameters in <see cref="Animation.AnimationEvent.StringParameter"/>,
+        /// <c>FloatParameter</c>, <c>IntParameter</c>.
+        /// </summary>
+        public virtual void OnAnimationEvent(Animation.AnimationEvent e) { }
+
         /// <summary>Called when this entity begins overlapping a non-trigger body.</summary>
         public virtual void OnCollisionEnter(Entity other) { }
 

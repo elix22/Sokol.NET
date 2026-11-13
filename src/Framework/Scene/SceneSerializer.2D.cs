@@ -28,6 +28,27 @@ namespace GameEditor.Framework.Scene
             RegisterItems();
             RegisterChaseCamera();
             RegisterParticles();
+            RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
+        }
+
+        // {"Clip":"Animations/DoorOpen.anim.json"} — "Auto":false and "Speed" only when not the defaults.
+        private static string? WriteAnimationPlayer(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<AnimationPlayer>(e, out var a)) return null;
+            var sb = new System.Text.StringBuilder("{\"Clip\":\"").Append(Esc(a.Clip ?? "")).Append('"');
+            if (!a.PlayAutomatically) sb.Append(",\"Auto\":false");
+            if (a.Speed != 1f) sb.Append(",\"Speed\":").Append(F(a.Speed));
+            return sb.Append('}').ToString();
+        }
+
+        private static void ReadAnimationPlayer(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var a = AnimationPlayer.Default;
+            if (el.TryGetProperty("Clip", out var clip)) a.Clip = clip.GetString() ?? "";
+            a.PlayAutomatically = !el.TryGetProperty("Auto", out var auto) || auto.ValueKind != JsonValueKind.False;
+            if (el.TryGetProperty("Speed", out var speed) && speed.ValueKind == JsonValueKind.Number) a.Speed = speed.GetSingle();
+            a.Playing = a.PlayAutomatically;       // Unity's Play Automatically: it plays from the game's start
+            world.AddComponent(e, a);
         }
 
         private static string? WriteAudioSource(ECSWorld world, Frent.Entity e)
