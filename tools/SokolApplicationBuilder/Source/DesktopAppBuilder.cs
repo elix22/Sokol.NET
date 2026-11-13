@@ -49,6 +49,17 @@ namespace SokolApplicationBuilder
                     Log.LogMessage(MessageImportance.Normal, $"Using project file: {projectFile}");
                 }
 
+                // A game made with the engine (its build files import the engine's Game.targets): the app is compiled
+                // ahead of time, so its scripts are registered - and their fields set - by generated code, as on the
+                // phones (RegisteredScripts.g.cs, compiled in under _DESKTOP_PUBLISHED_BINARY_). Any other project is
+                // left alone.
+                string engineTargets = Path.Combine(opts.ProjectPath, "Directory.Build.targets");
+                if (File.Exists(engineTargets) && File.ReadAllText(engineTargets).Contains("Game.targets"))
+                {
+                    Log.LogMessage(MessageImportance.High, "📝 Generating RegisteredScripts.g.cs for the desktop app...");
+                    Utils.GenerateRegisteredScripts(Log, opts.ProjectPath, Path.GetFileNameWithoutExtension(projectFile));
+                }
+
                 // Default the runtime identifier to the host OS/arch when --rid is omitted. Without this the
                 // publish command emits an empty "-r  -c Release", where -r swallows -c as its value and the
                 // dangling "Release" becomes a second project → MSB1008 / "Switch: Release". Android/iOS builders
