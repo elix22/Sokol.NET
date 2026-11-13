@@ -18,6 +18,21 @@ namespace GameEditor.Framework.Core
         /// <summary>Raised after an <see cref="Undo"/> or a <see cref="Redo"/> was applied.</summary>
         public static event System.Action? Applied;
 
+        /// <summary>Raised when a command was recorded (an editor's animation Record turns a scene edit into keys).</summary>
+        public static event System.Action<IEditorCommand>? Pushed;
+
+        /// <summary>
+        /// Takes <paramref name="cmd"/> off the history when it is the last one recorded (its effect stays as it is) — an
+        /// edit an animation Record turned into keys. False when it is not on top.
+        /// </summary>
+        public static bool RemoveTop(IEditorCommand cmd)
+        {
+            if (_undo.Count == 0 || !ReferenceEquals(_undo.Peek(), cmd)) return false;
+            _undo.Pop();
+            (cmd as IDiscardableCommand)?.Discard();
+            return true;
+        }
+
         public static bool CanUndo => _undo.Count > 0;
         public static bool CanRedo => _redo.Count > 0;
 
@@ -32,6 +47,7 @@ namespace GameEditor.Framework.Core
             cmd.Execute();
             Push(cmd);
             ClearRedo();
+            Pushed?.Invoke(cmd);
         }
 
         /// <summary>
@@ -41,6 +57,7 @@ namespace GameEditor.Framework.Core
         {
             Push(cmd);
             ClearRedo();
+            Pushed?.Invoke(cmd);
         }
 
         private static void Push(IEditorCommand cmd)

@@ -60,6 +60,14 @@ namespace GameEditor.Framework.Assets
             Version++;
         }
 
+        /// <summary>An editor wrote the clip under <paramref name="key"/> to its file: the clip it holds is the file's (not read again).</summary>
+        public static void Saved(string key)
+        {
+            if (!ConfigManager.HasProject) return;
+            string path = System.IO.Path.Combine(ConfigManager.ProjectFolder!, "Assets", key);
+            if (System.IO.File.Exists(path)) _written[key] = (path, System.IO.File.GetLastWriteTimeUtc(path));
+        }
+
         private static void Ask(string key, Action? then)
         {
             _pending.Add(key);
