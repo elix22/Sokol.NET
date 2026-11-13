@@ -533,6 +533,7 @@ namespace GameEditor.Framework.Scene
 
             if (PlayMode == PlayModeState.Stopped)
             {
+                EventBus.RaisePlayStarting();   // what only shows in an editor (an animation preview) goes back first
                 // Snapshot the scene so we can restore it on Stop()
                 if (ActiveScene != null)
                 {

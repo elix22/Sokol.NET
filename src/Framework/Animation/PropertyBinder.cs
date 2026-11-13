@@ -36,6 +36,16 @@ namespace GameEditor.Framework.Animation
         internal (Entity Entity, Vector3 Angles)[] Eulers = System.Array.Empty<(Entity, Vector3)>();
 
         public AnimationClip Clip { get; internal set; } = null!;
+
+        /// <summary>The entities the bound curves write (each once): what an editor's preview keeps and gives back.</summary>
+        public IEnumerable<Entity> TargetEntities
+        {
+            get
+            {
+                var seen = new HashSet<Entity>();
+                foreach (var t in Targets) if (seen.Add(t.Entity)) yield return t.Entity;
+            }
+        }
         /// <summary>The curves that found their entity and property.</summary>
         public int Bound => Targets.Length;
         /// <summary>The curves that did not (a path naming nothing, a property not known) — each warned once, at the binding.</summary>

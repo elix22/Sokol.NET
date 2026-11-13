@@ -16,6 +16,8 @@ namespace GameEditor.Framework.Core
         public static event Action? SceneUnloaded;
         /// <summary>A scene is about to be written to its file: what is saved with a scene (an editor's open tile maps) is written now.</summary>
         public static event Action? SceneSaving;
+        /// <summary>Play is about to start: before the scene is kept for Stop (an editor's preview gives its values back here).</summary>
+        public static event Action? PlayStarting;
 
         public static void RaiseEntitySelected(Entity e)             => EntitySelected?.Invoke(e);
         public static void RaiseEntityCreated(Entity e)              => EntityCreated?.Invoke(e);
@@ -25,5 +27,6 @@ namespace GameEditor.Framework.Core
         public static void RaiseSceneLoaded()                        => SceneLoaded?.Invoke();
         public static void RaiseSceneUnloaded()                      => SceneUnloaded?.Invoke();
         public static void RaiseSceneSaving()                        => SceneSaving?.Invoke();
+        public static void RaisePlayStarting()                       => PlayStarting?.Invoke();
     }
 }
