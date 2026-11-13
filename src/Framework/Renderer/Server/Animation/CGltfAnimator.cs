@@ -18,6 +18,9 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         private Matrix4x4[] _finalBoneMatrices;
         private CGltfAnimation? _currentAnimation;
         private float _currentTime;
+        // A crossfade (G6 A6): the clip fading out, its time, and how far through the fade it is.
+        private CGltfAnimation? _fadingAnimation;
+        private float _fadingTime, _fadeTime, _fadeLength;
 
         private Dictionary<string, Matrix4x4> _nodeGlobalTransforms = new();
         private Dictionary<int, float[]> _animatedMorphWeights = new();
@@ -110,6 +113,13 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             float duration = _currentAnimation.GetDuration();
             _currentTime = Loop ? _currentTime % duration : MathF.Min(_currentTime, duration);
 
+            if (_fadingAnimation != null)
+            {
+                _fadeTime += dt;
+                if (_fadeTime >= _fadeLength) _fadingAnimation = null;     // the fade done: one clip again, today's path
+                else { UpdateFade(dt); return; }
+            }
+
             // Batch-update all bones
             foreach (var bone in _currentAnimation.GetBones())
                 bone.Update(_currentTime);
@@ -146,6 +156,76 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         {
             _currentAnimation = animation;
             _currentTime = 0f;
+            _fadingAnimation = null;
+        }
+
+        /// <summary>
+        /// Fades <paramref name="animation"/> in over <paramref name="seconds"/> while the clip that plays fades out (from
+        /// its time now, going on): each bone's local translation / rotation / scale blended, never a jump. 0 seconds, or
+        /// nothing playing: <see cref="PlayAnimation"/>.
+        /// </summary>
+        public void CrossFade(CGltfAnimation animation, float seconds)
+        {
+            if (seconds <= 0f || _currentAnimation == null || ReferenceEquals(animation, _currentAnimation)) { PlayAnimation(animation); return; }
+            _fadingAnimation = _currentAnimation;
+            _fadingTime = _currentTime;
+            _currentAnimation = animation;
+            _currentTime = 0f;
+            _fadeTime = 0f;
+            _fadeLength = seconds;
+        }
+
+        /// <summary>How far a crossfade is, 0 → 1 (smoothstep of its time); 0 when none runs.</summary>
+        public float FadeWeight => _fadingAnimation == null ? 0f : FadeWeightAt(_fadeTime / _fadeLength);
+
+        public static float FadeWeightAt(float x)
+        {
+            x = Math.Clamp(x, 0f, 1f);
+            return x * x * (3f - 2f * x);
+        }
+
+        // A frame of a crossfade: both clips' bones at their times, blended by the fade's weight, the hierarchy composed once.
+        private void UpdateFade(float dt)
+        {
+            var fading = _fadingAnimation!;
+            _fadingTime += fading.GetTicksPerSecond() * dt * PlaybackSpeed;
+            float d = fading.GetDuration();
+            _fadingTime = d > 0f ? (Loop ? _fadingTime % d : MathF.Min(_fadingTime, d)) : 0f;
+            foreach (var bone in _currentAnimation!.GetBones()) bone.Update(_currentTime);
+            foreach (var bone in fading.GetBones()) bone.Update(_fadingTime);
+            ref CGltfNodeData rootNode = ref _currentAnimation.GetRootNode();
+            CalculateBlended(rootNode, Matrix4x4.Identity, FadeWeight);
+            ApplyAnimationToNodes();
+            UpdateMorphWeightAnimations(_currentTime);
+        }
+
+        /// <summary>Two local transforms blended: translation and scale lerped, rotation slerped, then composed (scale, rotation, translation).</summary>
+        public static Matrix4x4 Blend(in Matrix4x4 from, in Matrix4x4 to, float w)
+        {
+            if (!Matrix4x4.Decompose(from, out var s0, out var r0, out var t0) || !Matrix4x4.Decompose(to, out var s1, out var r1, out var t1))
+                return w < 0.5f ? from : to;
+            return Matrix4x4.CreateScale(Vector3.Lerp(s0, s1, w))
+                 * Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(r0, r1, w))
+                 * Matrix4x4.CreateTranslation(Vector3.Lerp(t0, t1, w));
+        }
+
+        private void CalculateBlended(CGltfNodeData node, Matrix4x4 parentTransform, float w)
+        {
+            Matrix4x4 to = _currentAnimation?.FindBone(node.Name)?.GetLocalTransform() ?? node.Transformation;
+            Matrix4x4 from = _fadingAnimation?.FindBone(node.Name)?.GetLocalTransform() ?? node.Transformation;
+            Matrix4x4 globalTransformation = Blend(from, to, w) * parentTransform;
+            _nodeGlobalTransforms[node.Name] = globalTransformation;
+
+            var boneInfoMap = _characterBoneInfoMap ?? _currentAnimation?.GetBoneIDMap();
+            if (boneInfoMap != null && boneInfoMap.TryGetValue(node.Name, out var boneInfo))
+            {
+                int index = boneInfo.Id;
+                if (index >= 0 && index < _finalBoneMatrices.Length)
+                    _finalBoneMatrices[index] = boneInfo.Offset * globalTransformation;
+            }
+
+            for (int i = 0; i < node.ChildrenCount; i++)
+                CalculateBlended(node.Children[i], globalTransformation, w);
         }
 
         private void CalculateBoneTransform(CGltfNodeData node, Matrix4x4 parentTransform)

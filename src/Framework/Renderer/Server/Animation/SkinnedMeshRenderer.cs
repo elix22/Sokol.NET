@@ -33,6 +33,8 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         public bool Playing;
         /// <summary>Round and round; off, it stops on the clip's last pose.</summary>
         public bool Loop;
+        /// <summary>Seconds a new clip fades in over (a crossfade, G6 A6); 0 switches at once.</summary>
+        public float Fade;
 
     }
 }

@@ -257,6 +257,7 @@ namespace GameEditor.Framework.Scene
                     if (skmr.Speed != 1f && skmr.Speed != 0f) sb.Append(",\"Speed\":").Append(F(skmr.Speed));
                     if (!skmr.Playing) sb.Append(",\"Playing\":false");
                     if (!skmr.Loop) sb.Append(",\"Loop\":false");
+                    if (skmr.Fade > 0f) sb.Append(",\"Fade\":").Append(F(skmr.Fade));
                     sb.Append('}');
                 }
 
@@ -537,6 +538,7 @@ namespace GameEditor.Framework.Scene
                     Speed           = skEl.TryGetProperty("Speed", out var sspeedEl) && sspeedEl.ValueKind == JsonValueKind.Number ? sspeedEl.GetSingle() : 1f,
                     Playing         = !skEl.TryGetProperty("Playing", out var splayEl) || splayEl.ValueKind != JsonValueKind.False,
                     Loop            = !skEl.TryGetProperty("Loop", out var sloopEl) || sloopEl.ValueKind != JsonValueKind.False,
+                    Fade            = skEl.TryGetProperty("Fade", out var sfadeEl) && sfadeEl.ValueKind == JsonValueKind.Number ? sfadeEl.GetSingle() : 0f,
                 });
 
             if (c.TryGetProperty("Camera", out var camEl))

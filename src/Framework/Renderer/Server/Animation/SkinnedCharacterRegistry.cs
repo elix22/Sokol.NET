@@ -80,7 +80,11 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                 string want = string.IsNullOrEmpty(smr.Clip) ? (Clips.Count > 0 ? Clips[0].Name : "") : smr.Clip;
                 if (want.Length > 0 && want != CurrentClipName)
                 {
-                    if (FindClip(want) is { } clip) anim.PlayAnimation(clip);
+                    if (FindClip(want) is { } clip)
+                    {
+                        if (CurrentClipName.Length > 0 && smr.Fade > 0f) anim.CrossFade(clip, smr.Fade);   // a clip changed: faded in
+                        else anim.PlayAnimation(clip);
+                    }
                     else if (_askedClip != want) Core.Logger.Warning($"[Animation] '{smr.CharacterKey}' has no clip '{want}' (it has {string.Join(", ", ClipNames)}).");
                     _askedClip = want;
                 }
