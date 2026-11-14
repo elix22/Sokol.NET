@@ -252,7 +252,14 @@ namespace GameEditor.Framework.Renderer.Server
             _tonemapPass.Render(drawn.TexView, MathF.Pow(2f, ExposureEV), TonemapType(Tonemapping));
             Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, true);
             Text3DRenderer.Draw(ECSWorld.Instance, in viewProj, true);   // text is not tonemapped (G8.4)
+            if (DrawScriptLines) ScriptLinesRenderer.Draw(in viewProj);
         }
+
+        /// <summary>
+        /// The view being drawn shows the lines scripts draw in the world (Scripting.Draw): set by an editor for its Scene
+        /// view, and for its Game view when its Gizmos toggle is on; never in a built game (G8.4 D3).
+        /// </summary>
+        public static bool DrawScriptLines { get; set; }
 
         /// <summary>A config.json "environmentTonemapping" ("none" / "neutral" / "aces") as a mode; anything else is None.</summary>
         public static TonemapMode TonemapOf(string? text) => text?.Trim().ToLowerInvariant() switch
@@ -442,6 +449,7 @@ namespace GameEditor.Framework.Renderer.Server
             EventBus.SceneLoaded -= AttachSceneNodeAnimations;
             _initialized = false;
             Text3DRenderer.Shutdown();
+            ScriptLinesRenderer.Shutdown();
             _clusterData?.Dispose();
             _clusterData = null;
             _instanceBuf.Dispose();
@@ -787,6 +795,7 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
                 Text3DRenderer.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
+                if (DrawScriptLines && (basePipelineFlags & PipelineFlags.OffscreenRt) != 0) ScriptLinesRenderer.Draw(in viewProj);
             }
         }
 

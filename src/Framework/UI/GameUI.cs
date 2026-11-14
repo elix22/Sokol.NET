@@ -360,7 +360,8 @@ namespace GameEditor.Framework.UI
             }
 
             // On the screen while there is something to show (see ShowOn).
-            bool wanted = _items.Count > 0 || _outlined.Count > 0 || !_canvas.IsNull || _hostSafe.Horizontal + _hostSafe.Vertical > 0f;
+            bool wanted = _items.Count > 0 || _outlined.Count > 0 || !_canvas.IsNull || _hostSafe.Horizontal + _hostSafe.Vertical > 0f
+                          || Scripting.Draw.Shapes.Count > 0;   // a script's shapes (G8.4 D3)
             if (_host != null && wanted != (Root.Parent == _host))
             {
                 if (wanted) _host.AddChild(Root);
@@ -853,6 +854,7 @@ namespace GameEditor.Framework.UI
                 if (safe.Top > 0f) renderer.FillRect(new Rect(0f, 0f, _hostWidth, safe.Top), Unsafe);
                 if (safe.Bottom > 0f) renderer.FillRect(new Rect(0f, _hostHeight - safe.Bottom, _hostWidth, safe.Bottom), Unsafe);
                 base.Draw(renderer);
+                DrawScriptShapes(renderer);
                 foreach (Entity e in _outlined)
                 {
                     if (!_rects.TryGetValue(e, out Rect r)) continue;
@@ -880,6 +882,36 @@ namespace GameEditor.Framework.UI
                         renderer.SetStrokeWidth(1f);
                         renderer.StrokeRect(box);
                     }
+                }
+            }
+        }
+
+        // G8.4 D3: the shapes scripts asked for this frame (Draw.Screen), over the UI, in its units (a screen 720 high).
+        private static void DrawScriptShapes(Sokol.GUI.Renderer r)
+        {
+            float k = Scale;
+            foreach (var s in Scripting.Draw.Shapes)
+            {
+                var c = new UIColor(s.Color.X, s.Color.Y, s.Color.Z, s.Color.W);
+                switch (s.Kind)
+                {
+                    case Scripting.Draw.ShapeKind.Line:
+                        r.DrawLine(s.A.X * k, s.A.Y * k, s.B.X * k, s.B.Y * k, MathF.Max(0.5f, s.Size * k), c);
+                        break;
+                    case Scripting.Draw.ShapeKind.Rect:
+                        var rect = new Rect(s.A.X * k, s.A.Y * k, s.B.X * k, s.B.Y * k);
+                        if (s.Filled) r.FillRect(rect, c); else r.StrokeRect(rect, MathF.Max(0.5f, s.Size * k), c);
+                        break;
+                    case Scripting.Draw.ShapeKind.Circle:
+                        if (s.Filled) r.FillCircle(s.A.X * k, s.A.Y * k, s.B.X * k, c);
+                        else r.StrokeCircle(s.A.X * k, s.A.Y * k, s.B.X * k, MathF.Max(0.5f, s.Size * k), c);
+                        break;
+                    case Scripting.Draw.ShapeKind.Text:
+                        r.SetFont(FontOf(null));
+                        r.SetFontSize(MathF.Max(1f, s.Size * k));
+                        r.SetTextAlign(TextHAlign.Left, TextVAlign.Top);
+                        r.DrawTextBox(s.A.X * k, s.A.Y * k, 100000f, s.Text ?? "", c);
+                        break;
                 }
             }
         }

@@ -223,6 +223,7 @@ namespace GameEditor.Framework.Scripting
             UnscaledDeltaTime = deltaTime;
             float realTime = deltaTime;
             deltaTime *= Scene.SceneManager.TimeScale;
+            Draw.BeginFrame(deltaTime);              // G8.4 D3: lines and shapes whose time is over, gone
 
             // Behaviours placed since the last pass start now. One that places another in its OnStart adds to the
             // list while it is walked: that one starts in this pass too.
@@ -269,6 +270,7 @@ namespace GameEditor.Framework.Scripting
             _pendingStart.Clear();
             _started = false;
             Animation.AnimationSystem.Reset();      // its bindings name this game's entities
+            Draw.Clear();
             Animation.AnimatorSystem.Reset();
             Logger.Info("[ScriptSystem] Stopped — all behaviours destroyed.");
         }

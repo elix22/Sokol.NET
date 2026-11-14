@@ -60,6 +60,8 @@
     <_ScreenCopyOut>$(_ShaderOutDir)screen_copy_shader.cs</_ScreenCopyOut>
     <_Text3DGlsl>$(_ShaderDir)text3d.glsl</_Text3DGlsl>
     <_Text3DOut>$(_ShaderOutDir)text3d_shader.cs</_Text3DOut>
+    <_LinesGlsl>$(_ShaderDir)lines.glsl</_LinesGlsl>
+    <_LinesOut>$(_ShaderOutDir)lines_shader.cs</_LinesOut>
   </PropertyGroup>
 
   <!-- Ensure the generated-shader output folder exists before any shader-compile target writes to
@@ -126,6 +128,14 @@
           Inputs="$(_Text3DGlsl)"
           Outputs="$(_Text3DOut)">
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_Text3DGlsl)&quot; --output &quot;$(_Text3DOut)&quot; --module text3d --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
+  <!-- G8.4 D3: the lines scripts draw in the world. -->
+  <Target Name="CompileFrameworkLinesShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_LinesGlsl)"
+          Outputs="$(_LinesOut)">
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_LinesGlsl)&quot; --output &quot;$(_LinesOut)&quot; --module lines --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
   <!-- PBR shader variants: one .cs file per define combination.
