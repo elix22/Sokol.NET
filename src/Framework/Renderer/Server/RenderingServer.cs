@@ -1314,6 +1314,19 @@ namespace GameEditor.Framework.Renderer.Server
                 }
             }
 
+            // The particles' lights (G8.8 Q5): point lights, ranked with the scene's by the same importance - inside the quality
+            // level's light limit and Forward+'s clusters; no shadows.
+            int particleLights = Scene.WorldParticles.GatherLights(world);
+            var lights = Scene.WorldParticles.Lights;
+            for (int pi = 0; pi < particleLights; pi++)
+            {
+                var q = lights[pi];
+                if (q.Intensity <= 0f || q.Range <= 0f) continue;
+                float importance = q.Intensity / MathF.Max(Vector3.DistanceSquared(cameraPos, q.Position), 0.01f);
+                var pl = new Light(Lighting.LightType.Point, q.Position, -Vector3.UnitY, q.Color, q.Intensity, q.Range);
+                TryInsertTopLight(in pl, importance);
+            }
+
             if (!anyDirectionalLight && PreviewSunDirection is { } sunDir)
             {
                 var sun = new Light(Lighting.LightType.Directional, Vector3.Zero, Vector3.Normalize(sunDir),

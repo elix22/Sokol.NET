@@ -115,6 +115,12 @@ namespace GameEditor.Framework.Scene
             Key(b, "TrailColorOverTrail"); Gradient(b, in p.TrailColorOverTrail);
             Bool(b, "TrailInheritColor", p.TrailInheritColor);
             Key(b, "TrailTexture").Append('"').Append(Esc(p.TrailTexture ?? "")).Append('"');
+            // Lights (G8.8 Q5): the template by its scene id
+            Bool(b, "LightsOn", p.LightsOn);
+            Key(b, "LightTemplate").Append((!p.LightTemplate.IsNull && p.LightTemplate.IsAlive ? world.GetSceneId(p.LightTemplate) : 0).ToString(CultureInfo.InvariantCulture));
+            Num(b, "LightRatio", p.LightRatio); Bool(b, "LightUseParticleColor", p.LightUseParticleColor); Bool(b, "LightSizeAffectsRange", p.LightSizeAffectsRange);
+            Bool(b, "LightAlphaAffectsIntensity", p.LightAlphaAffectsIntensity); Num(b, "LightRangeMultiplier", p.LightRangeMultiplier);
+            Num(b, "LightIntensityMultiplier", p.LightIntensityMultiplier); Key(b, "LightMax").Append(p.LightMax.ToString(CultureInfo.InvariantCulture));
             // Texture Sheet Animation
             Bool(b, "SheetOn", p.SheetOn); Key(b, "Sheet").Append('[').Append(p.SheetColumns.ToString(CultureInfo.InvariantCulture)).Append(',')
                                                        .Append(p.SheetRows.ToString(CultureInfo.InvariantCulture)).Append(']');
@@ -264,6 +270,18 @@ namespace GameEditor.Framework.Scene
             if (el.TryGetProperty("TrailColorOverTrail", out var tct) && tct.ValueKind == JsonValueKind.Object) p.TrailColorOverTrail = ReadGradient(tct);
             p.TrailInheritColor = Flag(el, "TrailInheritColor", p.TrailInheritColor);
             p.TrailTexture = Text(el, "TrailTexture", p.TrailTexture ?? "");
+            // Lights
+            p.LightsOn = Flag(el, "LightsOn", p.LightsOn);
+            p.LightTemplate = default;
+            if (el.TryGetProperty("LightTemplate", out var lt) && lt.ValueKind == JsonValueKind.Number && lt.TryGetInt32(out int lid) && lid > 0
+                && resolve(lid) is { IsNull: false } le) p.LightTemplate = le;
+            p.LightRatio = Math.Clamp(Number(el, "LightRatio", p.LightRatio), 0f, 1f);
+            p.LightUseParticleColor = Flag(el, "LightUseParticleColor", p.LightUseParticleColor);
+            p.LightSizeAffectsRange = Flag(el, "LightSizeAffectsRange", p.LightSizeAffectsRange);
+            p.LightAlphaAffectsIntensity = Flag(el, "LightAlphaAffectsIntensity", p.LightAlphaAffectsIntensity);
+            p.LightRangeMultiplier = MathF.Max(0f, Number(el, "LightRangeMultiplier", p.LightRangeMultiplier));
+            p.LightIntensityMultiplier = MathF.Max(0f, Number(el, "LightIntensityMultiplier", p.LightIntensityMultiplier));
+            p.LightMax = Math.Clamp((int)Number(el, "LightMax", p.LightMax), 0, WorldParticles.MaxLights);
             // Texture Sheet Animation
             p.SheetOn = Flag(el, "SheetOn", p.SheetOn);
             if (el.TryGetProperty("Sheet", out var sh) && sh.ValueKind == JsonValueKind.Array && sh.GetArrayLength() == 2)

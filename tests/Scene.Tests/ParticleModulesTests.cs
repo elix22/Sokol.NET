@@ -243,9 +243,16 @@ namespace Scene.Tests
             Entity c = Emitter(calm);
             Run(1f);
             Assert.NotEqual(first, Positions(c));
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            Run(2f);
-            Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+            // Two windows, the lesser: a one-off (the runtime compiling a method again, faster) is not a frame's allocation;
+            // one that every frame makes is in both.
+            long least = long.MaxValue;
+            for (int w = 0; w < 2; w++)
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                Run(1f);
+                least = Math.Min(least, GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+            Assert.Equal(0, least);
         }
 
         [Fact]

@@ -27,6 +27,7 @@ namespace GameEditor.Framework.Scene
             public Vector3 Tested;      // where it was when last tested against the world (Collision Quality Medium / Low)
             public float SubCarry;      // its Birth sub-emitters' part of a particle not yet made
             public int Trail;           // its trail's slot + 1 (0: none)
+            public bool Lit;            // it carries a light (the Lights module's Ratio)
         }
 
         sealed class Pool
@@ -53,6 +54,7 @@ namespace GameEditor.Framework.Scene
             public Vector3 EmitterVel;
             public readonly ParticleCollisionEvent[] Hits = new ParticleCollisionEvent[64];
             public int HitCount;
+            public int LightCount;      // its lights given to the renderer at the last gathering
             // Trails (G8.8 Q3): slots of TrailPoints points each, oldest first; a slot is a living particle's or a lingering one.
             public Vector3[] TrailPos = Array.Empty<Vector3>();
             public float[] TrailAge = Array.Empty<float>();
@@ -65,6 +67,53 @@ namespace GameEditor.Framework.Scene
         }
 
         private static readonly Dictionary<Entity, Pool> _pools = new();
+        /// <summary>A particle's light for the renderer (the Lights module): a point light.</summary>
+        public struct ParticleLight { public Vector3 Position, Color; public float Intensity, Range; }
+
+        /// <summary>The particles' lights at most a frame, all systems together.</summary>
+        public const int MaxLights = 256;
+        private static readonly ParticleLight[] _lights = new ParticleLight[MaxLights];
+
+        /// <summary>The lights of the last <see cref="GatherLights"/>.</summary>
+        public static ReadOnlySpan<ParticleLight> Lights => new(_lights, 0, _lightTotal);
+        private static int _lightTotal;
+
+        /// <summary>The lights one emitter gave the renderer at its last gathering.</summary>
+        public static int LightCountOf(Entity entity) => _pools.TryGetValue(entity, out Pool? p) ? p.LightCount : 0;
+
+        /// <summary>
+        /// The particles' point lights now (G8.8 Q5), for the renderer's light gathering: each system's lit particles, at most
+        /// its Maximum Lights, from its template light - colour, intensity and range, times the particle's as asked. Returns how
+        /// many (<see cref="Lights"/>).
+        /// </summary>
+        public static int GatherLights(ECSWorld world)
+        {
+            _lightTotal = 0;
+            foreach (Pool pool in _pools.Values)
+            {
+                pool.LightCount = 0;
+                ref readonly ParticlesComponent c = ref pool.C;
+                if (!c.LightsOn || pool.Count == 0 || c.LightTemplate.IsNull || !c.LightTemplate.IsAlive
+                    || !world.TryGetComponent<LightComponent>(c.LightTemplate, out var t)) continue;
+                int max = Math.Max(0, c.LightMax);
+                for (int i = 0; i < pool.Count && pool.LightCount < max && _lightTotal < MaxLights; i++)
+                {
+                    ref readonly Particle q = ref pool.Items[i];
+                    if (!q.Lit) continue;
+                    Vector4 col = ColorNow(in c, in q);
+                    _lights[_lightTotal++] = new ParticleLight
+                    {
+                        Position = WorldPos(pool, in q),
+                        Color = c.LightUseParticleColor ? t.Color * new Vector3(col.X, col.Y, col.Z) : t.Color,
+                        Intensity = t.Intensity * c.LightIntensityMultiplier * (c.LightAlphaAffectsIntensity ? Math.Clamp(col.W, 0f, 1f) : 1f),
+                        Range = t.Range * c.LightRangeMultiplier * (c.LightSizeAffectsRange ? SizeNow(in c, in q) : 1f),
+                    };
+                    pool.LightCount++;
+                }
+            }
+            return _lightTotal;
+        }
+
         /// <summary>The points of one trail at most (a ribbon's corners).</summary>
         public const int TrailPoints = 64;
         // The collision messages of a step, each (emitter, other) once: two arrays, compared by hand (a list of tuples and its
@@ -891,6 +940,7 @@ namespace GameEditor.Framework.Scene
                 }
                 q.Tested = q.Pos;
                 q.SubCarry = 0f;
+                q.Lit = c.LightsOn && (c.LightRatio >= 1f || (c.LightRatio > 0f && Next(ref pool.Seed) < c.LightRatio));
                 // A trail for the Ratio's share (a random drawn only for a ratio under 1), from a free slot.
                 if (c.TrailsOn && pool.FreeCount > 0 && (c.TrailRatio >= 1f || (c.TrailRatio > 0f && Next(ref pool.Seed) < c.TrailRatio)))
                 {

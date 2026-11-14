@@ -227,6 +227,18 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>An image key; empty: plain white.</summary>
         public string TrailTexture;
 
+        // ---- Lights (G8.8 Q5) ----
+        public bool LightsOn;
+        /// <summary>An entity with a Light (best disabled, so it lights nothing itself): its colour, intensity and range are the
+        /// pattern of the particles' point lights.</summary>
+        public Frent.Entity LightTemplate;
+        /// <summary>0..1: the share of particles given a light (drawn when made).</summary>
+        public float LightRatio;
+        public bool LightUseParticleColor, LightSizeAffectsRange, LightAlphaAffectsIntensity;
+        public float LightRangeMultiplier, LightIntensityMultiplier;
+        /// <summary>At most this many lights for the system.</summary>
+        public int LightMax;
+
         // ---- Texture Sheet Animation ----
         public bool SheetOn;
         public int SheetColumns, SheetRows;
@@ -311,6 +323,8 @@ namespace GameEditor.Framework.ECS.Components
             TrailRatio = 1f, TrailLifetime = 1f, TrailMinVertexDistance = 0.2f, TrailWorldSpace = true, TrailDieWithParticles = true,
             TrailTextureMode = ParticleTrailTexture.Stretch, TrailWidth = ParticleCurve.Line(1f, 1f), TrailColorOverLifetime = ParticleGradient.White,
             TrailColorOverTrail = ParticleGradient.White, TrailInheritColor = true, TrailTexture = "",
+            LightRatio = 0f, LightUseParticleColor = true, LightSizeAffectsRange = false, LightAlphaAffectsIntensity = true,
+            LightRangeMultiplier = 1f, LightIntensityMultiplier = 1f, LightMax = 20,
             SheetColumns = 1, SheetRows = 1, SheetTime = ParticleSheetTime.Lifetime, SheetFps = 10f, SheetCycles = 1f, SheetStartFrame = Vector2.Zero,
             Texture = "", RenderMode = ParticleRenderMode.Billboard, SpeedScale = 0f, LengthScale = 2f, Blend = ParticleBlend.Alpha, Sort = ParticleSort.None,
         };

@@ -150,9 +150,16 @@ namespace Scene.Tests
             var p = Mover(); p.Rate = 30f; p.Looping = true; p.Bursts = default; p.Spread = 90f; p.TrailRatio = 0.7f; p.TrailDieWithParticles = false; p.Life = new Vector2(1f, 1f);
             Emitter(p);
             Run(2f);
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            Run(2f);
-            Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+            // Two windows, the lesser: a one-off (the runtime compiling a method again, faster) is not a frame's allocation;
+            // one that every frame makes is in both.
+            long least = long.MaxValue;
+            for (int w = 0; w < 2; w++)
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                Run(1f);
+                least = Math.Min(least, GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+            Assert.Equal(0, least);
         }
 
         [Fact]
