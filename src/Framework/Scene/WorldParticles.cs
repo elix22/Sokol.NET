@@ -118,11 +118,51 @@ namespace GameEditor.Framework.Scene
             return n;
         }
 
-        private static Vector4 ColorNow(in ParticlesComponent c, in Particle q) =>
-            c.ColorOn ? q.Color * c.ColorOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : q.Color;
+        // A particle's colour and size now: its start values times the over-lifetime modules' and the by-speed ones'.
+        private static Vector4 ColorNow(in ParticlesComponent c, in Particle q)
+        {
+            Vector4 col = c.ColorOn ? q.Color * c.ColorOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : q.Color;
+            if (c.ColorBySpeedOn) col *= c.ColorBySpeed.Evaluate(SpeedFrac(c.ColorSpeedRange, q.Vel.Length()));
+            return col;
+        }
 
-        private static float SizeNow(in ParticlesComponent c, in Particle q) =>
-            q.Size * (c.SizeOn ? c.SizeOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : 1f);
+        private static float SizeNow(in ParticlesComponent c, in Particle q)
+        {
+            float size = q.Size * (c.SizeOn ? c.SizeOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : 1f);
+            if (c.SizeBySpeedOn) size *= c.SizeBySpeed.Evaluate(SpeedFrac(c.SizeSpeedRange, q.Vel.Length()));
+            return size;
+        }
+
+        // A speed's place in a by-speed module's range, 0..1.
+        private static float SpeedFrac(Vector2 range, float speed) =>
+            range.Y > range.X ? Math.Clamp((speed - range.X) / (range.Y - range.X), 0f, 1f) : speed >= range.Y ? 1f : 0f;
+
+        /// <summary>Each of one emitter's particles' velocity in the world, in the order of <see cref="CopyPositions"/>.</summary>
+        public static int CopyVelocities(Entity entity, Span<Vector3> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.Count, into.Length);
+            for (int i = 0; i < n; i++) into[i] = WorldVel(p, in p.Items[i]);
+            return n;
+        }
+
+        /// <summary>Each of one emitter's particles' rotation now (degrees in the view), in the order of <see cref="CopyPositions"/>.</summary>
+        public static int CopyRotations(Entity entity, Span<float> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.Count, into.Length);
+            for (int i = 0; i < n; i++) into[i] = p.Items[i].Rot;
+            return n;
+        }
+
+        /// <summary>Each of one emitter's particles' size now (metres), in the order of <see cref="CopyPositions"/>.</summary>
+        public static int CopySizes(Entity entity, Span<float> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.Count, into.Length);
+            for (int i = 0; i < n; i++) into[i] = SizeNow(in p.C, in p.Items[i]);
+            return n;
+        }
 
         /// <summary>How old each of one emitter's particles is, seconds (in the order of <see cref="CopyPositions"/>).</summary>
         public static int CopyAges(Entity entity, Span<float> into)
@@ -576,6 +616,11 @@ namespace GameEditor.Framework.Scene
                     p.Pos += Noise3(at, pool.NoiseSeed) * (c.NoiseStrength * dt);
                 }
                 if (spin) p.Rot += p.Spin * dt;
+                if (c.RotationBySpeedOn)
+                {
+                    float f = SpeedFrac(c.RotationSpeedRange, p.Vel.Length());
+                    p.Rot += (c.RotationBySpeed.X + (c.RotationBySpeed.Y - c.RotationBySpeed.X) * f) * dt;
+                }
                 if (collide && !Collide(self, pool, in c, ref p, from, i, stride, phase, planeAt[..planes], planeUp[..planes], planeOf[..planes]))
                 {
                     if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
@@ -826,6 +871,7 @@ namespace GameEditor.Framework.Scene
                     dir = Vector3.Normalize(Vector3.Lerp(dir, Vector3.Normalize(pos - centre), Math.Clamp(c.SpherizeDirection, 0f, 1f)) + new Vector3(1e-7f));
                 float speed = c.Speed.X + (c.Speed.Y - c.Speed.X) * Next(ref pool.Seed);
                 float life = c.Life.X + (c.Life.Y - c.Life.X) * Next(ref pool.Seed);
+                if (c.LifetimeBySpeedOn) life *= c.LifetimeBySpeed.Evaluate(SpeedFrac(c.LifetimeSpeedRange, pool.EmitterVel.Length()));
                 if (life <= 0f) continue;
                 // The new start values draw a random only where they are a range (an emitter of before draws none).
                 var q = new Particle

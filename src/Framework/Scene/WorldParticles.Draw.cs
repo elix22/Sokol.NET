@@ -111,9 +111,9 @@ namespace GameEditor.Framework.Scene
             {
                 ref readonly Particle p = ref pool.Items[sorted ? pool.SortOrder[s] : s];
                 float t = p.Life > 0f ? p.Age / p.Life : 1f;
-                float size = p.Size * (c.SizeOn ? c.SizeOverLifetime.Evaluate(t) : 1f);
+                float size = SizeNow(in c, in p);
                 if (size <= 0f) continue;
-                Vector4 col = c.ColorOn ? p.Color * c.ColorOverLifetime.Evaluate(t) : p.Color;
+                Vector4 col = ColorNow(in c, in p);
                 if (col.W <= 0f) continue;
                 Vector3 centre = WorldPos(pool, in p);
 

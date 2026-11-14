@@ -133,14 +133,38 @@ namespace GameEditor.Framework.ECS.Components
         public bool ColorOn;
         public ParticleGradient ColorOverLifetime;
 
+        // ---- Color by Speed (G8.8 Q4) ----
+        public bool ColorBySpeedOn;
+        /// <summary>The colour times this gradient at the particle's speed's place in <see cref="ColorSpeedRange"/>.</summary>
+        public ParticleGradient ColorBySpeed;
+        /// <summary>Metres a second: [the gradient's 0, its 1].</summary>
+        public Vector2 ColorSpeedRange;
+
         // ---- Size over Lifetime ----
         public bool SizeOn;
         public ParticleCurve SizeOverLifetime;
+
+        // ---- Size by Speed (G8.8 Q4) ----
+        public bool SizeBySpeedOn;
+        public ParticleCurve SizeBySpeed;
+        public Vector2 SizeSpeedRange;
 
         // ---- Rotation over Lifetime ----
         public bool RotationOn;
         /// <summary>Degrees a second: [min, max].</summary>
         public Vector2 AngularVelocity;
+
+        // ---- Rotation by Speed (G8.8 Q4) ----
+        public bool RotationBySpeedOn;
+        /// <summary>Degrees a second added at the low end of <see cref="RotationSpeedRange"/> and at its high end.</summary>
+        public Vector2 RotationBySpeed;
+        public Vector2 RotationSpeedRange;
+
+        // ---- Lifetime by Emitter Speed (G8.8 Q4) ----
+        public bool LifetimeBySpeedOn;
+        /// <summary>A particle's life when made times this curve at the emitter's speed's place in <see cref="LifetimeSpeedRange"/>.</summary>
+        public ParticleCurve LifetimeBySpeed;
+        public Vector2 LifetimeSpeedRange;
 
         // ---- Noise ----
         public bool NoiseOn;
@@ -278,6 +302,9 @@ namespace GameEditor.Framework.ECS.Components
             Velocity = Vector3.Zero, SpeedLimit = 1f, Dampen = 0f, Drag = 0f, Force = Vector3.Zero,
             ColorOverLifetime = ParticleGradient.White, SizeOverLifetime = ParticleCurve.Line(1f, 1f),
             AngularVelocity = new Vector2(45f, 45f),
+            ColorBySpeed = ParticleGradient.White, ColorSpeedRange = new Vector2(0f, 1f), SizeBySpeed = ParticleCurve.Line(1f, 1f),
+            SizeSpeedRange = new Vector2(0f, 1f), RotationBySpeed = new Vector2(45f, 45f), RotationSpeedRange = new Vector2(0f, 1f),
+            LifetimeBySpeed = ParticleCurve.Line(1f, 1f), LifetimeSpeedRange = new Vector2(0f, 1f),
             NoiseStrength = 1f, NoiseFrequency = 0.5f, NoiseScroll = 0f,
             CollisionType = ParticleCollisionType.Planes, CollisionDampen = 0f, Bounce = 1f, LifetimeLoss = 0f, MinKillSpeed = 0f,
             MaxKillSpeed = 10000f, RadiusScale = 1f, CollisionQuality = ParticleCollisionQuality.High,

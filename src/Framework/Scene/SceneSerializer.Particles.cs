@@ -70,6 +70,11 @@ namespace GameEditor.Framework.Scene
             Bool(b, "ColorOn", p.ColorOn); Key(b, "ColorOverLifetime"); Gradient(b, in p.ColorOverLifetime);
             Bool(b, "SizeOn", p.SizeOn); Key(b, "SizeOverLifetime"); Curve(b, in p.SizeOverLifetime);
             Bool(b, "RotationOn", p.RotationOn); Key(b, "AngularVelocity").Append(Pair(p.AngularVelocity));
+            // By speed (G8.8 Q4)
+            Bool(b, "ColorBySpeedOn", p.ColorBySpeedOn); Key(b, "ColorBySpeed"); Gradient(b, in p.ColorBySpeed); Key(b, "ColorSpeedRange").Append(Pair(p.ColorSpeedRange));
+            Bool(b, "SizeBySpeedOn", p.SizeBySpeedOn); Key(b, "SizeBySpeed"); Curve(b, in p.SizeBySpeed); Key(b, "SizeSpeedRange").Append(Pair(p.SizeSpeedRange));
+            Bool(b, "RotationBySpeedOn", p.RotationBySpeedOn); Key(b, "RotationBySpeed").Append(Pair(p.RotationBySpeed)); Key(b, "RotationSpeedRange").Append(Pair(p.RotationSpeedRange));
+            Bool(b, "LifetimeBySpeedOn", p.LifetimeBySpeedOn); Key(b, "LifetimeBySpeed"); Curve(b, in p.LifetimeBySpeed); Key(b, "LifetimeSpeedRange").Append(Pair(p.LifetimeSpeedRange));
             // Noise
             Bool(b, "NoiseOn", p.NoiseOn); Num(b, "NoiseStrength", p.NoiseStrength); Num(b, "NoiseFrequency", p.NoiseFrequency); Num(b, "NoiseScroll", p.NoiseScroll);
             // Collision (G8.8 Q1): the planes by their scene ids
@@ -193,6 +198,18 @@ namespace GameEditor.Framework.Scene
             p.SizeOn = Flag(el, "SizeOn", p.SizeOn);
             if (el.TryGetProperty("SizeOverLifetime", out var cv) && cv.ValueKind == JsonValueKind.Object) p.SizeOverLifetime = ReadCurve(cv);
             p.RotationOn = Flag(el, "RotationOn", p.RotationOn); Pair(el, "AngularVelocity", ref p.AngularVelocity);
+            // By speed
+            p.ColorBySpeedOn = Flag(el, "ColorBySpeedOn", p.ColorBySpeedOn);
+            if (el.TryGetProperty("ColorBySpeed", out var cbs) && cbs.ValueKind == JsonValueKind.Object) p.ColorBySpeed = ReadGradient(cbs);
+            Pair(el, "ColorSpeedRange", ref p.ColorSpeedRange);
+            p.SizeBySpeedOn = Flag(el, "SizeBySpeedOn", p.SizeBySpeedOn);
+            if (el.TryGetProperty("SizeBySpeed", out var sbs) && sbs.ValueKind == JsonValueKind.Object) p.SizeBySpeed = ReadCurve(sbs);
+            Pair(el, "SizeSpeedRange", ref p.SizeSpeedRange);
+            p.RotationBySpeedOn = Flag(el, "RotationBySpeedOn", p.RotationBySpeedOn);
+            Pair(el, "RotationBySpeed", ref p.RotationBySpeed); Pair(el, "RotationSpeedRange", ref p.RotationSpeedRange);
+            p.LifetimeBySpeedOn = Flag(el, "LifetimeBySpeedOn", p.LifetimeBySpeedOn);
+            if (el.TryGetProperty("LifetimeBySpeed", out var lbs) && lbs.ValueKind == JsonValueKind.Object) p.LifetimeBySpeed = ReadCurve(lbs);
+            Pair(el, "LifetimeSpeedRange", ref p.LifetimeSpeedRange);
             // Noise
             p.NoiseOn = Flag(el, "NoiseOn", p.NoiseOn); p.NoiseStrength = Number(el, "NoiseStrength", p.NoiseStrength);
             p.NoiseFrequency = MathF.Max(0f, Number(el, "NoiseFrequency", p.NoiseFrequency)); p.NoiseScroll = Number(el, "NoiseScroll", p.NoiseScroll);
