@@ -76,6 +76,8 @@ namespace GameEditor.Framework.Renderer.Server
         private static readonly InstanceBuffer _transmissionInstanceBuf = new(256);
         private static readonly System.Collections.Generic.List<(Matrix4x4 model, Resources.MeshResource mesh, Materials.PbrMaterial mat)> _transmissionDraws = new();
         private static readonly ScreenCopyPass _screenCopyPass = new();
+        private static readonly FxaaPass _fxaaPass = new();                  // G8.9c
+        private static readonly OffscreenTarget _fxaaTarget = new();         // the editor's Game view's FXAA picture, copied back
         private static sg_image _screenCopyImg;
         private static sg_view  _screenCopyAttView;   // color-attachment view (blit target)
         private static sg_view  _screenCopyTexView;   // texture view (sampled in the refraction shader)
@@ -91,6 +93,8 @@ namespace GameEditor.Framework.Renderer.Server
         private static readonly ShadowPass         _shadowPass  = new();
         private static readonly ShadowDebugPass     _shadowDebugPass = new();
         private static readonly TonemapPass         _tonemapPass = new();
+        // G8.9a: a view's bloom chain (its own sizes; the Scene and Game views each keep theirs), freed while bloom is off.
+        private static readonly Dictionary<OffscreenTarget, BloomPass> _bloomOf = new();
         private static readonly SkyboxPass          _skyboxPass  = new();
         private static readonly RenderView?[]      _views       = new RenderView[RenderingConstants.MAX_VIEWS];
         private static sg_sampler _shadowSampler;
@@ -199,8 +203,17 @@ namespace GameEditor.Framework.Renderer.Server
         /// The scene is drawn into an HDR target and tonemapped: a tone curve or an exposure is asked for and the GPU can
         /// draw into a float target. Otherwise the path of before, at its cost.
         /// </summary>
-        public static bool HdrActive => (Tonemapping != TonemapMode.None || ExposureEV != 0f) && ShaderVariantCache.HasHdr && HdrAllowed;
+        public static bool HdrActive => (Tonemapping != TonemapMode.None || ExposureEV != 0f || PostEffects.Any) && ShaderVariantCache.HasHdr && HdrAllowed;
+        /// <summary>
+        /// The scene is drawn through a companion target and the tonemap / post pass (G8.9): <see cref="HdrActive"/>, or a
+        /// post effect on a GPU (or a quality level) without float targets - then the companion is RGBA8 and the curve
+        /// stays in the shaders' output (G8.3's fallback).
+        /// </summary>
+        public static bool SceneTargetActive => HdrActive || PostEffects.Any;
+        /// <summary>The images the bloom holds now, in every view (0 while it is off): for the checks.</summary>
+        public static int BloomImages { get { int n = 0; foreach (var b in _bloomOf.Values) n += b.LiveImages; return n; } }
         private static bool _hdrPass;   // the pass drawn now is an HDR target's: linear output, no sprites
+        private static bool _companion; // the view's scene is drawn into its companion (BeginScene → EndScene)
         private static readonly System.Collections.Generic.Dictionary<OffscreenTarget, OffscreenTarget> _hdrOf = new();
 
         /// <summary>
@@ -209,11 +222,13 @@ namespace GameEditor.Framework.Renderer.Server
         /// </summary>
         public static PipelineFlags BeginScene(OffscreenTarget view, sg_color clear)
         {
-            if (!HdrActive) { sg_begin_pass(view.MakePass(clear)); return PipelineFlags.OffscreenRt; }
+            _companion = SceneTargetActive;
+            if (!_companion) { sg_begin_pass(view.MakePass(clear)); return PipelineFlags.OffscreenRt; }
+            bool hdrOn = HdrActive;
             if (!_hdrOf.TryGetValue(view, out var hdr)) _hdrOf[view] = hdr = new OffscreenTarget();
-            hdr.Follow(view, ShaderVariantCache.HdrFormat);
+            hdr.Follow(view, hdrOn ? ShaderVariantCache.HdrFormat : sg_pixel_format.SG_PIXELFORMAT_RGBA8);
             sg_begin_pass(hdr.MakePass(clear));
-            return PipelineFlags.OffscreenRt | PipelineFlags.Hdr;
+            return hdrOn ? PipelineFlags.OffscreenRt | PipelineFlags.Hdr : PipelineFlags.OffscreenRt;
         }
 
         /// <summary>
@@ -227,8 +242,20 @@ namespace GameEditor.Framework.Renderer.Server
         {
             sg_end_pass();
             bool hdr = (flags & PipelineFlags.Hdr) != 0;
-            var drawn = hdr ? _hdrOf[view] : view;
+            bool companion = _companion;
+            _companion = false;
+            var drawn = companion ? _hdrOf[view] : view;
             RenderTransmission(drawn, in viewProj);
+            // G8.9a: the bloom of the scene's picture, before the view's pass is opened (its own passes).
+            sg_view bloomView = default;
+            Vector3 bloom = Vector3.Zero;
+            if (companion && PostEffects.Bloom.On)
+            {
+                if (!_bloomOf.TryGetValue(view, out var bp)) _bloomOf[view] = bp = new BloomPass();
+                bloomView = bp.Render(drawn.TexView, drawn.Width, drawn.Height, in PostEffects.Bloom, !hdr,
+                                      hdr ? ShaderVariantCache.HdrFormat : sg_pixel_format.SG_PIXELFORMAT_RGBA8);
+                bloom = PostEffects.NormalisedTint(PostEffects.Bloom.Tint) * PostEffects.Bloom.Intensity;
+            }
             sg_begin_pass(new sg_pass
             {
                 attachments = { colors = { [0] = view.ColorAttView }, depth_stencil = view.DepthAttView },
@@ -236,7 +263,7 @@ namespace GameEditor.Framework.Renderer.Server
                 {
                     colors = { [0] = new sg_color_attachment_action
                     {
-                        load_action  = hdr ? sg_load_action.SG_LOADACTION_DONTCARE : sg_load_action.SG_LOADACTION_LOAD,
+                        load_action  = companion ? sg_load_action.SG_LOADACTION_DONTCARE : sg_load_action.SG_LOADACTION_LOAD,
                         store_action = sg_store_action.SG_STOREACTION_STORE
                     } },
                     depth = new sg_depth_attachment_action
@@ -245,11 +272,13 @@ namespace GameEditor.Framework.Renderer.Server
                         store_action = sg_store_action.SG_STOREACTION_STORE
                     }
                 },
-                label = hdr ? "scene-tonemap-pass" : "scene-over-pass"
+                label = companion ? "scene-tonemap-pass" : "scene-over-pass"
             });
-            if (!hdr) return;
+            if (!companion) return;
             _hdrPass = false;
-            _tonemapPass.Render(drawn.TexView, MathF.Pow(2f, ExposureEV), TonemapType(Tonemapping));
+            // HDR: exposure, curve, the post effects; an RGBA8 companion (no float target): the post effects only.
+            _tonemapPass.Render(drawn.TexView, hdr ? MathF.Pow(2f, ExposureEV) : 1f, hdr ? TonemapType(Tonemapping) : 0, bloomView, bloom, encoded: !hdr,
+                                aspect: drawn.Width / (float)Math.Max(1, drawn.Height));
             Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, true);
             Text3DRenderer.Draw(ECSWorld.Instance, in viewProj, true);   // text is not tonemapped (G8.4)
             if (DrawScriptLines) ScriptLinesRenderer.Draw(in viewProj);
@@ -489,6 +518,8 @@ namespace GameEditor.Framework.Renderer.Server
             Sprites2D.SpriteRenderSystem.Shutdown();
             _transmissionInstanceBuf.Dispose();
             _screenCopyPass.Shutdown();
+            _fxaaPass.Shutdown();
+            _fxaaTarget.Destroy();
             DestroyScreenCopy();
             if (_screenSampler.id != 0) { sg_destroy_sampler(_screenSampler); _screenSampler = default; }
             _matReg.Shutdown();
@@ -497,6 +528,8 @@ namespace GameEditor.Framework.Renderer.Server
             _shadowPass.Shutdown();
             _shadowDebugPass.Shutdown();
             _tonemapPass.Shutdown();
+            foreach (var b in _bloomOf.Values) b.Shutdown();
+            _bloomOf.Clear();
             _skyboxPass.Shutdown();
             _cubeShadows.Shutdown();
             _shadowAtlas.Shutdown();
@@ -596,6 +629,8 @@ namespace GameEditor.Framework.Renderer.Server
             // SubmitView reads them. Once per CPU frame regardless of view count.
             UpdateNodeAnimations();
             Text3DRenderer.Prepare(ECSWorld.Instance);   // G8.4: the texts that changed, drawn into their textures (no pass open)
+            if (!PostEffects.Bloom.On)                     // G8.9a: bloom off - its targets freed
+                foreach (var b in _bloomOf.Values) if (b.LiveImages > 0) b.Free();
             _lightBuf.Reset();
             _stats.Reset();
             _drawCount = 0;
@@ -644,6 +679,52 @@ namespace GameEditor.Framework.Renderer.Server
             if (!_initialized) return;
             _screenCopyPass.RenderToSwapchain(sceneColorView);
         }
+
+        /// <summary>
+        /// <see cref="BlitToSwapchain(sg_view)"/> through FXAA (G8.9c): the scene target (<paramref name="srcW"/> ×
+        /// <paramref name="srcH"/>) over the whole swapchain (<paramref name="dstW"/> × <paramref name="dstH"/>), its edges
+        /// smoothed. Inside the swapchain's pass, before the game's UI.
+        /// </summary>
+        public static void BlitToSwapchainFxaa(sg_view sceneColorView, int srcW, int srcH, int dstW, int dstH)
+        {
+            if (!_initialized) return;
+            _fxaaPass.RenderToSwapchain(sceneColorView, srcW, srcH, dstW, dstH);
+            FxaaFrames++;
+        }
+
+        /// <summary>
+        /// A view's picture through FXAA (G8.9c; the editor's Game view): into a target of its own, then copied back. Outside
+        /// any pass. Its target is freed when no FXAA is asked for a while (<see cref="FreeFxaa"/>).
+        /// </summary>
+        public static void ApplyFxaa(OffscreenTarget view)
+        {
+            if (!_initialized || !view.IsValid) return;
+            if (!_fxaaTarget.IsValid || _fxaaTarget.Width != view.Width || _fxaaTarget.Height != view.Height)
+                _fxaaTarget.Create(view.Width, view.Height);
+            sg_begin_pass(new sg_pass
+            {
+                attachments = { colors = { [0] = _fxaaTarget.ColorAttView } },
+                action = { colors = { [0] = new sg_color_attachment_action { load_action = sg_load_action.SG_LOADACTION_DONTCARE, store_action = sg_store_action.SG_STOREACTION_STORE } } },
+                label = "fxaa-pass",
+            });
+            _fxaaPass.Render(view.TexView, view.Width, view.Height);
+            sg_end_pass();
+            sg_begin_pass(new sg_pass
+            {
+                attachments = { colors = { [0] = view.ColorAttView } },
+                action = { colors = { [0] = new sg_color_attachment_action { load_action = sg_load_action.SG_LOADACTION_DONTCARE, store_action = sg_store_action.SG_STOREACTION_STORE } } },
+                label = "fxaa-copy-back",
+            });
+            _screenCopyPass.Render(_fxaaTarget.TexView);
+            sg_end_pass();
+            FxaaFrames++;
+        }
+
+        /// <summary>The editor's FXAA target freed (its Game view's camera has none).</summary>
+        public static void FreeFxaa() { if (_fxaaTarget.IsValid) _fxaaTarget.Destroy(); }
+
+        /// <summary>Frames drawn through FXAA so far (a game's copy or the Game view's): for the checks.</summary>
+        public static int FxaaFrames { get; private set; }
 
         /// <summary>
         /// True when an <b>active and visible</b> mesh actually uses a transmissive

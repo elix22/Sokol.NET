@@ -270,7 +270,9 @@ namespace GameEditor.Framework.Scene
                       .Append(",\"Main\":").Append(cam.IsMain ? "true" : "false")
                       .Append(",\"Ortho\":").Append(cam.IsOrthographic ? "true" : "false")
                       .Append(",\"OrthoSize\":").Append(F(cam.OrthoSize))
-                      .Append(",\"Enabled\":").Append(cam.Enabled ? "true" : "false").Append('}');
+                      .Append(",\"Enabled\":").Append(cam.Enabled ? "true" : "false");
+                    if (cam.AntiAliasing == AntiAliasing.Fxaa) sb.Append(",\"AA\":\"FXAA\"");   // G8.9c; none: not written
+                    sb.Append('}');
                 }
 
                 if (world.TryGetComponent<LightComponent>(id, out var lt))
@@ -551,6 +553,8 @@ namespace GameEditor.Framework.Scene
                     IsOrthographic = camEl.TryGetProperty("Ortho", out var orthoEl) && orthoEl.GetBoolean(),
                     OrthoSize      = camEl.TryGetProperty("OrthoSize", out var osEl) ? osEl.GetSingle() : 5f,
                     Enabled        = !camEl.TryGetProperty("Enabled", out var camEnEl) || camEnEl.GetBoolean(),
+                    AntiAliasing   = camEl.TryGetProperty("AA", out var aaEl) && aaEl.ValueKind == JsonValueKind.String
+                                     && string.Equals(aaEl.GetString(), "FXAA", StringComparison.OrdinalIgnoreCase) ? AntiAliasing.Fxaa : AntiAliasing.None,
                 });
 
             if (c.TryGetProperty("Light", out var ltEl))

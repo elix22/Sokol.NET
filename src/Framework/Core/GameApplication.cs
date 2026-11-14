@@ -212,6 +212,7 @@ namespace GameEditor.Framework.Core
             Logger.Info($"[Quality] {Scripting.Quality.ThisTarget}: level {Scripting.Quality.Current.Name}");
             RenderingServer.Tonemapping         = RenderingServer.TonemapOf(c.EnvironmentTonemapping);
             RenderingServer.ExposureEV          = c.EnvironmentExposure;
+            PostEffects.Load(c);   // G8.9: the Environment's post effects
         }
 
         // ── Play ─────────────────────────────────────────────────────────────
@@ -303,24 +304,26 @@ namespace GameEditor.Framework.Core
             //   • a render scale under 1 (the quality level, G8.5) → the offscreen target at that share of the pixels,
             //     stretched to the swapchain; the game's UI is drawn at full size over it.
             bool scaled = RenderingServer.RenderScale < 1f;
+            bool fxaa = cam.AntiAliasing == ECS.Components.AntiAliasing.Fxaa;   // G8.9c: the main camera's
             int sw = RenderingServer.Scaled(width), sh = RenderingServer.Scaled(height);
-            if (RenderingServer.HdrActive && width > 0 && height > 0)
+            if (RenderingServer.SceneTargetActive && width > 0 && height > 0)
             {
-                // G8.3: a tone curve or an exposure — the scene into an HDR target, tonemapped into the scene target
+                // G8.3: a tone curve or an exposure (G8.9: or a post effect) — the scene into an HDR target, tonemapped into the scene target
                 // (its depth kept for the sprites drawn after), copied to the swapchain under the game's UI.
                 _sceneTarget.Resize(sw, sh);
                 var flags = RenderingServer.BeginScene(_sceneTarget, clear.colors[0].clear_value);
-                RenderingServer.RenderSkybox(viewProj, offscreen: true, hdr: true);
+                RenderingServer.RenderSkybox(viewProj, offscreen: true, hdr: RenderingServer.HdrActive);
                 RenderingServer.SubmitView(viewProj, flags, allowShadowPassRendering: false, csm: csm);
                 RenderingServer.EndScene(_sceneTarget, viewProj, flags);
                 Sokol.SG.sg_end_pass();
 
                 Sokol.ScreenCapture.BeginFrame(clear);
-                RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
+                if (fxaa) RenderingServer.BlitToSwapchainFxaa(_sceneTarget.TexView, sw, sh, width, height);
+                else RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
                 Render();
                 Sokol.SG.sg_end_pass();
             }
-            else if (scaled || RenderingServer.SceneNeedsTransmission)
+            else if (scaled || fxaa || RenderingServer.SceneNeedsTransmission)
             {
                 if (width > 0 && height > 0)
                 {
@@ -335,7 +338,9 @@ namespace GameEditor.Framework.Core
                 }
 
                 Sokol.ScreenCapture.BeginFrame(clear);     // the swapchain - or, once after Screenshot(), a picture of the frame
-                if (_sceneTarget.IsValid)
+                if (_sceneTarget.IsValid && fxaa)
+                    RenderingServer.BlitToSwapchainFxaa(_sceneTarget.TexView, _sceneTarget.Width, _sceneTarget.Height, width, height);
+                else if (_sceneTarget.IsValid)
                     RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
                 Render();
                 Sokol.SG.sg_end_pass();

@@ -108,6 +108,24 @@
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_TonemapPassGlsl)&quot; --output &quot;$(_TonemapPassOut)&quot; --module tonemap_pass --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
+  <!-- G8.9a: the post effects' bloom (docs POST_EFFECTS_DESIGN.md). -->
+  <Target Name="CompileFrameworkBloomShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_ShaderDir)bloom.glsl"
+          Outputs="$(_ShaderOutDir)bloom_shader.cs">
+    <Message Text="Compiling Framework shader: bloom.glsl (all platforms)" Importance="high" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_ShaderDir)bloom.glsl&quot; --output &quot;$(_ShaderOutDir)bloom_shader.cs&quot; --module bloom --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
+  <!-- G8.9c: the post effects' FXAA (docs POST_EFFECTS_DESIGN.md). -->
+  <Target Name="CompileFrameworkFxaaShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_ShaderDir)fxaa.glsl"
+          Outputs="$(_ShaderOutDir)fxaa_shader.cs">
+    <Message Text="Compiling Framework shader: fxaa.glsl (all platforms)" Importance="high" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_ShaderDir)fxaa.glsl&quot; --output &quot;$(_ShaderOutDir)fxaa_shader.cs&quot; --module fxaa --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
   <Target Name="CompileFrameworkCubemapShader" BeforeTargets="BeforeBuild"
           DependsOnTargets="EnsureFrameworkShaderOutDir"
           Inputs="$(_CubemapGlsl);$(_TonemappingGlsl)"

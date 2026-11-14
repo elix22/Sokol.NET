@@ -112,7 +112,13 @@ namespace GameEditor.Framework.ECS.Components
         public bool IsOrthographic;
         public float OrthoSize;   // half-height in world units (ortho mode only)
         public bool Enabled;      // when false the camera does not render
+        /// <summary>The picture's edges smoothed (G8.9c, the reference editor's camera Anti-aliasing): None or FXAA. The Game
+        /// view and a built game; never the Scene view.</summary>
+        public AntiAliasing AntiAliasing;
     }
+
+    /// <summary>A camera's anti-aliasing (G8.9c).</summary>
+    public enum AntiAliasing : byte { None, Fxaa }
 
     public enum LightType { Directional, Point, Spot }
 

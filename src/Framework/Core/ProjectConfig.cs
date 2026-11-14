@@ -30,6 +30,23 @@ namespace GameEditor.Framework.Core
         // G8.3: the scene's tone curve ("none" | "neutral" | "aces") and exposure in EV (0 = none).
         public string EnvironmentTonemapping { get; set; } = "none";
         public float  EnvironmentExposure    { get; set; } = 0f;
+        // G8.9a: the post effects' bloom (Intensity 0 = off), the reference editor's defaults.
+        public float  EnvironmentBloomIntensity { get; set; } = 0f;
+        public float  EnvironmentBloomThreshold { get; set; } = 0.9f;
+        public float  EnvironmentBloomScatter   { get; set; } = 0.7f;
+        public string EnvironmentBloomTint      { get; set; } = "1 1 1";   // "r g b"
+        public float  EnvironmentBloomClamp     { get; set; } = 65472f;
+        public bool   EnvironmentBloomHq        { get; set; } = false;
+        // G8.9b: the vignette (Intensity 0 = off) and the colour adjustments (0 / white = none).
+        public float  EnvironmentVignetteIntensity  { get; set; } = 0f;
+        public float  EnvironmentVignetteSmoothness { get; set; } = 0.2f;
+        public string EnvironmentVignetteCenter     { get; set; } = "0.5 0.5";   // "x y", 0..1, the top left 0 0
+        public string EnvironmentVignetteColor      { get; set; } = "0 0 0";     // "r g b"
+        public bool   EnvironmentVignetteRounded    { get; set; } = false;
+        public float  EnvironmentContrast           { get; set; } = 0f;
+        public string EnvironmentColorFilter        { get; set; } = "1 1 1";
+        public float  EnvironmentHueShift           { get; set; } = 0f;
+        public float  EnvironmentSaturation         { get; set; } = 0f;
         // G8.5: the quality levels (config.json "quality": levels, the default per target, the editor's level). The
         // Rendering Path (G8.2) and the cascades are a level's values.
         public System.Collections.Generic.List<QualityLevel> QualityLevels { get; set; } = QualityLevel.Defaults();
