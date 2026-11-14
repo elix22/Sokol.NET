@@ -225,6 +225,10 @@ namespace GameEditor.Framework.Scripting
         /// <summary>Called when this entity begins overlapping a non-trigger body.</summary>
         public virtual void OnCollisionEnter(Entity other) { }
 
+        /// <summary>A particle of a particle system hit <paramref name="other"/> this step (G8.8: the Collision module's Send Collision
+        /// Messages): called on the emitter's scripts with what it hit, and on the hit entity's with the emitter; once a step a pair.</summary>
+        public virtual void OnParticleCollision(Entity other) { }
+
         /// <summary>Called when this entity stops overlapping a non-trigger body.</summary>
         public virtual void OnCollisionExit(Entity other) { }
 

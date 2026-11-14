@@ -20,6 +20,12 @@ namespace GameEditor.Framework.ECS.Components
     /// <summary>The order an emitter's particles are drawn in: as made, the farthest first, the oldest in front, the youngest in front.</summary>
     public enum ParticleSort : byte { None, ByDistance, OldestInFront, YoungestInFront }
 
+    /// <summary>The Collision module's kinds: planes (entities' positions and ups) or the physics world.</summary>
+    public enum ParticleCollisionType : byte { Planes, World }
+
+    /// <summary>How many particles a frame are tested against the world: all, half, a quarter (each from where it was last tested).</summary>
+    public enum ParticleCollisionQuality : byte { High, Medium, Low }
+
     /// <summary>The Texture Sheet Animation's time: the frames over a particle's life, or so many a second.</summary>
     public enum ParticleSheetTime : byte { Lifetime, Fps }
 
@@ -139,6 +145,24 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>How fast the noise changes (its field moves through itself, a second).</summary>
         public float NoiseScroll;
 
+        // ---- Collision (G8.8 Q1) ----
+        public bool CollisionOn;
+        public ParticleCollisionType CollisionType;
+        public ParticlePlanes Planes;
+        /// <summary>0..1: the part of the speed lost in a hit.</summary>
+        public float CollisionDampen;
+        /// <summary>The part of the speed into the surface given back (1: as fast out as in).</summary>
+        public float Bounce;
+        /// <summary>0..1: the part of its life a particle loses in a hit (1: it dies).</summary>
+        public float LifetimeLoss;
+        /// <summary>After a hit a particle slower than this, or faster than <see cref="MaxKillSpeed"/>, dies.</summary>
+        public float MinKillSpeed, MaxKillSpeed;
+        /// <summary>A particle's radius for its hits: half its size times this.</summary>
+        public float RadiusScale;
+        public ParticleCollisionQuality CollisionQuality;
+        /// <summary>Calls OnParticleCollision(other) on the emitter's scripts and on the other's.</summary>
+        public bool SendCollisionMessages;
+
         // ---- Texture Sheet Animation ----
         public bool SheetOn;
         public int SheetColumns, SheetRows;
@@ -215,6 +239,8 @@ namespace GameEditor.Framework.ECS.Components
             ColorOverLifetime = ParticleGradient.White, SizeOverLifetime = ParticleCurve.Line(1f, 1f),
             AngularVelocity = new Vector2(45f, 45f),
             NoiseStrength = 1f, NoiseFrequency = 0.5f, NoiseScroll = 0f,
+            CollisionType = ParticleCollisionType.Planes, CollisionDampen = 0f, Bounce = 1f, LifetimeLoss = 0f, MinKillSpeed = 0f,
+            MaxKillSpeed = 10000f, RadiusScale = 1f, CollisionQuality = ParticleCollisionQuality.High,
             SheetColumns = 1, SheetRows = 1, SheetTime = ParticleSheetTime.Lifetime, SheetFps = 10f, SheetCycles = 1f, SheetStartFrame = Vector2.Zero,
             Texture = "", RenderMode = ParticleRenderMode.Billboard, SpeedScale = 0f, LengthScale = 2f, Blend = ParticleBlend.Alpha, Sort = ParticleSort.None,
         };

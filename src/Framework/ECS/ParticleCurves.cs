@@ -314,4 +314,41 @@ namespace GameEditor.Framework.ECS.Components
         public override readonly bool Equals(object? obj) => obj is ParticleBursts o && Equals(o);
         public override readonly int GetHashCode() => Count;
     }
+
+    /// <summary>The Collision module's planes (G8.8 Q1): up to <see cref="Capacity"/> entities, each a plane through its
+    /// position facing its up; the first <see cref="Count"/>.</summary>
+    public struct ParticlePlanes : IEquatable<ParticlePlanes>
+    {
+        public const int Capacity = 6;
+
+        [InlineArray(Capacity)]
+        public struct EntityArray { private Frent.Entity _e; }
+
+        public EntityArray Items;
+        public int Count;
+
+        public bool Add(Frent.Entity e)
+        {
+            if (Count >= Capacity) return false;
+            Items[Count++] = e;
+            return true;
+        }
+
+        public void RemoveAt(int index)
+        {
+            if (index < 0 || index >= Count) return;
+            for (int i = index; i < Count - 1; i++) Items[i] = Items[i + 1];
+            Items[--Count] = default;
+        }
+
+        public readonly bool Equals(ParticlePlanes o)
+        {
+            if (Count != o.Count) return false;
+            for (int i = 0; i < Count; i++) if (Items[i] != o.Items[i]) return false;
+            return true;
+        }
+
+        public override readonly bool Equals(object? obj) => obj is ParticlePlanes o && Equals(o);
+        public override readonly int GetHashCode() => Count;
+    }
 }

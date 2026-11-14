@@ -21,6 +21,8 @@ namespace GameEditor.Framework.Scene
         private static readonly string[] BlendNames = { "Alpha", "Additive" };
         private static readonly string[] SortNames = { "None", "ByDistance", "OldestInFront", "YoungestInFront" };
         private static readonly string[] SheetTimeNames = { "Lifetime", "Fps" };
+        private static readonly string[] CollisionTypeNames = { "Planes", "World" };
+        private static readonly string[] CollisionQualityNames = { "High", "Medium", "Low" };
 
         private static void RegisterParticles()
         {
@@ -66,6 +68,19 @@ namespace GameEditor.Framework.Scene
             Bool(b, "RotationOn", p.RotationOn); Key(b, "AngularVelocity").Append(Pair(p.AngularVelocity));
             // Noise
             Bool(b, "NoiseOn", p.NoiseOn); Num(b, "NoiseStrength", p.NoiseStrength); Num(b, "NoiseFrequency", p.NoiseFrequency); Num(b, "NoiseScroll", p.NoiseScroll);
+            // Collision (G8.8 Q1): the planes by their scene ids
+            Bool(b, "CollisionOn", p.CollisionOn); Name(b, "CollisionType", CollisionTypeNames, (int)p.CollisionType);
+            Key(b, "Planes").Append('[');
+            for (int i = 0; i < p.Planes.Count; i++)
+            {
+                if (i > 0) b.Append(',');
+                Frent.Entity pe = p.Planes.Items[i];
+                b.Append((!pe.IsNull && pe.IsAlive ? world.GetSceneId(pe) : 0).ToString(CultureInfo.InvariantCulture));
+            }
+            b.Append(']');
+            Num(b, "CollisionDampen", p.CollisionDampen); Num(b, "Bounce", p.Bounce); Num(b, "LifetimeLoss", p.LifetimeLoss);
+            Num(b, "MinKillSpeed", p.MinKillSpeed); Num(b, "MaxKillSpeed", p.MaxKillSpeed); Num(b, "RadiusScale", p.RadiusScale);
+            Name(b, "CollisionQuality", CollisionQualityNames, (int)p.CollisionQuality); Bool(b, "SendCollisionMessages", p.SendCollisionMessages);
             // Texture Sheet Animation
             Bool(b, "SheetOn", p.SheetOn); Key(b, "Sheet").Append('[').Append(p.SheetColumns.ToString(CultureInfo.InvariantCulture)).Append(',')
                                                        .Append(p.SheetRows.ToString(CultureInfo.InvariantCulture)).Append(']');
@@ -152,6 +167,22 @@ namespace GameEditor.Framework.Scene
             // Noise
             p.NoiseOn = Flag(el, "NoiseOn", p.NoiseOn); p.NoiseStrength = Number(el, "NoiseStrength", p.NoiseStrength);
             p.NoiseFrequency = MathF.Max(0f, Number(el, "NoiseFrequency", p.NoiseFrequency)); p.NoiseScroll = Number(el, "NoiseScroll", p.NoiseScroll);
+            // Collision
+            p.CollisionOn = Flag(el, "CollisionOn", p.CollisionOn);
+            p.CollisionType = (ParticleCollisionType)Named(el, "CollisionType", CollisionTypeNames, (int)p.CollisionType);
+            p.Planes = default;
+            if (el.TryGetProperty("Planes", out var pl) && pl.ValueKind == JsonValueKind.Array)
+                foreach (var x in pl.EnumerateArray())
+                    if (x.ValueKind == JsonValueKind.Number && x.TryGetInt32(out int sid) && sid > 0 && resolve(sid) is { IsNull: false } pe)
+                        p.Planes.Add(pe);
+            p.CollisionDampen = Math.Clamp(Number(el, "CollisionDampen", p.CollisionDampen), 0f, 1f);
+            p.Bounce = MathF.Max(0f, Number(el, "Bounce", p.Bounce));
+            p.LifetimeLoss = Math.Clamp(Number(el, "LifetimeLoss", p.LifetimeLoss), 0f, 1f);
+            p.MinKillSpeed = MathF.Max(0f, Number(el, "MinKillSpeed", p.MinKillSpeed));
+            p.MaxKillSpeed = MathF.Max(0f, Number(el, "MaxKillSpeed", p.MaxKillSpeed));
+            p.RadiusScale = MathF.Max(0f, Number(el, "RadiusScale", p.RadiusScale));
+            p.CollisionQuality = (ParticleCollisionQuality)Named(el, "CollisionQuality", CollisionQualityNames, (int)p.CollisionQuality);
+            p.SendCollisionMessages = Flag(el, "SendCollisionMessages", p.SendCollisionMessages);
             // Texture Sheet Animation
             p.SheetOn = Flag(el, "SheetOn", p.SheetOn);
             if (el.TryGetProperty("Sheet", out var sh) && sh.ValueKind == JsonValueKind.Array && sh.GetArrayLength() == 2)

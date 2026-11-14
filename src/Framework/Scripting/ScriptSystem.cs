@@ -404,6 +404,15 @@ namespace GameEditor.Framework.Scripting
             }
         }
 
+        internal static void DispatchParticleCollision(Entity entity, Entity other)
+        {
+            foreach (var entry in _running)
+            {
+                if (entry.EntityId != entity) continue;
+                SafeCall(entry.Behaviour, b => b.OnParticleCollision(other), nameof(GameBehaviour.OnParticleCollision));
+            }
+        }
+
         internal static void DispatchCollisionExit(Entity entity, Entity other)
         {
             foreach (var entry in _running)

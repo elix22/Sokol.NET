@@ -24,6 +24,7 @@ namespace GameEditor.Framework.Scene
             public float Rot, Spin;     // degrees, degrees a second
             public Vector4 Color;       // Start Color
             public float Frame;         // the Texture Sheet's start frame
+            public Vector3 Tested;      // where it was when last tested against the world (Collision Quality Medium / Low)
         }
 
         sealed class Pool
@@ -44,11 +45,18 @@ namespace GameEditor.Framework.Scene
             public bool Playing;
             public bool Paused;
             public bool NeedsPrewarm;
+            public readonly ParticleCollisionEvent[] Hits = new ParticleCollisionEvent[64];
+            public int HitCount;
             public float[] SortKeys = Array.Empty<float>();
             public int[] SortOrder = Array.Empty<int>();
         }
 
         private static readonly Dictionary<Entity, Pool> _pools = new();
+        // The collision messages of a step, each (emitter, other) once: two arrays, compared by hand (a list of tuples and its
+        // Contains, a generic comparer over a tuple of structs, stopped the web build's Mono interpreter on an assertion).
+        private const int MaxMessages = 256;
+        private static readonly Entity[] _messageEmitter = new Entity[MaxMessages], _messageOther = new Entity[MaxMessages];
+        private static int _messageCount;
         private static readonly List<Entity> _gone = new();
         private static int _frame;
 
@@ -76,6 +84,16 @@ namespace GameEditor.Framework.Scene
             if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
             int n = Math.Min(p.Count, into.Length);
             for (int i = 0; i < n; i++) into[i] = p.Items[i].Age;
+            return n;
+        }
+
+        /// <summary>The hits of one emitter's particles in the last step (Collision module): as many as fit; returns how many
+        /// (at most 64 a step are kept).</summary>
+        public static int CopyCollisions(Entity entity, Span<ParticleCollisionEvent> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.HitCount, into.Length);
+            for (int i = 0; i < n; i++) into[i] = p.Hits[i];
             return n;
         }
 
@@ -195,6 +213,7 @@ namespace GameEditor.Framework.Scene
         private static void StepSome(ECSWorld world, float dt, Entity root, bool onlyUnder)
         {
             _frame++;
+            _messageCount = 0;
             if (!world.HasAnyComponent<ParticlesComponent>())
             {
                 if (_pools.Count > 0) _pools.Clear();
@@ -221,14 +240,22 @@ namespace GameEditor.Framework.Scene
                     pool.NeedsPrewarm = false;
                     pool.HasLast = true; pool.Last = pool.Origin;
                     int steps = (int)MathF.Ceiling(MathF.Max(0.05f, c.Duration) * 30f);
-                    for (int i = 0; i < steps; i++) Simulate(pool, in c, in model, 1f / 30f);
+                    for (int i = 0; i < steps; i++) Simulate(world, e, pool, in c, in model, 1f / 30f);
                 }
-                Simulate(pool, in c, in model, run);
+                Simulate(world, e, pool, in c, in model, run);
             }
             // An emitter gone from the scene takes its particles with it.
             _gone.Clear();
             foreach (var pair in _pools) if (pair.Value.Seen != _frame) _gone.Add(pair.Key);
             foreach (Entity e in _gone) _pools.Remove(e);
+            // The collision messages (not in the editor's preview: no script runs there), each pair once a step, both sides.
+            if (!onlyUnder)
+                for (int i = 0; i < _messageCount; i++)
+                {
+                    Entity emitter = _messageEmitter[i], other = _messageOther[i];
+                    Scripting.ScriptSystem.DispatchParticleCollision(emitter, other);
+                    Scripting.ScriptSystem.DispatchParticleCollision(other, emitter);
+                }
         }
 
         private static bool IsUnder(ECSWorld world, Entity e, Entity root)
@@ -242,7 +269,7 @@ namespace GameEditor.Framework.Scene
             return false;
         }
 
-        private static void Simulate(Pool pool, in ParticlesComponent c, in Matrix4x4 model, float dt)
+        private static void Simulate(ECSWorld world, Entity self, Pool pool, in ParticlesComponent c, in Matrix4x4 model, float dt)
         {
             Quaternion toLocal = Quaternion.Conjugate(pool.Rotation);
             Vector3 down = new(0f, -c.Gravity, 0f);
@@ -255,12 +282,33 @@ namespace GameEditor.Framework.Scene
             bool spin = c.RotationOn;
             float scroll = pool.Time * c.NoiseScroll;
 
+            // The Collision module: the planes in the world (a position and its up), the world's quality stride.
+            pool.HitCount = 0;
+            bool collide = c.CollisionOn;
+            Span<Vector3> planeAt = stackalloc Vector3[ParticlePlanes.Capacity], planeUp = stackalloc Vector3[ParticlePlanes.Capacity];
+            Span<int> planeOf = stackalloc int[ParticlePlanes.Capacity];
+            int planes = 0;
+            if (collide && c.CollisionType == ParticleCollisionType.Planes)
+                for (int k = 0; k < c.Planes.Count; k++)
+                {
+                    Entity pe = c.Planes.Items[k];
+                    if (pe.IsNull || !pe.IsAlive || !world.TryGetComponent<Transform>(pe, out var pt)) continue;
+                    Matrix4x4 pm = Transform.GetWorldMatrix(world, pt);
+                    Vector3 up = Vector3.TransformNormal(Vector3.UnitY, pm);
+                    if (up.LengthSquared() < 1e-12f) continue;
+                    planeAt[planes] = pm.Translation; planeUp[planes] = Vector3.Normalize(up); planeOf[planes] = k;
+                    planes++;
+                }
+            int stride = c.CollisionQuality == ParticleCollisionQuality.Low ? 4 : c.CollisionQuality == ParticleCollisionQuality.Medium ? 2 : 1;
+            int phase = _frame % stride;
+
             // Age and move.
             for (int i = 0; i < pool.Count;)
             {
                 ref Particle p = ref pool.Items[i];
                 p.Age += dt;
                 if (p.Age >= p.Life) { pool.Items[i] = pool.Items[--pool.Count]; continue; }
+                Vector3 from = p.Pos;
                 if (c.Gravity != 0f) p.Vel += down * dt;
                 if (c.ForceOn) p.Vel += force * dt;
                 if (c.LimitOn)
@@ -280,6 +328,11 @@ namespace GameEditor.Framework.Scene
                     p.Pos += Noise3(at, pool.NoiseSeed) * (c.NoiseStrength * dt);
                 }
                 if (spin) p.Rot += p.Spin * dt;
+                if (collide && !Collide(self, pool, in c, ref p, from, i, stride, phase, planeAt[..planes], planeUp[..planes], planeOf[..planes]))
+                {
+                    pool.Items[i] = pool.Items[--pool.Count];
+                    continue;
+                }
                 i++;
             }
 
@@ -318,6 +371,86 @@ namespace GameEditor.Framework.Scene
             int make = pool.Pending;
             pool.Pending = 0;
             if (make > 0) Make(pool, in c, in model, make);
+        }
+
+        // One particle's step against the Collision module (docs PARTICLES_3D_DESIGN.md §6.1): planes every frame, the world for
+        // the particles of this frame's share (from where each was last tested). A hit puts it on the surface at its radius and
+        // turns its speed; false: it dies (its life lost, too slow or too fast).
+        private static bool Collide(Entity self, Pool pool, in ParticlesComponent c, ref Particle p, Vector3 from, int index, int stride,
+                                    int phase, ReadOnlySpan<Vector3> planeAt, ReadOnlySpan<Vector3> planeUp, ReadOnlySpan<int> planeOf)
+        {
+            bool local = !c.World;
+            Vector3 ToWorld(Vector3 v) => local ? pool.Origin + Vector3.Transform(v, pool.Rotation) : v;
+            float t = p.Life > 0f ? p.Age / p.Life : 1f;
+            float radius = MathF.Max(0f, p.Size * (c.SizeOn ? c.SizeOverLifetime.Evaluate(t) : 1f) * 0.5f * c.RadiusScale);
+            Vector3 b = ToWorld(p.Pos);
+            bool hit = false;
+            Vector3 at = default, normal = default;
+            Entity other = default;
+            if (c.CollisionType == ParticleCollisionType.Planes)
+            {
+                Vector3 a = ToWorld(from);
+                for (int k = 0; k < planeAt.Length && !hit; k++)
+                {
+                    Vector3 n = planeUp[k];
+                    float d0 = Vector3.Dot(a - planeAt[k], n), d1 = Vector3.Dot(b - planeAt[k], n);
+                    // Into the plane, its sphere reaching it, and not from far behind it.
+                    if (d1 < radius && d0 >= -radius && Vector3.Dot(b - a, n) < 0f)
+                    {
+                        hit = true; normal = n; at = b + n * (radius - d1); other = c.Planes.Items[planeOf[k]];
+                    }
+                }
+            }
+            else if ((index + phase) % stride == 0)
+            {
+                Vector3 a = ToWorld(stride > 1 ? p.Tested : from);
+                Vector3 dir = b - a;
+                float len = dir.Length();
+                if (len > 1e-6f)
+                {
+                    dir /= len;
+                    if (SceneManager.Raycast(a, dir, len + radius, out Entity e3, out var h3) && h3.Distance - radius <= len)
+                    {
+                        hit = true; normal = h3.Normal; at = a + dir * MathF.Max(0f, h3.Distance - radius); other = e3;
+                    }
+                    else if (Physics2D.Physics2DWorld.Raycast(new Vector2(a.X, a.Y), new Vector2(dir.X, dir.Y), (len + radius) * new Vector2(dir.X, dir.Y).Length(),
+                                                              out Entity e2, out var h2))
+                    {
+                        float along = h2.Distance / MathF.Max(1e-6f, new Vector2(dir.X, dir.Y).Length());
+                        if (along - radius <= len)
+                        {
+                            hit = true; normal = new Vector3(h2.Normal, 0f); at = a + dir * MathF.Max(0f, along - radius); other = e2;
+                        }
+                    }
+                }
+                if (!hit) p.Tested = p.Pos;
+            }
+            if (!hit) return true;
+
+            // The speed into the surface turned (times Bounce), the whole speed less Dampen.
+            Vector3 vel = local ? Vector3.Transform(p.Vel, pool.Rotation) : p.Vel;
+            float vn = Vector3.Dot(vel, normal);
+            if (vn < 0f) vel = (vel - normal * vn * (1f + c.Bounce)) * (1f - Math.Clamp(c.CollisionDampen, 0f, 1f));
+            Quaternion toLocal = Quaternion.Conjugate(pool.Rotation);
+            p.Pos = local ? Vector3.Transform(at - pool.Origin, toLocal) : at;
+            p.Vel = local ? Vector3.Transform(vel, toLocal) : vel;
+            p.Tested = p.Pos;
+            if (pool.HitCount < pool.Hits.Length)
+                pool.Hits[pool.HitCount++] = new ParticleCollisionEvent { Point = at, Normal = normal, Velocity = vel, Other = other };
+            if (c.SendCollisionMessages && !other.IsNull) Message(self, other);
+            p.Age += p.Life * Math.Clamp(c.LifetimeLoss, 0f, 1f);
+            float speed = vel.Length();
+            return p.Age < p.Life && speed >= c.MinKillSpeed && speed <= c.MaxKillSpeed;
+        }
+
+        private static void Message(Entity emitter, Entity other)
+        {
+            for (int i = 0; i < _messageCount; i++)
+                if (_messageEmitter[i] == emitter && _messageOther[i] == other) return;
+            if (_messageCount == MaxMessages) return;
+            _messageEmitter[_messageCount] = emitter;
+            _messageOther[_messageCount] = other;
+            _messageCount++;
         }
 
         // A vector given in the emitter's space or the world's, into the space the particles live in.
@@ -414,6 +547,7 @@ namespace GameEditor.Framework.Scene
                     q.Pos = pos == pool.Origin ? Vector3.Zero : Vector3.Transform(pos - pool.Origin, toLocal);
                     q.Vel = Vector3.Transform(q.Vel, toLocal);
                 }
+                q.Tested = q.Pos;
                 pool.Items[pool.Count++] = q;
             }
         }
@@ -530,5 +664,12 @@ namespace GameEditor.Framework.Scene
             h ^= h >> 13; h *= 0x5BD1E995u; h ^= h >> 15;
             return (h & 0xFFFFFF) / 8388608f - 1f;
         }
+    }
+
+    /// <summary>One hit of a particle (the Collision module): where, the surface's normal, its velocity after, what it hit.</summary>
+    public struct ParticleCollisionEvent
+    {
+        public Vector3 Point, Normal, Velocity;
+        public Entity Other;
     }
 }
