@@ -251,6 +251,7 @@ namespace GameEditor.Framework.Scripting
             // And the animation players: a clip's pose for this moment (animation comes after the scripts' update), its events to the scripts.
             Animation.AnimationSystem.EventSink ??= DispatchAnimationEvent;
             Animation.AnimationSystem.Update(ECS.ECSWorld.Instance, deltaTime);
+            Animation.AnimatorSystem.Update(ECS.ECSWorld.Instance, deltaTime);      // and the controllers' characters
             Sound.Audio.Update(ECS.ECSWorld.Instance, realTime);     // sound goes on while the game's time stands
 
             // The end of the frame for scripts: entities handed to Destroy leave now, and a scene that was
@@ -268,6 +269,7 @@ namespace GameEditor.Framework.Scripting
             _pendingStart.Clear();
             _started = false;
             Animation.AnimationSystem.Reset();      // its bindings name this game's entities
+            Animation.AnimatorSystem.Reset();
             Logger.Info("[ScriptSystem] Stopped — all behaviours destroyed.");
         }
 

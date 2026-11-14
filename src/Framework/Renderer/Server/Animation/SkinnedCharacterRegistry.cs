@@ -73,6 +73,13 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             /// another clip plays from its start ("" = the first), the speed, the loop. False when it is not to move this
             /// frame (not playing: the pose holds).
             /// </summary>
+            /// <summary>A controller poses this character (G6 A7): its skinned meshes' own clip settings wait.</summary>
+            public bool Driven;
+
+            /// <summary>A clip's length in seconds, by name (0 when the character has none of that name).</summary>
+            public float ClipSeconds(string name)
+                => FindClip(name) is { } c ? c.GetDuration() / MathF.Max(c.GetTicksPerSecond(), 1e-6f) : 0f;
+
             public bool Apply(in SkinnedMeshRenderer smr)
             {
                 var anim = Animator;

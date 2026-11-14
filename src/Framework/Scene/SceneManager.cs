@@ -221,11 +221,11 @@ namespace GameEditor.Framework.Scene
                             {
                                 times.Tracks = times.Now;
                                 // And the animation clips its players name: a clip plays from the game's first frame.
-                                Assets.ClipLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
+                                Assets.ClipLibrary.LoadNamedIn(TextsOf(json, loaded), () => Assets.ControllerLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
                                 {
-                                    times.Clips = times.Now;
+                                    times.Clips = times.Now;            // the clips and the controllers
                                     then(json, loaded);
-                                });
+                                }));
                             }); }); });
                     }, freshMaps); });
                 }

@@ -29,6 +29,10 @@ namespace GameEditor.Framework.Scene
             RegisterChaseCamera();
             RegisterParticles();
             RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
+            RegisterComponentExtension("Animator",
+                static (w, e) => w.TryGetComponent<ECS.Components.Animator>(e, out var a) ? "{\"Controller\":\"" + Esc(a.Controller ?? "") + "\"}" : null,
+                static (w, e, el, resolve) => w.AddComponent(e, new ECS.Components.Animator { Controller = el.TryGetProperty("Controller", out var c) ? c.GetString() ?? "" : "" }),
+                static (w, e) => w.RemoveComponent<ECS.Components.Animator>(e));
         }
 
         // {"Clip":"Animations/DoorOpen.anim.json"} — "Auto":false and "Speed" only when not the defaults.

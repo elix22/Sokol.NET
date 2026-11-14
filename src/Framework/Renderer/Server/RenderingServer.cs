@@ -1913,7 +1913,7 @@ namespace GameEditor.Framework.Renderer.Server
                 {
                     anim.LastUpdatedFrame = _animationFrame;
                     // The character follows its first skinned mesh's playback settings (G6 A0); not playing: the pose holds.
-                    if (entry.Apply(smr)) anim.UpdateAnimation(dt);
+                    if (!entry.Driven && entry.Apply(smr)) anim.UpdateAnimation(dt);   // a controller's character: posed by AnimatorSystem
                 }
                 RefreshJointTextureIfNeeded(entry);
             }
@@ -1957,7 +1957,7 @@ namespace GameEditor.Framework.Renderer.Server
                 {
                     anim.LastUpdatedFrame = _animationFrame;
                     // The character follows its first skinned mesh's playback settings (G6 A0); not playing: the pose holds.
-                    if (entry.Apply(smr)) anim.UpdateAnimation(dt);
+                    if (!entry.Driven && entry.Apply(smr)) anim.UpdateAnimation(dt);   // a controller's character: posed by AnimatorSystem
                 }
                 RefreshJointTextureIfNeeded(entry);
 

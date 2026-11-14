@@ -199,6 +199,59 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             UpdateMorphWeightAnimations(_currentTime);
         }
 
+        // ── Posed from outside (G6 A7: a controller's state machine) ───────────────────────────────────────────
+        private readonly Dictionary<string, Matrix4x4> _lastLocal = new();     // each node's local matrix as last posed
+        private readonly Dictionary<string, Matrix4x4> _snapshot = new();      // the pose a transition fades out from
+
+        /// <summary>
+        /// Poses the character from outside (a controller): clip <paramref name="a"/> at <paramref name="secondsA"/>,
+        /// blended with <paramref name="b"/> at <paramref name="secondsB"/> by <paramref name="weightB"/> (a blend tree's two
+        /// neighbours; null / 0: <paramref name="a"/> alone); then, while <paramref name="fromSnapshot"/> is ≥ 0, blended
+        /// from the pose kept by the last <paramref name="takeSnapshot"/> (a transition fading out the pose as it was when it
+        /// began). Times are seconds, round and round each clip.
+        /// </summary>
+        public void Pose(CGltfAnimation a, float secondsA, CGltfAnimation? b, float secondsB, float weightB, float fromSnapshot, bool takeSnapshot)
+        {
+            if (takeSnapshot) { _snapshot.Clear(); foreach (var kv in _lastLocal) _snapshot[kv.Key] = kv.Value; }
+            _fadingAnimation = null;
+            _currentAnimation = a;
+            _currentTime = Ticks(a, secondsA);
+            foreach (var bone in a.GetBones()) bone.Update(_currentTime);
+            float tb = 0f;
+            if (b != null && weightB > 0f) { tb = Ticks(b, secondsB); foreach (var bone in b.GetBones()) bone.Update(tb); }
+            ref CGltfNodeData root = ref a.GetRootNode();
+            CalculatePosed(root, Matrix4x4.Identity, a, b != null && weightB > 0f ? b : null, weightB, fromSnapshot);
+            ApplyAnimationToNodes();
+            UpdateMorphWeightAnimations(_currentTime);
+        }
+
+        private static float Ticks(CGltfAnimation clip, float seconds)
+        {
+            float t = seconds * clip.GetTicksPerSecond(), d = clip.GetDuration();
+            if (d <= 0f) return 0f;
+            t %= d;
+            return t < 0f ? t + d : t;
+        }
+
+        private void CalculatePosed(CGltfNodeData node, Matrix4x4 parentTransform, CGltfAnimation a, CGltfAnimation? b, float wb, float fromSnapshot)
+        {
+            Matrix4x4 local = a.FindBone(node.Name)?.GetLocalTransform() ?? node.Transformation;
+            if (b != null) local = Blend(local, b.FindBone(node.Name)?.GetLocalTransform() ?? node.Transformation, wb);
+            if (fromSnapshot >= 0f) local = Blend(_snapshot.TryGetValue(node.Name, out var was) ? was : node.Transformation, local, FadeWeightAt(fromSnapshot));
+            _lastLocal[node.Name] = local;
+            Matrix4x4 globalTransformation = local * parentTransform;
+            _nodeGlobalTransforms[node.Name] = globalTransformation;
+            var boneInfoMap = _characterBoneInfoMap ?? a.GetBoneIDMap();
+            if (boneInfoMap != null && boneInfoMap.TryGetValue(node.Name, out var boneInfo))
+            {
+                int index = boneInfo.Id;
+                if (index >= 0 && index < _finalBoneMatrices.Length)
+                    _finalBoneMatrices[index] = boneInfo.Offset * globalTransformation;
+            }
+            for (int i = 0; i < node.ChildrenCount; i++)
+                CalculatePosed(node.Children[i], globalTransformation, a, b, wb, fromSnapshot);
+        }
+
         /// <summary>Two local transforms blended: translation and scale lerped, rotation slerped, then composed (scale, rotation, translation).</summary>
         public static Matrix4x4 Blend(in Matrix4x4 from, in Matrix4x4 to, float w)
         {

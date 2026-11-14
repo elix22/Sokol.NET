@@ -27,3 +27,17 @@ namespace GameEditor.Framework.ECS.Components
         public static AnimationPlayer Default => new() { Clip = "", PlayAutomatically = true, Speed = 1f, Playing = true };
     }
 }
+
+namespace GameEditor.Framework.ECS.Components
+{
+    /// <summary>
+    /// Runs an animator controller (a <c>.controller.json</c>: parameters, states, transitions) on the skinned character
+    /// at and below its entity while the game plays (scene block "Animator"). A script drives it through
+    /// <see cref="Animation.AnimatorSystem"/>: SetFloat / SetInt / SetBool / SetTrigger / Play, State.
+    /// </summary>
+    public struct Animator
+    {
+        /// <summary>The controller's key below Assets ("Animations/Hero.controller.json").</summary>
+        public string Controller;
+    }
+}
