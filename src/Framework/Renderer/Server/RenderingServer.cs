@@ -629,6 +629,8 @@ namespace GameEditor.Framework.Renderer.Server
             // SubmitView reads them. Once per CPU frame regardless of view count.
             UpdateNodeAnimations();
             Text3DRenderer.Prepare(ECSWorld.Instance);   // G8.4: the texts that changed, drawn into their textures (no pass open)
+            // G8.10: the shader graphs' Time in edit mode (in Play the game's update moves it: GraphClock.Advance).
+            if (Scene.SceneManager.PlayMode == PlayModeState.Stopped) GameEditor.Framework.Renderer.Server.Materials.Graph.GraphClock.Advance(Math.Min(Sokol.SApp.sapp_frame_duration(), 0.1));
             if (!PostEffects.Bloom.On)                     // G8.9a: bloom off - its targets freed
                 foreach (var b in _bloomOf.Values) if (b.LiveImages > 0) b.Free();
             _lightBuf.Reset();
@@ -1781,6 +1783,41 @@ namespace GameEditor.Framework.Renderer.Server
         /// PBR variant. Unset texture slots fall back to placeholders; the IBL env slots bind
         /// the placeholder cube (never sampled while use_ibl=0).
         /// </summary>
+        // ── Shader graphs (G8.10, examples/GameEditor/docs/SHADER_GRAPH_DESIGN.md) ─────────────────────────────────
+        /// <summary>The shader graphs' Time (Materials.Graph.GraphClock).</summary>
+        public static float GraphTime => (float)GameEditor.Framework.Renderer.Server.Materials.Graph.GraphClock.Time;
+        /// <summary>Draws made with a shader graph's pipeline so far (for the checks).</summary>
+        public static int GraphDraws { get; private set; }
+
+        // A material's graph pipeline for a static mesh, or default (no graph, or its shader could not be made: the
+        // engine's shader draws it).
+        private static sg_pipeline GraphPipeline(PbrMaterial mat, int cascades, PipelineFlags pf, out string variant)
+        {
+            variant = "";
+            if (mat.Graph?.Source is not { } src) return default;
+            return _shaderCache.GetGraphPipeline(src, cascades, pf, out variant);
+        }
+
+        // The material block of a graph's shader: the engine's block, then graph_params (8 vec4: the properties and, in
+        // [7].x, the time) where the graph's shader says it is.
+        private static unsafe void ApplyGraphMaterial<T>(int slot, ref T block, Materials.Graph.GraphBinding graph, string variant) where T : unmanaged
+        {
+            var (offset, size) = graph.Source!.GraphParams(variant, sg_query_backend());
+            if (offset < 0 || size < offset + 128 || size > 4096)
+            {
+                sg_apply_uniforms(slot, SG_RANGE(ref block));
+                return;
+            }
+            byte* buf = stackalloc byte[size];
+            new Span<byte>(buf, size).Clear();
+            int head = Math.Min(sizeof(T), offset);
+            fixed (T* b = &block) Buffer.MemoryCopy(b, buf, size, head);
+            graph.Params[28] = GraphTime;
+            fixed (float* p = graph.Params) Buffer.MemoryCopy(p, buf + offset, size - offset, 128);
+            sg_apply_uniforms(slot, new sg_range { ptr = buf, size = (nuint)size });
+            GraphDraws++;
+        }
+
         private static void DrawPbrGroup(
             PbrMaterial mat, MeshResource mesh, int groupSize, int instanceByteOffset,
             PipelineFlags basePipelineFlags,
@@ -1793,7 +1830,8 @@ namespace GameEditor.Framework.Renderer.Server
             PipelineFlags pf = basePipelineFlags;
             if (mat.DoubleSided) pf |= PipelineFlags.DoubleSided;
             if (blend)           pf |= PipelineFlags.AlphaBlend;
-            sg_apply_pipeline(_shaderCache.GetPbrPipeline(pf));
+            var graphPipe = GraphPipeline(mat, 0, pf, out string graphVariant);   // G8.10: a shader graph's, if the material has one
+            sg_apply_pipeline(graphPipe.id != 0 ? graphPipe : _shaderCache.GetPbrPipeline(pf));
 
             var matParams = new pbr_pbr_material_params_t
             {
@@ -1853,7 +1891,8 @@ namespace GameEditor.Framework.Renderer.Server
             };
 
             sg_apply_uniforms(UB_pbr_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
-            sg_apply_uniforms(UB_pbr_pbr_material_params, SG_RANGE(ref matParams));
+            if (graphPipe.id != 0) ApplyGraphMaterial(UB_pbr_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
+            else sg_apply_uniforms(UB_pbr_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(UB_pbr_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(UB_pbr_pbr_ibl_params,      SG_RANGE(ref Unsafe.AsRef(in ibl)));
             sg_apply_uniforms(UB_pbr_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
@@ -3644,7 +3683,8 @@ namespace GameEditor.Framework.Renderer.Server
             PipelineFlags pf = basePipelineFlags;
             if (mat.DoubleSided) pf |= PipelineFlags.DoubleSided;
             if (blend)           pf |= PipelineFlags.AlphaBlend;
-            sg_apply_pipeline(_shaderCache.GetPbrCsm1Pipeline(pf));
+            var graphPipe = GraphPipeline(mat, 1, pf, out string graphVariant);
+            sg_apply_pipeline(graphPipe.id != 0 ? graphPipe : _shaderCache.GetPbrCsm1Pipeline(pf));
 
             var vs = new Csm1.Shaders.pbr_csm1_pbr_vs_params_t
             {
@@ -3768,7 +3808,8 @@ namespace GameEditor.Framework.Renderer.Server
             };
 
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_vs_params,       SG_RANGE(ref vs));
-            sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, SG_RANGE(ref matParams));
+            if (graphPipe.id != 0) ApplyGraphMaterial(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
+            else sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_camera_params,   SG_RANGE(ref cam));
@@ -3854,7 +3895,8 @@ namespace GameEditor.Framework.Renderer.Server
             PipelineFlags pf = basePipelineFlags;
             if (mat.DoubleSided) pf |= PipelineFlags.DoubleSided;
             if (blend)           pf |= PipelineFlags.AlphaBlend;
-            sg_apply_pipeline(_shaderCache.GetPbrCsm4Pipeline(pf));
+            var graphPipe = GraphPipeline(mat, 4, pf, out string graphVariant);
+            sg_apply_pipeline(graphPipe.id != 0 ? graphPipe : _shaderCache.GetPbrCsm4Pipeline(pf));
 
             var vs = new Csm4.Shaders.pbr_csm4_pbr_vs_params_t
             {
@@ -3981,7 +4023,8 @@ namespace GameEditor.Framework.Renderer.Server
             };
 
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_vs_params,       SG_RANGE(ref vs));
-            sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, SG_RANGE(ref matParams));
+            if (graphPipe.id != 0) ApplyGraphMaterial(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
+            else sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_camera_params,   SG_RANGE(ref cam));

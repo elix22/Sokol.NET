@@ -299,6 +299,40 @@ namespace GameEditor.Framework.Assets
         /// An empty path clears the slot. Desktop reads synchronously; web/mobile load async via
         /// SFilesystem. Used by the Inspector's PBR material editor.
         /// </summary>
+        /// <summary>
+        /// G8.10: a shader graph material's texture properties loaded into the map slots its graph's compile gave them, after
+        /// the material's own maps. The slots' map paths (what the .pbrmat keeps as baseColorMap …) are left as they were: a
+        /// graph's texture is the graph property's, not the material's map.
+        /// </summary>
+        public static void ApplyGraphTextures(string key, PbrMaterial mat)
+        {
+            if (mat.Graph?.Source is not { } graph) return;
+            foreach (var slot in graph.Slots)
+            {
+                if (slot.Type != Renderer.Server.Materials.Graph.GraphPropertyType.Texture2D) continue;
+                string path = mat.Graph.TexturePath(slot.Name);
+                if (path.Length == 0) continue;
+                var s = (MaterialRegistry.PbrTextureSlot)slot.Slot;
+                string kept = s switch
+                {
+                    MaterialRegistry.PbrTextureSlot.BaseColor => mat.BaseColorMapPath ?? "",
+                    MaterialRegistry.PbrTextureSlot.MetallicRoughness => mat.MetallicRoughnessMapPath ?? "",
+                    MaterialRegistry.PbrTextureSlot.Normal => mat.NormalMapPath ?? "",
+                    MaterialRegistry.PbrTextureSlot.Occlusion => mat.OcclusionMapPath ?? "",
+                    _ => mat.EmissiveMapPath ?? "",
+                };
+                ApplyPbrMaterialTexture(key, s, path);
+                switch (s)   // (a desktop load is synchronous: put the map's path back)
+                {
+                    case MaterialRegistry.PbrTextureSlot.BaseColor: mat.BaseColorMapPath = kept; break;
+                    case MaterialRegistry.PbrTextureSlot.MetallicRoughness: mat.MetallicRoughnessMapPath = kept; break;
+                    case MaterialRegistry.PbrTextureSlot.Normal: mat.NormalMapPath = kept; break;
+                    case MaterialRegistry.PbrTextureSlot.Occlusion: mat.OcclusionMapPath = kept; break;
+                    default: mat.EmissiveMapPath = kept; break;
+                }
+            }
+        }
+
         public static void ApplyPbrMaterialTexture(
             string materialKey, MaterialRegistry.PbrTextureSlot slot, string? uiPath)
         {
@@ -374,6 +408,7 @@ namespace GameEditor.Framework.Assets
             ApplyMapIfSet(MaterialRegistry.PbrTextureSlot.Normal,            mat.NormalMapPath);
             ApplyMapIfSet(MaterialRegistry.PbrTextureSlot.Occlusion,         mat.OcclusionMapPath);
             ApplyMapIfSet(MaterialRegistry.PbrTextureSlot.Emissive,          mat.EmissiveMapPath);
+            ApplyGraphTextures(key, mat);
 
             void ApplyMapIfSet(MaterialRegistry.PbrTextureSlot slot, string? p)
             {

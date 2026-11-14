@@ -372,6 +372,55 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>PBR pipeline that also samples the 4-cascade directional shadow.</summary>
         public sg_pipeline GetPbrCsm4Pipeline(PipelineFlags flags) => Get(_pbrCsm4, flags);
 
+        // ── Shader graphs (G8.10, docs SHADER_GRAPH_DESIGN.md) ────────────────────────────────────────────────────
+        // A graph's shaders keep pbr.glsl's attributes, blocks and slots, so its families use the engine's PBR pipeline
+        // builders; one family per graph and cascade count (its Forward+ twin and LOW_TIER shader inside it, chosen by Get
+        // as the engine's are), remade when the graph's shaders change (its source's Version: the editor's Save).
+        private sealed class GraphEntry { public int Version; public Family Family = null!; }
+        private readonly Dictionary<(string Key, int Cascades), GraphEntry> _graphs = new();
+
+        private static sg_shader_desc GraphDesc(Materials.Graph.IGraphShaderSource src, string variant, sg_backend backend)
+            => src.Describe(variant, backend, out var d) ? d : default;
+
+        /// <summary>
+        /// A shader graph's pipeline for a static mesh with <paramref name="cascades"/> shadow cascades (0, 1, 4) and these
+        /// flags, and the variant it is (for the graph's parameters' place). Default when the graph's shader could not be
+        /// made: the caller draws with the engine's PBR shader.
+        /// </summary>
+        public sg_pipeline GetGraphPipeline(Materials.Graph.IGraphShaderSource src, int cascades, PipelineFlags flags, out string variant)
+        {
+            var key = (src.Key, cascades);
+            if (!_graphs.TryGetValue(key, out var e) || e.Version != src.Version)
+            {
+                if (e != null) DestroyFamily(e.Family);
+                var engine = cascades == 4 ? _pbrCsm4 : cascades == 1 ? _pbrCsm1 : _pbr;
+                string full = Materials.Graph.GraphShaders.Variant(cascades, false, false);
+                string low = Materials.Graph.GraphShaders.Variant(cascades, false, true);
+                string clustered = Materials.Graph.GraphShaders.Variant(cascades, true, false);
+                var f = new Family($"graph:{src.Key}:{full}", b => GraphDesc(src, full, b), b => GraphDesc(src, low, b), engine.Build,
+                                   PbrLowLight, LowTierUniforms.PbrLightBytes);
+                f.Clustered = new Family($"graph:{src.Key}:{clustered}", b => GraphDesc(src, clustered, b), null, engine.Build, 0, 0);
+                e = new GraphEntry { Version = src.Version, Family = f };
+                _graphs[key] = e;
+            }
+            var p = Get(e.Family, flags);
+            variant = Materials.Graph.GraphShaders.Variant(cascades, CurrentClustered, CurrentLow);
+            return p.id != 0 && sg_query_pipeline_state(p) == sg_resource_state.SG_RESOURCESTATE_VALID ? p : default;
+        }
+
+        private static void DestroyFamily(Family f)
+        {
+            if (f.Clustered != null) DestroyFamily(f.Clustered);
+            for (int i = 0; i < f.Pipelines.Length; i++)
+            {
+                if (f.Pipelines[i].id != 0) sg_destroy_pipeline(f.Pipelines[i]);
+                f.Pipelines[i] = default;
+            }
+            if (f.Shader.id != 0) sg_destroy_shader(f.Shader);
+            f.Shader = default;
+            f.Made = false;
+        }
+
         /// <summary>PBR pipeline with GPU skinning (80 B per-vertex buffer: +joints_0,+weights_0).</summary>
         public sg_pipeline GetPbrSkinningPipeline(PipelineFlags flags) => Get(_pbrSkin, flags);
 
@@ -878,6 +927,8 @@ namespace GameEditor.Framework.Renderer.Server
 
         public void Shutdown()
         {
+            foreach (var g in _graphs.Values) DestroyFamily(g.Family);
+            _graphs.Clear();
             foreach (var f in All)
             {
                 for (int i = 0; i < f.Pipelines.Length; i++)

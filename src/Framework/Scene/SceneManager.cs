@@ -1049,6 +1049,8 @@ namespace GameEditor.Framework.Scene
             StepWorlds(deltaTime);
             // The particles: after everything moved this frame, with the game's time - in a 2D game too, and held while it stands.
             if (PlayMode == PlayModeState.Playing) WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
+            // The shader graphs' Time node: the game's time (G8.10).
+            if (PlayMode == PlayModeState.Playing) Renderer.Server.Materials.Graph.GraphClock.Advance(deltaTime * TimeScale);
         }
 
         private static void StepWorlds(float deltaTime)

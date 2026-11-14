@@ -441,19 +441,42 @@ vec3 getTransmissionIBL(vec3 n, vec3 v_dir_in, vec3 baseColor) {
 #endif  // TRANSMISSION
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+// ── The surface (G8.10, the shader graph): what the material gives the lighting ─────────────────────────────
+// Filled from the material's factors and maps; a shader graph's generated graphSurface() may change any of it: the
+// graph compiler writes a copy of this file (its @includes expanded) with the two GRAPH_SURFACE_ comments replaced.
+struct Surface {
+    vec4  baseColor;   // rgb + alpha
+    float metallic;
+    float roughness;   // perceptual
+    vec3  normal;      // world space
+    float occlusion;
+    vec3  emissive;
+};
+
+// GRAPH_SURFACE_FUNCTION  (a shader graph's compiler puts its graphSurface(inout Surface) here; a comment otherwise)
+
 void main()
 {
-    vec4  baseColor          = getBaseColor();
-    baseColor.rgb *= v_Custom.rgb;   // the instance's tint: a mesh particle's colour (G8.8 Q6); white for every other mesh
-    vec2  mr                 = getMetallicRoughness();
-    float metallic           = clamp(mr.x, 0.0, 1.0);
-    float perceptualRoughness= clamp(mr.y, 0.0, 1.0);
+    Surface surf;
+    surf.baseColor = getBaseColor();
+    surf.baseColor.rgb *= v_Custom.rgb;   // the instance's tint: a mesh particle's colour (G8.8 Q6); white for every other mesh
+    vec2 mr0 = getMetallicRoughness();
+    surf.metallic  = mr0.x;
+    surf.roughness = mr0.y;
+    surf.normal    = getNormal();
+    surf.occlusion = getOcclusion();
+    surf.emissive  = getEmissive();
+    // GRAPH_SURFACE_CALL  (a shader graph's compiler puts graphSurface(surf); here)
+
+    vec4  baseColor          = surf.baseColor;
+    float metallic           = clamp(surf.metallic, 0.0, 1.0);
+    float perceptualRoughness= clamp(surf.roughness, 0.0, 1.0);
     float alphaRoughness     = perceptualRoughness * perceptualRoughness;
 
     // Alpha-test / mask
     if (alphamode == 1 && baseColor.a < alpha_cutoff) discard;
 
-    vec3  n   = getNormal();
+    vec3  n   = surf.normal;
     vec3  v   = normalize(u_Camera - v_Position);
     float NdotV = clampedDot(n, v);
 
@@ -641,11 +664,11 @@ void main()
     }
 
     // ── Occlusion ─────────────────────────────────────────────────────────────
-    float ao = getOcclusion();
+    float ao = surf.occlusion;
     color    = color * (1.0 + occlusion_strength * (ao - 1.0));
 
     // ── Emissive ──────────────────────────────────────────────────────────────
-    color += getEmissive();
+    color += surf.emissive;
 
     // ── Final alpha ───────────────────────────────────────────────────────────
     float finalAlpha = baseColor.a;
@@ -659,6 +682,8 @@ void main()
     finalAlpha = 1.0;
 #endif
 
+    // GRAPH_UNLIT_COLOR  (an Unlit shader graph's compiler puts color = its colour; finalAlpha = its alpha; here)
+
     // ── Debug views ───────────────────────────────────────────────────────────
     if (debug_view_enabled > 0.5) {
         int mode = int(debug_view_mode + 0.5);
@@ -670,7 +695,7 @@ void main()
         else if (mode == DEBUG_TANGENT_W)       color = vec3((1.0 - v_Tangent.w) * 0.5);
         else if (mode == DEBUG_ALPHA)           color = vec3(baseColor.a);
         else if (mode == DEBUG_OCCLUSION)       color = vec3(ao);
-        else if (mode == DEBUG_EMISSIVE)        color = getEmissive();
+        else if (mode == DEBUG_EMISSIVE)        color = surf.emissive;
         else if (mode == DEBUG_METALLIC)        color = vec3(metallic);
         else if (mode == DEBUG_ROUGHNESS)       color = vec3(perceptualRoughness);
         else if (mode == DEBUG_BASE_COLOR)      color = baseColor.rgb;

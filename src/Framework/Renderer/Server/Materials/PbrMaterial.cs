@@ -13,6 +13,10 @@ namespace GameEditor.Framework.Renderer.Server.Materials
     {
         public override MaterialKind Kind => MaterialKind.Pbr;
 
+        /// <summary>G8.10: a shader graph that draws this material (its key, its properties' values); null - the engine's
+        /// PBR shader. Its texture properties are this material's map slots (BaseColorMap … EmissiveMap, slots 0-4).</summary>
+        public Graph.GraphBinding? Graph;
+
         // ── Core PBR scalars ────────────────────────────────────────────────
         public Vector4 BaseColorFactor    = Vector4.One;
         public float   MetallicFactor     = 1f;

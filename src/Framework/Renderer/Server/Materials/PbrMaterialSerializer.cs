@@ -116,6 +116,15 @@ namespace GameEditor.Framework.Renderer.Server.Materials
                 w.WriteString("normalMap",            PersistablePath(m.NormalMapPath));
                 w.WriteString("occlusionMap",         PersistablePath(m.OcclusionMapPath));
                 w.WriteString("emissiveMap",          PersistablePath(m.EmissiveMapPath));
+                // G8.10: a material of a shader graph - the graph, and its own values of the graph's properties.
+                if (m.Graph is { } g)
+                {
+                    w.WriteString("graph", g.Key);
+                    w.WriteStartObject("properties");
+                    foreach (var kv in g.Values) WriteVec4(w, kv.Key, kv.Value);
+                    foreach (var kv in g.Textures) w.WriteString(kv.Key, PersistablePath(kv.Value));
+                    w.WriteEndObject();
+                }
                 w.WriteEndObject();
             }
             return Encoding.UTF8.GetString(buffer.WrittenSpan);
@@ -152,6 +161,24 @@ namespace GameEditor.Framework.Renderer.Server.Materials
             m.NormalMapPath            = ReadString(r, "normalMap");
             m.OcclusionMapPath         = ReadString(r, "occlusionMap");
             m.EmissiveMapPath          = ReadString(r, "emissiveMap");
+            if (r.TryGetProperty("graph", out var ge) && ge.ValueKind == JsonValueKind.String && ge.GetString() is { Length: > 0 } graphKey)
+            {
+                var g = new Graph.GraphBinding(graphKey);
+                if (r.TryGetProperty("properties", out var ps) && ps.ValueKind == JsonValueKind.Object)
+                    foreach (var p in ps.EnumerateObject())
+                    {
+                        if (p.Value.ValueKind == JsonValueKind.String) { g.Textures[p.Name] = p.Value.GetString() ?? ""; continue; }
+                        var v = new float[4];
+                        if (p.Value.ValueKind == JsonValueKind.Number) v[0] = p.Value.GetSingle();
+                        else if (p.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            int i = 0;
+                            foreach (var x in p.Value.EnumerateArray()) { if (i < 4 && x.ValueKind == JsonValueKind.Number) v[i] = x.GetSingle(); i++; }
+                        }
+                        g.Values[p.Name] = new Vector4(v[0], v[1], v[2], v[3]);
+                    }
+                m.Graph = g;
+            }
             return m;
         }
 

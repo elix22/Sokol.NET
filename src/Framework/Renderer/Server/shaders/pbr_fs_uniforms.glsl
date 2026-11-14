@@ -80,6 +80,8 @@ layout(binding=1) uniform pbr_material_params {
     float debug_view_mode;
     // Game-style punch: 0 = off (physical), 1 = shadows fully darken the IBL ambient.
     float shadow_ambient_weight;
+    // GRAPH_PARAMS  (a shader graph's compiler puts its vec4 graph_params[8] here: a graph's copy only - the engine's
+    // block is unchanged, the LOW_TIER one has no room to spare)
 };
 
 // ─── Lights (binding=2) — packed GpuLight[32] ────────────────────────────────
