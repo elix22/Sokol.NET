@@ -162,7 +162,8 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")},\n");
             sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
             sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
-            sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)}\n");
+            sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"renderingPath\": \"{Esc(config.RenderingPath)}\"\n");
             sb.Append('}');
             return Assets.AssetRefs.Stamp(sb.ToString());
         }
@@ -189,6 +190,7 @@ namespace GameEditor.Framework.Core
 
         private static void ReadEnvironment(JsonElement root, ProjectConfig cfg)
         {
+            if (root.TryGetProperty("renderingPath", out var rp))          cfg.RenderingPath     = rp.GetString()  ?? cfg.RenderingPath;
             if (root.TryGetProperty("environmentMode", out var em))        cfg.EnvironmentMode   = em.GetString()  ?? cfg.EnvironmentMode;
             if (root.TryGetProperty("environmentFolder", out var ef))      cfg.EnvironmentFolder = ef.GetString()  ?? cfg.EnvironmentFolder;
             if (root.TryGetProperty("environmentFaces", out var efa))      cfg.EnvironmentFaces  = efa.GetString() ?? cfg.EnvironmentFaces;

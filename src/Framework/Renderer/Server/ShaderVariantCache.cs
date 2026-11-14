@@ -16,6 +16,7 @@
 //   loc 8   : in_custom        float4
 
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using static Sokol.SG;
@@ -43,6 +44,16 @@ using PbrSkinMorphLow = pbr_skinning_morphing_low_shader_cs_pbr_skinning_morphin
 using PbrSkinMorphCsm1Low = pbr_skinning_morphing_csm1_low_shader_cs_pbr_skinning_morphing_csm1_low.Shaders;
 using PbrSkinMorphCsm4Low = pbr_skinning_morphing_csm4_low_shader_cs_pbr_skinning_morphing_csm4_low.Shaders;
 using PbrTransmissionLow = pbr_transmission_low_shader_cs_pbr_transmission_low.Shaders;
+using PbrC = pbr_clustered_shader_cs_pbr_clustered.Shaders;
+using PbrCsm1C = pbr_csm1_clustered_shader_cs_pbr_csm1_clustered.Shaders;
+using PbrCsm4C = pbr_csm4_clustered_shader_cs_pbr_csm4_clustered.Shaders;
+using PbrSkinningC = pbr_skinning_clustered_shader_cs_pbr_skinning_clustered.Shaders;
+using PbrSkinningCsm1C = pbr_skinning_csm1_clustered_shader_cs_pbr_skinning_csm1_clustered.Shaders;
+using PbrSkinningCsm4C = pbr_skinning_csm4_clustered_shader_cs_pbr_skinning_csm4_clustered.Shaders;
+using PbrSkinMorphC = pbr_skinning_morphing_clustered_shader_cs_pbr_skinning_morphing_clustered.Shaders;
+using PbrSkinMorphCsm1C = pbr_skinning_morphing_csm1_clustered_shader_cs_pbr_skinning_morphing_csm1_clustered.Shaders;
+using PbrSkinMorphCsm4C = pbr_skinning_morphing_csm4_clustered_shader_cs_pbr_skinning_morphing_csm4_clustered.Shaders;
+using PbrTransmissionC = pbr_transmission_clustered_shader_cs_pbr_transmission_clustered.Shaders;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.Renderer.Server.Materials;
 
@@ -73,7 +84,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             public readonly string Name;
             public readonly Func<sg_backend, sg_shader_desc> FullDesc;
-            public readonly Func<sg_backend, sg_shader_desc> LowDesc;
+            public readonly Func<sg_backend, sg_shader_desc>? LowDesc;
             public readonly Func<sg_shader, PipelineFlags, sg_pipeline> Build;
             public readonly int LowLightBytes;   // the LOW_TIER shader's light block, as sokol-shdc sized it (0 = not checked)
             public readonly int ExpectedLowBytes;
@@ -81,8 +92,10 @@ namespace GameEditor.Framework.Renderer.Server
             public sg_shader Shader;
             public bool Made;
             public bool Low;
+            /// <summary>This family's Forward+ (CLUSTERED) shader, made when a Forward+ view first draws with it.</summary>
+            public Family? Clustered;
 
-            public Family(string name, Func<sg_backend, sg_shader_desc> full, Func<sg_backend, sg_shader_desc> low,
+            public Family(string name, Func<sg_backend, sg_shader_desc> full, Func<sg_backend, sg_shader_desc>? low,
                           Func<sg_shader, PipelineFlags, sg_pipeline> build, int lowLightBytes, int expectedLowBytes)
             {
                 Name = name; FullDesc = full; LowDesc = low; Build = build;
@@ -146,9 +159,41 @@ namespace GameEditor.Framework.Renderer.Server
 
         public ShaderVariantCache()
         {
-            All = new[] { _blinn, _pbr, _pbrCsm1, _pbrCsm4, _pbrSkin, _pbrSkinCsm1, _pbrSkinCsm4,
-                          _pbrSkinMorph, _pbrSkinMorphCsm1, _pbrSkinMorphCsm4, _pbrTransmission };
+            // Forward+ (G8.2, CLUSTERED_LIGHTING_DESIGN.md): the same pipelines (vertex layouts) over the CLUSTERED shaders.
+            _pbr.Clustered              = new("pbr-clustered", PbrC.pbr_clustered_pbr_program_shader_desc, null, _pbr.Build, 0, 0);
+            _pbrCsm1.Clustered          = new("pbr-csm1-clustered", PbrCsm1C.pbr_csm1_clustered_pbr_program_shader_desc, null, _pbrCsm1.Build, 0, 0);
+            _pbrCsm4.Clustered          = new("pbr-csm4-clustered", PbrCsm4C.pbr_csm4_clustered_pbr_program_shader_desc, null, _pbrCsm4.Build, 0, 0);
+            _pbrSkin.Clustered          = new("pbr-skinning-clustered", PbrSkinningC.pbr_skinning_clustered_pbr_program_shader_desc, null, _pbrSkin.Build, 0, 0);
+            _pbrSkinCsm1.Clustered      = new("pbr-skinning-csm1-clustered", PbrSkinningCsm1C.pbr_skinning_csm1_clustered_pbr_program_shader_desc, null, _pbrSkinCsm1.Build, 0, 0);
+            _pbrSkinCsm4.Clustered      = new("pbr-skinning-csm4-clustered", PbrSkinningCsm4C.pbr_skinning_csm4_clustered_pbr_program_shader_desc, null, _pbrSkinCsm4.Build, 0, 0);
+            _pbrSkinMorph.Clustered     = new("pbr-skinning-morphing-clustered", PbrSkinMorphC.pbr_skinning_morphing_clustered_pbr_program_shader_desc, null, _pbrSkinMorph.Build, 0, 0);
+            _pbrSkinMorphCsm1.Clustered = new("pbr-skinning-morphing-csm1-clustered", PbrSkinMorphCsm1C.pbr_skinning_morphing_csm1_clustered_pbr_program_shader_desc, null, _pbrSkinMorphCsm1.Build, 0, 0);
+            _pbrSkinMorphCsm4.Clustered = new("pbr-skinning-morphing-csm4-clustered", PbrSkinMorphCsm4C.pbr_skinning_morphing_csm4_clustered_pbr_program_shader_desc, null, _pbrSkinMorphCsm4.Build, 0, 0);
+            _pbrTransmission.Clustered  = new("pbr-transmission-clustered", PbrTransmissionC.pbr_transmission_clustered_pbr_program_shader_desc, null, _pbrTransmission.Build, 0, 0);
+            var all = new List<Family> { _blinn, _pbr, _pbrCsm1, _pbrCsm4, _pbrSkin, _pbrSkinCsm1, _pbrSkinCsm4,
+                                         _pbrSkinMorph, _pbrSkinMorphCsm1, _pbrSkinMorphCsm4, _pbrTransmission };
+            foreach (var f in all.ToArray()) if (f.Clustered != null) all.Add(f.Clustered);
+            All = all.ToArray();
         }
+
+        /// <summary>
+        /// Set by the renderer for each view: the view draws in Forward+ (a perspective view, the project's Rendering
+        /// Path Forward+, a GPU that is not LOW_TIER). The pipelines handed out are then the CLUSTERED ones.
+        /// </summary>
+        public static bool UseClustered { get; set; }
+
+        /// <summary>True once the GPU refused a CLUSTERED shader: Forward from then on (logged once).</summary>
+        public static bool ClusteredRefused { get; private set; }
+
+        /// <summary>
+        /// Forward+ can be drawn: not LOW_TIER — nor asked for (<see cref="ForceLowTier"/> on a GLES 3 / WebGL 2 GPU, which
+        /// a game may set after the start: the next family made is LOW_TIER) — and no CLUSTERED shader refused.
+        /// </summary>
+        public static bool ClusteredAllowed => !LowTier && !ClusteredRefused && !(ForceLowTier && _gles);
+        private static bool _gles;
+
+        /// <summary>True when the pipeline handed out last is a CLUSTERED one: the draw binds the view's cluster data.</summary>
+        public bool CurrentClustered { get; private set; }
 
         /// <summary>
         /// True once a full shader was refused by the GPU (or <see cref="ForceLowTier"/> asked for it): every family
@@ -180,6 +225,9 @@ namespace GameEditor.Framework.Renderer.Server
         /// </summary>
         public bool CurrentLow { get; private set; }
 
+        /// <summary>The names of the families made, with a shader (a check: which CLUSTERED ones a scene drew with).</summary>
+        public IEnumerable<string> MadeNames { get { foreach (var f in All) if (f.Made && f.Shader.id != 0) yield return f.Name; } }
+
         /// <summary>How many families have been made (a check: a 2D scene makes none).</summary>
         public int FamiliesMade { get { int n = 0; foreach (var f in All) if (f.Made) n++; return n; } }
 
@@ -189,6 +237,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             // Nothing is made here: each family is made by the first draw that asks for it (Get).
             var backend = sg_query_backend();
+            _gles = backend == sg_backend.SG_BACKEND_GLES3;
             if (ForceLowTier && backend == sg_backend.SG_BACKEND_GLES3) LowTier = true;
             int vertexComponents = sg_query_limits().gl_max_vertex_uniform_components;
             _smallVertexUniforms = backend == sg_backend.SG_BACKEND_GLES3 && vertexComponents < SkinnedVertexComponents;
@@ -211,9 +260,38 @@ namespace GameEditor.Framework.Renderer.Server
 
         private sg_pipeline Get(Family f, PipelineFlags flags)
         {
+            if (UseClustered && f.Clustered is { } c && ClusteredAllowed)
+            {
+                if (!c.Made) MakeClustered(c);
+                if (!ClusteredRefused)
+                {
+                    CurrentLow = false;
+                    CurrentClustered = true;
+                    return c.Pipelines[(int)flags & 0x07];
+                }
+            }
+            CurrentClustered = false;
             if (!f.Made) Make(f);
             CurrentLow = f.Low;
             return f.Pipelines[(int)flags & 0x07];
+        }
+
+        // A CLUSTERED family: no LOW_TIER shader of its own — a GPU that refuses it draws in Forward from then on.
+        private void MakeClustered(Family f)
+        {
+            f.Made = true;
+            var shader = sg_make_shader(f.FullDesc(sg_query_backend()));
+            if (sg_query_shader_state(shader) == sg_resource_state.SG_RESOURCESTATE_FAILED)
+            {
+                sg_destroy_shader(shader);
+                if (!ClusteredRefused)
+                    Logger.Warning($"[ShaderVariantCache] the GPU refused the '{f.Name}' shader — Forward (32 lights) from now on");
+                ClusteredRefused = true;
+                return;
+            }
+            f.Shader = shader;
+            for (int i = 0; i < f.Pipelines.Length; i++)
+                f.Pipelines[i] = f.Build(shader, (PipelineFlags)i);
         }
 
         private void Make(Family f)
@@ -235,7 +313,7 @@ namespace GameEditor.Framework.Renderer.Server
             }
             if (shader.id == 0)
             {
-                shader = sg_make_shader(f.LowDesc(backend));
+                shader = sg_make_shader(f.LowDesc!(backend));
                 f.Low = true;
                 if (f.LowLightBytes != f.ExpectedLowBytes)
                     Logger.Error($"[ShaderVariantCache] LOW_TIER '{f.Name}': block is {f.LowLightBytes} bytes, LowTierUniforms packs {f.ExpectedLowBytes}");
@@ -778,7 +856,9 @@ namespace GameEditor.Framework.Renderer.Server
                 f.Low = false;
             }
             CurrentLow = false;
+            CurrentClustered = false;
             LowTier = false;
+            ClusteredRefused = false;
         }
 
         public void Dispose()

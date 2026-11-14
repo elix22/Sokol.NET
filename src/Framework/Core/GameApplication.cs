@@ -208,6 +208,7 @@ namespace GameEditor.Framework.Core
             RenderingServer.ApplyEnvironment(s);
             RenderingServer.ShadowAmbientWeight = c.EnvironmentShadowAmbient;
             RenderingServer.EnableCsm4          = c.EnvironmentCsm4;
+            RenderingServer.Path                = RenderingServer.PathOf(c.RenderingPath);
         }
 
         // ── Play ─────────────────────────────────────────────────────────────

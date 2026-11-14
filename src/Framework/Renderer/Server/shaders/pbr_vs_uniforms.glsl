@@ -78,4 +78,10 @@ layout(binding=11) uniform sampler   u_jointsSampler_Smp;
 @image_sample_type u_MorphTargetsSampler_Tex unfilterable_float
 @sampler_type u_MorphTargetsSampler_Smp nonfiltering
 layout(binding=9) uniform texture2DArray u_MorphTargetsSampler_Tex;
+#ifdef CLUSTERED
+// Forward+ takes sampler slot 9 for its cluster texture (pbr_fs_uniforms.glsl): the morph texture is read through the
+// joint texture's sampler, the same non-filtering one (RenderingServer binds _jointSampler to both).
+#define u_MorphTargetsSampler_Smp u_jointsSampler_Smp
+#else
 layout(binding=9) uniform sampler        u_MorphTargetsSampler_Smp;
+#endif

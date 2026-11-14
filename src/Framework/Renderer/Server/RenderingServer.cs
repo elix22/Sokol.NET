@@ -13,6 +13,7 @@
 //       Sokol frame can each append without clobbering one another.
 
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Frent;
@@ -30,6 +31,7 @@ using PbrSkinMorph = pbr_skinning_morphing_shader_cs_pbr_skinning_morphing;
 using PbrSkinMorphCsm1 = pbr_skinning_morphing_csm1_shader_cs_pbr_skinning_morphing_csm1;
 using PbrSkinMorphCsm4 = pbr_skinning_morphing_csm4_shader_cs_pbr_skinning_morphing_csm4;
 using PbrTx = pbr_transmission_shader_cs_pbr_transmission.Shaders;
+using PbrClustered = pbr_clustered_shader_cs_pbr_clustered.Shaders;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
@@ -162,10 +164,41 @@ namespace GameEditor.Framework.Renderer.Server
             foreach (var dict in _prevLodLevel) dict.Remove(e);
         }
 
-        // Top-N light selection scratch (M2): keep the highest-importance lights only.
-        private static readonly Light[] _topLights = new Light[RenderingConstants.MAX_LIGHTS];
-        private static readonly float[] _topLightScores = new float[RenderingConstants.MAX_LIGHTS];
+        // Top-N light selection scratch (M2): keep the highest-importance lights only — MAX_LIGHTS in Forward, up to
+        // Forward+'s limit (ClusterData.MaxLightsFor) in a Forward+ view.
+        private const int MaxSelectableLights = 256;
+        private static readonly Light[] _topLights = new Light[MaxSelectableLights];
+        private static readonly float[] _topLightScores = new float[MaxSelectableLights];
         private static int _topLightCount;
+        private static int _topLightCap = RenderingConstants.MAX_LIGHTS;
+
+        // ── Forward+ (G8.2, examples/GameEditor/docs/CLUSTERED_LIGHTING_DESIGN.md) ────────────────────────────
+        /// <summary>
+        /// The project's Rendering Path (config.json "rendering"): Forward+ lights a perspective view through the cluster
+        /// grid, up to 256 lights on desktop and 32 on a phone and in a browser; Forward loops 32 lights on every pixel.
+        /// Forward+ falls back to Forward on LOW_TIER, for an orthographic view and a view without camera data.
+        /// </summary>
+        public static RenderingPath Path { get; set; } = RenderingPath.ForwardPlus;
+        /// <summary>A config.json "renderingPath" ("forward" / "forward+") as a path; anything else is Forward+.</summary>
+        public static RenderingPath PathOf(string? text)
+            => string.Equals(text?.Trim(), "forward", StringComparison.OrdinalIgnoreCase) ? RenderingPath.Forward : RenderingPath.ForwardPlus;
+        public static string TextOf(RenderingPath path) => path == RenderingPath.Forward ? "forward" : "forward+";
+        private static ClusterData? _clusterData;
+        private static sg_view _clusterView;
+        private static PbrClustered.pbr_clustered_pbr_cluster_params_t _clusterParams;
+        /// <summary>True while the view being drawn is in Forward+.</summary>
+        public static bool ViewIsClustered { get; private set; }
+
+        // The CLUSTERED pipeline's extras (the cluster texture, its sampler, the cluster block); nothing for the others.
+        // Every CLUSTERED shader has them at the same slots (view 12, sampler 9, block 7: pbr_fs_uniforms.glsl).
+        private static sg_bindings ClusterBind(sg_bindings b)
+        {
+            if (!_shaderCache.CurrentClustered) return b;
+            b.views[PbrClustered.VIEW_pbr_clustered_cluster_tex] = _clusterView;
+            b.samplers[PbrClustered.SMP_pbr_clustered_cluster_smp] = _jointSampler;
+            sg_apply_uniforms(PbrClustered.UB_pbr_clustered_pbr_cluster_params, SG_RANGE(ref _clusterParams));
+            return b;
+        }
 
         // ── Frame stats ──────────────────────────────────────────────────────────────────
 
@@ -327,6 +360,8 @@ namespace GameEditor.Framework.Renderer.Server
             EventBus.EntityDestroyed -= ForgetEntity;
             EventBus.SceneLoaded -= AttachSceneNodeAnimations;
             _initialized = false;
+            _clusterData?.Dispose();
+            _clusterData = null;
             _instanceBuf.Dispose();
             Sprites2D.SpriteRenderSystem.Shutdown();
             _transmissionInstanceBuf.Dispose();
@@ -452,7 +487,7 @@ namespace GameEditor.Framework.Renderer.Server
             UpdateSkinnedAnimators(ECSWorld.Instance);
 
             FrameProfiler.Begin(FrameProfiler.Zone.ShadowPass);
-            CollectLightsAndShadows(ECSWorld.Instance, in viewProj, renderShadowPasses: true, csm);
+            CollectLightsAndShadows(ECSWorld.Instance, in viewProj, renderShadowPasses: true, csm, forDrawing: false);
             FrameProfiler.End(FrameProfiler.Zone.ShadowPass);
         }
 
@@ -526,6 +561,8 @@ namespace GameEditor.Framework.Renderer.Server
         /// needs it, so a scene with no meshes makes none. <see cref="ShaderVariantCache.LowTier"/> tells which kind.
         /// </summary>
         public static int ShaderFamiliesMade => _shaderCache.FamiliesMade;
+        /// <summary>The shader families made so far, by name ("pbr", "pbr-clustered", ...).</summary>
+        public static IEnumerable<string> ShaderFamilyNames => _shaderCache.MadeNames;
 
         /// <summary>When true, <see cref="RenderSkybox"/> draws the IBL environment cubemap.</summary>
         public static bool ShowSkybox { get; set; } = true;
@@ -683,6 +720,7 @@ namespace GameEditor.Framework.Renderer.Server
             // so the color pass binds matching cascade VPs + split depths.
 
             CollectLightsAndShadows(world, in viewProj, allowShadowPassRendering, csm);
+            if ((uint)viewIndex < (uint)_viewLighting.Length) _viewLighting[viewIndex] = (ViewIsClustered, ViewLights);
 
             // ── 1b. Skinned characters (GPU skinning) ────────────────────────────────────
             // Drawn here, before the static-mesh early-returns below, so a scene with ONLY a
@@ -1054,12 +1092,16 @@ namespace GameEditor.Framework.Renderer.Server
 
         // ── Helpers ──────────────────────────────────────────────────────────────────────
 
-        private static void CollectLightsAndShadows(ECSWorld world, in Matrix4x4 cameraViewProj, bool renderShadowPasses, CsmCamera? csm = null)
+        private static void CollectLightsAndShadows(ECSWorld world, in Matrix4x4 cameraViewProj, bool renderShadowPasses, CsmCamera? csm = null, bool forDrawing = true)
         {
             Matrix4x4.Invert(cameraViewProj, out var _invCamVP);
             Vector3 cameraPos = new Vector3(_invCamVP.M41, _invCamVP.M42, _invCamVP.M43);
             _lightBuf.Reset();
             _topLightCount = 0;
+            // Forward+ for this view: a perspective camera (csm), the project's path, a GPU that draws the full shaders.
+            ViewIsClustered = Path == RenderingPath.ForwardPlus && csm.HasValue && ShaderVariantCache.ClusteredAllowed;
+            if (ViewIsClustered) _clusterData ??= new ClusterData(ClusterData.MaxLightsFor(sg_query_backend()));
+            _topLightCap = ViewIsClustered ? _clusterData!.MaxLights : RenderingConstants.MAX_LIGHTS;
             _spotShadowTopCount = 0;
             _pointShadowTopCount = 0;
             _hasDirectionalShadow = false;
@@ -1280,7 +1322,36 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 _lightBuf.Add(in _topLights[li]);
             }
+
+            // Forward+: every selected light (in the order the shader reads them) into the view's cluster grid — when a
+            // view is drawn next (not for the shadow maps alone: a texture is updated once a frame).
+            if (ViewIsClustered && forDrawing)
+            {
+                var cc = csm!.Value;
+                for (int li = 0; li < _topLightCount; li++) _clusterLights[li] = new GpuLight(in _topLights[li]);
+                var span = new ReadOnlySpan<GpuLight>(_clusterLights, 0, _topLightCount);
+                if (_clusterData!.Builder.Build(cc.View, cc.Proj, cc.Near, cc.Far, span))
+                {
+                    _clusterView = _clusterData.Upload(span, _animationFrame);
+                    _clusterParams = new PbrClustered.pbr_clustered_pbr_cluster_params_t
+                    {
+                        cluster_view_proj = _clusterData.Builder.ViewProj,
+                        cluster_params    = _clusterData.Params,
+                    };
+                }
+                else ViewIsClustered = false;
+            }
+            ShaderVariantCache.UseClustered = ViewIsClustered;
+            ViewLights = ViewIsClustered ? _topLightCount : _lightBuf.Count;
         }
+
+        private static readonly GpuLight[] _clusterLights = new GpuLight[MaxSelectableLights];
+        /// <summary>The lights the view drawn last is lit by (Forward: at most 32; Forward+: its limit).</summary>
+        public static int ViewLights { get; private set; }
+        private static readonly (bool Clustered, int Lights)[] _viewLighting = new (bool, int)[RenderingConstants.MAX_VIEWS];
+        /// <summary>How view <paramref name="viewIndex"/> was lit when last drawn: Forward+ or Forward, and by how many lights.</summary>
+        public static (bool Clustered, int Lights) LightingOf(int viewIndex)
+            => (uint)viewIndex < (uint)_viewLighting.Length ? _viewLighting[viewIndex] : default;
 
         private static void BuildFsParams(Material? mat, Vector3 cameraPos,
                                           out blinn_phong_fs_params_t fs)
@@ -1522,7 +1593,7 @@ namespace GameEditor.Framework.Renderer.Server
                 if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0)
                     continue;
 
-                sg_apply_bindings(new sg_bindings
+                sg_apply_bindings(ClusterBind(new sg_bindings
                 {
                     vertex_buffers        = { [0] = sub.VertexBuffer, [1] = _instanceBuf.Buffer },
                     vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -1551,7 +1622,7 @@ namespace GameEditor.Framework.Renderer.Server
                         [SMP_pbr_shadow_atlas_smp]           = _shadowSampler,
                         [SMP_pbr_cube_shadow_array_smp]      = _cubeShadowSampler,
                     },
-                });
+                }));
 
                 sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
@@ -1779,7 +1850,10 @@ namespace GameEditor.Framework.Renderer.Server
 
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_material_params, SG_RANGE(ref matParams));
-            LowTierUniforms.ApplyPbrLights(PbrTx.UB_pbr_transmission_pbr_light_params, in lights, _shaderCache.CurrentLow);
+            // The CLUSTERED transmission shader has no light block: its lights are in the cluster texture, and glass samples
+            // no shadows (the block's other contents), so the compiler drops it.
+            if (!_shaderCache.CurrentClustered)
+                LowTierUniforms.ApplyPbrLights(PbrTx.UB_pbr_transmission_pbr_light_params, in lights, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_ibl_params,      SG_RANGE(ref ibl));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -1802,7 +1876,7 @@ namespace GameEditor.Framework.Renderer.Server
                 if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0)
                     continue;
 
-                sg_apply_bindings(new sg_bindings
+                sg_apply_bindings(ClusterBind(new sg_bindings
                 {
                     vertex_buffers        = { [0] = sub.VertexBuffer, [1] = _transmissionInstanceBuf.Buffer },
                     vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -1831,7 +1905,7 @@ namespace GameEditor.Framework.Renderer.Server
                         [PbrTx.SMP_pbr_transmission_u_TransmissionSampler_Raw]            = matSmp,
                         [PbrTx.SMP_pbr_transmission_u_TransmissionFramebufferSampler_Raw] = _screenSampler,
                     },
-                });
+                }));
 
                 sg_draw(0u, (uint)sub.IndexCount, 1u);
                 _stats.DrawCalls++;
@@ -2170,7 +2244,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -2203,7 +2277,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkin.Shaders.SMP_pbr_skinning_cube_shadow_array_smp]      = _cubeShadowSampler,
                     [PbrSkin.Shaders.SMP_pbr_skinning_u_jointsSampler_Smp]        = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -2380,7 +2454,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -2411,7 +2485,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkinCsm4.Shaders.SMP_pbr_skinning_csm4_cube_shadow_array_smp]      = _cubeShadowSampler,
                     [PbrSkinCsm4.Shaders.SMP_pbr_skinning_csm4_u_jointsSampler_Smp]        = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -2584,7 +2658,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -2615,7 +2689,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkinCsm1.Shaders.SMP_pbr_skinning_csm1_cube_shadow_array_smp]      = _cubeShadowSampler,
                     [PbrSkinCsm1.Shaders.SMP_pbr_skinning_csm1_u_jointsSampler_Smp]        = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -2796,7 +2870,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -2829,7 +2903,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkinMorph.Shaders.SMP_pbr_skinning_morphing_u_jointsSampler_Smp]        = _jointSampler,
                     [PbrSkinMorph.Shaders.SMP_pbr_skinning_morphing_u_MorphTargetsSampler_Smp]  = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -2999,7 +3073,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -3032,7 +3106,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkinMorphCsm1.Shaders.SMP_pbr_skinning_morphing_csm1_u_jointsSampler_Smp]        = _jointSampler,
                     [PbrSkinMorphCsm1.Shaders.SMP_pbr_skinning_morphing_csm1_u_MorphTargetsSampler_Smp]  = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -3205,7 +3279,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_sampler cubeSmp = iblActive ? _environment!.CubeSampler : _texCache.DefaultSampler;
             sg_sampler lutSmp  = iblActive ? _environment!.LutSampler  : _texCache.DefaultSampler;
 
-            sg_apply_bindings(new sg_bindings
+            sg_apply_bindings(ClusterBind(new sg_bindings
             {
                 vertex_buffers        = { [0] = mesh.VertexBuffer, [1] = _skinnedInstanceBuf.Buffer },
                 vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -3238,7 +3312,7 @@ namespace GameEditor.Framework.Renderer.Server
                     [PbrSkinMorphCsm4.Shaders.SMP_pbr_skinning_morphing_csm4_u_jointsSampler_Smp]        = _jointSampler,
                     [PbrSkinMorphCsm4.Shaders.SMP_pbr_skinning_morphing_csm4_u_MorphTargetsSampler_Smp]  = _jointSampler,
                 },
-            });
+            }));
 
             sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
@@ -3404,7 +3478,7 @@ namespace GameEditor.Framework.Renderer.Server
                 if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0)
                     continue;
 
-                sg_apply_bindings(new sg_bindings
+                sg_apply_bindings(ClusterBind(new sg_bindings
                 {
                     vertex_buffers        = { [0] = sub.VertexBuffer, [1] = _instanceBuf.Buffer },
                     vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -3433,7 +3507,7 @@ namespace GameEditor.Framework.Renderer.Server
                         [Csm1.Shaders.SMP_pbr_csm1_shadow_atlas_smp]           = _shadowSampler,
                         [Csm1.Shaders.SMP_pbr_csm1_cube_shadow_array_smp]      = _cubeShadowSampler,
                     },
-                });
+                }));
 
                 sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
@@ -3615,7 +3689,7 @@ namespace GameEditor.Framework.Renderer.Server
                 if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0)
                     continue;
 
-                sg_apply_bindings(new sg_bindings
+                sg_apply_bindings(ClusterBind(new sg_bindings
                 {
                     vertex_buffers        = { [0] = sub.VertexBuffer, [1] = _instanceBuf.Buffer },
                     vertex_buffer_offsets = { [1] = instanceByteOffset },
@@ -3644,7 +3718,7 @@ namespace GameEditor.Framework.Renderer.Server
                         [Csm4.Shaders.SMP_pbr_csm4_shadow_atlas_smp]           = _shadowSampler,
                         [Csm4.Shaders.SMP_pbr_csm4_cube_shadow_array_smp]      = _cubeShadowSampler,
                     },
-                });
+                }));
 
                 sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
@@ -3792,7 +3866,7 @@ namespace GameEditor.Framework.Renderer.Server
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void TryInsertTopLight(in Light light, float score)
         {
-            if (_topLightCount < RenderingConstants.MAX_LIGHTS)
+            if (_topLightCount < _topLightCap)
             {
                 int insert = _topLightCount;
                 while (insert > 0 && score > _topLightScores[insert - 1]) insert--;
@@ -3808,11 +3882,11 @@ namespace GameEditor.Framework.Renderer.Server
             }
 
             // Already full: drop low-priority light immediately.
-            if (score <= _topLightScores[RenderingConstants.MAX_LIGHTS - 1]) return;
+            if (score <= _topLightScores[_topLightCap - 1]) return;
 
-            int at = RenderingConstants.MAX_LIGHTS - 1;
+            int at = _topLightCap - 1;
             while (at > 0 && score > _topLightScores[at - 1]) at--;
-            for (int i = RenderingConstants.MAX_LIGHTS - 1; i > at; i--)
+            for (int i = _topLightCap - 1; i > at; i--)
             {
                 _topLights[i] = _topLights[i - 1];
                 _topLightScores[i] = _topLightScores[i - 1];

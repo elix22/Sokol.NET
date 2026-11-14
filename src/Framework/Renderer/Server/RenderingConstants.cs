@@ -4,6 +4,12 @@ namespace GameEditor.Framework.Renderer.Server
     /// Global rendering constants. All pre-allocated arrays are sized by these values.
     /// Changing a value here requires restarting the editor (buffers are allocated in Init()).
     /// </summary>
+    /// <summary>
+    /// A project's Rendering Path (G8.2): Forward loops every light on every pixel; Forward+ puts the lights in a cluster
+    /// grid and shades a pixel with its cluster's lights only (examples/GameEditor/docs/CLUSTERED_LIGHTING_DESIGN.md).
+    /// </summary>
+    public enum RenderingPath { Forward, ForwardPlus }
+
     public static class RenderingConstants
     {
         /// <summary>Maximum number of active lights in a scene (uniform-block limit).</summary>

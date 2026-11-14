@@ -212,6 +212,28 @@ layout(binding=11) uniform samplerShadow   cube_shadow_array_smp;
 #endif
 #endif
 
+// ─── Forward+ (binding=7 block, binding=12 texture, sampler 9; CLUSTERED only) ──
+// G8.2 (examples/GameEditor/docs/CLUSTERED_LIGHTING_DESIGN.md): the view's lights and its clusters' light masks in
+// one RGBA32F texture, 64 texels wide (ClusterData.cs) — the lights first (4 texels a light, laid out as
+// lights_data), then each cluster's mask (16 bits a float, cluster_params.w words a cluster, 4 words a texel).
+// The clusters: 16 x 9 tiles in NDC, 24 depth slices (ClusterBuilder.cs, whose formula ClusterOf is the one below).
+// Read with texelFetch only: unfilterable float + a non-filtering sampler (slot 9: the morph texture shares the
+// joint sampler in these variants, pbr_vs_uniforms.glsl). The tags stay outside the #ifdef (sokol-shdc reads them first).
+@image_sample_type cluster_tex unfilterable_float
+@sampler_type cluster_smp nonfiltering
+#ifdef CLUSTERED
+layout(binding=7) uniform pbr_cluster_params {
+    mat4  cluster_view_proj;
+    vec4  cluster_params;   // x = near, y = 24 / ln(far / near), z = the first mask texel, w = 16-bit words a cluster
+};
+layout(binding=12) uniform texture2D cluster_tex;
+layout(binding=9)  uniform sampler   cluster_smp;
+vec4 cluster_texel(int i) { return texelFetch(sampler2D(cluster_tex, cluster_smp), ivec2(i & 63, i >> 6), 0); }
+#define LIGHT_DATA(i, k) cluster_texel((i) * 4 + (k))
+#else
+#define LIGHT_DATA(i, k) lights_data[(i) * 4 + (k)]
+#endif
+
 // Combined-sampler macros required by ibl.glsl
 #define u_GGXEnvSampler      samplerCube(u_GGXEnvTexture,       u_GGXEnvSampler_Raw)
 #define u_LambertianEnvSampler samplerCube(u_LambertianEnvTexture, u_LambertianEnvSampler_Raw)

@@ -523,9 +523,36 @@ void main()
 
     // ── Punctual lights ──────────────────────────────────────────────────────
     if (use_punctual_lights > 0) {
+#ifdef CLUSTERED
+        // Forward+: only the lights of this pixel's cluster — the set bits of its mask, lowest first (no findLSB in
+        // GLSL ES 3.0: the lowest bit by x & -x, its index by log2 of an exact power of two).
+        vec4  cclip  = cluster_view_proj * vec4(v_Position, 1.0);
+        float cw     = max(cclip.w, 1e-6);
+        int   ctx    = clamp(int(floor((cclip.x / cw * 0.5 + 0.5) * 16.0)), 0, 15);
+        int   cty    = clamp(int(floor((cclip.y / cw * 0.5 + 0.5) * 9.0)), 0, 8);
+        int   ctz    = clamp(int(floor(log(cw / cluster_params.x) * cluster_params.y)), 0, 23);
+        int   cwords = int(cluster_params.w + 0.5);
+        int   cbase  = int(cluster_params.z + 0.5) + ((ctz * 9 + cty) * 16 + ctx) * ((cwords + 3) / 4);
+        int   cword  = 0;
+        uint  cbits  = 0u;
+        vec4  ctexel = vec4(0.0);
+        for (int it = 0; it < 256; it++) {
+            while (cbits == 0u && cword < cwords) {
+                int c4 = cword - (cword / 4) * 4;
+                if (c4 == 0) ctexel = cluster_texel(cbase + cword / 4);
+                cbits = uint(c4 == 0 ? ctexel.x : c4 == 1 ? ctexel.y : c4 == 2 ? ctexel.z : ctexel.w);
+                cword++;
+            }
+            if (cbits == 0u) break;
+            uint clow = cbits & (~cbits + 1u);
+            cbits ^= clow;
+            int i = (cword - 1) * 16 + int(log2(float(clow)) + 0.5);
+#else
         for (int i = 0; i < num_lights; i++) {
-            vec3  lightColor    = lights_data[i*4+2].xyz;
-            float lightIntensity= lights_data[i*4+2].w;
+#endif
+            vec4  lightCI       = LIGHT_DATA(i, 2);
+            vec3  lightColor    = lightCI.xyz;
+            float lightIntensity= lightCI.w;
 
             vec4  lightInfo = getLightDirectionAndAttenuation(i, v_Position);
             vec3  l         = lightInfo.xyz;
@@ -536,7 +563,8 @@ void main()
 
             // ── Shadow factor: directional via CSM, spot via the atlas cone slice ──
             float shadow = 1.0;
-            int ltype_i = int(lights_data[i*4+0].w + 0.5);
+            vec4  lightPT = LIGHT_DATA(i, 0);
+            int ltype_i = int(lightPT.w + 0.5);
 #if CSM_CASCADES > 0
             if (ltype_i == LIGHT_TYPE_DIRECTIONAL) {
                 // view_depth = -(u_ViewMatrix * vec4(v_Position,1)).z
@@ -551,15 +579,19 @@ void main()
 #if !defined(TRANSMISSION)
             if (ltype_i == LIGHT_TYPE_SPOT) {
                 // lights_data[i*4+3].z = spot shadow atlas slice (4-11), or 0 = no shadow.
-                shadow = sample_spot_shadow(lights_data[i*4+3].z, v_Position, n);
+                shadow = sample_spot_shadow(LIGHT_DATA(i, 3).z, v_Position, n);
             }
             else if (ltype_i == LIGHT_TYPE_POINT) {
-                // lights_data[i*4+3].z = point shadow slot (0-3); pos = lights_data[i*4+0].xyz.
-                shadow = sample_point_shadow(int(lights_data[i*4+3].z + 0.5),
-                                             lights_data[i*4+0].xyz, v_Position, n);
+                // lights_data[i*4+3].z = point shadow slot (0-3), or -1 = no shadow; pos = lights_data[i*4+0].xyz.
+                // floor, not int(): int(-1 + 0.5) is 0 (truncation) — a light without shadows read slot 0's map, whose
+                // matrix is then the identity: a shadowed box at the world's origin.
+                shadow = sample_point_shadow(int(floor(LIGHT_DATA(i, 3).z + 0.5)),
+                                             lightPT.xyz, v_Position, n);
             }
 #endif
-            g_minShadow = min(g_minShadow, shadow);
+            // A light's shadow shows only where the light reaches (att > 0): a cube face's corners and a spot's square
+            // map reach past its range and cone, and there its shadow would darken the ambient where it gives no light.
+            if (att > 0.0) g_minShadow = min(g_minShadow, shadow);
 
             // ── Base material ─────────────────────────────────────────────
             float NdotL = clampedDot(n, l);

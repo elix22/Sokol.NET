@@ -28,5 +28,7 @@ namespace GameEditor.Framework.Core
         public string EnvironmentAmbientSource { get; set; } = "sky";         // "sky" | "color" | "disabled"
         public string EnvironmentAmbientColor  { get; set; } = "0.1 0.1 0.1"; // "r g b", used by "color"
         public float  EnvironmentAmbientEnergy { get; set; } = 1f;
+        // G8.2: the Rendering Path — "forward+" (the cluster grid; a new project's) or "forward" (every light on every pixel).
+        public string RenderingPath { get; set; } = "forward+";
     }
 }

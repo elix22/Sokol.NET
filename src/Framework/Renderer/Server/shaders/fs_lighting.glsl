@@ -17,12 +17,15 @@ float get_range_attenuation(float range, float distance)
 // Returns vec4(lightDir.xyz, attenuation).
 vec4 getLightDirectionAndAttenuation(int i, vec3 frag_pos)
 {
-    vec3  pos       = lights_data[i*4+0].xyz;
-    float ltype     = lights_data[i*4+0].w;
-    vec3  dir       = lights_data[i*4+1].xyz;
-    float range     = lights_data[i*4+1].w;
-    float innerCos  = lights_data[i*4+3].x;
-    float outerCos  = lights_data[i*4+3].y;
+    vec4  pt        = LIGHT_DATA(i, 0);   // the uniform block, or Forward+'s texture (pbr_fs_uniforms.glsl)
+    vec4  dr        = LIGHT_DATA(i, 1);
+    vec4  ss        = LIGHT_DATA(i, 3);
+    vec3  pos       = pt.xyz;
+    float ltype     = pt.w;
+    vec3  dir       = dr.xyz;
+    float range     = dr.w;
+    float innerCos  = ss.x;
+    float outerCos  = ss.y;
 
     vec3  l = vec3(0.0);
     float att = 1.0;

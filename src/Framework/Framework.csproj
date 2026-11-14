@@ -156,6 +156,42 @@
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_transmission_shader.cs&quot; --module pbr_transmission --defines TRANSMISSION --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
+  <!-- CLUSTERED variants (Forward+, G8.2: examples/GameEditor/docs/CLUSTERED_LIGHTING_DESIGN.md): each PBR family's
+       shader reading its lights from the view's cluster texture. ShaderVariantCache makes one only when a perspective
+       view draws in Forward+ on a GPU that is not LOW_TIER. -->
+  <Target Name="CompileFrameworkClusteredShaders" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_PbrGlsl);
+                  $(_ShaderDir)fs_constants.glsl;
+                  $(_ShaderDir)pbr_vs_uniforms.glsl;
+                  $(_ShaderDir)pbr_fs_uniforms.glsl;
+                  $(_ShaderDir)fs_lighting.glsl;
+                  $(_ShaderDir)brdf.glsl;
+                  $(_ShaderDir)ibl.glsl;
+                  $(_ShaderDir)animation.glsl"
+          Outputs="$(_ShaderOutDir)pbr_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_csm1_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_csm4_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_csm1_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_csm4_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_csm1_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_skinning_morphing_csm4_clustered_shader.cs;
+                   $(_ShaderOutDir)pbr_transmission_clustered_shader.cs">
+    <Message Text="Compiling Framework CLUSTERED (Forward+) shader variants (10)" Importance="high" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_clustered_shader.cs&quot; --module pbr_clustered --defines CLUSTERED --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_csm1_clustered_shader.cs&quot; --module pbr_csm1_clustered --defines CLUSTERED:CSM1 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_csm4_clustered_shader.cs&quot; --module pbr_csm4_clustered --defines CLUSTERED:CSM4 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_clustered_shader.cs&quot; --module pbr_skinning_clustered --defines CLUSTERED:SKINNING --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_csm1_clustered_shader.cs&quot; --module pbr_skinning_csm1_clustered --defines CLUSTERED:SKINNING:CSM1 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_csm4_clustered_shader.cs&quot; --module pbr_skinning_csm4_clustered --defines CLUSTERED:SKINNING:CSM4 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_clustered_shader.cs&quot; --module pbr_skinning_morphing_clustered --defines CLUSTERED:SKINNING:MORPHING --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_csm1_clustered_shader.cs&quot; --module pbr_skinning_morphing_csm1_clustered --defines CLUSTERED:SKINNING:MORPHING:CSM1 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_skinning_morphing_csm4_clustered_shader.cs&quot; --module pbr_skinning_morphing_csm4_clustered --defines CLUSTERED:SKINNING:MORPHING:CSM4 --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_PbrGlsl)&quot; --output &quot;$(_ShaderOutDir)pbr_transmission_clustered_shader.cs&quot; --module pbr_transmission_clustered --defines CLUSTERED:TRANSMISSION --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
   <!-- LOW_TIER variants (GLSL ES 3.0 only: WebGL 2 and Android GLES 3): the lit shaders with 16 lights,
        4 spot-shadow matrices, 1 point-shadow light and skinning through the joint texture, for a GPU whose
        uniform limits refuse the full ones (PowerVR GE8320: 1024 fragment components). ShaderVariantCache
