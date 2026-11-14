@@ -62,6 +62,8 @@
     <_Text3DOut>$(_ShaderOutDir)text3d_shader.cs</_Text3DOut>
     <_LinesGlsl>$(_ShaderDir)lines.glsl</_LinesGlsl>
     <_LinesOut>$(_ShaderOutDir)lines_shader.cs</_LinesOut>
+    <_ParticlesGlsl>$(_ShaderDir)particles.glsl</_ParticlesGlsl>
+    <_ParticlesOut>$(_ShaderOutDir)particles_shader.cs</_ParticlesOut>
   </PropertyGroup>
 
   <!-- Ensure the generated-shader output folder exists before any shader-compile target writes to
@@ -128,6 +130,14 @@
           Inputs="$(_Text3DGlsl)"
           Outputs="$(_Text3DOut)">
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_Text3DGlsl)&quot; --output &quot;$(_Text3DOut)&quot; --module text3d --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
+  <!-- G8.7: the world's particles (docs PARTICLES_3D_DESIGN.md), Alpha and Additive. -->
+  <Target Name="CompileFrameworkParticlesShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_ParticlesGlsl)"
+          Outputs="$(_ParticlesOut)">
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_ParticlesGlsl)&quot; --output &quot;$(_ParticlesOut)&quot; --module particles --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
   <!-- G8.4 D3: the lines scripts draw in the world. -->

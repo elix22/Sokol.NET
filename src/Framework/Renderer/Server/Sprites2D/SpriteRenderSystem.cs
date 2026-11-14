@@ -49,7 +49,7 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
         /// <summary>Quads (sprites and tiles) and draw calls of the last view drawn.</summary>
         public static int LastSprites, LastDrawCalls;
 
-        public static void BeginFrame() => _batch.BeginFrame();
+        public static void BeginFrame() { _batch.BeginFrame(); WorldParticles.BeginFrame(); }
 
         public static void Shutdown() { WorldParticles.Shutdown(); _batch.Dispose(); }
 
@@ -139,11 +139,16 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                 if (it.TileLayer < 0) _batch.Draw(it.View, it.Nearest, it.Origin, it.AxisX, it.AxisY, it.Uv, it.Rgba);
                 else DrawLayer(in _tileLayers[it.TileLayer], in inverse, invertible);
             }
-            // The particles after the sprites: quads facing the camera, a texture's in one call (docs/H5_DESIGN.md §16).
-            if (particles) WorldParticles.Draw(_batch, in viewProj);
             _batch.Flush(in viewProj, offscreen);
             LastSprites = _batch.SpriteCount;
             LastDrawCalls = _batch.DrawCalls;
+            // The particles after the sprites, in their own batch (Alpha and Additive; docs PARTICLES_3D_DESIGN.md §3.0).
+            if (particles)
+            {
+                WorldParticles.Draw(in viewProj, offscreen);
+                LastSprites += WorldParticles.LastQuads;
+                LastDrawCalls += WorldParticles.LastDrawCalls;
+            }
             Array.Clear(_tileLayers, 0, layers);     // the maps are not held on to between frames
         }
 
