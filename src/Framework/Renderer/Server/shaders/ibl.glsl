@@ -43,8 +43,22 @@ vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 m
     return normalize(refractionVector) * thickness * modelScale;
 }
 
+// The light probes' light (irradiance / π) for unit normal n: per channel c + v·n + nᵀQn (AmbientSH.cs), M8b.
+float probe_channel(int i, vec3 n)
+{
+    vec4 a = u_ProbeSH[i];
+    vec4 b = u_ProbeSH[i + 1];
+    vec4 c = u_ProbeSH[i + 2];
+    return a.x + dot(a.yzw, n) + dot(b.xyz, n * n)
+         + 2.0 * (b.w * n.x * n.y + c.x * n.x * n.z + c.y * n.y * n.z);
+}
+
 vec3 getDiffuseLight(vec3 n)
 {
+    // Baked light probes (M8b): the object's diffuse light from them - the sky's, the bounces', Baked lights' - in
+    // place of the sky's own (the reflection stays the sky's).
+    if (u_ProbeSH[2].w > 0.5)
+        return max(vec3(probe_channel(0, n), probe_channel(3, n), probe_channel(6, n)), vec3(0.0));
     vec3 rotatedNormal = mat3(u_EnvRotation) * n;
     vec4 textureSample = texture(u_LambertianEnvSampler, rotatedNormal);
     textureSample.rgb *= u_EnvIntensity;

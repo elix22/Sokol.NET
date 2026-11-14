@@ -75,6 +75,13 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     Shadows = lc.CastsShadows,
                 });
             }
+            // the light probes (M8b): every active Light Probe Group's, in world space
+            foreach (var row in world.Query<ActiveFlag, LightProbeGroup, Transform>().EnumerateWithEntities<ActiveFlag, LightProbeGroup, Transform>())
+            {
+                if (!row.Item1.Value.Active || row.Item2.Value.Positions is not { } local) continue;
+                var m = Transform.GetWorldMatrix(world, row.Item3.Value);
+                foreach (var p in local) input.Probes.Add(Vector3.Transform(p, m));
+            }
             return input;
         }
 

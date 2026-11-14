@@ -638,6 +638,7 @@ namespace GameEditor.Framework.Renderer.Server
             _lightBuf.Reset();
             _stats.Reset();
             _drawCount = 0;
+            _probeSlotCount = 0;
             FrameProfiler.BeginFrame();
         }
 
@@ -974,6 +975,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             FrameProfiler.Begin(FrameProfiler.Zone.EcsExtract);
             _drawCount = 0;
+            _probeSlotCount = 0;
             // Gate per-entity TryGetComponent<LodGroup> behind a cheap per-frame archetype check
             // so non-LOD scenes pay nothing for this feature on the hot path.
             bool anyLodGroups = world.HasAnyComponent<LodGroup>();
@@ -996,8 +998,10 @@ namespace GameEditor.Framework.Renderer.Server
                 MeshResource? meshRes = _meshReg.GetByPath(mr.MeshPath);
                 if (meshRes == null) continue;
                 // M8a: a lightmapped entity draws its own mesh (the same shape, its lightmap UV in texcoord_1)
+                bool lightmapped = false;
                 if (mr.ContributeGI && GI.Lightmaps.Active && GI.Lightmaps.MeshFor(world.GetSceneId(row.Entity)) is { } lit)
                 {
+                    lightmapped = true;
                     for (int s = 0; s < lit.SubMeshes.Length && s < meshRes.SubMeshes.Length; s++)
                         if (lit.SubMeshes[s].MaterialKey.Length == 0 && meshRes.SubMeshes[s].MaterialKey.Length > 0)
                             lit.SubMeshes[s].MaterialKey = meshRes.SubMeshes[s].MaterialKey;   // the source's materials
@@ -1059,7 +1063,9 @@ namespace GameEditor.Framework.Renderer.Server
                 }
 
                 ushort lodMask = (ushort)(drawFlags | (ushort)(lodIndex & 0xF));
-                _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, lodMask, 0, (uint)entity.GetHashCode(), worldAabb.Center, worldRadius);
+                // M8b: not lightmapped, with probes baked: its light from the probes at its centre (drawn on its own)
+                ushort probe = !lightmapped && GI.Lightmaps.HasProbes ? ProbeSlot(worldAabb.Center) : (ushort)0;
+                _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, lodMask, probe, (uint)entity.GetHashCode(), worldAabb.Center, worldRadius);
                 _cpuInst[_drawCount] = new InstanceData(
                     in model,
                     new Vector4(1f, 1f, 1f, mr.ReceivesShadows ? 1f : 0f));
@@ -1215,7 +1221,8 @@ namespace GameEditor.Framework.Renderer.Server
                        && _cmds[_sortOrder[i + groupSize]].MaterialId == curMat
                       && _cmds[_sortOrder[i + groupSize]].MeshId     == curMesh
                       && ((_cmds[_sortOrder[i + groupSize]].LodMask & DrawFlagDisableSubMeshMaterial) != 0) == disableSubMeshMaterial
-                      && (_cmds[_sortOrder[i + groupSize]].LodMask & 0x0F) == curLod)
+                      && (_cmds[_sortOrder[i + groupSize]].LodMask & 0x0F) == curLod
+                      && _cmds[_sortOrder[i + groupSize]].SortKey == _cmds[firstIdx].SortKey)   // M8b: one probe light a group
                     groupSize++;
 
                 Material?     mat  = _matReg.GetById(curMat);
@@ -1248,6 +1255,9 @@ namespace GameEditor.Framework.Renderer.Server
 
                     // Pick the shadow-receiving variant: CSM4 (4 cascades, slices 0-3) when the
                     // camera supplied frustum data, else CSM1 (single slice-0 map), else no shadow.
+                    ushort groupProbe = _cmds[firstIdx].SortKey;   // M8b: the group's probe light, if any
+                    _probeOn = groupProbe != 0;
+                    if (_probeOn) { _probeSlots.AsSpan((groupProbe - 1) * 9, 9).CopyTo(_probeSH); ProbeDraws++; }
                     if (_csmCascadeCount == 4)
                     {
                         DrawPbrCsm4Group(pbrMat, mesh, groupSize, pbrInstByteOffset,
@@ -1269,6 +1279,7 @@ namespace GameEditor.Framework.Renderer.Server
                         DrawPbrGroup(pbrMat, mesh, groupSize, pbrInstByteOffset, basePipelineFlags,
                             in pbrVs, in pbrLights, in pbrCam, in pbrIbl);
                     }
+                    _probeOn = false;
 
                     instanceOffset += groupSize;
                     i += groupSize;
@@ -1808,6 +1819,38 @@ namespace GameEditor.Framework.Renderer.Server
 
         // A material's graph pipeline for a static mesh, or default (no graph, or its shader could not be made: the
         // engine's shader draws it).
+        // ── Light probes (M8b, docs BAKED_GI_DESIGN.md §4) ───────────────────────────────────────────────────
+        // The light of the probes around the object drawn next (set per draw: a probe-lit group, a character); off:
+        // the sky's diffuse light.
+        private static bool _probeOn;
+        private static readonly Vector4[] _probeSH = new Vector4[9];
+        /// <summary>Draws lit by the baked probes so far: objects' groups, characters (a check reads the change, M8b).</summary>
+        public static long ProbeDraws { get; private set; }
+        public static long ProbeCharacterDraws { get; private set; }
+        // A frame's probe-lit draws: their light, 9 vec4 each; a draw's DrawCommand.SortKey is its slot + 1 (0: none).
+        private static readonly Vector4[] _probeSlots = new Vector4[RenderingConstants.MAX_DRAWS * 9];
+        private static int _probeSlotCount;
+
+        private static ushort ProbeSlot(Vector3 at)
+        {
+            if (_probeSlotCount >= RenderingConstants.MAX_DRAWS || !GI.Lightmaps.SampleProbes(at, _probeSlots.AsSpan(_probeSlotCount * 9, 9))) return 0;
+            return (ushort)(++_probeSlotCount);
+        }
+        private const int ProbeBytes = 9 * 16;
+
+        // Applies an IBL block with the current probe light in its last 9 vec4 (u_ProbeSH: the block's last member in
+        // every PBR variant).
+        private static unsafe void ApplyIbl<T>(int slot, ref T ibl) where T : unmanaged
+        {
+            fixed (T* p = &ibl)
+            {
+                var dst = new Span<Vector4>((byte*)p + sizeof(T) - ProbeBytes, 9);
+                if (_probeOn) _probeSH.AsSpan().CopyTo(dst);
+                else dst.Clear();
+                sg_apply_uniforms(slot, new sg_range { ptr = p, size = (nuint)sizeof(T) });
+            }
+        }
+
         private static sg_pipeline GraphPipeline(PbrMaterial mat, int cascades, PipelineFlags pf, out string variant)
         {
             variant = "";
@@ -1916,7 +1959,7 @@ namespace GameEditor.Framework.Renderer.Server
             if (graphPipe.id != 0) ApplyGraphMaterial(UB_pbr_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(UB_pbr_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(UB_pbr_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(UB_pbr_pbr_ibl_params,      SG_RANGE(ref Unsafe.AsRef(in ibl)));
+            { var iblDraw = ibl; ApplyIbl(UB_pbr_pbr_ibl_params, ref iblDraw); }
             sg_apply_uniforms(UB_pbr_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(UB_pbr_pbr_rendering_flags, SG_RANGE(ref flags));
 
@@ -2217,7 +2260,7 @@ namespace GameEditor.Framework.Renderer.Server
             // no shadows (the block's other contents), so the compiler drops it.
             if (!_shaderCache.CurrentClustered)
                 LowTierUniforms.ApplyPbrLights(PbrTx.UB_pbr_transmission_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrTx.UB_pbr_transmission_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(PbrTx.UB_pbr_transmission_pbr_rendering_flags, SG_RANGE(ref flags));
 
@@ -2425,6 +2468,9 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 int instByteOffset = baseOff + k * Unsafe.SizeOf<InstanceData>();
                 var d = _skinnedDraws[k];
+                // M8b: a character's light from the baked probes around its bounds' centre (the reference editor's)
+                _probeOn = GI.Lightmaps.HasProbes && GI.Lightmaps.SampleProbes(d.mesh.LocalBounds.Transform(d.model).Center, _probeSH);
+                if (_probeOn) ProbeCharacterDraws++;
                 // Morphed primitives route to the skinning+morphing variants (extra morph-texture bind +
                 // weights uniform); non-morphed skinned chars keep the cheaper non-morph pipeline.
                 bool morph = d.mesh.HasMorph;
@@ -2443,6 +2489,7 @@ namespace GameEditor.Framework.Renderer.Server
                     if (morph) DrawSkinnedMorphing(d.smr, d.entry, d.mesh, instByteOffset, basePipelineFlags, in viewProj, cameraPos);
                     else       DrawSkinned        (d.smr, d.entry, d.mesh, instByteOffset, basePipelineFlags, in viewProj, cameraPos);
                 }
+                _probeOn = false;
             }
         }
 
@@ -2593,7 +2640,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkin.Shaders.UB_pbr_skinning_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkin.Shaders.UB_pbr_skinning_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkin.Shaders.UB_pbr_skinning_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkin.Shaders.UB_pbr_skinning_pbr_rendering_flags, SG_RANGE(ref flags));
 
@@ -2804,7 +2851,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(PbrSkinCsm4.Shaders.UB_pbr_skinning_csm4_pbr_csm_params,      SG_RANGE(ref csm));
@@ -3010,7 +3057,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(PbrSkinCsm1.Shaders.UB_pbr_skinning_csm1_pbr_csm_params,      SG_RANGE(ref csm));
@@ -3225,7 +3272,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorph.Shaders.UB_pbr_skinning_morphing_pbr_rendering_flags, SG_RANGE(ref flags));
 
@@ -3429,7 +3476,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(PbrSkinMorphCsm1.Shaders.UB_pbr_skinning_morphing_csm1_pbr_csm_params,      SG_RANGE(ref csm));
@@ -3637,7 +3684,7 @@ namespace GameEditor.Framework.Renderer.Server
             LowTierUniforms.ApplySkinnedVs(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_vs_params, in vs, _shaderCache.CurrentLow);
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(PbrSkinMorphCsm4.Shaders.UB_pbr_skinning_morphing_csm4_pbr_csm_params,      SG_RANGE(ref csm));
@@ -3845,7 +3892,7 @@ namespace GameEditor.Framework.Renderer.Server
             if (graphPipe.id != 0) ApplyGraphMaterial(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(Csm1.Shaders.UB_pbr_csm1_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_csm_params,      SG_RANGE(ref csm));
@@ -4072,7 +4119,7 @@ namespace GameEditor.Framework.Renderer.Server
             if (graphPipe.id != 0) ApplyGraphMaterial(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, SG_RANGE(ref matParams));
             LowTierUniforms.ApplyPbrLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
-            sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_ibl_params,      SG_RANGE(ref ibl));
+            ApplyIbl(Csm4.Shaders.UB_pbr_csm4_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_csm_params,      SG_RANGE(ref csm));

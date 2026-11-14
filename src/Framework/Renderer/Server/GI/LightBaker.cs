@@ -45,6 +45,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
         /// <summary>The sky's linear radiance toward a world direction (the environment the scene is lit by).</summary>
         public Func<Vector3, Vector3> Sky = _ => Vector3.Zero;
         public LightingSettings Settings = new();
+        /// <summary>Light probe positions (world, M8b): each baked as SH L2 of the light arriving there.</summary>
+        public List<Vector3> Probes = new();
     }
 
     /// <summary>A lightmap page: per texel the light a white diffuse surface there gives back (irradiance / π, linear) and,
@@ -69,6 +71,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
     {
         public List<LightmapPage> Pages = new();
         public List<BakedEntity> Entities = new();
+        /// <summary>Each probe: where, and the radiance arriving there projected on SH L2 (∫ L·Y dω, 9 colours).</summary>
+        public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
         public long Rays;
         public double Seconds;
     }
@@ -130,6 +134,21 @@ namespace GameEditor.Framework.Renderer.Server.GI
             }
             var bvh = new Bvh(corners.ToArray());
             var ctx = new Context(input, bvh, triMaterial.ToArray(), triUv0.ToArray());
+
+            // ── light probes (M8b): the light arriving at each, over the whole sphere ──
+            if (input.Probes.Count > 0)
+            {
+                var probes = new Vector3[input.Probes.Count][];
+                long probeRays = 0;
+                Parallel.For(0, probes.Length, new ParallelOptions { CancellationToken = cancel }, i =>
+                {
+                    long r = 0;
+                    probes[i] = Probe(ctx, input.Probes[i], i, ref r);
+                    Interlocked.Add(ref probeRays, r);
+                });
+                for (int i = 0; i < probes.Length; i++) result.Probes.Add((input.Probes[i], probes[i]));
+                result.Rays += probeRays;
+            }
 
             // ── texels: each surface's position and normal where its triangles cover a texel centre ──
             var pages = new List<Texels>();
@@ -341,6 +360,54 @@ namespace GameEditor.Framework.Renderer.Server.GI
             dir = total > 1e-8f ? (dirDirect + dirSamples * inv) / total : n;
             float len = dir.Length();
             if (len > 1f) dir /= len;
+        }
+
+        // A probe: radiance from directions spread evenly over the sphere (the sky, the bounces × Indirect Intensity) and
+        // each Baked light as a lobe toward it (π × colour × attenuation: convolved, a surface facing it gets the
+        // shader's NdotL·att·I·colour), projected on SH L2.
+        private static Vector3[] Probe(Context ctx, Vector3 pos, int index, ref long rays)
+        {
+            var sh = new Vector3[9];
+            Span<float> y = stackalloc float[9];
+            int n = Math.Max(64, ctx.Samples);
+            var rng = new Rng((uint)index * 2654435761u ^ 0xA5A5A5A5u);
+            // even directions (a Fibonacci lattice, turned by a random angle a probe): far less noise in the higher bands
+            // than random ones
+            float spin = 2f * MathF.PI * rng.Float();
+            const float Golden = 2.3999632f;   // π (3 − √5)
+            for (int k = 0; k < n; k++)
+            {
+                float z = 1f - (2f * k + 1f) / n, phi = spin + k * Golden, r = MathF.Sqrt(MathF.Max(0f, 1f - z * z));
+                var w = new Vector3(r * MathF.Cos(phi), r * MathF.Sin(phi), z);
+                var l = Radiance(ctx, pos, w, ref rng, ref rays, out bool sky);
+                if (!sky) l *= ctx.IndirectIntensity;
+                Lighting.AmbientSH.Basis(w, y);
+                for (int j = 0; j < 9; j++) sh[j] += l * y[j];
+            }
+            float scale = 4f * MathF.PI / n;
+            for (int j = 0; j < 9; j++) sh[j] *= scale;
+            foreach (var lt in ctx.Input.Lights)
+            {
+                if (lt.Mode != LightMode.Baked) continue;
+                Vector3 toL; float dist, att;
+                if (lt.Type == LightType.Directional) { toL = -Vector3.Normalize(lt.Direction); dist = 1e6f; att = 1f; }
+                else
+                {
+                    var d = lt.Position - pos;
+                    dist = d.Length();
+                    if (dist < 1e-6f) continue;
+                    toL = d / dist;
+                    att = lt.Range < 0f ? 1f : MathF.Max(MathF.Min(1f - MathF.Pow(dist / MathF.Max(lt.Range, 1e-4f), 4f), 1f), 0f) / MathF.Max(dist * dist, 1e-4f);
+                    if (lt.Type == LightType.Spot)
+                        att *= Math.Clamp((Vector3.Dot(-toL, Vector3.Normalize(lt.Direction)) - lt.OuterCos) / MathF.Max(lt.InnerCos - lt.OuterCos, 1e-4f), 0f, 1f);
+                }
+                if (att <= 0f) continue;
+                if (lt.Shadows) { rays++; if (ctx.Bvh.Occluded(pos, toL, dist - 2f * Eps)) continue; }
+                Lighting.AmbientSH.Basis(toL, y);
+                var c = lt.Color * (MathF.PI * att);
+                for (int j = 0; j < 9; j++) sh[j] += c * y[j];
+            }
+            return sh;
         }
 
         // ── texel coverage ──────────────────────────────────────────────────────────────

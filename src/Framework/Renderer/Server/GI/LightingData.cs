@@ -31,6 +31,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
         /// <summary>The Baked lights (scene ids): not drawn on lightmapped surfaces, their light is in the maps.</summary>
         public List<int> BakedLights = new();
         public bool Directional;
+        /// <summary>Light probes (M8b): where, and the radiance arriving there on SH L2 (9 colours).</summary>
+        public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
         /// <summary>Lightmapped entity (scene id) → its mesh (null until <see cref="ReadMeshes"/>).</summary>
         public Dictionary<int, ObjSubMesh[]> Meshes = new();
 
@@ -58,6 +60,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 data.Pages.Add(entry);
             }
             foreach (var e in bake.Entities) { data.EntityPage[e.SceneId] = e.Page; data.Meshes[e.SceneId] = e.Mesh; }
+            data.Probes.AddRange(bake.Probes);
             File.WriteAllText(Path.Combine(folder, JsonFile), data.ToJson());
             File.WriteAllBytes(Path.Combine(folder, MeshFile), data.MeshBytes());
             return data;
@@ -157,6 +160,17 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 w.WriteStartArray("bakedLights");
                 foreach (int id in BakedLights) w.WriteNumberValue(id);
                 w.WriteEndArray();
+                w.WriteStartArray("probes");
+                foreach (var (pos, sh) in Probes)
+                {
+                    w.WriteStartObject();
+                    w.WriteStartArray("p"); w.WriteNumberValue(pos.X); w.WriteNumberValue(pos.Y); w.WriteNumberValue(pos.Z); w.WriteEndArray();
+                    w.WriteStartArray("sh");
+                    foreach (var c in sh) { w.WriteNumberValue(c.X); w.WriteNumberValue(c.Y); w.WriteNumberValue(c.Z); }
+                    w.WriteEndArray();
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
                 w.WriteEndObject();
             }
             return Encoding.UTF8.GetString(ms.ToArray());
@@ -207,6 +221,14 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         if (e.TryGetProperty("id", out var id) && e.TryGetProperty("page", out var pg)) d.EntityPage[id.GetInt32()] = pg.GetInt32();
                 if (r.TryGetProperty("bakedLights", out var bl))
                     foreach (var e in bl.EnumerateArray()) d.BakedLights.Add(e.GetInt32());
+                if (r.TryGetProperty("probes", out var pr))
+                    foreach (var e in pr.EnumerateArray())
+                    {
+                        if (!e.TryGetProperty("p", out var pp) || !e.TryGetProperty("sh", out var sv) || sv.GetArrayLength() != 27) continue;
+                        var sh = new Vector3[9];
+                        for (int k = 0; k < 9; k++) sh[k] = new Vector3(sv[k * 3].GetSingle(), sv[k * 3 + 1].GetSingle(), sv[k * 3 + 2].GetSingle());
+                        d.Probes.Add((new Vector3(pp[0].GetSingle(), pp[1].GetSingle(), pp[2].GetSingle()), sh));
+                    }
                 return d;
             }
             catch (Exception) { return null; }

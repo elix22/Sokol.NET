@@ -23,6 +23,43 @@ namespace GameEditor.Framework.Renderer.Server.GI
         private static readonly Dictionary<ushort, int> _pageOfMesh = new();
         private static readonly HashSet<int> _bakedLights = new();
         private static int _version;
+        private static System.Numerics.Vector3[] _probePos = Array.Empty<System.Numerics.Vector3>();
+        private static System.Numerics.Vector4[] _probePacked = Array.Empty<System.Numerics.Vector4>();   // 9 a probe
+
+        /// <summary>The loaded bake has light probes (M8b): objects that are not lightmapped take their light from them.</summary>
+        public static bool HasProbes => _data != null && _probePos.Length > 0;
+        public static int ProbeCount => _probePos.Length;
+
+        /// <summary>
+        /// The probes' light at <paramref name="at"/> (the packed form the shaders read: <see cref="Lighting.AmbientSH.Pack"/>,
+        /// [2].W = 1): every probe weighted 1 / (d² + 0.01)², the weights summing to 1 - continuous as an object moves,
+        /// a probe's own light at its place. False without probes.
+        /// </summary>
+        public static bool SampleProbes(System.Numerics.Vector3 at, Span<System.Numerics.Vector4> dst)
+        {
+            dst.Clear();
+            if (!HasProbes) return false;
+            Blend(_probePos, _probePacked, at, dst);
+            return true;
+        }
+
+        /// <summary>The blend <see cref="SampleProbes"/> makes, of any probes (each 9 packed vec4).</summary>
+        public static void Blend(ReadOnlySpan<System.Numerics.Vector3> positions, ReadOnlySpan<System.Numerics.Vector4> packed,
+                                 System.Numerics.Vector3 at, Span<System.Numerics.Vector4> dst)
+        {
+            dst.Clear();
+            float total = 0f;
+            for (int i = 0; i < positions.Length; i++)
+            {
+                float d2 = System.Numerics.Vector3.DistanceSquared(at, positions[i]);
+                float w = 1f / ((d2 + 0.01f) * (d2 + 0.01f));
+                total += w;
+                for (int k = 0; k < 9; k++) dst[k] += packed[i * 9 + k] * w;
+            }
+            float inv = 1f / total;
+            for (int k = 0; k < 9; k++) dst[k] *= inv;
+            dst[2] = new System.Numerics.Vector4(dst[2].X, dst[2].Y, dst[2].Z, 1f);
+        }
 
         /// <summary>A bake is loaded for the scene.</summary>
         public static bool Active => _data != null;
@@ -129,10 +166,17 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 _pageOfMesh[meshId] = page;
             }
             foreach (int id in data.BakedLights) _bakedLights.Add(id);
+            _probePos = new System.Numerics.Vector3[data.Probes.Count];
+            _probePacked = new System.Numerics.Vector4[data.Probes.Count * 9];
+            for (int i = 0; i < data.Probes.Count; i++)
+            {
+                _probePos[i] = data.Probes[i].Position;
+                Lighting.AmbientSH.FromRadianceSH(data.Probes[i].Radiance).Pack(_probePacked.AsSpan(i * 9, 9), 1f);
+            }
             _folderKey = folderKey;
             _data = data;
             _version++;
-            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_meshByScene.Count} lightmapped, {data.BakedLights.Count} baked light(s)");
+            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_meshByScene.Count} lightmapped, {data.BakedLights.Count} baked light(s), {data.Probes.Count} probe(s)");
         }
 
         /// <summary>Drops the loaded bake: its textures and meshes freed.</summary>
@@ -147,6 +191,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
             }
             foreach (int id in _meshByScene.Keys) RenderingServer.Meshes.Remove(MeshKey(_folderKey, id));
             _meshByScene.Clear(); _pageOfMesh.Clear(); _bakedLights.Clear();
+            _probePos = Array.Empty<System.Numerics.Vector3>(); _probePacked = Array.Empty<System.Numerics.Vector4>();
             _light = Array.Empty<sg_view>(); _dir = Array.Empty<sg_view>();
             _data = null; _folderKey = "";
         }

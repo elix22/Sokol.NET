@@ -45,8 +45,19 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             }
 
             float norm = (float)(4.0 * Math.PI / weightSum);
+            for (int k = 0; k < 9; k++) sh[k] *= norm;
+            return FromRadianceSH(sh);
+        }
+
+        /// <summary>
+        /// From a radiance's projection on the 9 SH basis functions (<see cref="Basis"/>; ∫ L·Y dω): convolved with the
+        /// clamped cosine, as irradiance / π - the baked light probes' too (M8b).
+        /// </summary>
+        public static AmbientSH FromRadianceSH(ReadOnlySpan<Vector3> radiance)
+        {
+            var sh = new Vector3[9];
             // Cosine convolution / π per band: Â0/π = 1, Â1/π = 2/3, Â2/π = 1/4.
-            for (int k = 0; k < 9; k++) sh[k] *= norm * (k == 0 ? 1f : k < 4 ? 2f / 3f : 0.25f);
+            for (int k = 0; k < 9; k++) sh[k] = radiance[k] * (k == 0 ? 1f : k < 4 ? 2f / 3f : 0.25f);
 
             var a = new AmbientSH();
             for (int ch = 0; ch < 3; ch++)
@@ -161,7 +172,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         }
 
         // Real SH basis l ≤ 2, order: Y00, Y1-1 (y), Y10 (z), Y11 (x), Y2-2 (xy), Y2-1 (yz), Y20, Y21 (xz), Y22.
-        private static void Basis(Vector3 d, Span<float> y)
+        /// <summary>The 9 real SH basis functions (l ≤ 2) at the unit direction <paramref name="d"/>.</summary>
+        public static void Basis(Vector3 d, Span<float> y)
         {
             y[0] = 0.282095f;
             y[1] = 0.488603f * d.Y;
