@@ -229,6 +229,10 @@ namespace GameEditor.Framework.Scripting
         /// Messages): called on the emitter's scripts with what it hit, and on the hit entity's with the emitter; once a step a pair.</summary>
         public virtual void OnParticleCollision(Entity other) { }
 
+        /// <summary>Particles of this entity's particle system met a Callback condition of its Triggers module this step (G8.8 Q7):
+        /// <c>WorldParticles.CopyTriggered(entity, span)</c> lists them.</summary>
+        public virtual void OnParticleTrigger() { }
+
         /// <summary>Called when this entity stops overlapping a non-trigger body.</summary>
         public virtual void OnCollisionExit(Entity other) { }
 

@@ -28,6 +28,7 @@ namespace GameEditor.Framework.Scene
             public float SubCarry;      // its Birth sub-emitters' part of a particle not yet made
             public int Trail;           // its trail's slot + 1 (0: none)
             public bool Lit;            // it carries a light (the Lights module's Ratio)
+            public byte Inside;         // the triggers it was inside at the last step (a bit each)
         }
 
         sealed class Pool
@@ -55,6 +56,9 @@ namespace GameEditor.Framework.Scene
             public readonly ParticleCollisionEvent[] Hits = new ParticleCollisionEvent[64];
             public int HitCount;
             public int LightCount;      // its lights given to the renderer at the last gathering
+            public readonly ParticleTriggerEvent[] Triggered = new ParticleTriggerEvent[64];
+            public int TriggeredCount;
+            public bool TellTrigger;    // a Callback condition met this step: the emitter's scripts are told
             // Trails (G8.8 Q3): slots of TrailPoints points each, oldest first; a slot is a living particle's or a lingering one.
             public Vector3[] TrailPos = Array.Empty<Vector3>();
             public float[] TrailAge = Array.Empty<float>();
@@ -67,6 +71,125 @@ namespace GameEditor.Framework.Scene
         }
 
         private static readonly Dictionary<Entity, Pool> _pools = new();
+        /// <summary>The particles that met a Callback condition of the Triggers module in the last step (at most 64): where, the
+        /// trigger, the condition.</summary>
+        public static int CopyTriggered(Entity entity, Span<ParticleTriggerEvent> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.TriggeredCount, into.Length);
+            for (int i = 0; i < n; i++) into[i] = p.Triggered[i];
+            return n;
+        }
+
+        // The wind of the step (G8.8 Q7): the active Wind Zones, at most 16, and the time their pulse and turbulence run on.
+        private struct Wind { public Vector3 At, Forward; public WindZone Z; }
+        private static readonly Wind[] _winds = new Wind[16];
+        private static int _windCount;
+        private static float _windTime;
+
+        private static Vector3 WindAt(Vector3 p)
+        {
+            Vector3 f = Vector3.Zero;
+            for (int k = 0; k < _windCount; k++)
+            {
+                ref readonly Wind w = ref _winds[k];
+                float main = w.Z.Main * (1f + w.Z.PulseMagnitude * MathF.Sin(MathF.Tau * w.Z.PulseFrequency * _windTime));
+                if (w.Z.Mode == WindZoneMode.Directional) f += w.Forward * main;
+                else
+                {
+                    Vector3 d = p - w.At;
+                    float len = d.Length();
+                    if (len >= w.Z.Radius || len < 1e-5f) continue;
+                    f += d / len * (main * (1f - len / w.Z.Radius));
+                }
+                if (w.Z.Turbulence > 0f) f += Noise3(p * 0.5f + new Vector3(_windTime), 0xA511E9B3u + (uint)k) * w.Z.Turbulence;
+            }
+            return f;
+        }
+
+        // The triggers of the emitter being stepped: their inverse world matrices (the shapes' space) and shapes.
+        private struct TriggerBody { public Matrix4x4 ToLocal; public float Scale; public Entity E; public System.Collections.Generic.List<Physics.ShapeEntry>? Shapes; }
+        private static readonly TriggerBody[] _triggers = new TriggerBody[ParticlePlanes.Capacity];
+        private static int _triggerCount;
+
+        private static void PrepareTriggers(ECSWorld world, in ParticlesComponent c)
+        {
+            _triggerCount = 0;
+            if (!c.TriggersOn) return;
+            for (int k = 0; k < c.Triggers.Count; k++)
+            {
+                Entity te = c.Triggers.Items[k];
+                if (te.IsNull || !te.IsAlive || !world.TryGetComponent<Transform>(te, out var tt) || !world.TryGetComponent<RigidbodyComponent>(te, out var rb)) continue;
+                Matrix4x4 m = Transform.GetWorldMatrix(world, tt);
+                if (!Matrix4x4.Invert(m, out var inv)) continue;
+                float scale = MathF.Cbrt(MathF.Abs(m.GetDeterminant()));
+                _triggers[_triggerCount++] = new TriggerBody { ToLocal = inv, Scale = MathF.Max(1e-5f, scale), E = te, Shapes = rb.Shapes };
+            }
+        }
+
+        // A point (grown by a radius, world metres) inside a trigger's shapes: in the body's own space, each shape at its offset.
+        private static bool InsideTrigger(in TriggerBody t, Vector3 world, float radius)
+        {
+            Vector3 p = Vector3.Transform(world, t.ToLocal);
+            float r = radius / t.Scale;
+            if (t.Shapes == null || t.Shapes.Count == 0) return MathF.Abs(p.X) <= 0.5f + r && MathF.Abs(p.Y) <= 0.5f + r && MathF.Abs(p.Z) <= 0.5f + r;
+            foreach (var s in t.Shapes)
+            {
+                Vector3 q = Vector3.Transform(p - s.Offset, Quaternion.Conjugate(s.OffsetRotation == default ? Quaternion.Identity : s.OffsetRotation));
+                switch (s.Shape)
+                {
+                    case Physics.ColliderShape.Sphere:
+                        if (q.Length() <= s.Radius + r) return true;
+                        break;
+                    case Physics.ColliderShape.Capsule:
+                    {
+                        float y = Math.Clamp(q.Y, -s.HalfHeight, s.HalfHeight);
+                        if (Vector3.Distance(q, new Vector3(0f, y, 0f)) <= s.Radius + r) return true;
+                        break;
+                    }
+                    case Physics.ColliderShape.Cylinder:
+                        if (MathF.Abs(q.Y) <= s.HalfHeight + r && new Vector2(q.X, q.Z).Length() <= s.Radius + r) return true;
+                        break;
+                    default:   // Box, and a plane, hull or mesh as their box
+                        if (MathF.Abs(q.X) <= s.HalfExtent.X + r && MathF.Abs(q.Y) <= s.HalfExtent.Y + r && MathF.Abs(q.Z) <= s.HalfExtent.Z + r) return true;
+                        break;
+                }
+            }
+            return false;
+        }
+
+        // One particle against the Triggers module: false - it dies (a Kill condition met).
+        private static bool Trigger(Pool pool, in ParticlesComponent c, ref Particle p)
+        {
+            Vector3 at = WorldPos(pool, in p);
+            float radius = SizeNow(in c, in p) * 0.5f * MathF.Max(0f, c.TriggerRadiusScale);
+            int now = 0, first = -1;
+            for (int k = 0; k < _triggerCount; k++)
+                if (InsideTrigger(in _triggers[k], at, radius)) { now |= 1 << k; if (first < 0) first = k; }
+            int was = p.Inside;
+            p.Inside = (byte)now;
+            bool kill = false;
+            void Meet(Pool pool, ParticleTriggerAction action, ParticleTriggerKind kind, int k, Vector3 at, ref bool kill)
+            {
+                if (action == ParticleTriggerAction.Kill) kill = true;
+                else if (action == ParticleTriggerAction.Callback)
+                {
+                    pool.TellTrigger = true;
+                    if (pool.TriggeredCount < pool.Triggered.Length)
+                        pool.Triggered[pool.TriggeredCount++] = new ParticleTriggerEvent { Position = at, Trigger = k >= 0 ? _triggers[k].E : default, Kind = kind };
+                }
+            }
+            for (int k = 0; k < _triggerCount; k++)
+            {
+                int bit = 1 << k;
+                if ((now & bit) != 0 && (was & bit) == 0) Meet(pool, c.TriggerEnter, ParticleTriggerKind.Enter, k, at, ref kill);
+                if ((now & bit) == 0 && (was & bit) != 0) Meet(pool, c.TriggerExit, ParticleTriggerKind.Exit, k, at, ref kill);
+            }
+            if (now != 0) Meet(pool, c.TriggerInside, ParticleTriggerKind.Inside, first, at, ref kill);
+            else Meet(pool, c.TriggerOutside, ParticleTriggerKind.Outside, -1, at, ref kill);
+            return !kill;
+        }
+
         /// <summary>A mesh particle for the renderer (G8.8 Q6): its model matrix and its colour (the material's tint).</summary>
         public struct MeshParticle { public Matrix4x4 Model; public Vector4 Tint; }
 
@@ -521,6 +644,17 @@ namespace GameEditor.Framework.Scene
                 if (_pools.Count > 0) _pools.Clear();
                 return;
             }
+            // The Wind Zones (G8.8 Q7), for the systems with External Forces.
+            _windCount = 0;
+            _windTime += dt;
+            if (world.HasAnyComponent<WindZone>())
+                foreach (var row in world.Query<ActiveFlag, WindZone, Transform>().EnumerateWithEntities<ActiveFlag, WindZone, Transform>())
+                {
+                    if (!row.Item1.Value.Active || _windCount == _winds.Length) continue;
+                    Matrix4x4 wm = Transform.GetWorldMatrix(world, row.Item3.Value);
+                    Vector3 fw = Vector3.TransformNormal(Vector3.UnitZ, wm);
+                    _winds[_windCount++] = new Wind { At = wm.Translation, Forward = fw.LengthSquared() > 1e-10f ? Vector3.Normalize(fw) : Vector3.UnitZ, Z = row.Item2.Value };
+                }
             // The sub-emitters named by the active emitters: they do not make particles on their own.
             _subEntityCount = 0;
             foreach (var row in world.Query<ActiveFlag, ParticlesComponent>().EnumerateWithEntities<ActiveFlag, ParticlesComponent>())
@@ -560,6 +694,10 @@ namespace GameEditor.Framework.Scene
             _gone.Clear();
             foreach (var pair in _pools) if (pair.Value.Seen != _frame) _gone.Add(pair.Key);
             foreach (Entity e in _gone) _pools.Remove(e);
+            // The trigger callbacks (G8.8 Q7): the emitter's scripts told once a step.
+            if (!onlyUnder)
+                foreach (var pair in _pools)
+                    if (pair.Value.TellTrigger) { pair.Value.TellTrigger = false; Scripting.ScriptSystem.DispatchParticleTrigger(pair.Key); }
             // The collision messages (not in the editor's preview: no script runs there), each pair once a step, both sides.
             if (!onlyUnder)
                 for (int i = 0; i < _messageCount; i++)
@@ -650,6 +788,9 @@ namespace GameEditor.Framework.Scene
         private static void Simulate(ECSWorld world, Entity self, Pool pool, in ParticlesComponent c, in Matrix4x4 model, float dt)
         {
             PrepareSubs(world, self, in c);
+            PrepareTriggers(world, in c);
+            pool.TriggeredCount = 0;
+            bool wind = c.ExternalForcesOn && _windCount > 0;
             bool births = false;
             for (int k = 0; k < _subCount; k++) births |= _subs[k].Entry.Type == ParticleSubType.Birth;
             pool.EmitterVel = pool.HasLast && dt > 0f ? (pool.Origin - pool.Last) / dt : Vector3.Zero;
@@ -712,6 +853,12 @@ namespace GameEditor.Framework.Scene
                 p.Pos += p.Vel * dt;
                 if (c.VelocityOn) p.Pos += velocity * dt;
                 if (carried != Vector3.Zero) p.Pos += carried * dt;
+                if (wind)
+                {
+                    // External Forces: the Wind Zones' push at the particle (in the world; into the emitter's space when local).
+                    Vector3 push = WindAt(c.World ? p.Pos : pool.Origin + Vector3.Transform(p.Pos, pool.Rotation)) * (c.ExternalMultiplier * dt);
+                    p.Vel += c.World ? push : Vector3.Transform(push, Quaternion.Conjugate(pool.Rotation));
+                }
                 if (c.NoiseOn)
                 {
                     Vector3 at = (c.World ? p.Pos : pool.Origin + Vector3.Transform(p.Pos, pool.Rotation)) * c.NoiseFrequency + new Vector3(scroll);
@@ -724,6 +871,13 @@ namespace GameEditor.Framework.Scene
                     p.Rot += (c.RotationBySpeed.X + (c.RotationBySpeed.Y - c.RotationBySpeed.X) * f) * dt;
                 }
                 if (collide && !Collide(self, pool, in c, ref p, from, i, stride, phase, planeAt[..planes], planeUp[..planes], planeOf[..planes]))
+                {
+                    if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
+                    if (p.Trail != 0) EndTrail(pool, in c, in p);
+                    pool.Items[i] = pool.Items[--pool.Count];
+                    continue;
+                }
+                if (_triggerCount > 0 && !Trigger(pool, in c, ref p))
                 {
                     if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
                     if (p.Trail != 0) EndTrail(pool, in c, in p);
@@ -1124,5 +1278,16 @@ namespace GameEditor.Framework.Scene
     {
         public Vector3 Point, Normal, Velocity;
         public Entity Other;
+    }
+
+    /// <summary>The Triggers module's conditions.</summary>
+    public enum ParticleTriggerKind : byte { Inside, Outside, Enter, Exit }
+
+    /// <summary>A particle that met a Callback condition of the Triggers module: where it was, the trigger (none for Outside), which condition.</summary>
+    public struct ParticleTriggerEvent
+    {
+        public Vector3 Position;
+        public Entity Trigger;
+        public ParticleTriggerKind Kind;
     }
 }

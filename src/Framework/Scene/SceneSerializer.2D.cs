@@ -28,6 +28,7 @@ namespace GameEditor.Framework.Scene
             RegisterItems();
             RegisterChaseCamera();
             RegisterParticles();
+            RegisterWindZone();
             RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
             RegisterComponentExtension("Text3D", WriteText3D, ReadText3D, static (w, e) => w.RemoveComponent<Text3D>(e));
             RegisterComponentExtension("Animator",

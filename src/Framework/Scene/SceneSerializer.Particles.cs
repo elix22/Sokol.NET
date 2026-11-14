@@ -19,6 +19,7 @@ namespace GameEditor.Framework.Scene
         private static readonly string[] BoxFromNames = { "Volume", "Shell", "Edge" };
         private static readonly string[] RenderModeNames = { "Billboard", "Stretched", "Horizontal", "Vertical", "Mesh" };
         private static readonly string[] MeshAlignmentNames = { "World", "Velocity" };
+        private static readonly string[] TriggerActionNames = { "Ignore", "Kill", "Callback" };
         private static readonly string[] BlendNames = { "Alpha", "Additive" };
         private static readonly string[] SortNames = { "None", "ByDistance", "OldestInFront", "YoungestInFront" };
         private static readonly string[] SheetTimeNames = { "Lifetime", "Fps" };
@@ -122,6 +123,19 @@ namespace GameEditor.Framework.Scene
             Num(b, "LightRatio", p.LightRatio); Bool(b, "LightUseParticleColor", p.LightUseParticleColor); Bool(b, "LightSizeAffectsRange", p.LightSizeAffectsRange);
             Bool(b, "LightAlphaAffectsIntensity", p.LightAlphaAffectsIntensity); Num(b, "LightRangeMultiplier", p.LightRangeMultiplier);
             Num(b, "LightIntensityMultiplier", p.LightIntensityMultiplier); Key(b, "LightMax").Append(p.LightMax.ToString(CultureInfo.InvariantCulture));
+            // Triggers and External Forces (G8.8 Q7): the triggers by their scene ids
+            Bool(b, "TriggersOn", p.TriggersOn); Key(b, "Triggers").Append('[');
+            for (int i = 0; i < p.Triggers.Count; i++)
+            {
+                if (i > 0) b.Append(',');
+                Frent.Entity te = p.Triggers.Items[i];
+                b.Append((!te.IsNull && te.IsAlive ? world.GetSceneId(te) : 0).ToString(CultureInfo.InvariantCulture));
+            }
+            b.Append(']');
+            Name(b, "TriggerInside", TriggerActionNames, (int)p.TriggerInside); Name(b, "TriggerOutside", TriggerActionNames, (int)p.TriggerOutside);
+            Name(b, "TriggerEnter", TriggerActionNames, (int)p.TriggerEnter); Name(b, "TriggerExit", TriggerActionNames, (int)p.TriggerExit);
+            Num(b, "TriggerRadiusScale", p.TriggerRadiusScale);
+            Bool(b, "ExternalForcesOn", p.ExternalForcesOn); Num(b, "ExternalMultiplier", p.ExternalMultiplier);
             // Texture Sheet Animation
             Bool(b, "SheetOn", p.SheetOn); Key(b, "Sheet").Append('[').Append(p.SheetColumns.ToString(CultureInfo.InvariantCulture)).Append(',')
                                                        .Append(p.SheetRows.ToString(CultureInfo.InvariantCulture)).Append(']');
@@ -287,6 +301,20 @@ namespace GameEditor.Framework.Scene
             p.LightRangeMultiplier = MathF.Max(0f, Number(el, "LightRangeMultiplier", p.LightRangeMultiplier));
             p.LightIntensityMultiplier = MathF.Max(0f, Number(el, "LightIntensityMultiplier", p.LightIntensityMultiplier));
             p.LightMax = Math.Clamp((int)Number(el, "LightMax", p.LightMax), 0, WorldParticles.MaxLights);
+            // Triggers and External Forces
+            p.TriggersOn = Flag(el, "TriggersOn", p.TriggersOn);
+            p.Triggers = default;
+            if (el.TryGetProperty("Triggers", out var trs) && trs.ValueKind == JsonValueKind.Array)
+                foreach (var x in trs.EnumerateArray())
+                    if (x.ValueKind == JsonValueKind.Number && x.TryGetInt32(out int tid) && tid > 0 && resolve(tid) is { IsNull: false } te)
+                        p.Triggers.Add(te);
+            p.TriggerInside = (ParticleTriggerAction)Named(el, "TriggerInside", TriggerActionNames, (int)p.TriggerInside);
+            p.TriggerOutside = (ParticleTriggerAction)Named(el, "TriggerOutside", TriggerActionNames, (int)p.TriggerOutside);
+            p.TriggerEnter = (ParticleTriggerAction)Named(el, "TriggerEnter", TriggerActionNames, (int)p.TriggerEnter);
+            p.TriggerExit = (ParticleTriggerAction)Named(el, "TriggerExit", TriggerActionNames, (int)p.TriggerExit);
+            p.TriggerRadiusScale = MathF.Max(0f, Number(el, "TriggerRadiusScale", p.TriggerRadiusScale));
+            p.ExternalForcesOn = Flag(el, "ExternalForcesOn", p.ExternalForcesOn);
+            p.ExternalMultiplier = Number(el, "ExternalMultiplier", p.ExternalMultiplier);
             // Texture Sheet Animation
             p.SheetOn = Flag(el, "SheetOn", p.SheetOn);
             if (el.TryGetProperty("Sheet", out var sh) && sh.ValueKind == JsonValueKind.Array && sh.GetArrayLength() == 2)

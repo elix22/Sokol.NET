@@ -35,6 +35,9 @@ namespace GameEditor.Framework.ECS.Components
     /// <summary>How a trail's texture lies along it: once over the whole trail, or repeated every width.</summary>
     public enum ParticleTrailTexture : byte { Stretch, Tile }
 
+    /// <summary>What happens to a particle meeting a Triggers condition: nothing, it dies, or the emitter's scripts are told.</summary>
+    public enum ParticleTriggerAction : byte { Ignore, Kill, Callback }
+
     /// <summary>The Texture Sheet Animation's time: the frames over a particle's life, or so many a second.</summary>
     public enum ParticleSheetTime : byte { Lifetime, Fps }
 
@@ -242,6 +245,19 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>At most this many lights for the system.</summary>
         public int LightMax;
 
+        // ---- Triggers (G8.8 Q7) ----
+        public bool TriggersOn;
+        /// <summary>Up to 6 entities with a Rigidbody marked Is Trigger (an entity list, as the Collision module's planes).</summary>
+        public ParticlePlanes Triggers;
+        public ParticleTriggerAction TriggerInside, TriggerOutside, TriggerEnter, TriggerExit;
+        /// <summary>A particle's radius for the test: half its size times this.</summary>
+        public float TriggerRadiusScale;
+
+        // ---- External Forces (G8.8 Q7) ----
+        public bool ExternalForcesOn;
+        /// <summary>The Wind Zones' push times this.</summary>
+        public float ExternalMultiplier;
+
         // ---- Texture Sheet Animation ----
         public bool SheetOn;
         public int SheetColumns, SheetRows;
@@ -336,6 +352,8 @@ namespace GameEditor.Framework.ECS.Components
             TrailColorOverTrail = ParticleGradient.White, TrailInheritColor = true, TrailTexture = "",
             LightRatio = 0f, LightUseParticleColor = true, LightSizeAffectsRange = false, LightAlphaAffectsIntensity = true,
             LightRangeMultiplier = 1f, LightIntensityMultiplier = 1f, LightMax = 20,
+            TriggerInside = ParticleTriggerAction.Ignore, TriggerOutside = ParticleTriggerAction.Ignore, TriggerEnter = ParticleTriggerAction.Ignore,
+            TriggerExit = ParticleTriggerAction.Ignore, TriggerRadiusScale = 1f, ExternalMultiplier = 1f,
             SheetColumns = 1, SheetRows = 1, SheetTime = ParticleSheetTime.Lifetime, SheetFps = 10f, SheetCycles = 1f, SheetStartFrame = Vector2.Zero,
             MeshKey = "", MeshMaterial = "", MeshAlignment = ParticleMeshAlignment.World, MeshCastShadows = true, Lit = false,
             Texture = "", RenderMode = ParticleRenderMode.Billboard, SpeedScale = 0f, LengthScale = 2f, Blend = ParticleBlend.Alpha, Sort = ParticleSort.None,
