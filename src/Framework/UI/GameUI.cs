@@ -713,6 +713,14 @@ namespace GameEditor.Framework.UI
             }
         }
 
+        // A picture for the UI: a PNG / JPG as before, or an .svg rasterized at its own size (G8.4 D2).
+        private static UIImage? Picture(IntPtr vg, byte[] bytes, NVGimageFlags flags)
+        {
+            if (!Assets.SvgRaster.IsSvg(bytes)) return UIImage.LoadFromMemory(vg, bytes, flags);
+            var rgba = Assets.SvgRaster.Rasterize(bytes, 1f, out int w, out int h);
+            return rgba == null ? null : UIImage.FromRgba(vg, w, h, rgba, flags);
+        }
+
         // ── For the world's text (G8.4: Text3D draws with the UI's NanoVG context and fonts) ───────────────
         /// <summary>The NanoVG context of the screen the game's UI is shown on (a built game's, an editor's host), or 0.</summary>
         internal static IntPtr TextVg => (_host as Screen)?.Renderer?.VGContext ?? IntPtr.Zero;
@@ -1093,7 +1101,7 @@ namespace GameEditor.Framework.UI
                 if (ConfigManager.HasProject)
                 {
                     string path = System.IO.Path.Combine(ConfigManager.ProjectFolder!, "Assets", key);
-                    image = System.IO.File.Exists(path) ? UIImage.LoadFromMemory(vg, System.IO.File.ReadAllBytes(path), flags) : null;
+                    image = System.IO.File.Exists(path) ? Picture(vg, System.IO.File.ReadAllBytes(path), flags) : null;
                     if (image == null) Logger.Warning($"[UI] The picture '{key}' could not be read.");
                     return _images[key] = image;
                 }
@@ -1101,7 +1109,7 @@ namespace GameEditor.Framework.UI
                 SFilesystem.LoadFileAsync(key, (path, buffer, status) =>
                 {
                     _pending.Remove(key);
-                    UIImage? read = status == SFileLoadStatus.Success && buffer != null ? UIImage.LoadFromMemory(vg, buffer, flags) : null;
+                    UIImage? read = status == SFileLoadStatus.Success && buffer != null ? Picture(vg, buffer, flags) : null;
                     if (read == null) Logger.Warning($"[UI] The picture '{key}' could not be read.");
                     _images[key] = read;
                 });

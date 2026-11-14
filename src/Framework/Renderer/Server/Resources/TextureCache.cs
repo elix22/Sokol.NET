@@ -84,16 +84,30 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             if (!sg_isvalid()) return default;
 
             int w = 0, h = 0, ch = 0;
-            byte* pixels = StbImage.stbi_load_csharp(
-                in data[0], data.Length, ref w, ref h, ref ch, 4);
-
-            if (pixels == null)
+            byte* pixels = null;
+            byte[]? svgPixels = null;
+            ReadOnlySpan<byte> pixelSpan;
+            if (GameEditor.Framework.Assets.SvgRaster.IsSvg(data))
             {
-                Console.Error.WriteLine($"[TextureCache] stbi_load failed for '{key}'");
-                return PlaceholderWhite;
+                // G8.4 D2: an .svg, rasterized now at its own pixel size (docs TEXT3D_SVG_DRAW_DESIGN.md §5b).
+                svgPixels = GameEditor.Framework.Assets.SvgRaster.Rasterize(data, 1f, out w, out h);
+                if (svgPixels == null)
+                {
+                    Console.Error.WriteLine($"[TextureCache] the SVG '{key}' could not be read");
+                    return PlaceholderWhite;
+                }
+                pixelSpan = svgPixels;
             }
-
-            var pixelSpan = new ReadOnlySpan<byte>(pixels, w * h * 4);
+            else
+            {
+                pixels = StbImage.stbi_load_csharp(in data[0], data.Length, ref w, ref h, ref ch, 4);
+                if (pixels == null)
+                {
+                    Console.Error.WriteLine($"[TextureCache] stbi_load failed for '{key}'");
+                    return PlaceholderWhite;
+                }
+                pixelSpan = new ReadOnlySpan<byte>(pixels, w * h * 4);
+            }
 
             var imgDesc = new sg_image_desc
             {
@@ -105,7 +119,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             imgDesc.data.mip_levels[0] = SG_RANGE(pixelSpan);
 
             sg_image img = sg_make_image(imgDesc);
-            StbImage.stbi_image_free_csharp(pixels);
+            if (pixels != null) StbImage.stbi_image_free_csharp(pixels);
 
             sg_view view = sg_make_view(new sg_view_desc
             {
