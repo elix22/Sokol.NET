@@ -1391,7 +1391,7 @@ namespace GameEditor.Framework.Renderer.Server
                 var spotFwd = Vector3.Normalize(new Vector3(lightWorld.M31, lightWorld.M32, lightWorld.M33));
                 float outerRad = slc.OuterAngle * (MathF.PI / 180f);
 
-                Matrix4x4 spotVp = BuildSpotShadowViewProj(spotPos, spotFwd, slc.Range, outerRad);
+                Matrix4x4 spotVp = BuildSpotShadowViewProj(spotPos, spotFwd, slc.Range, outerRad, ShadowNear(world, spotPos, slc.Range));
                 int atlasSlice = ShadowAtlas.DirectionalCascades + si;
                 if (renderShadowPasses)
                 {
@@ -1431,9 +1431,10 @@ namespace GameEditor.Framework.Renderer.Server
                 var pointPos = new Vector3(lightWorld.M41, lightWorld.M42, lightWorld.M43);
 
                 bool hasSkinnedCasters = renderShadowPasses && world.HasAnyComponent<Animation.SkinnedMeshRenderer>();
+                float pointNear = ShadowNear(world, pointPos, plc.Range);
                 for (int face = 0; face < CubeShadowArray.FacesPerLight; face++)
                 {
-                    Matrix4x4 pointFaceVp = BuildPointShadowFaceViewProj(pointPos, face, plc.Range);
+                    Matrix4x4 pointFaceVp = BuildPointShadowFaceViewProj(pointPos, face, plc.Range, pointNear);
                     if (renderShadowPasses)
                     {
                         _stats.ShadowDrawCalls += _shadowPass.RenderPointFaceCounted(world, _meshReg, _cubeShadows, pi, face, in pointFaceVp);
@@ -3985,7 +3986,35 @@ namespace GameEditor.Framework.Renderer.Server
             return any;
         }
 
-        private static Matrix4x4 BuildSpotShadowViewProj(Vector3 position, Vector3 direction, float range, float outerAngleRad)
+        /// <summary>
+        /// The near plane of a spot or point light's shadow: as far as its range allows (10 %, at least 0.5 — depth
+        /// precision, see BuildSpotShadowViewProj), but nearer when a shadow caster is: a caster in front of the near
+        /// plane is cut out of the shadow map and casts nothing (a post 1.3 m from a light of range 14 had no shadow,
+        /// 2026-11-14). 90 % of the distance to the nearest caster's bounds, never under 0.05; a caster whose bounds hold
+        /// the light (a room, a level) does not count — its walls are as far as they are, and the near plane stays as
+        /// before. With no caster that near, the shadow is the same as before.
+        /// </summary>
+        private static float ShadowNear(ECSWorld world, Vector3 lightPos, float range)
+        {
+            float near = MathF.Max(0.5f, MathF.Max(range, 0.1f) * 0.1f);
+            foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>()
+                                     .Enumerate<ActiveFlag, MeshRenderer, Transform>())
+            {
+                if (!row.Item1.Value.Active) continue;
+                ref readonly var mr = ref row.Item2.Value;
+                if (!mr.Visible || !mr.CastsShadows) continue;
+                MeshResource? mesh = _meshReg.GetByPath(mr.MeshPath);
+                if (mesh == null) continue;
+                Aabb box = mesh.LocalBounds.Transform(Transform.GetWorldMatrix(world, row.Item3.Value));
+                Vector3 nearest = Vector3.Clamp(lightPos, box.Min, box.Max);
+                float d = Vector3.Distance(lightPos, nearest);
+                if (d <= 0f) continue;                       // the light inside its bounds
+                if (d * 0.9f < near) near = MathF.Max(0.05f, d * 0.9f);
+            }
+            return near;
+        }
+
+        private static Matrix4x4 BuildSpotShadowViewProj(Vector3 position, Vector3 direction, float range, float outerAngleRad, float nearPlane)
         {
             Vector3 target = position + direction;
             Vector3 up = Vector3.UnitY;
@@ -3998,15 +4027,14 @@ namespace GameEditor.Framework.Renderer.Server
             // nearly the whole [0,1] depth range into the first few percent of distance,
             // which inflates the effective world-space depth bias near the far plane and
             // makes short occluders (e.g. a cube on the floor) stop casting shadows.
-            // Keep the near plane as large as the range allows to preserve precision.
-            // (Orthographic directional shadows have linear depth and don't need this.)
-            float nearPlane = MathF.Max(0.5f, farPlane * 0.1f);
+            // Keep the near plane as large as the range allows to preserve precision — and no farther than the
+            // nearest caster (ShadowNear). (Orthographic directional shadows have linear depth and don't need this.)
             Matrix4x4 view = Matrix4x4.CreateLookAt(position, target, up);
             Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(fov, 1f, nearPlane, farPlane);
             return view * proj;
         }
 
-        private static Matrix4x4 BuildPointShadowFaceViewProj(Vector3 position, int faceIndex, float range)
+        private static Matrix4x4 BuildPointShadowFaceViewProj(Vector3 position, int faceIndex, float range, float nearPlane)
         {
             Vector3 dir;
             Vector3 up;
@@ -4020,10 +4048,9 @@ namespace GameEditor.Framework.Renderer.Server
                 default: dir = -Vector3.UnitZ; up = -Vector3.UnitY; break;
             }
 
-            // See BuildSpotShadowViewProj: a larger near plane preserves perspective
+            // See BuildSpotShadowViewProj and ShadowNear: a larger near plane preserves perspective
             // depth precision so the constant shader bias stays small in world space.
             float farPlane  = MathF.Max(range, 0.1f);
-            float nearPlane = MathF.Max(0.5f, farPlane * 0.1f);
             Matrix4x4 view = Matrix4x4.CreateLookAt(position, position + dir, up);
             Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * 0.5f, 1f, nearPlane, farPlane);
             return view * proj;

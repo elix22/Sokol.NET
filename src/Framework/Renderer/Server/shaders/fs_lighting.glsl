@@ -185,9 +185,12 @@ float sample_point_shadow(int point_slot, vec3 light_pos, vec3 worldPos, vec3 nr
 {
     if (point_slot < 0 || point_slot >= POINT_SHADOW_VEC4S / 24) return 1.0;
 
-    // Face selection uses the true position; the depth sample uses a normal-offset position
-    // (avoids the self-shadow acne rings of a close point light).
-    vec3 to_frag = worldPos - light_pos;
+    // The depth is read at a normal-offset position (avoids the self-shadow acne rings of a close point
+    // light), and the face is chosen from that same position: chosen from the true one, an offset point
+    // near a face's edge fell outside that face and came out lit — a thin lit line along the cube map's
+    // seams across a shadow (2026-11-14).
+    vec3 p = worldPos + nrm * PUNCTUAL_NORMAL_OFFSET;
+    vec3 to_frag = p - light_pos;
     vec3 a = abs(to_frag);
     int face;
     if (a.x >= a.y && a.x >= a.z)      face = to_frag.x > 0.0 ? 0 : 1;
@@ -199,7 +202,7 @@ float sample_point_shadow(int point_slot, vec3 light_pos, vec3 worldPos, vec3 nr
         point_shadow_vp[li + 0], point_shadow_vp[li + 1],
         point_shadow_vp[li + 2], point_shadow_vp[li + 3]);
 
-    vec4 clip = face_vp * vec4(worldPos + nrm * PUNCTUAL_NORMAL_OFFSET, 1.0);
+    vec4 clip = face_vp * vec4(p, 1.0);
     vec3 ndc  = clip.xyz / max(clip.w, 1e-5);
 #if !SOKOL_GLSL
     ndc.y = -ndc.y;
