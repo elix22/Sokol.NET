@@ -17,7 +17,8 @@ namespace GameEditor.Framework.Scene
         private static readonly string[] ShapeNames = { "Cone", "Sphere", "Hemisphere", "Box", "Circle", "Edge" };
         private static readonly string[] ConeFromNames = { "Base", "Volume" };
         private static readonly string[] BoxFromNames = { "Volume", "Shell", "Edge" };
-        private static readonly string[] RenderModeNames = { "Billboard", "Stretched", "Horizontal", "Vertical" };
+        private static readonly string[] RenderModeNames = { "Billboard", "Stretched", "Horizontal", "Vertical", "Mesh" };
+        private static readonly string[] MeshAlignmentNames = { "World", "Velocity" };
         private static readonly string[] BlendNames = { "Alpha", "Additive" };
         private static readonly string[] SortNames = { "None", "ByDistance", "OldestInFront", "YoungestInFront" };
         private static readonly string[] SheetTimeNames = { "Lifetime", "Fps" };
@@ -129,6 +130,10 @@ namespace GameEditor.Framework.Scene
             // Renderer
             Name(b, "RenderMode", RenderModeNames, (int)p.RenderMode); Num(b, "SpeedScale", p.SpeedScale); Num(b, "LengthScale", p.LengthScale);
             Name(b, "Blend", BlendNames, (int)p.Blend); Name(b, "Sort", SortNames, (int)p.Sort);
+            // Mesh particles and lit billboards (G8.8 Q6)
+            Key(b, "MeshKey").Append('"').Append(Esc(p.MeshKey ?? "")).Append('"');
+            Key(b, "MeshMaterial").Append('"').Append(Esc(p.MeshMaterial ?? "")).Append('"');
+            Name(b, "MeshAlignment", MeshAlignmentNames, (int)p.MeshAlignment); Bool(b, "MeshCastShadows", p.MeshCastShadows); Bool(b, "Lit", p.Lit);
             return b.Append('}').ToString();
 
             static StringBuilder Key(StringBuilder b, string k) => b.Append(",\"").Append(k).Append("\":");
@@ -297,6 +302,11 @@ namespace GameEditor.Framework.Scene
             p.SpeedScale = MathF.Max(0f, Number(el, "SpeedScale", p.SpeedScale)); p.LengthScale = MathF.Max(0f, Number(el, "LengthScale", p.LengthScale));
             p.Blend = (ParticleBlend)Named(el, "Blend", BlendNames, (int)p.Blend);
             p.Sort = (ParticleSort)Named(el, "Sort", SortNames, (int)p.Sort);
+            p.MeshKey = Text(el, "MeshKey", p.MeshKey ?? "");
+            p.MeshMaterial = Text(el, "MeshMaterial", p.MeshMaterial ?? "");
+            p.MeshAlignment = (ParticleMeshAlignment)Named(el, "MeshAlignment", MeshAlignmentNames, (int)p.MeshAlignment);
+            p.MeshCastShadows = Flag(el, "MeshCastShadows", p.MeshCastShadows);
+            p.Lit = Flag(el, "Lit", p.Lit);
 
             if (old)
             {

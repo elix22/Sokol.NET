@@ -444,6 +444,7 @@ vec3 getTransmissionIBL(vec3 n, vec3 v_dir_in, vec3 baseColor) {
 void main()
 {
     vec4  baseColor          = getBaseColor();
+    baseColor.rgb *= v_Custom.rgb;   // the instance's tint: a mesh particle's colour (G8.8 Q6); white for every other mesh
     vec2  mr                 = getMetallicRoughness();
     float metallic           = clamp(mr.x, 0.0, 1.0);
     float perceptualRoughness= clamp(mr.y, 0.0, 1.0);

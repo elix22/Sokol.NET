@@ -67,6 +67,59 @@ namespace GameEditor.Framework.Scene
         }
 
         private static readonly Dictionary<Entity, Pool> _pools = new();
+        /// <summary>A mesh particle for the renderer (G8.8 Q6): its model matrix and its colour (the material's tint).</summary>
+        public struct MeshParticle { public Matrix4x4 Model; public Vector4 Tint; }
+
+        /// <summary>One system's mesh particles: its mesh and material, where they start in <see cref="Meshes"/>, how many.</summary>
+        public struct MeshBatch { public string Mesh, Material; public int Start, Count; public bool CastShadows; }
+
+        public const int MaxMeshes = 4096;
+        private static readonly MeshParticle[] _meshes = new MeshParticle[MaxMeshes];
+        private static readonly MeshBatch[] _meshBatches = new MeshBatch[128];
+        private static int _meshCount, _meshBatchCount;
+
+        public static ReadOnlySpan<MeshParticle> Meshes => new(_meshes, 0, _meshCount);
+        public static ReadOnlySpan<MeshBatch> MeshBatches => new(_meshBatches, 0, _meshBatchCount);
+
+        /// <summary>
+        /// The mesh particles now (Render Mode Mesh), for the renderer and its shadow passes: each system's particles as model
+        /// matrices - scaled by their size, turned about their own Y by their rotation (after +Z along the velocity, aligned so)
+        /// - and colours. Returns how many batches (<see cref="MeshBatches"/>).
+        /// </summary>
+        public static int GatherMeshes()
+        {
+            _meshCount = 0; _meshBatchCount = 0;
+            const float Deg = MathF.PI / 180f;
+            foreach (Pool pool in _pools.Values)
+            {
+                ref readonly ParticlesComponent c = ref pool.C;
+                if (c.RenderMode != ParticleRenderMode.Mesh || pool.Count == 0 || string.IsNullOrEmpty(c.MeshKey) || _meshBatchCount == _meshBatches.Length) continue;
+                int start = _meshCount;
+                for (int i = 0; i < pool.Count && _meshCount < MaxMeshes; i++)
+                {
+                    ref readonly Particle q = ref pool.Items[i];
+                    float size = SizeNow(in c, in q);
+                    if (size <= 0f) continue;
+                    Matrix4x4 m = Matrix4x4.CreateScale(size) * Matrix4x4.CreateRotationY(q.Rot * Deg);
+                    if (c.MeshAlignment == ParticleMeshAlignment.Velocity)
+                    {
+                        Vector3 v = WorldVel(pool, in q);
+                        if (v.LengthSquared() > 1e-10f)
+                        {
+                            Vector3 f = Vector3.Normalize(v);
+                            Vector3 up = MathF.Abs(f.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX;
+                            m *= Matrix4x4.CreateWorld(Vector3.Zero, -f, up);    // the world's -Z along -f: the mesh's +Z along the velocity
+                        }
+                    }
+                    m.Translation = WorldPos(pool, in q);
+                    _meshes[_meshCount++] = new MeshParticle { Model = m, Tint = ColorNow(in c, in q) };
+                }
+                if (_meshCount > start)
+                    _meshBatches[_meshBatchCount++] = new MeshBatch { Mesh = c.MeshKey, Material = c.MeshMaterial ?? "", Start = start, Count = _meshCount - start, CastShadows = c.MeshCastShadows };
+            }
+            return _meshBatchCount;
+        }
+
         /// <summary>A particle's light for the renderer (the Lights module): a point light.</summary>
         public struct ParticleLight { public Vector3 Position, Color; public float Intensity, Range; }
 

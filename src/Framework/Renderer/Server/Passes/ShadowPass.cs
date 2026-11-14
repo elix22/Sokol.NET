@@ -593,6 +593,35 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                         drawCallCount++;
                     }
                 }
+
+                // Mesh particles that cast shadows (G8.8 Q6), as gathered this frame.
+                var meshBatches = Scene.WorldParticles.MeshBatches;
+                var meshParticles = Scene.WorldParticles.Meshes;
+                for (int b = 0; b < meshBatches.Length; b++)
+                {
+                    var batch = meshBatches[b];
+                    if (!batch.CastShadows) continue;
+                    sg_buffer vb = default, ib = default;
+                    int indexCount = 0;
+                    if (PrimitiveMeshSpec.TryParse(batch.Mesh, out var pspec))
+                    {
+                        PrimitiveShadowMesh prim = GetOrCreatePrimitiveShadowMesh(PrimitiveMeshSpec.ToMeshPath(pspec));
+                        vb = prim.VertexBuffer; ib = prim.IndexBuffer; indexCount = prim.IndexCount;
+                    }
+                    else if (meshRegistry.GetByPath(batch.Mesh) is { SubMeshes: { Length: > 0 } subs } && subs[0].IndexCount > 0)
+                    {
+                        vb = subs[0].VertexBuffer; ib = subs[0].IndexBuffer; indexCount = subs[0].IndexCount;
+                    }
+                    if (indexCount == 0 || vb.id == 0 || ib.id == 0) continue;
+                    sg_apply_bindings(new sg_bindings { vertex_buffers = { [0] = vb }, index_buffer = ib });
+                    for (int k = batch.Start; k < batch.Start + batch.Count; k++)
+                    {
+                        var vsp = new shadow_caster_vs_params_t { mvp = meshParticles[k].Model * lightViewProj };
+                        sg_apply_uniforms(UB_shadow_caster_vs_params, SG_RANGE(ref vsp));
+                        sg_draw(0, (uint)indexCount, 1);
+                        drawCallCount++;
+                    }
+                }
             }
             finally
             {

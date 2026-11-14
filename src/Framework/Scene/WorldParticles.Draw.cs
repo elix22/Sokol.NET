@@ -69,7 +69,7 @@ namespace GameEditor.Framework.Scene
         {
             ref readonly ParticlesComponent c = ref pool.C;
             if (c.TrailsOn && pool.TrailCount.Length > 0) DrawTrails(pool, in c, forward);
-            if (pool.Count == 0) return;
+            if (pool.Count == 0 || c.RenderMode == ParticleRenderMode.Mesh) return;     // mesh particles: the renderer draws them
             sg_view view;
             bool nearest = false;
             Vector4 frameUv = new(0f, 0f, 1f, 1f);       // u0, vTop, u1, vBottom of the texture's frame
@@ -105,6 +105,17 @@ namespace GameEditor.Framework.Scene
             // Vertical: upright, facing the camera about the world's up.
             Vector3 flatRight = new(right.X, 0f, right.Z);
             flatRight = flatRight.LengthSquared() > 1e-8f ? Vector3.Normalize(flatRight) : Vector3.UnitX;
+            // Lit (G8.8 Q6): one normal an emitter - toward the camera, up for Horizontal, the camera flattened for Vertical -
+            // so one light colour, the scene's ambient there and its main light, times every particle's colour.
+            Vector4 light = Vector4.One;
+            if (c.Lit)
+            {
+                Vector3 n = c.RenderMode == ParticleRenderMode.Horizontal ? Vector3.UnitY
+                          : c.RenderMode == ParticleRenderMode.Vertical ? Vector3.Cross(Vector3.UnitY, flatRight)
+                          : -forward;
+                if (Vector3.Dot(n, forward) > 0f && c.RenderMode != ParticleRenderMode.Horizontal) n = -n;
+                light = new Vector4(Renderer.Server.RenderingServer.ParticleLight(Vector3.Normalize(n)), 1f);
+            }
             const float Deg = MathF.PI / 180f;
 
             for (int s = 0; s < count; s++)
@@ -113,7 +124,7 @@ namespace GameEditor.Framework.Scene
                 float t = p.Life > 0f ? p.Age / p.Life : 1f;
                 float size = SizeNow(in c, in p);
                 if (size <= 0f) continue;
-                Vector4 col = ColorNow(in c, in p);
+                Vector4 col = ColorNow(in c, in p) * light;
                 if (col.W <= 0f) continue;
                 Vector3 centre = WorldPos(pool, in p);
 

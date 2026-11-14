@@ -13,7 +13,10 @@ namespace GameEditor.Framework.ECS.Components
     public enum ParticleBoxFrom : byte { Volume, Shell, Edge }
 
     /// <summary>The Renderer module's modes: facing the camera, stretched along the speed, flat on the ground, upright facing the camera.</summary>
-    public enum ParticleRenderMode : byte { Billboard, Stretched, Horizontal, Vertical }
+    public enum ParticleRenderMode : byte { Billboard, Stretched, Horizontal, Vertical, Mesh }
+
+    /// <summary>How a mesh particle is turned: as the world (its own rotation about Y), or its +Z along its velocity.</summary>
+    public enum ParticleMeshAlignment : byte { World, Velocity }
 
     public enum ParticleBlend : byte { Alpha, Additive }
 
@@ -260,6 +263,14 @@ namespace GameEditor.Framework.ECS.Components
         public float LengthScale;
         public ParticleBlend Blend;
         public ParticleSort Sort;
+        /// <summary>Render Mode Mesh (G8.8 Q6): the mesh as a Mesh Renderer names it (a model's mesh or a primitive).</summary>
+        public string MeshKey;
+        /// <summary>The mesh particles' material key (empty: the mesh's own); a particle's colour tints it.</summary>
+        public string MeshMaterial;
+        public ParticleMeshAlignment MeshAlignment;
+        public bool MeshCastShadows;
+        /// <summary>Billboards lit by the scene's main light and ambient (G8.8 Q6); off: their colour as it is.</summary>
+        public bool Lit;
 
         // ---- The fields of before G8.7, as views over the modules (§3.0) ----
 
@@ -326,6 +337,7 @@ namespace GameEditor.Framework.ECS.Components
             LightRatio = 0f, LightUseParticleColor = true, LightSizeAffectsRange = false, LightAlphaAffectsIntensity = true,
             LightRangeMultiplier = 1f, LightIntensityMultiplier = 1f, LightMax = 20,
             SheetColumns = 1, SheetRows = 1, SheetTime = ParticleSheetTime.Lifetime, SheetFps = 10f, SheetCycles = 1f, SheetStartFrame = Vector2.Zero,
+            MeshKey = "", MeshMaterial = "", MeshAlignment = ParticleMeshAlignment.World, MeshCastShadows = true, Lit = false,
             Texture = "", RenderMode = ParticleRenderMode.Billboard, SpeedScale = 0f, LengthScale = 2f, Blend = ParticleBlend.Alpha, Sort = ParticleSort.None,
         };
 

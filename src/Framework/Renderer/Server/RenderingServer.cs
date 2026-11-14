@@ -609,6 +609,7 @@ namespace GameEditor.Framework.Renderer.Server
             // Advance skinned animators BEFORE the shadow pass so skinned casters write the current
             // pose into the shadow maps; the color pass (SubmitView) then reads the same pose.
             UpdateSkinnedAnimators(ECSWorld.Instance);
+            Scene.WorldParticles.GatherMeshes();         // the mesh particles cast shadows this frame (G8.8 Q6)
 
             FrameProfiler.Begin(FrameProfiler.Zone.ShadowPass);
             CollectLightsAndShadows(ECSWorld.Instance, in viewProj, renderShadowPasses: true, csm, forDrawing: false);
@@ -798,11 +799,30 @@ namespace GameEditor.Framework.Renderer.Server
                     if (_environment?.Ambient is { } sky)
                     {
                         _ambientConst = Vector3.Zero;
-                        sky.Rotated(_environment.Rotation).Pack(_ambientSky, _environment.Intensity * e * BlinnSkyAmbientScale);
+                        var rotated = sky.Rotated(_environment.Rotation);
+                        rotated.Pack(_ambientSky, _environment.Intensity * e * BlinnSkyAmbientScale);
+                        _particleSky = rotated; _particleSkyScale = _environment.Intensity * e * BlinnSkyAmbientScale;
+                        return;
                     }
                     else _ambientConst = new Vector3(0.1f, 0.1f, 0.1f);
                     break;
             }
+            _particleSky = null;
+        }
+
+        // Lit particles (G8.8 Q6): the sky's ambient as harmonics (null: the ambient colour), the main directional light.
+        private static AmbientSH? _particleSky;
+        private static float _particleSkyScale;
+        private static Vector3 _mainLightDir = -Vector3.UnitY, _mainLightColor;
+
+        /// <summary>
+        /// The light on a surface facing <paramref name="normal"/> (G8.8 Q6, lit particles): the scene's ambient there (the sky's
+        /// harmonics, or the ambient colour) plus its main directional light (the strongest, as last gathered) times n·l.
+        /// </summary>
+        public static Vector3 ParticleLight(Vector3 normal)
+        {
+            Vector3 ambient = _particleSky != null ? Vector3.Max(Vector3.Zero, _particleSky.Evaluate(normal) * _particleSkyScale) : _ambientConst;
+            return ambient + _mainLightColor * MathF.Max(0f, Vector3.Dot(normal, -_mainLightDir));
         }
 
         /// <summary>The sprites drawn for the last view, and the draw calls they took (a run of sprites of one image is one).</summary>
@@ -947,6 +967,32 @@ namespace GameEditor.Framework.Renderer.Server
                     in model,
                     new Vector4(1f, 1f, 1f, mr.ReceivesShadows ? 1f : 0f));
                 _drawCount++;
+            }
+
+            // Mesh particles (G8.8 Q6): drawn as the scene's meshes - culled, sorted, lit, shadowed - their colour the tint.
+            int meshBatches = Scene.WorldParticles.GatherMeshes();
+            var batches = Scene.WorldParticles.MeshBatches;
+            var meshParticles = Scene.WorldParticles.Meshes;
+            for (int b = 0; b < meshBatches && _drawCount < RenderingConstants.MAX_DRAWS; b++)
+            {
+                var batch = batches[b];
+                MeshResource? meshRes = _meshReg.GetByPath(batch.Mesh);
+                if (meshRes == null) continue;
+                ushort matId = 0;
+                if (!string.IsNullOrEmpty(batch.Material))
+                {
+                    matId = _matReg.GetIdByKey(batch.Material);
+                    if (matId == 0) matId = _matReg.GetFirstIdByMtlFile(batch.Material);
+                }
+                for (int k = batch.Start; k < batch.Start + batch.Count && _drawCount < RenderingConstants.MAX_DRAWS; k++)
+                {
+                    ref readonly var mp = ref meshParticles[k];
+                    Matrix4x4 pm = mp.Model;
+                    Aabb box = meshRes.LocalBounds.Transform(pm);
+                    _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, 0, 0, 0x80000000u | (uint)k, box.Center, box.Extents.Length());
+                    _cpuInst[_drawCount] = new InstanceData(in pm, new Vector4(mp.Tint.X, mp.Tint.Y, mp.Tint.Z, 1f));
+                    _drawCount++;
+                }
             }
 
             FrameProfiler.End(FrameProfiler.Zone.EcsExtract);
@@ -1260,6 +1306,8 @@ namespace GameEditor.Framework.Renderer.Server
             float bestDirectionalShadowScore = float.NegativeInfinity;
             bool hasDirectionalShadowLight = false;
             bool anyDirectionalLight = false;
+            float mainIntensity = 0f;                    // the strongest directional light: lit particles' (G8.8 Q6)
+            Vector3 mainDir = -Vector3.UnitY, mainColor = Vector3.Zero;
 
             foreach (var row in world.Query<ActiveFlag, LightComponent, Transform>()
                                      .EnumerateWithEntities<ActiveFlag, LightComponent, Transform>())
@@ -1296,6 +1344,12 @@ namespace GameEditor.Framework.Renderer.Server
                 );
                 TryInsertTopLight(in l, importance);
 
+                if (lc.Type == GameEditor.Framework.ECS.Components.LightType.Directional && lc.Intensity > mainIntensity)
+                {
+                    mainIntensity = lc.Intensity;
+                    mainDir = fwd; mainColor = lc.Color * lc.Intensity;
+                }
+
                 if (lc.CastsShadows && lc.Type == GameEditor.Framework.ECS.Components.LightType.Directional && importance > bestDirectionalShadowScore)
                 {
                     bestDirectionalShadowScore = importance;
@@ -1314,6 +1368,7 @@ namespace GameEditor.Framework.Renderer.Server
                 }
             }
 
+            _mainLightDir = mainDir; _mainLightColor = mainColor;
             // The particles' lights (G8.8 Q5): point lights, ranked with the scene's by the same importance - inside the quality
             // level's light limit and Forward+'s clusters; no shadows.
             int particleLights = Scene.WorldParticles.GatherLights(world);
