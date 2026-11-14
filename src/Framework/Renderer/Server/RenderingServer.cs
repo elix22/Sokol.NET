@@ -175,6 +175,8 @@ namespace GameEditor.Framework.Renderer.Server
         private static readonly Light[] _topLights = new Light[MaxSelectableLights];
         private static readonly float[] _topLightScores = new float[MaxSelectableLights];
         private static int _topLightCount;
+        /// <summary>The punctual lights the last view drew in real time (a check: Baked lights with a bake loaded are not, M8a).</summary>
+        public static int LightsDrawn => _topLightCount;
         private static int _topLightCap = RenderingConstants.MAX_LIGHTS;
 
         // ── Forward+ (G8.2, examples/GameEditor/docs/CLUSTERED_LIGHTING_DESIGN.md) ────────────────────────────
@@ -792,6 +794,10 @@ namespace GameEditor.Framework.Renderer.Server
 
         // ── Environment authoring ─────────────────────────────────────────────────────────
 
+        /// <summary>The current environment's diffuse light as harmonics (null: none yet) - the lightmap baker's sky for a
+        /// cubemap environment (M8a).</summary>
+        public static AmbientSH? EnvironmentAmbient => _environment?.Ambient;
+
         /// <summary>The settings backing the current environment (copy; safe to mutate).</summary>
         public static EnvironmentSettings CurrentEnvironmentSettings
             => (_envSettings ?? new EnvironmentSettings()).Clone();
@@ -989,6 +995,14 @@ namespace GameEditor.Framework.Renderer.Server
 
                 MeshResource? meshRes = _meshReg.GetByPath(mr.MeshPath);
                 if (meshRes == null) continue;
+                // M8a: a lightmapped entity draws its own mesh (the same shape, its lightmap UV in texcoord_1)
+                if (mr.ContributeGI && GI.Lightmaps.Active && GI.Lightmaps.MeshFor(world.GetSceneId(row.Entity)) is { } lit)
+                {
+                    for (int s = 0; s < lit.SubMeshes.Length && s < meshRes.SubMeshes.Length; s++)
+                        if (lit.SubMeshes[s].MaterialKey.Length == 0 && meshRes.SubMeshes[s].MaterialKey.Length > 0)
+                            lit.SubMeshes[s].MaterialKey = meshRes.SubMeshes[s].MaterialKey;   // the source's materials
+                    meshRes = lit;
+                }
 
                 bool disableSubMeshMaterial = string.Equals(
                     mr.MaterialPath,
@@ -1398,6 +1412,9 @@ namespace GameEditor.Framework.Renderer.Server
                 if (!row.Item1.Value.Active) continue;
                 ref readonly var lc = ref row.Item2.Value;
                 if (!lc.Enabled) continue;
+                // M8a: with a bake loaded, a Baked light is in the lightmaps and not drawn in real time (the reference
+                // editor's: moving objects get it from light probes, M8b); without one it still lights the scene.
+                if (lc.Mode == GameEditor.Framework.ECS.Components.LightMode.Baked && GI.Lightmaps.Active) continue;
                 if (lc.Type == GameEditor.Framework.ECS.Components.LightType.Directional) anyDirectionalLight = true;
                 ref readonly var lt = ref row.Item3.Value;
 
@@ -1879,6 +1896,10 @@ namespace GameEditor.Framework.Renderer.Server
             };
 
             bool iblActive = _environment is { IsLoaded: true };
+            // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
+            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+            sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
+            sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
             var flags = new pbr_pbr_rendering_flags_t
             {
                 use_ibl             = iblActive ? 1 : 0,
@@ -1887,7 +1908,8 @@ namespace GameEditor.Framework.Renderer.Server
                 linear_output       = _hdrPass ? 1 : 0,
                 tonemap_type        = FallbackType,
                 tonemap_exposure    = FallbackExposure,      // LDR RGBA8 target → tonemap + sRGB in-shader
-                ambient_strength    = 0.4f,   // dielectric diffuse ambient (pbr.glsl:489) + IBL-off fallback
+                ambient_strength    = 0.4f,
+                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,   // dielectric diffuse ambient (pbr.glsl:489) + IBL-off fallback
             };
 
             sg_apply_uniforms(UB_pbr_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
@@ -1943,6 +1965,8 @@ namespace GameEditor.Framework.Renderer.Server
                         [VIEW_pbr_u_GGXEnvTexture]            = ggxEnv,
                         [VIEW_pbr_u_LambertianEnvTexture]     = lambEnv,
                         [VIEW_pbr_u_GGXLUTTexture]            = lut,
+                        [VIEW_pbr_u_LightmapTexture]    = lmLight,
+                        [VIEW_pbr_u_LightmapDirTexture] = lmDir,
                         [VIEW_pbr_shadow_atlas]              = _shadowAtlas.TextureView,
                         [VIEW_pbr_cube_shadow_array]         = _cubeShadows.TextureView,
                     },
@@ -3787,6 +3811,14 @@ namespace GameEditor.Framework.Renderer.Server
                 shadow_ambient_weight        = ShadowAmbientWeight,
             };
 
+            // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
+
+            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+
+            sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
+
+            sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
+
             var flags = new Csm1.Shaders.pbr_csm1_pbr_rendering_flags_t
             {
                 use_ibl             = iblActive ? 1 : 0,
@@ -3796,6 +3828,8 @@ namespace GameEditor.Framework.Renderer.Server
                 tonemap_type        = FallbackType,
                 tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
+
+                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,
             };
 
             int pcf = ShadowQuality >= 2 ? 25 : (ShadowQuality >= 1 ? 9 : 1);
@@ -3847,6 +3881,8 @@ namespace GameEditor.Framework.Renderer.Server
                         [Csm1.Shaders.VIEW_pbr_csm1_u_GGXEnvTexture]            = ggxEnv,
                         [Csm1.Shaders.VIEW_pbr_csm1_u_LambertianEnvTexture]     = lambEnv,
                         [Csm1.Shaders.VIEW_pbr_csm1_u_GGXLUTTexture]            = lut,
+                        [Csm1.Shaders.VIEW_pbr_csm1_u_LightmapTexture]    = lmLight,
+                        [Csm1.Shaders.VIEW_pbr_csm1_u_LightmapDirTexture] = lmDir,
                         [Csm1.Shaders.VIEW_pbr_csm1_shadow_atlas]               = _shadowAtlas.TextureView,
                         [Csm1.Shaders.VIEW_pbr_csm1_cube_shadow_array]          = _cubeShadows.TextureView,
                     },
@@ -4002,6 +4038,14 @@ namespace GameEditor.Framework.Renderer.Server
                 shadow_ambient_weight        = ShadowAmbientWeight,
             };
 
+            // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
+
+            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+
+            sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
+
+            sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
+
             var flags = new Csm4.Shaders.pbr_csm4_pbr_rendering_flags_t
             {
                 use_ibl             = iblActive ? 1 : 0,
@@ -4011,6 +4055,8 @@ namespace GameEditor.Framework.Renderer.Server
                 tonemap_type        = FallbackType,
                 tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
+
+                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,
             };
 
             int pcf = ShadowQuality >= 2 ? 25 : (ShadowQuality >= 1 ? 9 : 1);
@@ -4062,6 +4108,8 @@ namespace GameEditor.Framework.Renderer.Server
                         [Csm4.Shaders.VIEW_pbr_csm4_u_GGXEnvTexture]            = ggxEnv,
                         [Csm4.Shaders.VIEW_pbr_csm4_u_LambertianEnvTexture]     = lambEnv,
                         [Csm4.Shaders.VIEW_pbr_csm4_u_GGXLUTTexture]            = lut,
+                        [Csm4.Shaders.VIEW_pbr_csm4_u_LightmapTexture]    = lmLight,
+                        [Csm4.Shaders.VIEW_pbr_csm4_u_LightmapDirTexture] = lmDir,
                         [Csm4.Shaders.VIEW_pbr_csm4_shadow_atlas]               = _shadowAtlas.TextureView,
                         [Csm4.Shaders.VIEW_pbr_csm4_cube_shadow_array]          = _cubeShadows.TextureView,
                     },

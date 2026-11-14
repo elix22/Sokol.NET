@@ -91,6 +91,7 @@ namespace GameEditor.Framework.Scene
         {
             ActiveScene?.Clear();
             EventBus.RaiseSceneUnloaded();
+            Renderer.Server.GI.Lightmaps.Unload();   // M8a: a new scene has no bake
             ActiveScene = new Scene(name);
             EventBus.RaiseSceneLoaded();
             UndoStack.Clear();
@@ -150,6 +151,15 @@ namespace GameEditor.Framework.Scene
             ActiveScene.IsDirty = false;
             PreloadSceneMeshes();
             PreloadSceneMaterials();
+            // M8a: the scene's bake, beside it in the project (the editor reads scenes from their files)
+            Renderer.Server.GI.Lightmaps.Unload();
+            if (ConfigManager.HasProject)
+            {
+                string assets = System.IO.Path.Combine(ConfigManager.ProjectFolder!, "Assets");
+                string full = System.IO.Path.GetFullPath(path);
+                if (full.StartsWith(System.IO.Path.GetFullPath(assets), StringComparison.Ordinal))
+                    Renderer.Server.GI.Lightmaps.LoadFromFolder(assets, System.IO.Path.GetRelativePath(assets, full));
+            }
             EventBus.RaiseSceneLoaded();
             UndoStack.Clear();
             Logger.Info($"Scene loaded from {path}");
@@ -470,6 +480,7 @@ namespace GameEditor.Framework.Scene
             ActiveScene.IsDirty = false;
             PreloadSceneMeshes();
             PreloadSceneMaterials();
+            Renderer.Server.GI.Lightmaps.LoadForSceneAsync(assetPath);   // M8a: its bake, when it has one
             if (_loadTimes is { } t)
             {
                 t.Read = SceneSerializer.LastReadMs;

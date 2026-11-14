@@ -237,7 +237,10 @@ namespace GameEditor.Framework.Scene
                         .Append("\",\"Mat\":\"").Append(Esc(mr.MaterialPath ?? ""))
                                             .Append("\",\"Vis\":").Append(mr.Visible ? "true" : "false")
                                             .Append(",\"RecvSh\":").Append(mr.ReceivesShadows ? "true" : "false")
-                                            .Append(",\"CastSh\":").Append(mr.CastsShadows ? "true" : "false").Append('}');
+                                            .Append(",\"CastSh\":").Append(mr.CastsShadows ? "true" : "false");
+                    if (mr.ContributeGI) sb.Append(",\"GI\":true");   // M8a; written only when set
+                    if (mr.ScaleInLightmap != 1f) sb.Append(",\"LmScale\":").Append(F(mr.ScaleInLightmap));
+                    sb.Append('}');
                 }
 
                 // Skinned characters hold only registry keys (live GPU + animator live in
@@ -285,7 +288,10 @@ namespace GameEditor.Framework.Scene
                       .Append(",\"Inner\":").Append(F(lt.InnerAngle))
                         .Append(",\"Outer\":").Append(F(lt.OuterAngle))
                       .Append(",\"CastSh\":").Append(lt.CastsShadows ? "true" : "false")
-                        .Append(",\"Enabled\":").Append(lt.Enabled ? "true" : "false").Append('}');
+                        .Append(",\"Enabled\":").Append(lt.Enabled ? "true" : "false");
+                    if (lt.Mode != LightMode.Realtime) sb.Append(",\"Mode\":\"").Append(lt.Mode.ToString()).Append('"');   // M8a
+                    if (lt.IndirectMultiplier != 1f) sb.Append(",\"IndMul\":").Append(F(lt.IndirectMultiplier));
+                    sb.Append('}');
                 }
 
                 if (world.TryGetComponent<RigidbodyComponent>(id, out var rb))
@@ -525,6 +531,8 @@ namespace GameEditor.Framework.Scene
                     Visible      = mrEl.GetProperty("Vis").GetBoolean(),
                     ReceivesShadows = !mrEl.TryGetProperty("RecvSh", out var recvShEl) || recvShEl.GetBoolean(),
                     CastsShadows = !mrEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
+                    ContributeGI = mrEl.TryGetProperty("GI", out var giEl) && giEl.ValueKind == JsonValueKind.True,
+                    ScaleInLightmap = mrEl.TryGetProperty("LmScale", out var lmsEl) && lmsEl.ValueKind == JsonValueKind.Number ? lmsEl.GetSingle() : 1f,
                 });
 
             if (c.TryGetProperty("SkinnedMeshRenderer", out var skEl))
@@ -568,6 +576,9 @@ namespace GameEditor.Framework.Scene
                     OuterAngle = ltEl.TryGetProperty("Outer", out var outerEl) ? outerEl.GetSingle() : 35f,
                     CastsShadows = !ltEl.TryGetProperty("CastSh", out var castShEl) || castShEl.GetBoolean(),
                     Enabled      = !ltEl.TryGetProperty("Enabled", out var ltEnEl) || ltEnEl.GetBoolean(),
+                    Mode         = ltEl.TryGetProperty("Mode", out var ltModeEl) && ltModeEl.ValueKind == JsonValueKind.String
+                                   && Enum.TryParse<LightMode>(ltModeEl.GetString(), true, out var ltMode) ? ltMode : LightMode.Realtime,
+                    IndirectMultiplier = ltEl.TryGetProperty("IndMul", out var indEl) && indEl.ValueKind == JsonValueKind.Number ? indEl.GetSingle() : 1f,
                 });
 
             if (c.TryGetProperty("Rigidbody", out var rbEl))

@@ -101,6 +101,12 @@ namespace GameEditor.Framework.ECS.Components
         public bool Visible;
         public bool ReceivesShadows;
         public bool CastsShadows;
+        /// <summary>Baked into the lightmaps and lit by them (M8a, docs BAKED_GI_DESIGN.md; the reference editor's Contribute
+        /// Global Illumination / Static flag).</summary>
+        public bool ContributeGI;
+        private float _scaleInLightmapLess1;   // stored less 1: a renderer made without it has the default 1
+        /// <summary>This renderer's share of lightmap texels against the scene's resolution (1 = as set).</summary>
+        public float ScaleInLightmap { readonly get => _scaleInLightmapLess1 + 1f; set => _scaleInLightmapLess1 = value - 1f; }
     }
 
     public struct CameraComponent
@@ -122,6 +128,13 @@ namespace GameEditor.Framework.ECS.Components
 
     public enum LightType { Directional, Point, Spot }
 
+    /// <summary>
+    /// How a light takes part in baked lighting (M8a, the reference editor's light Mode): Realtime - drawn every frame, not
+    /// baked; Mixed - drawn every frame, its bounce baked; Baked - its light and bounce baked, not drawn on lightmapped
+    /// surfaces.
+    /// </summary>
+    public enum LightMode : byte { Realtime, Mixed, Baked }
+
     public struct LightComponent
     {
         public LightType Type;
@@ -132,6 +145,11 @@ namespace GameEditor.Framework.ECS.Components
         public float OuterAngle;  // spot only — half-angle of outer cone, degrees (default 35)
         public bool CastsShadows;
         public bool Enabled;      // when false the light does not contribute to scene lighting
+        /// <summary>Realtime (default), Mixed or Baked (M8a).</summary>
+        public LightMode Mode;
+        private float _indirectMultiplierLess1;   // stored less 1: a light made without it has the default 1
+        /// <summary>Its bounced light's strength in the bake (1 = physical; 0 = no bounce).</summary>
+        public float IndirectMultiplier { readonly get => _indirectMultiplierLess1 + 1f; set => _indirectMultiplierLess1 = value - 1f; }
     }
 
     public struct RigidbodyComponent

@@ -134,7 +134,7 @@ layout(binding=5) uniform pbr_rendering_flags {
     float ambient_strength; // fallback ambient when IBL is off
     float tonemap_type;     // G8.3, a GPU without float targets: the curve in the shader's own output (0 none, 2 ACES, 3 Neutral)
     float tonemap_exposure; // ... and the exposure (× before the curve; 1 = none)
-    float _rf_pad2;
+    float lightmap_mode;    // M8a: 0 none, 1 a lightmap, 2 a directional lightmap (static variants only)
 };
 
 // ─── CSM (binding=6, conditional) ────────────────────────────────────────────
@@ -234,6 +234,15 @@ vec4 cluster_texel(int i) { return texelFetch(sampler2D(cluster_tex, cluster_smp
 #define LIGHT_DATA(i, k) cluster_texel((i) * 4 + (k))
 #else
 #define LIGHT_DATA(i, k) lights_data[(i) * 4 + (k)]
+#endif
+
+// ─── Lightmaps (M8a, docs BAKED_GI_DESIGN.md §3.5): static meshes only ───────────
+// The page (RGBM, range 8, linear) and, directional, its dominant direction. No sampler slot is free (sokol's 12 are
+// taken): they are read with the GGX LUT's sampler (linear, clamp).
+#if !defined(SKINNING) && !defined(MORPHING) && !defined(TRANSMISSION)
+#define LIGHTMAPS 1
+layout(binding=13) uniform texture2D u_LightmapTexture;
+layout(binding=14) uniform texture2D u_LightmapDirTexture;
 #endif
 
 // Combined-sampler macros required by ibl.glsl

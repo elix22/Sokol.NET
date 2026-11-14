@@ -55,6 +55,10 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// </summary>
         public MeshResource?[] LodSlots = Array.Empty<MeshResource?>();
 
+        /// <summary>The sub-meshes' vertices and indices as uploaded, kept only while <see cref="MeshRegistry.KeepCpuCopies"/>
+        /// is on (the editor: the lightmap baker reads them, M8a); null in a game.</summary>
+        public ObjSubMesh[]? Cpu;
+
         /// <summary>Reference count maintained by MeshRegistry.</summary>
         public int RefCount;
 

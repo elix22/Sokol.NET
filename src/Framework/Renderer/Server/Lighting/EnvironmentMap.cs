@@ -425,6 +425,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         internal static readonly Vector3 Horizon = new(0.80f, 0.85f, 0.90f);
         internal static readonly Vector3 Ground  = new(0.40f, 0.38f, 0.36f);
 
+        /// <summary>The procedural sky's display (sRGB) colour toward a direction, sharp (the lightmap baker's sky, M8a).</summary>
+        public static Vector3 SkyColor(Vector3 dir) => SampleSky(dir, 0f);
+
         internal static Vector3 SampleSky(Vector3 dir, float blur)
         {
             Vector3 zenith = Zenith, horizon = Horizon, ground = Ground;

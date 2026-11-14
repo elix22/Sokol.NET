@@ -504,6 +504,20 @@ void main()
         f_specular_ibl     = specLight * iblFresnel;
     }
 
+#ifdef LIGHTMAPS
+    // A baked lightmap (M8a): the diffuse light from it - the sky's and the bounces', and Baked lights' - in place of
+    // the sky's diffuse light; the reflection stays the sky's.
+    if (lightmap_mode > 0.5) {
+        vec4 lm = texture(sampler2D(u_LightmapTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
+        vec3 baked = lm.rgb * (lm.a * 8.0);
+        if (lightmap_mode > 1.5) {
+            vec4 ld = texture(sampler2D(u_LightmapDirTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
+            baked *= (dot(n, ld.xyz - 0.5) + 0.5) / max(1e-4, ld.w);
+        }
+        f_diffuse_ibl = baked * diffuseColor;
+    }
+#endif
+
 #ifdef TRANSMISSION
     transmission = transmission_factor;
     if (has_transmission_tex > 0.5) {
@@ -525,8 +539,13 @@ void main()
     g_surfaceColorBeforeMix = f_diffuse_ibl + f_specular_ibl;
 #endif
 
-    if (use_ibl > 0) {
-        // The sky's light and reflection: the ambient light comes from the sky. (A dielectric had a flat
+#ifdef LIGHTMAPS
+    bool lightmapped = lightmap_mode > 0.5;
+#else
+    bool lightmapped = false;
+#endif
+    if (use_ibl > 0 || lightmapped) {
+        // The sky's light and reflection: the ambient light comes from the sky (or a lightmap: M8a). (A dielectric had a flat
         // ambient_strength instead, the same on every face, whatever the sky.)
         color = f_diffuse_ibl + f_specular_ibl;
     } else {

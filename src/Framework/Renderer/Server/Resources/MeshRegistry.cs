@@ -32,6 +32,10 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         // The track parts made, with the TrackLibrary.Version they were made at: made again when it moves on.
         private readonly Dictionary<string, int> _trackMade = new(StringComparer.Ordinal);
 
+        /// <summary>Each mesh keeps its vertices and indices on the CPU (<see cref="MeshResource.Cpu"/>): the editor turns it on
+        /// before loading (the lightmap baker reads them, M8a); games leave it off.</summary>
+        public static bool KeepCpuCopies;
+
         private readonly Dictionary<string, MeshResource> _byPath = new(StringComparer.Ordinal);
         private readonly MeshResource?[] _byId;    // sparse id → resource
         private ushort   _nextId = 1;              // 0 = invalid
@@ -93,7 +97,8 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 MtlLib      = obj.MtlLib,
                 SubMeshes   = subResources,
                 LocalBounds = obj.Bounds,
-                RefCount    = 1
+                RefCount    = 1,
+                Cpu         = KeepCpuCopies ? obj.SubMeshes : null
             };
 
             _byPath[path] = res;
@@ -148,7 +153,8 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 MtlLib      = "",
                 SubMeshes   = subResources,
                 LocalBounds = bounds,
-                RefCount    = 1
+                RefCount    = 1,
+                Cpu         = KeepCpuCopies ? subMeshes : null
             };
             _byPath[key] = res;
             _byId[id]    = res;
@@ -180,6 +186,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             }
             existing.SubMeshes   = subResources;
             existing.LocalBounds = bounds;
+            existing.Cpu         = KeepCpuCopies ? subMeshes : null;
             return existing.Id;
         }
 
@@ -405,7 +412,8 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 MtlLib      = "",
                 SubMeshes   = subResources,
                 LocalBounds = new Aabb(bmin, bmax),
-                RefCount    = 1
+                RefCount    = 1,
+                Cpu         = KeepCpuCopies ? new[] { sub } : null
             };
 
             _byPath[path] = resource;
@@ -453,7 +461,8 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 SubMeshes   = new[] { new MeshSubResource { VertexBuffer = UploadVertexBuffer(sub, path, 0), IndexBuffer = UploadIndexBuffer(sub, path, 0),
                                                             IndexCount = indices.Length, MaterialName = "", MaterialKey = "" } },
                 LocalBounds = bounds,
-                RefCount    = 1
+                RefCount    = 1,
+                Cpu         = KeepCpuCopies ? new[] { sub } : null
             };
             _byPath[path] = resource;
             _byId[id]     = resource;
@@ -471,12 +480,14 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             if (!TrackPart(TrackData.KeyOf(path)!, path.Substring(path.IndexOf('#') + 1), out var vertices, out var indices, out var bounds))
             {
                 resource.SubMeshes = Array.Empty<MeshSubResource>();
+                resource.Cpu = null;
                 return;
             }
             var sub = new ObjSubMesh { MaterialName = "", Vertices = vertices, Indices = indices };
             resource.SubMeshes = new[] { new MeshSubResource { VertexBuffer = UploadVertexBuffer(sub, path, 0), IndexBuffer = UploadIndexBuffer(sub, path, 0),
                                                                IndexCount = indices.Length, MaterialName = "", MaterialKey = "" } };
             resource.LocalBounds = bounds;
+            resource.Cpu = KeepCpuCopies ? new[] { sub } : null;
         }
 
         // ── primitive vertex builders ─────────────────────────────────────────────────
