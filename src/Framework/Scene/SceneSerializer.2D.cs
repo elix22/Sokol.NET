@@ -29,10 +29,35 @@ namespace GameEditor.Framework.Scene
             RegisterChaseCamera();
             RegisterParticles();
             RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
+            RegisterComponentExtension("Text3D", WriteText3D, ReadText3D, static (w, e) => w.RemoveComponent<Text3D>(e));
             RegisterComponentExtension("Animator",
                 static (w, e) => w.TryGetComponent<ECS.Components.Animator>(e, out var a) ? "{\"Controller\":\"" + Esc(a.Controller ?? "") + "\"}" : null,
                 static (w, e, el, resolve) => w.AddComponent(e, new ECS.Components.Animator { Controller = el.TryGetProperty("Controller", out var c) ? c.GetString() ?? "" : "" }),
                 static (w, e) => w.RemoveComponent<ECS.Components.Animator>(e));
+        }
+
+        // G8.4: {"Text":"Shop","Font":"","Size":0.5,"Color":[1,1,1,1],"Align":"Center","Billboard":"Off","Outline":0,"OutlineColor":[0,0,0,1],"Key":""}.
+        private static string? WriteText3D(ECSWorld world, Frent.Entity e)
+        {
+            if (!world.TryGetComponent<Text3D>(e, out var t)) return null;
+            return "{\"Text\":\"" + Esc(t.Text ?? "") + "\",\"Font\":\"" + Esc(t.Font ?? "") + "\",\"Size\":" + F(t.Size) + ",\"Color\":" + Four(t.Color)
+                 + ",\"Align\":\"" + t.Align + "\",\"Billboard\":\"" + t.Billboard + "\",\"Outline\":" + F(t.Outline)
+                 + ",\"OutlineColor\":" + Four(t.OutlineColor) + ",\"Key\":\"" + Esc(t.Key ?? "") + "\"}";
+        }
+
+        private static void ReadText3D(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
+        {
+            var t = Text3D.Default;
+            t.Text = Text(el, "Text", t.Text);
+            t.Font = Text(el, "Font", t.Font);
+            t.Size = Number(el, "Size", t.Size);
+            Four(el, "Color", ref t.Color);
+            if (Enum.TryParse(Text(el, "Align", ""), true, out UIAlign align)) t.Align = align;
+            if (Enum.TryParse(Text(el, "Billboard", ""), true, out Text3DBillboard bb)) t.Billboard = bb;
+            t.Outline = Number(el, "Outline", t.Outline);
+            Four(el, "OutlineColor", ref t.OutlineColor);
+            t.Key = Text(el, "Key", "");
+            world.AddComponent(e, t);
         }
 
         // {"Clip":"Animations/DoorOpen.anim.json"} — "Auto":false and "Speed" only when not the defaults.

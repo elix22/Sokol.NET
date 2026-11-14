@@ -251,6 +251,7 @@ namespace GameEditor.Framework.Renderer.Server
             _hdrPass = false;
             _tonemapPass.Render(drawn.TexView, MathF.Pow(2f, ExposureEV), TonemapType(Tonemapping));
             Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, true);
+            Text3DRenderer.Draw(ECSWorld.Instance, in viewProj, true);   // text is not tonemapped (G8.4)
         }
 
         /// <summary>A config.json "environmentTonemapping" ("none" / "neutral" / "aces") as a mode; anything else is None.</summary>
@@ -440,6 +441,7 @@ namespace GameEditor.Framework.Renderer.Server
             EventBus.EntityDestroyed -= ForgetEntity;
             EventBus.SceneLoaded -= AttachSceneNodeAnimations;
             _initialized = false;
+            Text3DRenderer.Shutdown();
             _clusterData?.Dispose();
             _clusterData = null;
             _instanceBuf.Dispose();
@@ -552,6 +554,7 @@ namespace GameEditor.Framework.Renderer.Server
             // Advance rigid/node animations (e.g. watch hands) into their entity Transforms BEFORE
             // SubmitView reads them. Once per CPU frame regardless of view count.
             UpdateNodeAnimations();
+            Text3DRenderer.Prepare(ECSWorld.Instance);   // G8.4: the texts that changed, drawn into their textures (no pass open)
             _lightBuf.Reset();
             _stats.Reset();
             _drawCount = 0;
@@ -781,7 +784,10 @@ namespace GameEditor.Framework.Renderer.Server
             // Into an HDR target the sprites are not drawn here: they come after the tone curve (DrawSprites, G8.3 —
             // their batch draws into RGBA8 targets only).
             if (!_hdrPass)
+            {
                 Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
+                Text3DRenderer.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
+            }
         }
 
         private static void SubmitMeshes(

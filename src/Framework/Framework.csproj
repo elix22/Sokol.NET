@@ -58,6 +58,8 @@
     <!-- Screen-copy blit (captures opaque scene for transmission/refraction sampling) -->
     <_ScreenCopyGlsl>$(_ShaderDir)screen_copy.glsl</_ScreenCopyGlsl>
     <_ScreenCopyOut>$(_ShaderOutDir)screen_copy_shader.cs</_ScreenCopyOut>
+    <_Text3DGlsl>$(_ShaderDir)text3d.glsl</_Text3DGlsl>
+    <_Text3DOut>$(_ShaderOutDir)text3d_shader.cs</_Text3DOut>
   </PropertyGroup>
 
   <!-- Ensure the generated-shader output folder exists before any shader-compile target writes to
@@ -116,6 +118,14 @@
           Outputs="$(_ScreenCopyOut)">
     <Message Text="Compiling Framework shader: screen_copy.glsl (all platforms)" Importance="high" />
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_ScreenCopyGlsl)&quot; --output &quot;$(_ScreenCopyOut)&quot; --module screen_copy --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
+  </Target>
+
+  <!-- G8.4: a Text3D's quad in the world (docs TEXT3D_SVG_DRAW_DESIGN.md). -->
+  <Target Name="CompileFrameworkText3DShader" BeforeTargets="BeforeBuild"
+          DependsOnTargets="EnsureFrameworkShaderOutDir"
+          Inputs="$(_Text3DGlsl)"
+          Outputs="$(_Text3DOut)">
+    <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_Text3DGlsl)&quot; --output &quot;$(_Text3DOut)&quot; --module text3d --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
   </Target>
 
   <!-- PBR shader variants: one .cs file per define combination.

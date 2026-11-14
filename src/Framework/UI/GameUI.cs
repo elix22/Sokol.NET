@@ -713,6 +713,14 @@ namespace GameEditor.Framework.UI
             }
         }
 
+        // ── For the world's text (G8.4: Text3D draws with the UI's NanoVG context and fonts) ───────────────
+        /// <summary>The NanoVG context of the screen the game's UI is shown on (a built game's, an editor's host), or 0.</summary>
+        internal static IntPtr TextVg => (_host as Screen)?.Renderer?.VGContext ?? IntPtr.Zero;
+        /// <summary>The registry's name of a text's font (the engine's own, or the game's font file by its key), registered.</summary>
+        internal static string FontName(string? key) => FontOf(key);
+        /// <summary>A text as shown: its key's text in the game's language, else the text itself.</summary>
+        internal static string Shown(string? key, string? text) => Said(key, text);
+
         // ── Fonts ───────────────────────────────────────────────────────────────────────
 
         // The font registry's name for a text's font: the engine's own, or a font file of the game by its key.
