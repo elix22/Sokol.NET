@@ -253,6 +253,7 @@ vec2 applyTextureTransform(vec2 uv, vec2 offset, float rotation, vec2 scale) {
 // NOTE: No @include tonemapping.glsl — Framework routes PBR HDR output to a
 // separate TonemapPass.  This shader always writes linear HDR color.
 @include fs_lighting.glsl
+@include tone_curves.glsl
 
 // ── Aliases (pbr_material_params → names expected by helper functions below) ──
 #define base_color_factor              base_color_factor
@@ -697,6 +698,12 @@ void main()
     if (linear_output == 0 && debug_view_enabled <= 0.5) {
         // No tone curve (the common engines' default): clamped, then linear → sRGB. ACES (Narkowicz, without its 0.6
         // exposure) lifted mid-grey 1.5× and washed every picture out (docs: ENVIRONMENT_DESIGN.md).
+        // G8.3: on a GPU without float targets the scene's tone curve and exposure come here (1 and 0: the picture of
+        // before, unchanged).
+        color *= tonemap_exposure;
+        int tmt = int(tonemap_type + 0.5);
+        if (tmt == 2)      color = toneMapACES_Hill(color);
+        else if (tmt == 3) color = toneMapKhrPbrNeutral(color);
         color = clamp(color, 0.0, 1.0);
         color = pow(color, vec3(1.0 / 2.2)); // linear → sRGB
     }

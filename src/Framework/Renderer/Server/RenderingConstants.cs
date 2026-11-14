@@ -10,6 +10,10 @@ namespace GameEditor.Framework.Renderer.Server
     /// </summary>
     public enum RenderingPath { Forward, ForwardPlus }
 
+    /// <summary>The scene's tone curve (G8.3, examples/GameEditor/docs/HDR_TONEMAP_DESIGN.md): None (the picture of before),
+    /// Neutral (Khronos PBR Neutral), ACES.</summary>
+    public enum TonemapMode { None, Neutral, Aces }
+
     public static class RenderingConstants
     {
         /// <summary>Maximum number of active lights in a scene (uniform-block limit).</summary>

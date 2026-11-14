@@ -39,11 +39,15 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 shader         = _shader,
                 primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+                // G8.3: into a view's RGBA8 target whose depth (the HDR scene's) stays loaded for what is drawn after.
+                colors = { [0] = new sg_color_target_state { pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8 } },
                 depth = new sg_depth_state
                 {
+                    pixel_format  = sg_pixel_format.SG_PIXELFORMAT_DEPTH,
                     compare       = sg_compare_func.SG_COMPAREFUNC_ALWAYS,
                     write_enabled = false,
                 },
+                sample_count = 1,
                 label = "tonemap-pipeline",
             });
         }

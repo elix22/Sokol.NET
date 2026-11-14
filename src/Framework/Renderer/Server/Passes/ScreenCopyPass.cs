@@ -22,6 +22,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         private sg_shader   _shader;
         private sg_pipeline _pipeline;            // → RGBA8, sample_count 1, no depth (offscreen screen-copy)
         private sg_pipeline _swapchainPipeline;   // → swapchain colour/depth/sample_count (present)
+        private sg_pipeline _hdrPipeline;         // → the HDR format (G8.3): the copy of an HDR scene, made when first needed
         private sg_sampler  _sampler;
 
         public void Init()
@@ -81,12 +82,30 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         {
             if (_pipeline.id != 0)          { sg_destroy_pipeline(_pipeline);          _pipeline          = default; }
             if (_swapchainPipeline.id != 0) { sg_destroy_pipeline(_swapchainPipeline); _swapchainPipeline = default; }
+            if (_hdrPipeline.id != 0)       { sg_destroy_pipeline(_hdrPipeline);       _hdrPipeline       = default; }
             if (_shader.id != 0)            { sg_destroy_shader(_shader);              _shader            = default; }
             if (_sampler.id != 0)           { sg_destroy_sampler(_sampler);            _sampler           = default; }
         }
 
         /// <summary>Draws a fullscreen triangle copying <paramref name="srcView"/> into the active pass.</summary>
         public void Render(sg_view srcView) => Blit(_pipeline, srcView);
+
+        /// <summary>The same into a target of <paramref name="format"/> (RGBA8, or the HDR format of an HDR scene's copy).</summary>
+        public void Render(sg_view srcView, sg_pixel_format format)
+        {
+            if (format == SG_PIXELFORMAT_RGBA8) { Blit(_pipeline, srcView); return; }
+            if (_hdrPipeline.id == 0)
+                _hdrPipeline = sg_make_pipeline(new sg_pipeline_desc
+                {
+                    shader         = _shader,
+                    primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES,
+                    colors = { [0] = new sg_color_target_state { pixel_format = format } },
+                    depth  = new sg_depth_state { pixel_format = SG_PIXELFORMAT_NONE },
+                    sample_count = 1,
+                    label = "screen-copy-hdr-pipeline",
+                });
+            Blit(_hdrPipeline, srcView);
+        }
 
         /// <summary>
         /// Copies <paramref name="srcView"/> into the active SWAPCHAIN pass (swapchain-format pipeline).

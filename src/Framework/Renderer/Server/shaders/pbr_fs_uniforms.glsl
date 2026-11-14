@@ -130,8 +130,8 @@ layout(binding=5) uniform pbr_rendering_flags {
     int   alphamode;        // 0=opaque, 1=mask, 2=blend
     int   linear_output;    // 1 = HDR output (no tonemap); tonemap done in post-process pass
     float ambient_strength; // fallback ambient when IBL is off
-    float _rf_pad0;
-    float _rf_pad1;
+    float tonemap_type;     // G8.3, a GPU without float targets: the curve in the shader's own output (0 none, 2 ACES, 3 Neutral)
+    float tonemap_exposure; // ... and the exposure (× before the curve; 1 = none)
     float _rf_pad2;
 };
 

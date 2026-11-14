@@ -30,5 +30,8 @@ namespace GameEditor.Framework.Core
         public float  EnvironmentAmbientEnergy { get; set; } = 1f;
         // G8.2: the Rendering Path — "forward+" (the cluster grid; a new project's) or "forward" (every light on every pixel).
         public string RenderingPath { get; set; } = "forward+";
+        // G8.3: the scene's tone curve ("none" | "neutral" | "aces") and exposure in EV (0 = none).
+        public string EnvironmentTonemapping { get; set; } = "none";
+        public float  EnvironmentExposure    { get; set; } = 0f;
     }
 }

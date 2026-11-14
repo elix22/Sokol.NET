@@ -23,6 +23,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         private sg_shader   _shader;
         private sg_pipeline _offscreenPip;   // RGBA8 / DEPTH, sample_count 1
         private sg_pipeline _swapchainPip;    // matches the default framebuffer
+        private sg_pipeline _hdrPip;          // the HDR format / DEPTH (G8.3), made when first needed
         private sg_buffer   _vbuf;
         private sg_buffer   _ibuf;
         private uint        _indexCount;
@@ -94,7 +95,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         /// before opaque geometry (it does not write depth, so geometry layers on top).
         /// </summary>
         public void Render(in Matrix4x4 viewProj, EnvironmentMap env, bool offscreen,
-                           float exposure, int tonemapType)
+                           float exposure, int tonemapType, bool hdr = false)
         {
             if (!_initialized || !env.IsLoaded) return;
 
@@ -108,11 +109,13 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 u_EnvIntensity      = env.Intensity,
                 u_EnvBlurNormalized = 0f,
                 u_MipCount          = env.MipCount,
-                u_LinearOutput      = 0,             // LDR RGBA8 target → tonemap in-shader
+                u_LinearOutput      = hdr ? 1 : 0,   // an HDR target: linear (the tone curve comes after); RGBA8: in-shader
             };
             var tm = new cubemap_tonemapping_params_t { u_Exposure = exposure, u_type = tonemapType };
 
-            sg_apply_pipeline(offscreen ? _offscreenPip : _swapchainPip);
+            if (hdr && _hdrPip.id == 0)
+                _hdrPip = MakePipeline(ShaderVariantCache.HdrFormat, sg_pixel_format.SG_PIXELFORMAT_DEPTH, 1, "skybox-hdr-pip");
+            sg_apply_pipeline(hdr ? _hdrPip : offscreen ? _offscreenPip : _swapchainPip);
 
             var b = new sg_bindings
             {
@@ -138,6 +141,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             if (_ibuf.id        != 0) { sg_destroy_buffer(_ibuf);          _ibuf = default; }
             if (_offscreenPip.id != 0) { sg_destroy_pipeline(_offscreenPip); _offscreenPip = default; }
             if (_swapchainPip.id != 0) { sg_destroy_pipeline(_swapchainPip); _swapchainPip = default; }
+            if (_hdrPip.id != 0)       { sg_destroy_pipeline(_hdrPip);       _hdrPip       = default; }
             if (_shader.id       != 0) { sg_destroy_shader(_shader);        _shader = default; }
         }
     }

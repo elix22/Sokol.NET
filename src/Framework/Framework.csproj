@@ -96,7 +96,7 @@
 
   <Target Name="CompileFrameworkTonemapShader" BeforeTargets="BeforeBuild"
           DependsOnTargets="EnsureFrameworkShaderOutDir"
-          Inputs="$(_TonemapPassGlsl)"
+          Inputs="$(_TonemapPassGlsl);$(_ShaderDir)tone_curves.glsl"
           Outputs="$(_TonemapPassOut)">
     <Message Text="Compiling Framework shader: tonemap_pass.glsl (all platforms)" Importance="high" />
     <Exec Command="&quot;$(_SokolShdcPath)&quot; --input &quot;$(_TonemapPassGlsl)&quot; --output &quot;$(_TonemapPassOut)&quot; --module tonemap_pass --slang &quot;glsl430:hlsl5:metal_macos:metal_ios:glsl300es&quot; --reflection -f sokol_csharp" />
@@ -128,6 +128,7 @@
                   $(_ShaderDir)pbr_vs_uniforms.glsl;
                   $(_ShaderDir)pbr_fs_uniforms.glsl;
                   $(_ShaderDir)fs_lighting.glsl;
+                  $(_ShaderDir)tone_curves.glsl;
                   $(_ShaderDir)brdf.glsl;
                   $(_ShaderDir)ibl.glsl;
                   $(_ShaderDir)animation.glsl"
@@ -166,6 +167,7 @@
                   $(_ShaderDir)pbr_vs_uniforms.glsl;
                   $(_ShaderDir)pbr_fs_uniforms.glsl;
                   $(_ShaderDir)fs_lighting.glsl;
+                  $(_ShaderDir)tone_curves.glsl;
                   $(_ShaderDir)brdf.glsl;
                   $(_ShaderDir)ibl.glsl;
                   $(_ShaderDir)animation.glsl"
@@ -205,6 +207,7 @@
                   $(_ShaderDir)pbr_vs_uniforms.glsl;
                   $(_ShaderDir)pbr_fs_uniforms.glsl;
                   $(_ShaderDir)fs_lighting.glsl;
+                  $(_ShaderDir)tone_curves.glsl;
                   $(_ShaderDir)brdf.glsl;
                   $(_ShaderDir)ibl.glsl;
                   $(_ShaderDir)animation.glsl"

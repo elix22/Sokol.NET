@@ -209,6 +209,8 @@ namespace GameEditor.Framework.Core
             RenderingServer.ShadowAmbientWeight = c.EnvironmentShadowAmbient;
             RenderingServer.EnableCsm4          = c.EnvironmentCsm4;
             RenderingServer.Path                = RenderingServer.PathOf(c.RenderingPath);
+            RenderingServer.Tonemapping         = RenderingServer.TonemapOf(c.EnvironmentTonemapping);
+            RenderingServer.ExposureEV          = c.EnvironmentExposure;
         }
 
         // ── Play ─────────────────────────────────────────────────────────────
@@ -297,7 +299,23 @@ namespace GameEditor.Framework.Core
             //     full-screen copy): the common case, and the best one for a low-end phone;
             //   • see-through materials → the scene goes to an offscreen target, the refraction pass runs
             //     there, and the result is copied to the swapchain.
-            if (RenderingServer.SceneNeedsTransmission)
+            if (RenderingServer.HdrActive && width > 0 && height > 0)
+            {
+                // G8.3: a tone curve or an exposure — the scene into an HDR target, tonemapped into the scene target
+                // (its depth kept for the sprites drawn after), copied to the swapchain under the game's UI.
+                _sceneTarget.Resize(width, height);
+                var flags = RenderingServer.BeginScene(_sceneTarget, clear.colors[0].clear_value);
+                RenderingServer.RenderSkybox(viewProj, offscreen: true, hdr: true);
+                RenderingServer.SubmitView(viewProj, flags, allowShadowPassRendering: false, csm: csm);
+                RenderingServer.EndScene(_sceneTarget, viewProj, flags);
+                Sokol.SG.sg_end_pass();
+
+                Sokol.ScreenCapture.BeginFrame(clear);
+                RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
+                Render();
+                Sokol.SG.sg_end_pass();
+            }
+            else if (RenderingServer.SceneNeedsTransmission)
             {
                 if (width > 0 && height > 0)
                 {

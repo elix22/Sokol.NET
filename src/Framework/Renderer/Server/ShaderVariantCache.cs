@@ -66,6 +66,7 @@ namespace GameEditor.Framework.Renderer.Server
         AlphaBlend   = 1 << 0,
         DoubleSided  = 1 << 1,
         OffscreenRt  = 1 << 2,   // rendering to an offscreen RenderView
+        Hdr          = 1 << 3,   // ... a float one (G8.3: the scene before its tone curve); with OffscreenRt
     }
 
     public sealed class ShaderVariantCache : IDisposable
@@ -88,7 +89,7 @@ namespace GameEditor.Framework.Renderer.Server
             public readonly Func<sg_shader, PipelineFlags, sg_pipeline> Build;
             public readonly int LowLightBytes;   // the LOW_TIER shader's light block, as sokol-shdc sized it (0 = not checked)
             public readonly int ExpectedLowBytes;
-            public readonly sg_pipeline[] Pipelines = new sg_pipeline[8];
+            public readonly sg_pipeline[] Pipelines = new sg_pipeline[16];   // the flags' 4 bits (Hdr: made when the GPU has an HDR format)
             public sg_shader Shader;
             public bool Made;
             public bool Low;
@@ -238,6 +239,7 @@ namespace GameEditor.Framework.Renderer.Server
             // Nothing is made here: each family is made by the first draw that asks for it (Get).
             var backend = sg_query_backend();
             _gles = backend == sg_backend.SG_BACKEND_GLES3;
+            HdrFormat = FindHdrFormat();
             if (ForceLowTier && backend == sg_backend.SG_BACKEND_GLES3) LowTier = true;
             int vertexComponents = sg_query_limits().gl_max_vertex_uniform_components;
             _smallVertexUniforms = backend == sg_backend.SG_BACKEND_GLES3 && vertexComponents < SkinnedVertexComponents;
@@ -267,13 +269,48 @@ namespace GameEditor.Framework.Renderer.Server
                 {
                     CurrentLow = false;
                     CurrentClustered = true;
-                    return c.Pipelines[(int)flags & 0x07];
+                    return Pipeline(c, flags);
                 }
             }
             CurrentClustered = false;
             if (!f.Made) Make(f);
             CurrentLow = f.Low;
-            return f.Pipelines[(int)flags & 0x07];
+            return Pipeline(f, flags);
+        }
+
+        /// <summary>
+        /// The float format an HDR target is drawn in (G8.3): RG11B10F when the GPU can draw into it and blend, else
+        /// RGBA16F, else none (<see cref="sg_pixel_format._SG_PIXELFORMAT_DEFAULT"/>: no HDR pipelines are made).
+        /// </summary>
+        public static sg_pixel_format HdrFormat { get; private set; }
+        public static bool HasHdr => HdrFormat != sg_pixel_format._SG_PIXELFORMAT_DEFAULT && !ForceNoHdr;
+        /// <summary>As on a GPU without float render targets (a check sees the in-shader fallback anywhere).</summary>
+        public static bool ForceNoHdr { get; set; }
+        private static bool _buildHdr;   // while a family's HDR pipelines are made
+        private static sg_pixel_format OffscreenColor => _buildHdr ? HdrFormat : SG_PIXELFORMAT_RGBA8;
+
+        private static sg_pixel_format FindHdrFormat()
+        {
+            foreach (var f in new[] { sg_pixel_format.SG_PIXELFORMAT_RG11B10F, sg_pixel_format.SG_PIXELFORMAT_RGBA16F })
+            {
+                var info = sg_query_pixelformat(f);
+                if (info.render && info.blend) return f;
+            }
+            return sg_pixel_format._SG_PIXELFORMAT_DEFAULT;
+        }
+
+        // A family's pipeline for these flags, made the first time it is asked for: a family holds only the variants a
+        // project draws with (21 families × 16 kinds made at once overran the pipeline pool — G8.3's regression).
+        private static sg_pipeline Pipeline(Family f, PipelineFlags flags)
+        {
+            int i = (int)flags & 0x0F;
+            if (f.Pipelines[i].id == 0 && f.Shader.id != 0)
+            {
+                _buildHdr = (i & (int)PipelineFlags.Hdr) != 0;
+                f.Pipelines[i] = f.Build(f.Shader, (PipelineFlags)i);
+                _buildHdr = false;
+            }
+            return f.Pipelines[i];
         }
 
         // A CLUSTERED family: no LOW_TIER shader of its own — a GPU that refuses it draws in Forward from then on.
@@ -290,8 +327,7 @@ namespace GameEditor.Framework.Renderer.Server
                 return;
             }
             f.Shader = shader;
-            for (int i = 0; i < f.Pipelines.Length; i++)
-                f.Pipelines[i] = f.Build(shader, (PipelineFlags)i);
+            // its pipelines are made as they are asked for (Pipeline)
         }
 
         private void Make(Family f)
@@ -321,8 +357,7 @@ namespace GameEditor.Framework.Renderer.Server
                     Logger.Error($"[ShaderVariantCache] the GPU refused the LOW_TIER '{f.Name}' shader too — its meshes are not drawn");
             }
             f.Shader = shader;
-            for (int i = 0; i < f.Pipelines.Length; i++)
-                f.Pipelines[i] = f.Build(shader, (PipelineFlags)i);
+            // its pipelines are made as they are asked for (Pipeline)
         }
 
         /// <summary>Look up the Blinn-Phong pipeline for the given flag combination.</summary>
@@ -452,7 +487,7 @@ namespace GameEditor.Framework.Renderer.Server
             // ── Pixel format ─────────────────────────────────────────────────────────
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }
@@ -532,7 +567,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }
@@ -613,7 +648,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }
@@ -687,7 +722,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }
@@ -760,7 +795,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }
@@ -824,7 +859,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             if (offscreen)
             {
-                desc.colors[0].pixel_format = SG_PIXELFORMAT_RGBA8;
+                desc.colors[0].pixel_format = OffscreenColor;
                 desc.depth.pixel_format     = SG_PIXELFORMAT_DEPTH;
                 desc.sample_count           = 1;
             }

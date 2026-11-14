@@ -81,6 +81,7 @@ namespace GameEditor.Framework.Renderer.Server
         private static sg_view  _screenCopyTexView;   // texture view (sampled in the refraction shader)
         private static sg_sampler _screenSampler;     // linear / clamp-to-edge for refraction sampling
         private static int _screenCopyW, _screenCopyH;
+        private static sg_pixel_format _screenCopyFormat;
         // Cap so a pathological scene can't unbounded-grow the deferred list; glass is rare.
         private const int TransmissionDrawCap = 256;
 
@@ -188,6 +189,85 @@ namespace GameEditor.Framework.Renderer.Server
         private static PbrClustered.pbr_clustered_pbr_cluster_params_t _clusterParams;
         /// <summary>True while the view being drawn is in Forward+.</summary>
         public static bool ViewIsClustered { get; private set; }
+
+        // ── HDR and tonemapping (G8.3, examples/GameEditor/docs/HDR_TONEMAP_DESIGN.md) ─────────────────────────
+        /// <summary>The scene's tone curve (the Environment's): None keeps today's picture.</summary>
+        public static TonemapMode Tonemapping { get; set; } = TonemapMode.None;
+        /// <summary>The scene's exposure, in EV (the picture × 2^EV before the curve); 0 = none.</summary>
+        public static float ExposureEV { get; set; }
+        /// <summary>
+        /// The scene is drawn into an HDR target and tonemapped: a tone curve or an exposure is asked for and the GPU can
+        /// draw into a float target. Otherwise the path of before, at its cost.
+        /// </summary>
+        public static bool HdrActive => (Tonemapping != TonemapMode.None || ExposureEV != 0f) && ShaderVariantCache.HasHdr;
+        private static bool _hdrPass;   // the pass drawn now is an HDR target's: linear output, no sprites
+        private static readonly System.Collections.Generic.Dictionary<OffscreenTarget, OffscreenTarget> _hdrOf = new();
+
+        /// <summary>
+        /// Opens the pass a view's scene is drawn in: the view's own (as before) or, when <see cref="HdrActive"/>, its HDR
+        /// companion (sharing its depth). Returns the pipeline flags SubmitView takes for it, and whether the skybox is HDR.
+        /// </summary>
+        public static PipelineFlags BeginScene(OffscreenTarget view, sg_color clear)
+        {
+            if (!HdrActive) { sg_begin_pass(view.MakePass(clear)); return PipelineFlags.OffscreenRt; }
+            if (!_hdrOf.TryGetValue(view, out var hdr)) _hdrOf[view] = hdr = new OffscreenTarget();
+            hdr.Follow(view, ShaderVariantCache.HdrFormat);
+            sg_begin_pass(hdr.MakePass(clear));
+            return PipelineFlags.OffscreenRt | PipelineFlags.Hdr;
+        }
+
+        /// <summary>
+        /// Ends the scene's pass begun by <see cref="BeginScene"/>: its glass (RenderTransmission), and — when it was HDR —
+        /// the view's own pass opened with the depth kept and the scene tonemapped into it, then the sprites and world
+        /// particles. Returns with the view's pass open: what is drawn over the scene (grid, gizmos) comes next, then
+        /// <c>sg_end_pass</c>. When it was not HDR the view's pass is open too (re-opened after the glass, colour and depth
+        /// kept).
+        /// </summary>
+        public static void EndScene(OffscreenTarget view, in Matrix4x4 viewProj, PipelineFlags flags)
+        {
+            sg_end_pass();
+            bool hdr = (flags & PipelineFlags.Hdr) != 0;
+            var drawn = hdr ? _hdrOf[view] : view;
+            RenderTransmission(drawn, in viewProj);
+            sg_begin_pass(new sg_pass
+            {
+                attachments = { colors = { [0] = view.ColorAttView }, depth_stencil = view.DepthAttView },
+                action =
+                {
+                    colors = { [0] = new sg_color_attachment_action
+                    {
+                        load_action  = hdr ? sg_load_action.SG_LOADACTION_DONTCARE : sg_load_action.SG_LOADACTION_LOAD,
+                        store_action = sg_store_action.SG_STOREACTION_STORE
+                    } },
+                    depth = new sg_depth_attachment_action
+                    {
+                        load_action  = sg_load_action.SG_LOADACTION_LOAD,
+                        store_action = sg_store_action.SG_STOREACTION_STORE
+                    }
+                },
+                label = hdr ? "scene-tonemap-pass" : "scene-over-pass"
+            });
+            if (!hdr) return;
+            _hdrPass = false;
+            _tonemapPass.Render(drawn.TexView, MathF.Pow(2f, ExposureEV), TonemapType(Tonemapping));
+            Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, true);
+        }
+
+        /// <summary>A config.json "environmentTonemapping" ("none" / "neutral" / "aces") as a mode; anything else is None.</summary>
+        public static TonemapMode TonemapOf(string? text) => text?.Trim().ToLowerInvariant() switch
+        {
+            "aces" => TonemapMode.Aces, "neutral" => TonemapMode.Neutral, _ => TonemapMode.None,
+        };
+        public static string TextOf(TonemapMode m) => m switch { TonemapMode.Aces => "aces", TonemapMode.Neutral => "neutral", _ => "none" };
+
+        // A GPU without float targets (or ShaderVariantCache.ForceNoHdr): the curve and the exposure in the shaders' own
+        // output instead (pbr.glsl, the skybox) — the same picture for opaque surfaces.
+        private static bool Fallback => !ShaderVariantCache.HasHdr && (Tonemapping != TonemapMode.None || ExposureEV != 0f);
+        private static float FallbackType => Fallback ? TonemapType(Tonemapping) : 0f;
+        private static float FallbackExposure => Fallback ? MathF.Pow(2f, ExposureEV) : 1f;
+
+        // TonemapPass's operators: 0 none (exposure only), 2 ACES (the fitted RRT + ODT), 3 Khronos PBR Neutral.
+        private static int TonemapType(TonemapMode m) => m switch { TonemapMode.Aces => 2, TonemapMode.Neutral => 3, _ => 0 };
 
         // The CLUSTERED pipeline's extras (the cluster texture, its sampler, the cluster block); nothing for the others.
         // Every CLUSTERED shader has them at the same slots (view 12, sampler 9, block 7: pbr_fs_uniforms.glsl).
@@ -573,11 +653,13 @@ namespace GameEditor.Framework.Renderer.Server
         /// No-op when no environment is loaded or <see cref="ShowSkybox"/> is false.
         /// Tonemap matches the PBR forward path (ACES Narkowicz, exposure 1) for an LDR target.
         /// </summary>
-        public static void RenderSkybox(in Matrix4x4 viewProj, bool offscreen = true)
+        public static void RenderSkybox(in Matrix4x4 viewProj, bool offscreen = true, bool hdr = false)
         {
             if (!_initialized || !ShowSkybox) return;
             if (_environment is { IsLoaded: true } env)
-                _skyboxPass.Render(in viewProj, env, offscreen, exposure: 1f, tonemapType: 0);   // no tone curve, as the meshes (the common engines' default)
+                _skyboxPass.Render(in viewProj, env, offscreen, exposure: FallbackExposure,
+                                   tonemapType: Tonemapping == TonemapMode.Aces && Fallback ? 2 : Tonemapping == TonemapMode.Neutral && Fallback ? 4 : 0,
+                                   hdr: hdr);   // the curve: the tonemap pass's (HDR), or the fallback's, or none
         }
 
         // ── Environment authoring ─────────────────────────────────────────────────────────
@@ -694,8 +776,12 @@ namespace GameEditor.Framework.Renderer.Server
             CsmCamera? csm = null)
         {
             if (!_initialized) return;
+            _hdrPass = (basePipelineFlags & PipelineFlags.Hdr) != 0;
             SubmitMeshes(in viewProj, basePipelineFlags, viewIndex, allowShadowPassRendering, csm);
-            Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
+            // Into an HDR target the sprites are not drawn here: they come after the tone curve (DrawSprites, G8.3 —
+            // their batch draws into RGBA8 targets only).
+            if (!_hdrPass)
+                Sprites2D.SpriteRenderSystem.Draw(ECSWorld.Instance, in viewProj, (basePipelineFlags & PipelineFlags.OffscreenRt) != 0);
         }
 
         private static void SubmitMeshes(
@@ -1551,7 +1637,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,      // LDR RGBA8 target → tonemap + sRGB in-shader
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,      // LDR RGBA8 target → tonemap + sRGB in-shader
                 ambient_strength    = 0.4f,   // dielectric diffuse ambient (pbr.glsl:489) + IBL-off fallback
             };
 
@@ -1637,15 +1725,15 @@ namespace GameEditor.Framework.Renderer.Server
         // surfaces, which sample the copy along the refracted ray (pbr.glsl getTransmissionIBL).
         // Editor/offscreen only; standalone (swapchain) transmission is deferred.
 
-        private static void EnsureScreenCopy(int w, int h)
+        private static void EnsureScreenCopy(int w, int h, sg_pixel_format format)
         {
-            if (_screenCopyImg.id != 0 && _screenCopyW == w && _screenCopyH == h) return;
+            if (_screenCopyImg.id != 0 && _screenCopyW == w && _screenCopyH == h && _screenCopyFormat == format) return;
             DestroyScreenCopy();
-            _screenCopyW = w; _screenCopyH = h;
+            _screenCopyW = w; _screenCopyH = h; _screenCopyFormat = format;
             _screenCopyImg = sg_make_image(new sg_image_desc
             {
                 width = w, height = h,
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                pixel_format = format,   // the scene's: RGBA8, or an HDR scene's float format (G8.3)
                 // Pinned to 1 (see OffscreenTarget): a render-target image otherwise inherits the
                 // swapchain sample count, mismatching the single-sampled screen-copy blit pipeline.
                 sample_count = 1,
@@ -1683,7 +1771,8 @@ namespace GameEditor.Framework.Renderer.Server
             if (!_initialized || _transmissionDraws.Count == 0 || !target.IsValid) return;
 
             int w = target.Width, h = target.Height;
-            EnsureScreenCopy(w, h);
+            _hdrPass = target.IsHdr;
+            EnsureScreenCopy(w, h, target.ColorFormat);
 
             // One model matrix (1 instance) per transmission draw → the dedicated instance buffer.
             _transmissionInstanceBuf.ResetStaging();
@@ -1710,7 +1799,7 @@ namespace GameEditor.Framework.Renderer.Server
                 label = "transmission-screen-copy-pass"
             };
             sg_begin_pass(copyPass);
-            _screenCopyPass.Render(target.TexView);
+            _screenCopyPass.Render(target.TexView, target.ColorFormat);
             sg_end_pass();
 
             // 2) Transmission pass: re-open the scene target preserving opaque colour + depth.
@@ -1761,7 +1850,7 @@ namespace GameEditor.Framework.Renderer.Server
             in pbr_pbr_camera_params_t cam)
         {
             // Editor renders to an offscreen RT; standalone (swapchain) transmission is deferred.
-            PipelineFlags pf = PipelineFlags.OffscreenRt;
+            PipelineFlags pf = PipelineFlags.OffscreenRt | (_hdrPass ? PipelineFlags.Hdr : 0);
             if (mat.DoubleSided) pf |= PipelineFlags.DoubleSided;
             sg_apply_pipeline(_shaderCache.GetPbrTransmissionPipeline(pf));
 
@@ -1844,7 +1933,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -2221,7 +2312,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -2421,7 +2514,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -2625,7 +2720,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -2847,7 +2944,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -3040,7 +3139,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -3246,7 +3347,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -3440,7 +3543,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
@@ -3651,7 +3756,9 @@ namespace GameEditor.Framework.Renderer.Server
                 use_ibl             = iblActive ? 1 : 0,
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
-                linear_output       = 0,
+                linear_output       = _hdrPass ? 1 : 0,
+                tonemap_type        = FallbackType,
+                tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
             };
 
