@@ -25,6 +25,7 @@ namespace GameEditor.Framework.Scene
             public Vector4 Color;       // Start Color
             public float Frame;         // the Texture Sheet's start frame
             public Vector3 Tested;      // where it was when last tested against the world (Collision Quality Medium / Low)
+            public float SubCarry;      // its Birth sub-emitters' part of a particle not yet made
         }
 
         sealed class Pool
@@ -45,6 +46,10 @@ namespace GameEditor.Framework.Scene
             public bool Playing;
             public bool Paused;
             public bool NeedsPrewarm;
+            /// <summary>A sub-emitter of an active emitter: it makes particles only when its parent asks (G8.8 Q2).</summary>
+            public bool IsSub;
+            /// <summary>The emitter's velocity in the world this step (Inherit Velocity).</summary>
+            public Vector3 EmitterVel;
             public readonly ParticleCollisionEvent[] Hits = new ParticleCollisionEvent[64];
             public int HitCount;
             public float[] SortKeys = Array.Empty<float>();
@@ -59,6 +64,15 @@ namespace GameEditor.Framework.Scene
         private static int _messageCount;
         private static readonly List<Entity> _gone = new();
         private static int _frame;
+
+        // The sub-emitters of the step (G8.8 Q2): the entities named by an active emitter's Sub Emitters, and for the emitter
+        // being simulated its entries made ready (pool, component, matrix, burst count). Arrays, compared by hand.
+        private const int MaxSubs = 256;
+        private static readonly Entity[] _subEntities = new Entity[MaxSubs];
+        private static int _subEntityCount;
+        private struct SubInfo { public Pool? Pool; public ParticlesComponent C; public Matrix4x4 Model; public ParticleSubEmitter Entry; public int Burst; }
+        private static readonly SubInfo[] _subs = new SubInfo[ParticleSubEmitters.Capacity];
+        private static int _subCount;
 
         /// <summary>The particles alive now, all emitters together.</summary>
         public static int Alive
@@ -77,6 +91,22 @@ namespace GameEditor.Framework.Scene
             for (int i = 0; i < n; i++) into[i] = WorldPos(p, in p.Items[i]);
             return n;
         }
+
+        /// <summary>The colour of each of one emitter's particles now (its Start Color times Color over Lifetime), in the order of
+        /// <see cref="CopyPositions"/>.</summary>
+        public static int CopyColors(Entity entity, Span<Vector4> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p)) return 0;
+            int n = Math.Min(p.Count, into.Length);
+            for (int i = 0; i < n; i++) into[i] = ColorNow(in p.C, in p.Items[i]);
+            return n;
+        }
+
+        private static Vector4 ColorNow(in ParticlesComponent c, in Particle q) =>
+            c.ColorOn ? q.Color * c.ColorOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : q.Color;
+
+        private static float SizeNow(in ParticlesComponent c, in Particle q) =>
+            q.Size * (c.SizeOn ? c.SizeOverLifetime.Evaluate(q.Life > 0f ? q.Age / q.Life : 1f) : 1f);
 
         /// <summary>How old each of one emitter's particles is, seconds (in the order of <see cref="CopyPositions"/>).</summary>
         public static int CopyAges(Entity entity, Span<float> into)
@@ -219,6 +249,15 @@ namespace GameEditor.Framework.Scene
                 if (_pools.Count > 0) _pools.Clear();
                 return;
             }
+            // The sub-emitters named by the active emitters: they do not make particles on their own.
+            _subEntityCount = 0;
+            foreach (var row in world.Query<ActiveFlag, ParticlesComponent>().EnumerateWithEntities<ActiveFlag, ParticlesComponent>())
+            {
+                ref readonly var c = ref row.Item2.Value;
+                if (!c.SubOn || !row.Item1.Value.Active) continue;
+                for (int k = 0; k < c.SubEmitters.Count && _subEntityCount < MaxSubs; k++)
+                    if (c.SubEmitters.Items[k].Emitter != row.Entity) _subEntities[_subEntityCount++] = c.SubEmitters.Items[k].Emitter;
+            }
             foreach (var row in world.Query<ActiveFlag, ParticlesComponent, Transform>().EnumerateWithEntities<ActiveFlag, ParticlesComponent, Transform>())
             {
                 Entity e = row.Entity;
@@ -227,6 +266,7 @@ namespace GameEditor.Framework.Scene
                 Pool pool = Get(e, in c);
                 pool.Seen = _frame;
                 pool.C = c;
+                pool.IsSub = IsSubEntity(e);
                 if (!row.Item1.Value.Active) { pool.Count = 0; continue; }
                 Matrix4x4 model = Transform.GetWorldMatrix(world, row.Item3.Value);
                 pool.Origin = model.Translation;
@@ -258,6 +298,72 @@ namespace GameEditor.Framework.Scene
                 }
         }
 
+        private static bool IsSubEntity(Entity e)
+        {
+            for (int i = 0; i < _subEntityCount; i++) if (_subEntities[i] == e) return true;
+            return false;
+        }
+
+        // The emitter's sub-emitters made ready for its step: each entry's pool, component, matrix and burst count.
+        private static void PrepareSubs(ECSWorld world, Entity self, in ParticlesComponent c)
+        {
+            _subCount = 0;
+            if (!c.SubOn) return;
+            for (int k = 0; k < c.SubEmitters.Count; k++)
+            {
+                ParticleSubEmitter entry = c.SubEmitters.Items[k];
+                Entity se = entry.Emitter;
+                if (se.IsNull || !se.IsAlive || se == self || !world.TryGetComponent<ParticlesComponent>(se, out var sc)
+                    || !world.TryGetComponent<Transform>(se, out var st)) continue;
+                ref SubInfo s = ref _subs[_subCount++];
+                s.C = sc;
+                s.Pool = Get(se, in sc);
+                s.Model = Transform.GetWorldMatrix(world, st);
+                s.Entry = entry;
+                int burst = 0;
+                for (int b = 0; b < sc.Bursts.Count; b++) burst += Math.Max(0, sc.Bursts.Items[b].Count);
+                s.Burst = sc.Bursts.Count > 0 ? burst : Math.Max(0, sc.Burst);
+            }
+        }
+
+        // Particles of sub-emitter s made at a parent particle's place, taking what the entry says from it.
+        private static void SpawnSub(ref uint seed, ref SubInfo s, int count, Vector3 at, Vector3 vel, Vector4 color, float size, float rot, float lifeMul)
+        {
+            if (s.Pool == null || count <= 0) return;
+            if (s.Entry.Probability < 1f && Next(ref seed) >= s.Entry.Probability) return;
+            Pool sp = s.Pool;
+            Matrix4x4 m = s.Model;
+            m.Translation = at;
+            int before = sp.Count;
+            Make(sp, in s.C, in m, count, placed: true);
+            ParticleInherit inherit = s.Entry.Inherit;
+            Vector3 add = s.C.InheritVelocityOn ? vel * s.C.InheritVelocity : Vector3.Zero;
+            if (!s.C.World) add = Vector3.Transform(add, Quaternion.Conjugate(sp.Rotation));
+            for (int i = before; i < sp.Count; i++)
+            {
+                ref Particle q = ref sp.Items[i];
+                if ((inherit & ParticleInherit.Color) != 0) q.Color *= color;
+                if ((inherit & ParticleInherit.Size) != 0) q.Size *= size;
+                if ((inherit & ParticleInherit.Rotation) != 0) q.Rot += rot;
+                if ((inherit & ParticleInherit.Lifetime) != 0) q.Life = MathF.Max(1e-3f, q.Life * lifeMul);
+                q.Vel += add;
+            }
+        }
+
+        // A parent particle's event: each sub-emitter of that type makes its count at the particle's place.
+        private static void SubEvent(Pool pool, in ParticlesComponent c, ref Particle p, ParticleSubType type, Vector3 at, Vector3 vel)
+        {
+            if (_subCount == 0) return;
+            Vector4 color = ColorNow(in c, in p);
+            float size = SizeNow(in c, in p), life = type == ParticleSubType.Death ? 1f : MathF.Max(0f, 1f - p.Age / MathF.Max(1e-6f, p.Life));
+            for (int k = 0; k < _subCount; k++)
+            {
+                ref SubInfo s = ref _subs[k];
+                if (s.Entry.Type != type) continue;
+                SpawnSub(ref pool.Seed, ref s, s.Burst, at, vel, color, size, p.Rot, life);
+            }
+        }
+
         private static bool IsUnder(ECSWorld world, Entity e, Entity root)
         {
             for (int depth = 0; depth < 64; depth++)
@@ -271,6 +377,11 @@ namespace GameEditor.Framework.Scene
 
         private static void Simulate(ECSWorld world, Entity self, Pool pool, in ParticlesComponent c, in Matrix4x4 model, float dt)
         {
+            PrepareSubs(world, self, in c);
+            bool births = false;
+            for (int k = 0; k < _subCount; k++) births |= _subs[k].Entry.Type == ParticleSubType.Birth;
+            pool.EmitterVel = pool.HasLast && dt > 0f ? (pool.Origin - pool.Last) / dt : Vector3.Zero;
+            Vector3 carried = c.InheritVelocityOn && c.InheritVelocityMode == ParticleInheritVelocity.Current && c.World ? pool.EmitterVel * c.InheritVelocity : Vector3.Zero;
             Quaternion toLocal = Quaternion.Conjugate(pool.Rotation);
             Vector3 down = new(0f, -c.Gravity, 0f);
             if (!c.World) down = Vector3.Transform(down, toLocal);
@@ -307,7 +418,12 @@ namespace GameEditor.Framework.Scene
             {
                 ref Particle p = ref pool.Items[i];
                 p.Age += dt;
-                if (p.Age >= p.Life) { pool.Items[i] = pool.Items[--pool.Count]; continue; }
+                if (p.Age >= p.Life)
+                {
+                    if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
+                    pool.Items[i] = pool.Items[--pool.Count];
+                    continue;
+                }
                 Vector3 from = p.Pos;
                 if (c.Gravity != 0f) p.Vel += down * dt;
                 if (c.ForceOn) p.Vel += force * dt;
@@ -322,6 +438,7 @@ namespace GameEditor.Framework.Scene
                 }
                 p.Pos += p.Vel * dt;
                 if (c.VelocityOn) p.Pos += velocity * dt;
+                if (carried != Vector3.Zero) p.Pos += carried * dt;
                 if (c.NoiseOn)
                 {
                     Vector3 at = (c.World ? p.Pos : pool.Origin + Vector3.Transform(p.Pos, pool.Rotation)) * c.NoiseFrequency + new Vector3(scroll);
@@ -330,8 +447,25 @@ namespace GameEditor.Framework.Scene
                 if (spin) p.Rot += p.Spin * dt;
                 if (collide && !Collide(self, pool, in c, ref p, from, i, stride, phase, planeAt[..planes], planeUp[..planes], planeOf[..planes]))
                 {
+                    if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
                     pool.Items[i] = pool.Items[--pool.Count];
                     continue;
+                }
+                if (births)
+                {
+                    // Birth sub-emitters: the particle is their emitter (their Rate over Time and over Distance).
+                    Vector3 here = WorldPos(pool, in p);
+                    for (int k = 0; k < _subCount; k++)
+                    {
+                        ref SubInfo s = ref _subs[k];
+                        if (s.Entry.Type != ParticleSubType.Birth) continue;
+                        p.SubCarry += s.C.Rate * dt + s.C.RateOverDistance * Vector3.Distance(p.Pos, from);
+                        int whole = (int)p.SubCarry;
+                        if (whole <= 0) continue;
+                        p.SubCarry -= whole;
+                        SpawnSub(ref pool.Seed, ref s, whole, here, WorldVel(pool, in p), ColorNow(in c, in p), SizeNow(in c, in p), p.Rot,
+                                 MathF.Max(0f, 1f - p.Age / MathF.Max(1e-6f, p.Life)));
+                    }
                 }
                 i++;
             }
@@ -345,7 +479,7 @@ namespace GameEditor.Framework.Scene
             pool.HasLast = true; pool.Last = pool.Origin;
             if (pool.Playing && now > 0f && (c.Looping || before < duration))
             {
-                if (c.Emitting)
+                if (c.Emitting && !pool.IsSub)
                 {
                     // Rate over Time over the part of the step inside the loop (all of it, looping: exactly dt).
                     float span = c.Looping && before >= 0f ? dt : MathF.Min(now, c.Looping ? now : duration) - MathF.Max(before, 0f);
@@ -370,7 +504,17 @@ namespace GameEditor.Framework.Scene
 
             int make = pool.Pending;
             pool.Pending = 0;
-            if (make > 0) Make(pool, in c, in model, make);
+            if (make > 0)
+            {
+                int first = pool.Count;
+                Make(pool, in c, in model, make);
+                if (c.InheritVelocityOn && c.InheritVelocityMode == ParticleInheritVelocity.Initial && pool.EmitterVel != Vector3.Zero)
+                {
+                    Vector3 add = pool.EmitterVel * c.InheritVelocity;
+                    if (!c.World) add = Vector3.Transform(add, Quaternion.Conjugate(pool.Rotation));
+                    for (int i = first; i < pool.Count; i++) pool.Items[i].Vel += add;
+                }
+            }
         }
 
         // One particle's step against the Collision module (docs PARTICLES_3D_DESIGN.md §6.1): planes every frame, the world for
@@ -438,6 +582,7 @@ namespace GameEditor.Framework.Scene
             if (pool.HitCount < pool.Hits.Length)
                 pool.Hits[pool.HitCount++] = new ParticleCollisionEvent { Point = at, Normal = normal, Velocity = vel, Other = other };
             if (c.SendCollisionMessages && !other.IsNull) Message(self, other);
+            if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Collision, at, vel);
             p.Age += p.Life * Math.Clamp(c.LifetimeLoss, 0f, 1f);
             float speed = vel.Length();
             return p.Age < p.Life && speed >= c.MinKillSpeed && speed <= c.MaxKillSpeed;
@@ -487,7 +632,10 @@ namespace GameEditor.Framework.Scene
             }
         }
 
-        private static void Make(Pool pool, in ParticlesComponent c, in Matrix4x4 model, int make)
+        private static Vector3 WorldVel(Pool p, in Particle q) => p.C.World ? q.Vel : Vector3.Transform(q.Vel, p.Rotation);
+
+        // placed: the shape at the matrix's translation (a sub-emitter's at its parent particle), not at the pool's origin.
+        private static void Make(Pool pool, in ParticlesComponent c, in Matrix4x4 model, int make, bool placed = false)
         {
             // The shape's axis in the world, and two across it (the axis as the entity's matrix turns and scales it: the
             // shape is scaled with the entity, the particles are not).
@@ -506,7 +654,7 @@ namespace GameEditor.Framework.Scene
             float arc = c.Arc >= 360f ? MathF.Tau : Math.Clamp(c.Arc, 0f, 360f) * Deg;
             float thick = Math.Clamp(c.RadiusThickness, 0f, 1f);
             float radius = MathF.Max(0f, c.Radius);
-            bool atOrigin = c.ShapePosition == Vector3.Zero;
+            bool atOrigin = c.ShapePosition == Vector3.Zero && !placed;
             Vector3 centre = atOrigin ? pool.Origin : Vector3.Transform(c.ShapePosition, model);
             Quaternion toLocal = Quaternion.Conjugate(pool.Rotation);
 
@@ -548,6 +696,7 @@ namespace GameEditor.Framework.Scene
                     q.Vel = Vector3.Transform(q.Vel, toLocal);
                 }
                 q.Tested = q.Pos;
+                q.SubCarry = 0f;
                 pool.Items[pool.Count++] = q;
             }
         }

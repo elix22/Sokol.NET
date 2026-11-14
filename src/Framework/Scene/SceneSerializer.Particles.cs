@@ -23,6 +23,9 @@ namespace GameEditor.Framework.Scene
         private static readonly string[] SheetTimeNames = { "Lifetime", "Fps" };
         private static readonly string[] CollisionTypeNames = { "Planes", "World" };
         private static readonly string[] CollisionQualityNames = { "High", "Medium", "Low" };
+        private static readonly string[] SubTypeNames = { "Birth", "Collision", "Death" };
+        private static readonly string[] InheritNames = { "Color", "Size", "Rotation", "Lifetime" };
+        private static readonly string[] InheritVelocityNames = { "Initial", "Current" };
 
         private static void RegisterParticles()
         {
@@ -81,6 +84,22 @@ namespace GameEditor.Framework.Scene
             Num(b, "CollisionDampen", p.CollisionDampen); Num(b, "Bounce", p.Bounce); Num(b, "LifetimeLoss", p.LifetimeLoss);
             Num(b, "MinKillSpeed", p.MinKillSpeed); Num(b, "MaxKillSpeed", p.MaxKillSpeed); Num(b, "RadiusScale", p.RadiusScale);
             Name(b, "CollisionQuality", CollisionQualityNames, (int)p.CollisionQuality); Bool(b, "SendCollisionMessages", p.SendCollisionMessages);
+            // Sub Emitters and Inherit Velocity (G8.8 Q2): the sub-emitters by their scene ids
+            Bool(b, "SubOn", p.SubOn); Key(b, "SubEmitters").Append('[');
+            for (int i = 0; i < p.SubEmitters.Count; i++)
+            {
+                ParticleSubEmitter u = p.SubEmitters.Items[i];
+                if (i > 0) b.Append(',');
+                b.Append("{\"Emitter\":").Append((!u.Emitter.IsNull && u.Emitter.IsAlive ? world.GetSceneId(u.Emitter) : 0).ToString(CultureInfo.InvariantCulture))
+                 .Append(",\"Type\":\"").Append(SubTypeNames[Math.Clamp((int)u.Type, 0, 2)]).Append("\",\"Inherit\":[");
+                bool first = true;
+                for (int f = 0; f < InheritNames.Length; f++)
+                    if (((int)u.Inherit & (1 << f)) != 0) { if (!first) b.Append(','); b.Append('"').Append(InheritNames[f]).Append('"'); first = false; }
+                b.Append("],\"Probability\":").Append(F(u.Probability)).Append('}');
+            }
+            b.Append(']');
+            Bool(b, "InheritVelocityOn", p.InheritVelocityOn); Name(b, "InheritVelocityMode", InheritVelocityNames, (int)p.InheritVelocityMode);
+            Num(b, "InheritVelocity", p.InheritVelocity);
             // Texture Sheet Animation
             Bool(b, "SheetOn", p.SheetOn); Key(b, "Sheet").Append('[').Append(p.SheetColumns.ToString(CultureInfo.InvariantCulture)).Append(',')
                                                        .Append(p.SheetRows.ToString(CultureInfo.InvariantCulture)).Append(']');
@@ -183,6 +202,28 @@ namespace GameEditor.Framework.Scene
             p.RadiusScale = MathF.Max(0f, Number(el, "RadiusScale", p.RadiusScale));
             p.CollisionQuality = (ParticleCollisionQuality)Named(el, "CollisionQuality", CollisionQualityNames, (int)p.CollisionQuality);
             p.SendCollisionMessages = Flag(el, "SendCollisionMessages", p.SendCollisionMessages);
+            // Sub Emitters and Inherit Velocity
+            p.SubOn = Flag(el, "SubOn", p.SubOn);
+            p.SubEmitters = default;
+            if (el.TryGetProperty("SubEmitters", out var subs) && subs.ValueKind == JsonValueKind.Array)
+                foreach (var x in subs.EnumerateArray())
+                {
+                    if (x.ValueKind != JsonValueKind.Object) continue;
+                    var u = new ParticleSubEmitter { Probability = Math.Clamp(Number(x, "Probability", 1f), 0f, 1f) };
+                    if (x.TryGetProperty("Emitter", out var id) && id.ValueKind == JsonValueKind.Number && id.TryGetInt32(out int sid) && sid > 0
+                        && resolve(sid) is { IsNull: false } se) u.Emitter = se;
+                    u.Type = (ParticleSubType)Named(x, "Type", SubTypeNames, (int)ParticleSubType.Birth);
+                    if (x.TryGetProperty("Inherit", out var inh) && inh.ValueKind == JsonValueKind.Array)
+                        foreach (var f in inh.EnumerateArray())
+                        {
+                            int at = f.ValueKind == JsonValueKind.String ? Array.IndexOf(InheritNames, f.GetString()) : -1;
+                            if (at >= 0) u.Inherit |= (ParticleInherit)(1 << at);
+                        }
+                    p.SubEmitters.Add(u);
+                }
+            p.InheritVelocityOn = Flag(el, "InheritVelocityOn", p.InheritVelocityOn);
+            p.InheritVelocityMode = (ParticleInheritVelocity)Named(el, "InheritVelocityMode", InheritVelocityNames, (int)p.InheritVelocityMode);
+            p.InheritVelocity = Number(el, "InheritVelocity", p.InheritVelocity);
             // Texture Sheet Animation
             p.SheetOn = Flag(el, "SheetOn", p.SheetOn);
             if (el.TryGetProperty("Sheet", out var sh) && sh.ValueKind == JsonValueKind.Array && sh.GetArrayLength() == 2)

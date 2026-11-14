@@ -351,4 +351,60 @@ namespace GameEditor.Framework.ECS.Components
         public override readonly bool Equals(object? obj) => obj is ParticlePlanes o && Equals(o);
         public override readonly int GetHashCode() => Count;
     }
+
+    /// <summary>When a sub-emitter makes particles: as long as a parent particle lives, when it hits something, when it dies.</summary>
+    public enum ParticleSubType : byte { Birth, Collision, Death }
+
+    /// <summary>What a sub-emitter's particles take from their parent particle.</summary>
+    [Flags]
+    public enum ParticleInherit : byte { None = 0, Color = 1, Size = 2, Rotation = 4, Lifetime = 8 }
+
+    /// <summary>One entry of the Sub Emitters module (G8.8 Q2): an emitter entity, when it makes particles, what they take, the chance.</summary>
+    public struct ParticleSubEmitter
+    {
+        public Frent.Entity Emitter;
+        public ParticleSubType Type;
+        public ParticleInherit Inherit;
+        public float Probability;
+    }
+
+    /// <summary>The Sub Emitters module's list: up to <see cref="Capacity"/> entries, the first <see cref="Count"/>.</summary>
+    public struct ParticleSubEmitters : IEquatable<ParticleSubEmitters>
+    {
+        public const int Capacity = 4;
+
+        [InlineArray(Capacity)]
+        public struct EntryArray { private ParticleSubEmitter _e; }
+
+        public EntryArray Items;
+        public int Count;
+
+        public bool Add(in ParticleSubEmitter s)
+        {
+            if (Count >= Capacity) return false;
+            Items[Count++] = s;
+            return true;
+        }
+
+        public void RemoveAt(int index)
+        {
+            if (index < 0 || index >= Count) return;
+            for (int i = index; i < Count - 1; i++) Items[i] = Items[i + 1];
+            Items[--Count] = default;
+        }
+
+        public readonly bool Equals(ParticleSubEmitters o)
+        {
+            if (Count != o.Count) return false;
+            for (int i = 0; i < Count; i++)
+            {
+                ParticleSubEmitter a = Items[i], b = o.Items[i];
+                if (a.Emitter != b.Emitter || a.Type != b.Type || a.Inherit != b.Inherit || a.Probability != b.Probability) return false;
+            }
+            return true;
+        }
+
+        public override readonly bool Equals(object? obj) => obj is ParticleSubEmitters o && Equals(o);
+        public override readonly int GetHashCode() => Count;
+    }
 }

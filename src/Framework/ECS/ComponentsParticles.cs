@@ -26,6 +26,9 @@ namespace GameEditor.Framework.ECS.Components
     /// <summary>How many particles a frame are tested against the world: all, half, a quarter (each from where it was last tested).</summary>
     public enum ParticleCollisionQuality : byte { High, Medium, Low }
 
+    /// <summary>Inherit Velocity's modes: the source's velocity when a particle is made, or as it is each frame.</summary>
+    public enum ParticleInheritVelocity : byte { Initial, Current }
+
     /// <summary>The Texture Sheet Animation's time: the frames over a particle's life, or so many a second.</summary>
     public enum ParticleSheetTime : byte { Lifetime, Fps }
 
@@ -162,6 +165,16 @@ namespace GameEditor.Framework.ECS.Components
         public ParticleCollisionQuality CollisionQuality;
         /// <summary>Calls OnParticleCollision(other) on the emitter's scripts and on the other's.</summary>
         public bool SendCollisionMessages;
+
+        // ---- Sub Emitters (G8.8 Q2) ----
+        public bool SubOn;
+        public ParticleSubEmitters SubEmitters;
+
+        // ---- Inherit Velocity (G8.8 Q2) ----
+        public bool InheritVelocityOn;
+        public ParticleInheritVelocity InheritVelocityMode;
+        /// <summary>The part of the source's velocity a particle takes: the moving emitter's, or a sub-emitter's parent particle's.</summary>
+        public float InheritVelocity;
 
         // ---- Texture Sheet Animation ----
         public bool SheetOn;
