@@ -847,7 +847,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             // Camera position is required for light importance ranking.
             Matrix4x4.Invert(viewProj, out var invVP);
-            var cameraPos = new Vector3(invVP.M41, invVP.M42, invVP.M43);
+            var cameraPos = EyeOf(in invVP);
 
             // ── 1. Collect lights and shadow matrices ───────────────────────────────────
             // Re-derives the same CSM cascades RenderShadowMaps computed (cheap, no re-render),
@@ -1226,14 +1226,20 @@ namespace GameEditor.Framework.Renderer.Server
 
         // ── Helpers ──────────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// The camera's position from its inverse view-projection: the last row over its w — the middle of the near plane,
+        /// a near distance (0.1) from the eye; an orthographic camera's w is 1. The row alone, used before G8.6, is the eye
+        /// divided by the near distance for a perspective camera (ten times as far at 0.1): the shading's view vector,
+        /// the LOD distances, the transparent order and the light ranking were all taken from there
+        /// (examples/GameEditor/docs/CAMERA_POSITION_DESIGN.md).
+        /// </summary>
+        internal static Vector3 EyeOf(in Matrix4x4 invViewProj)
+            => new Vector3(invViewProj.M41, invViewProj.M42, invViewProj.M43) / invViewProj.M44;
+
         private static void CollectLightsAndShadows(ECSWorld world, in Matrix4x4 cameraViewProj, bool renderShadowPasses, CsmCamera? csm = null, bool forDrawing = true)
         {
             Matrix4x4.Invert(cameraViewProj, out var _invCamVP);
-            // The eye, for ranking the lights by distance: the inverse view-projection's last row over its w (the middle of
-            // the near plane; an orthographic camera's w is 1). The row alone is the eye divided by the near distance for a
-            // perspective camera (ten times as far at 0.1): the lights over the limit were ranked from there (G8.5, seen
-            // with the Low level's 8 lights).
-            Vector3 cameraPos = new Vector3(_invCamVP.M41, _invCamVP.M42, _invCamVP.M43) / _invCamVP.M44;
+            Vector3 cameraPos = EyeOf(in _invCamVP);   // for ranking the lights by distance
             _lightBuf.Reset();
             _topLightCount = 0;
             // Forward+ for this view: a perspective camera (csm), the project's path, a GPU that draws the full shaders.
@@ -1857,7 +1863,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             // 2) Transmission pass: re-open the scene target preserving opaque colour + depth.
             Matrix4x4.Invert(viewProj, out var invVP);
-            var cameraPos = new Vector3(invVP.M41, invVP.M42, invVP.M43);
+            var cameraPos = EyeOf(in invVP);
             BuildPbrSharedUniforms(in viewProj, cameraPos, out var vs, out var lights, out var cam, out _);
 
             var txPass = new sg_pass
