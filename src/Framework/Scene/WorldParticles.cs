@@ -26,6 +26,7 @@ namespace GameEditor.Framework.Scene
             public float Frame;         // the Texture Sheet's start frame
             public Vector3 Tested;      // where it was when last tested against the world (Collision Quality Medium / Low)
             public float SubCarry;      // its Birth sub-emitters' part of a particle not yet made
+            public int Trail;           // its trail's slot + 1 (0: none)
         }
 
         sealed class Pool
@@ -52,11 +53,20 @@ namespace GameEditor.Framework.Scene
             public Vector3 EmitterVel;
             public readonly ParticleCollisionEvent[] Hits = new ParticleCollisionEvent[64];
             public int HitCount;
+            // Trails (G8.8 Q3): slots of TrailPoints points each, oldest first; a slot is a living particle's or a lingering one.
+            public Vector3[] TrailPos = Array.Empty<Vector3>();
+            public float[] TrailAge = Array.Empty<float>();
+            public int[] TrailCount = Array.Empty<int>(), FreeSlots = Array.Empty<int>(), Lingering = Array.Empty<int>();
+            public float[] SlotLife = Array.Empty<float>(), SlotSize = Array.Empty<float>();
+            public Vector4[] SlotColor = Array.Empty<Vector4>();
+            public int FreeCount, LingerCount;
             public float[] SortKeys = Array.Empty<float>();
             public int[] SortOrder = Array.Empty<int>();
         }
 
         private static readonly Dictionary<Entity, Pool> _pools = new();
+        /// <summary>The points of one trail at most (a ribbon's corners).</summary>
+        public const int TrailPoints = 64;
         // The collision messages of a step, each (emitter, other) once: two arrays, compared by hand (a list of tuples and its
         // Contains, a generic comparer over a tuple of structs, stopped the web build's Mono interpreter on an assertion).
         private const int MaxMessages = 256;
@@ -78,6 +88,12 @@ namespace GameEditor.Framework.Scene
         public static int Alive
         {
             get { int n = 0; foreach (Pool p in _pools.Values) n += p.Count; return n; }
+        }
+
+        /// <summary>Something to draw: particles alive, or the trails of dead ones (Die with Particles off).</summary>
+        public static bool AnyToDraw
+        {
+            get { foreach (Pool p in _pools.Values) if (p.Count > 0 || p.LingerCount > 0) return true; return false; }
         }
 
         /// <summary>The particles alive now of one emitter (the reference editor's particleCount).</summary>
@@ -162,7 +178,7 @@ namespace GameEditor.Framework.Scene
         {
             if (!_pools.TryGetValue(entity, out Pool? p)) return;
             p.Playing = false; p.Paused = false; p.Pending = 0;
-            if (clear) p.Count = 0;
+            if (clear) { p.Count = 0; ResetTrails(p); }
         }
 
         /// <summary>The system from its beginning, its particles gone (the editor's Restart).</summary>
@@ -171,13 +187,14 @@ namespace GameEditor.Framework.Scene
             if (!ECSWorld.Instance.TryGetComponent<ParticlesComponent>(entity, out var c)) return;
             Pool p = Get(entity, in c);
             p.Count = 0; p.Paused = false;
+            ResetTrails(p);
             Begin(p, in c);
         }
 
         /// <summary>One emitter's particles taken away; it goes on as it was.</summary>
         public static void Clear(Entity entity)
         {
-            if (_pools.TryGetValue(entity, out Pool? p)) { p.Count = 0; p.Pending = 0; }
+            if (_pools.TryGetValue(entity, out Pool? p)) { p.Count = 0; p.Pending = 0; ResetTrails(p); }
         }
 
         /// <summary>It is playing, or particles of it are still alive.</summary>
@@ -218,8 +235,121 @@ namespace GameEditor.Framework.Scene
                 Array.Resize(ref pool.SortKeys, max);
                 Array.Resize(ref pool.SortOrder, max);
                 pool.Count = Math.Min(pool.Count, max);
+                if (pool.TrailCount.Length > 0) SizeTrails(pool, max);
             }
+            if (c.TrailsOn && pool.TrailCount.Length != 2 * max) SizeTrails(pool, max);
             return pool;
+        }
+
+        // The trail slots: two for each particle the pool holds (a lingering trail keeps its slot), all free.
+        private static void SizeTrails(Pool p, int max)
+        {
+            int slots = 2 * max;
+            Array.Resize(ref p.TrailPos, slots * TrailPoints);
+            Array.Resize(ref p.TrailAge, slots * TrailPoints);
+            Array.Resize(ref p.TrailCount, slots);
+            Array.Resize(ref p.FreeSlots, slots);
+            Array.Resize(ref p.Lingering, slots);
+            Array.Resize(ref p.SlotLife, slots);
+            Array.Resize(ref p.SlotSize, slots);
+            Array.Resize(ref p.SlotColor, slots);
+            for (int i = 0; i < p.Count; i++) p.Items[i].Trail = 0;
+            ResetTrails(p);
+        }
+
+        // Every slot free (the pool emptied at once: Stop, Clear, Restart).
+        private static void ResetTrails(Pool p)
+        {
+            int slots = p.TrailCount.Length;
+            for (int i = 0; i < slots; i++) { p.FreeSlots[i] = slots - 1 - i; p.TrailCount[i] = 0; }
+            p.FreeCount = slots;
+            p.LingerCount = 0;
+        }
+
+        private static void FreeTrail(Pool p, int slot)
+        {
+            p.TrailCount[slot] = 0;
+            if (p.FreeCount < p.FreeSlots.Length) p.FreeSlots[p.FreeCount++] = slot;
+        }
+
+        // A particle ends: its trail freed, or kept until its points age out.
+        private static void EndTrail(Pool pool, in ParticlesComponent c, in Particle q)
+        {
+            if (q.Trail == 0) return;
+            int slot = q.Trail - 1;
+            if (c.TrailDieWithParticles || pool.TrailCount[slot] == 0 || pool.LingerCount >= pool.Lingering.Length) { FreeTrail(pool, slot); return; }
+            pool.SlotLife[slot] = q.Life;
+            pool.SlotSize[slot] = SizeNow(in c, in q);
+            pool.SlotColor[slot] = ColorNow(in c, in q);
+            pool.Lingering[pool.LingerCount++] = slot;
+        }
+
+        // A trail's points aged by dt; those older than its lifetime dropped (from the front: the oldest).
+        private static void AgeTrail(Pool pool, int slot, float dt, float maxAge)
+        {
+            int at = slot * TrailPoints, n = pool.TrailCount[slot], drop = 0;
+            for (int k = 0; k < n; k++)
+            {
+                pool.TrailAge[at + k] += dt;
+                if (pool.TrailAge[at + k] > maxAge) drop = k + 1;
+            }
+            if (drop > 0)
+            {
+                Array.Copy(pool.TrailPos, at + drop, pool.TrailPos, at, n - drop);
+                Array.Copy(pool.TrailAge, at + drop, pool.TrailAge, at, n - drop);
+                pool.TrailCount[slot] = n - drop;
+            }
+        }
+
+        // The head's point added when it moved far enough from the newest (the oldest dropped when full).
+        private static void PushTrail(Pool pool, int slot, Vector3 at, float minDistance)
+        {
+            int b = slot * TrailPoints, n = pool.TrailCount[slot];
+            if (n > 0 && Vector3.DistanceSquared(pool.TrailPos[b + n - 1], at) < minDistance * minDistance) return;
+            if (n == TrailPoints)
+            {
+                Array.Copy(pool.TrailPos, b + 1, pool.TrailPos, b, n - 1);
+                Array.Copy(pool.TrailAge, b + 1, pool.TrailAge, b, n - 1);
+                n--;
+            }
+            pool.TrailPos[b + n] = at;
+            pool.TrailAge[b + n] = 0f;
+            pool.TrailCount[slot] = n + 1;
+        }
+
+        // A point of the head in the trail's space: the world, or the emitter's (its position and rotation).
+        private static Vector3 TrailSpace(Pool pool, in ParticlesComponent c, Vector3 world) =>
+            c.TrailWorldSpace ? world : Vector3.Transform(world - pool.Origin, Quaternion.Conjugate(pool.Rotation));
+
+        /// <summary>The points of one emitter's trails now (the living particles' and the lingering ones), in the world.</summary>
+        public static int CopyTrailPoints(Entity entity, Span<Vector3> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p) || p.TrailCount.Length == 0) return 0;
+            int n = 0;
+            for (int s = 0; s < p.TrailCount.Length; s++)
+                for (int k = 0; k < p.TrailCount[s] && n < into.Length; k++)
+                {
+                    Vector3 v = p.TrailPos[s * TrailPoints + k];
+                    into[n++] = p.C.TrailWorldSpace ? v : p.Origin + Vector3.Transform(v, p.Rotation);
+                }
+            return n;
+        }
+
+        /// <summary>How many trails one emitter has now: its particles' and the lingering ones.</summary>
+        public static int TrailCountOf(Entity entity)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p) || p.TrailCount.Length == 0) return 0;
+            return p.TrailCount.Length - p.FreeCount;
+        }
+
+        /// <summary>The age of each trail point (seconds), in the order of <see cref="CopyTrailPoints"/>.</summary>
+        public static int CopyTrailAges(Entity entity, Span<float> into)
+        {
+            if (!_pools.TryGetValue(entity, out Pool? p) || p.TrailCount.Length == 0) return 0;
+            int n = 0;
+            for (int s = 0; s < p.TrailCount.Length; s++)
+                for (int k = 0; k < p.TrailCount[s] && n < into.Length; k++) into[n++] = p.TrailAge[s * TrailPoints + k];
+            return n;
         }
 
         // xorshift: 0..1
@@ -267,7 +397,7 @@ namespace GameEditor.Framework.Scene
                 pool.Seen = _frame;
                 pool.C = c;
                 pool.IsSub = IsSubEntity(e);
-                if (!row.Item1.Value.Active) { pool.Count = 0; continue; }
+                if (!row.Item1.Value.Active) { pool.Count = 0; ResetTrails(pool); continue; }
                 Matrix4x4 model = Transform.GetWorldMatrix(world, row.Item3.Value);
                 pool.Origin = model.Translation;
                 pool.Rotation = Matrix4x4.Decompose(model, out _, out Quaternion r, out _) && float.IsFinite(r.W) ? Quaternion.Normalize(r) : Quaternion.Identity;
@@ -421,6 +551,7 @@ namespace GameEditor.Framework.Scene
                 if (p.Age >= p.Life)
                 {
                     if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
+                    if (p.Trail != 0) EndTrail(pool, in c, in p);
                     pool.Items[i] = pool.Items[--pool.Count];
                     continue;
                 }
@@ -448,8 +579,16 @@ namespace GameEditor.Framework.Scene
                 if (collide && !Collide(self, pool, in c, ref p, from, i, stride, phase, planeAt[..planes], planeUp[..planes], planeOf[..planes]))
                 {
                     if (_subCount > 0) SubEvent(pool, in c, ref p, ParticleSubType.Death, WorldPos(pool, in p), WorldVel(pool, in p));
+                    if (p.Trail != 0) EndTrail(pool, in c, in p);
                     pool.Items[i] = pool.Items[--pool.Count];
                     continue;
+                }
+                if (p.Trail != 0 && c.TrailsOn)
+                {
+                    // Its trail: the points aged, the old ones dropped, the head's new point.
+                    int slot = p.Trail - 1;
+                    AgeTrail(pool, slot, dt, MathF.Max(0f, c.TrailLifetime) * p.Life);
+                    PushTrail(pool, slot, TrailSpace(pool, in c, WorldPos(pool, in p)), MathF.Max(0.001f, c.TrailMinVertexDistance));
                 }
                 if (births)
                 {
@@ -468,6 +607,15 @@ namespace GameEditor.Framework.Scene
                     }
                 }
                 i++;
+            }
+
+            // The lingering trails (of particles that died, Die with Particles off): aged until their points are gone.
+            for (int k = 0; k < pool.LingerCount;)
+            {
+                int slot = pool.Lingering[k];
+                AgeTrail(pool, slot, dt, MathF.Max(0f, c.TrailLifetime) * pool.SlotLife[slot]);
+                if (pool.TrailCount[slot] == 0) { FreeTrail(pool, slot); pool.Lingering[k] = pool.Lingering[--pool.LingerCount]; continue; }
+                k++;
             }
 
             // The system's time: its loops, its start delay; what it makes in this step.
@@ -697,6 +845,13 @@ namespace GameEditor.Framework.Scene
                 }
                 q.Tested = q.Pos;
                 q.SubCarry = 0f;
+                // A trail for the Ratio's share (a random drawn only for a ratio under 1), from a free slot.
+                if (c.TrailsOn && pool.FreeCount > 0 && (c.TrailRatio >= 1f || (c.TrailRatio > 0f && Next(ref pool.Seed) < c.TrailRatio)))
+                {
+                    int slot = pool.FreeSlots[--pool.FreeCount];
+                    pool.TrailCount[slot] = 0;
+                    q.Trail = slot + 1;
+                }
                 pool.Items[pool.Count++] = q;
             }
         }

@@ -57,7 +57,7 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
         {
             LastSprites = 0; LastDrawCalls = 0;
             bool sprites = world.HasAnyComponent<SpriteRenderer>(), maps = world.HasAnyComponent<TilemapRenderer>();
-            bool particles = WorldParticles.Alive > 0;
+            bool particles = WorldParticles.AnyToDraw;
             if (!sprites && !maps && !particles) return;
 
             int count = 0, layers = 0;

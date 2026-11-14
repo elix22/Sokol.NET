@@ -29,6 +29,9 @@ namespace GameEditor.Framework.ECS.Components
     /// <summary>Inherit Velocity's modes: the source's velocity when a particle is made, or as it is each frame.</summary>
     public enum ParticleInheritVelocity : byte { Initial, Current }
 
+    /// <summary>How a trail's texture lies along it: once over the whole trail, or repeated every width.</summary>
+    public enum ParticleTrailTexture : byte { Stretch, Tile }
+
     /// <summary>The Texture Sheet Animation's time: the frames over a particle's life, or so many a second.</summary>
     public enum ParticleSheetTime : byte { Lifetime, Fps }
 
@@ -176,6 +179,30 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>The part of the source's velocity a particle takes: the moving emitter's, or a sub-emitter's parent particle's.</summary>
         public float InheritVelocity;
 
+        // ---- Trails (G8.8 Q3) ----
+        public bool TrailsOn;
+        /// <summary>0..1: the share of particles given a trail.</summary>
+        public float TrailRatio;
+        /// <summary>0..1 of the particle's life a trail point lasts.</summary>
+        public float TrailLifetime;
+        /// <summary>Metres the head moves before a new point.</summary>
+        public float TrailMinVertexDistance;
+        /// <summary>On: the points stay in the world; off: they move with the emitter.</summary>
+        public bool TrailWorldSpace;
+        /// <summary>Off: a dead particle's trail stays until its points age out.</summary>
+        public bool TrailDieWithParticles;
+        public ParticleTrailTexture TrailTextureMode;
+        /// <summary>The width over the trail, head 0 → tail 1, times the particle's size.</summary>
+        public ParticleCurve TrailWidth;
+        /// <summary>The colour over a point's age (0 new → 1 its last).</summary>
+        public ParticleGradient TrailColorOverLifetime;
+        /// <summary>The colour along the trail, head 0 → tail 1.</summary>
+        public ParticleGradient TrailColorOverTrail;
+        /// <summary>The particle's colour times the gradients.</summary>
+        public bool TrailInheritColor;
+        /// <summary>An image key; empty: plain white.</summary>
+        public string TrailTexture;
+
         // ---- Texture Sheet Animation ----
         public bool SheetOn;
         public int SheetColumns, SheetRows;
@@ -254,6 +281,9 @@ namespace GameEditor.Framework.ECS.Components
             NoiseStrength = 1f, NoiseFrequency = 0.5f, NoiseScroll = 0f,
             CollisionType = ParticleCollisionType.Planes, CollisionDampen = 0f, Bounce = 1f, LifetimeLoss = 0f, MinKillSpeed = 0f,
             MaxKillSpeed = 10000f, RadiusScale = 1f, CollisionQuality = ParticleCollisionQuality.High,
+            TrailRatio = 1f, TrailLifetime = 1f, TrailMinVertexDistance = 0.2f, TrailWorldSpace = true, TrailDieWithParticles = true,
+            TrailTextureMode = ParticleTrailTexture.Stretch, TrailWidth = ParticleCurve.Line(1f, 1f), TrailColorOverLifetime = ParticleGradient.White,
+            TrailColorOverTrail = ParticleGradient.White, TrailInheritColor = true, TrailTexture = "",
             SheetColumns = 1, SheetRows = 1, SheetTime = ParticleSheetTime.Lifetime, SheetFps = 10f, SheetCycles = 1f, SheetStartFrame = Vector2.Zero,
             Texture = "", RenderMode = ParticleRenderMode.Billboard, SpeedScale = 0f, LengthScale = 2f, Blend = ParticleBlend.Alpha, Sort = ParticleSort.None,
         };

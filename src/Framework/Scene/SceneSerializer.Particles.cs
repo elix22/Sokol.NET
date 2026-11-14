@@ -26,6 +26,7 @@ namespace GameEditor.Framework.Scene
         private static readonly string[] SubTypeNames = { "Birth", "Collision", "Death" };
         private static readonly string[] InheritNames = { "Color", "Size", "Rotation", "Lifetime" };
         private static readonly string[] InheritVelocityNames = { "Initial", "Current" };
+        private static readonly string[] TrailTextureNames = { "Stretch", "Tile" };
 
         private static void RegisterParticles()
         {
@@ -100,6 +101,15 @@ namespace GameEditor.Framework.Scene
             b.Append(']');
             Bool(b, "InheritVelocityOn", p.InheritVelocityOn); Name(b, "InheritVelocityMode", InheritVelocityNames, (int)p.InheritVelocityMode);
             Num(b, "InheritVelocity", p.InheritVelocity);
+            // Trails (G8.8 Q3)
+            Bool(b, "TrailsOn", p.TrailsOn); Num(b, "TrailRatio", p.TrailRatio); Num(b, "TrailLifetime", p.TrailLifetime);
+            Num(b, "TrailMinVertexDistance", p.TrailMinVertexDistance); Bool(b, "TrailWorldSpace", p.TrailWorldSpace);
+            Bool(b, "TrailDieWithParticles", p.TrailDieWithParticles); Name(b, "TrailTextureMode", TrailTextureNames, (int)p.TrailTextureMode);
+            Key(b, "TrailWidth"); Curve(b, in p.TrailWidth);
+            Key(b, "TrailColorOverLifetime"); Gradient(b, in p.TrailColorOverLifetime);
+            Key(b, "TrailColorOverTrail"); Gradient(b, in p.TrailColorOverTrail);
+            Bool(b, "TrailInheritColor", p.TrailInheritColor);
+            Key(b, "TrailTexture").Append('"').Append(Esc(p.TrailTexture ?? "")).Append('"');
             // Texture Sheet Animation
             Bool(b, "SheetOn", p.SheetOn); Key(b, "Sheet").Append('[').Append(p.SheetColumns.ToString(CultureInfo.InvariantCulture)).Append(',')
                                                        .Append(p.SheetRows.ToString(CultureInfo.InvariantCulture)).Append(']');
@@ -224,6 +234,19 @@ namespace GameEditor.Framework.Scene
             p.InheritVelocityOn = Flag(el, "InheritVelocityOn", p.InheritVelocityOn);
             p.InheritVelocityMode = (ParticleInheritVelocity)Named(el, "InheritVelocityMode", InheritVelocityNames, (int)p.InheritVelocityMode);
             p.InheritVelocity = Number(el, "InheritVelocity", p.InheritVelocity);
+            // Trails
+            p.TrailsOn = Flag(el, "TrailsOn", p.TrailsOn);
+            p.TrailRatio = Math.Clamp(Number(el, "TrailRatio", p.TrailRatio), 0f, 1f);
+            p.TrailLifetime = Math.Clamp(Number(el, "TrailLifetime", p.TrailLifetime), 0f, 1f);
+            p.TrailMinVertexDistance = MathF.Max(0f, Number(el, "TrailMinVertexDistance", p.TrailMinVertexDistance));
+            p.TrailWorldSpace = Flag(el, "TrailWorldSpace", p.TrailWorldSpace);
+            p.TrailDieWithParticles = Flag(el, "TrailDieWithParticles", p.TrailDieWithParticles);
+            p.TrailTextureMode = (ParticleTrailTexture)Named(el, "TrailTextureMode", TrailTextureNames, (int)p.TrailTextureMode);
+            if (el.TryGetProperty("TrailWidth", out var tw) && tw.ValueKind == JsonValueKind.Object) p.TrailWidth = ReadCurve(tw);
+            if (el.TryGetProperty("TrailColorOverLifetime", out var tcl) && tcl.ValueKind == JsonValueKind.Object) p.TrailColorOverLifetime = ReadGradient(tcl);
+            if (el.TryGetProperty("TrailColorOverTrail", out var tct) && tct.ValueKind == JsonValueKind.Object) p.TrailColorOverTrail = ReadGradient(tct);
+            p.TrailInheritColor = Flag(el, "TrailInheritColor", p.TrailInheritColor);
+            p.TrailTexture = Text(el, "TrailTexture", p.TrailTexture ?? "");
             // Texture Sheet Animation
             p.SheetOn = Flag(el, "SheetOn", p.SheetOn);
             if (el.TryGetProperty("Sheet", out var sh) && sh.ValueKind == JsonValueKind.Array && sh.GetArrayLength() == 2)

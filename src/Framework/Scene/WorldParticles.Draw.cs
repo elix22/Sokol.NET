@@ -38,7 +38,7 @@ namespace GameEditor.Framework.Scene
             int n = 0;
             foreach (Pool pool in _pools.Values)
             {
-                if (pool.Count == 0) continue;
+                if (pool.Count == 0 && pool.LingerCount == 0) continue;
                 pool.Depth = Depth(pool.Origin, in viewProj);
                 if (n == _sorted.Length) Array.Resize(ref _sorted, n * 2);
                 _sorted[n++] = pool;
@@ -68,6 +68,8 @@ namespace GameEditor.Framework.Scene
         private static void DrawPool(Pool pool, in Matrix4x4 viewProj, Vector3 right, Vector3 up, Vector3 forward)
         {
             ref readonly ParticlesComponent c = ref pool.C;
+            if (c.TrailsOn && pool.TrailCount.Length > 0) DrawTrails(pool, in c, forward);
+            if (pool.Count == 0) return;
             sg_view view;
             bool nearest = false;
             Vector4 frameUv = new(0f, 0f, 1f, 1f);       // u0, vTop, u1, vBottom of the texture's frame
@@ -174,6 +176,80 @@ namespace GameEditor.Framework.Scene
                 else uv = new Vector4(frameUv.X, frameUv.W, frameUv.Z, frameUv.Y);
 
                 _batch.Draw(view, nearest, c.Blend, centre - (ax + ay) * 0.5f, ax, ay, uv, Pack(col));
+            }
+        }
+
+        // The emitter's trails before its particles (G8.8 Q3): a quad a segment facing the camera, from the head (the particle now)
+        // through its points to the oldest; its width the curve's along the trail times the particle's size, its colour the
+        // gradients' (and the particle's).
+        private static void DrawTrails(Pool pool, in ParticlesComponent c, Vector3 forward)
+        {
+            sg_view view = default;
+            if (!string.IsNullOrEmpty(c.TrailTexture))
+            {
+                if (SpriteLibrary.Find(c.TrailTexture, out SpriteFrame f) != SpriteLibrary.Answer.Ready) return;
+                view = f.View;
+            }
+            for (int i = 0; i < pool.Count; i++)
+            {
+                ref readonly Particle q = ref pool.Items[i];
+                if (q.Trail == 0) continue;
+                DrawTrail(pool, in c, q.Trail - 1, true, WorldPos(pool, in q), SizeNow(in c, in q), ColorNow(in c, in q),
+                          MathF.Max(1e-4f, c.TrailLifetime * q.Life), view, forward);
+            }
+            for (int k = 0; k < pool.LingerCount; k++)
+            {
+                int slot = pool.Lingering[k];
+                DrawTrail(pool, in c, slot, false, default, pool.SlotSize[slot], pool.SlotColor[slot], MathF.Max(1e-4f, c.TrailLifetime * pool.SlotLife[slot]), view, forward);
+            }
+        }
+
+        private static void DrawTrail(Pool pool, in ParticlesComponent c, int slot, bool hasHead, Vector3 head, float size, Vector4 color, float maxAge,
+                                      sg_view view, Vector3 forward)
+        {
+            int b = slot * TrailPoints, n = pool.TrailCount[slot];
+            Span<Vector3> pts = stackalloc Vector3[TrailPoints + 1];
+            Span<float> ages = stackalloc float[TrailPoints + 1];
+            int m = 0;
+            if (hasHead) { pts[0] = head; ages[0] = 0f; m = 1; }
+            for (int k = n - 1; k >= 0; k--)
+            {
+                Vector3 v = pool.TrailPos[b + k];
+                pts[m] = c.TrailWorldSpace ? v : pool.Origin + Vector3.Transform(v, pool.Rotation);
+                ages[m] = pool.TrailAge[b + k];
+                m++;
+            }
+            if (m < 2) return;
+            float total = 0f;
+            for (int i = 1; i < m; i++) total += Vector3.Distance(pts[i - 1], pts[i]);
+            if (total < 1e-5f) return;
+            Vector4 tint = c.TrailInheritColor ? color : Vector4.One;
+            float done = 0f;
+            for (int i = 1; i < m; i++)
+            {
+                Vector3 a = pts[i - 1], seg = pts[i] - a;
+                float len = seg.Length();
+                if (len < 1e-6f) continue;
+                float fa = done / total, fb = (done + len) / total;
+                done += len;
+                float w = size * 0.5f * (c.TrailWidth.Evaluate(fa) + c.TrailWidth.Evaluate(fb));
+                if (w <= 0f) continue;
+                Vector3 across = Vector3.Cross(seg, forward);
+                if (across.LengthSquared() < 1e-12f) continue;
+                across = Vector3.Normalize(across) * w;
+                float age = Math.Clamp(0.5f * (ages[i - 1] + ages[i]) / maxAge, 0f, 1f);
+                Vector4 col = tint * c.TrailColorOverTrail.Evaluate(0.5f * (fa + fb)) * c.TrailColorOverLifetime.Evaluate(age);
+                if (col.W <= 0f) continue;
+                float va = fa, vb = fb;
+                if (c.TrailTextureMode == ParticleTrailTexture.Tile)
+                {
+                    // Repeated every width: the segment from its start's place in a repeat (the shader keeps uv inside a quad's
+                    // rectangle, the sampler clamps: a segment shows at most one repeat).
+                    float start = (done - len) / w;
+                    va = start - MathF.Floor(start);
+                    vb = MathF.Min(1f, va + len / w);
+                }
+                _batch.Draw(view, false, c.Blend, a - across * 0.5f, across, seg, new Vector4(0f, va, 1f, vb), Pack(col));
             }
         }
 
