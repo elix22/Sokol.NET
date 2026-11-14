@@ -199,7 +199,7 @@ namespace GameEditor.Framework.Renderer.Server
         /// The scene is drawn into an HDR target and tonemapped: a tone curve or an exposure is asked for and the GPU can
         /// draw into a float target. Otherwise the path of before, at its cost.
         /// </summary>
-        public static bool HdrActive => (Tonemapping != TonemapMode.None || ExposureEV != 0f) && ShaderVariantCache.HasHdr;
+        public static bool HdrActive => (Tonemapping != TonemapMode.None || ExposureEV != 0f) && ShaderVariantCache.HasHdr && HdrAllowed;
         private static bool _hdrPass;   // the pass drawn now is an HDR target's: linear output, no sprites
         private static readonly System.Collections.Generic.Dictionary<OffscreenTarget, OffscreenTarget> _hdrOf = new();
 
@@ -270,7 +270,7 @@ namespace GameEditor.Framework.Renderer.Server
 
         // A GPU without float targets (or ShaderVariantCache.ForceNoHdr): the curve and the exposure in the shaders' own
         // output instead (pbr.glsl, the skybox) — the same picture for opaque surfaces.
-        private static bool Fallback => !ShaderVariantCache.HasHdr && (Tonemapping != TonemapMode.None || ExposureEV != 0f);
+        private static bool Fallback => !(ShaderVariantCache.HasHdr && HdrAllowed) && (Tonemapping != TonemapMode.None || ExposureEV != 0f);
         private static float FallbackType => Fallback ? TonemapType(Tonemapping) : 0f;
         private static float FallbackExposure => Fallback ? MathF.Pow(2f, ExposureEV) : 1f;
 
@@ -314,6 +314,38 @@ namespace GameEditor.Framework.Renderer.Server
 
         // Shadow quality: 0 = 1-tap sharp, 1 = 3×3 PCF medium (default), 2 = 5×5 PCF soft.
         public static int ShadowQuality { get; set; } = 1;
+
+        // ── The quality level's values (G8.5, examples/GameEditor/docs/QUALITY_TIERS_DESIGN.md; set by Quality.Apply) ──
+        /// <summary>A view's light limit: Forward never more than 32, Forward+ never more than the GPU's (256 / 32).</summary>
+        public static int MaxLights { get; set; } = MaxSelectableLights;
+        /// <summary>Spot and point lights cast their shadows (a directional light's are kept).</summary>
+        public static bool PunctualShadows { get; set; } = true;
+        /// <summary>The scene may be drawn into an HDR target when the Environment asks for a curve or an exposure;
+        /// false: the in-shader fallback (the same picture for opaque surfaces, no target).</summary>
+        public static bool HdrAllowed { get; set; } = true;
+        /// <summary>The 3D scene's pixels, a share of the view's (0.5–1); the game's UI stays full size. Read by the
+        /// frame that draws a game's view (GameApplication, an editor's Game view).</summary>
+        public static float RenderScale { get; set; } = 1f;
+        /// <summary>The scene target's size at <see cref="RenderScale"/>: at least one pixel.</summary>
+        public static int Scaled(int size) => Math.Max(1, (int)MathF.Round(size * Math.Clamp(RenderScale, 0.5f, 1f)));
+
+        /// <summary>The shadow atlas's slice size (spot and directional), in pixels; a point light's cube faces are a
+        /// quarter of it. Changing it makes the shadow textures again, between frames.</summary>
+        /// <summary>A point light's cube face size now (a quarter of <see cref="ShadowResolution"/>).</summary>
+        public static int PointShadowResolution => _cubeShadows.FaceSize;
+
+        public static int ShadowResolution
+        {
+            get => _shadowAtlas.SliceSize;
+            set
+            {
+                int size = Math.Clamp(value, 256, 4096);
+                if (size == _shadowAtlas.SliceSize) return;
+                _shadowAtlas.Resize(size);
+                _cubeShadows.Resize(Math.Max(128, size / 4));
+                _shadowPass.Resize(_shadowAtlas.SliceSize, _cubeShadows.FaceSize);
+            }
+        }
 
         /// <summary>
         /// When true (and a Scene-view camera frustum is supplied), the directional shadow uses
@@ -395,6 +427,7 @@ namespace GameEditor.Framework.Renderer.Server
             _shadowAtlas.Init();
             _cubeShadows.Init();
             _shadowPass.Init();
+            _shadowPass.Resize(_shadowAtlas.SliceSize, _cubeShadows.FaceSize);   // a size set before Init (G8.5)
             _shadowDebugPass.Init();
             _tonemapPass.Init();
             _skyboxPass.Init();
@@ -1196,13 +1229,17 @@ namespace GameEditor.Framework.Renderer.Server
         private static void CollectLightsAndShadows(ECSWorld world, in Matrix4x4 cameraViewProj, bool renderShadowPasses, CsmCamera? csm = null, bool forDrawing = true)
         {
             Matrix4x4.Invert(cameraViewProj, out var _invCamVP);
-            Vector3 cameraPos = new Vector3(_invCamVP.M41, _invCamVP.M42, _invCamVP.M43);
+            // The eye, for ranking the lights by distance: the inverse view-projection's last row over its w (the middle of
+            // the near plane; an orthographic camera's w is 1). The row alone is the eye divided by the near distance for a
+            // perspective camera (ten times as far at 0.1): the lights over the limit were ranked from there (G8.5, seen
+            // with the Low level's 8 lights).
+            Vector3 cameraPos = new Vector3(_invCamVP.M41, _invCamVP.M42, _invCamVP.M43) / _invCamVP.M44;
             _lightBuf.Reset();
             _topLightCount = 0;
             // Forward+ for this view: a perspective camera (csm), the project's path, a GPU that draws the full shaders.
             ViewIsClustered = Path == RenderingPath.ForwardPlus && csm.HasValue && ShaderVariantCache.ClusteredAllowed;
             if (ViewIsClustered) _clusterData ??= new ClusterData(ClusterData.MaxLightsFor(sg_query_backend()));
-            _topLightCap = ViewIsClustered ? _clusterData!.MaxLights : RenderingConstants.MAX_LIGHTS;
+            _topLightCap = Math.Clamp(MaxLights, 1, ViewIsClustered ? _clusterData!.MaxLights : RenderingConstants.MAX_LIGHTS);
             _spotShadowTopCount = 0;
             _pointShadowTopCount = 0;
             _hasDirectionalShadow = false;
@@ -1260,11 +1297,12 @@ namespace GameEditor.Framework.Renderer.Server
                     hasDirectionalShadowLight = true;
                 }
 
-                if (lc.CastsShadows && lc.Type == GameEditor.Framework.ECS.Components.LightType.Spot)
+                // PunctualShadows off (the quality level): spot and point lights are lit without their shadows (G8.5).
+                if (PunctualShadows && lc.CastsShadows && lc.Type == GameEditor.Framework.ECS.Components.LightType.Spot)
                 {
                     TryInsertTopSpotShadow(row.Entity, importance);
                 }
-                else if (lc.CastsShadows && lc.Type == GameEditor.Framework.ECS.Components.LightType.Point)
+                else if (PunctualShadows && lc.CastsShadows && lc.Type == GameEditor.Framework.ECS.Components.LightType.Point)
                 {
                     TryInsertTopPointShadow(row.Entity, importance);
                 }
@@ -1301,7 +1339,7 @@ namespace GameEditor.Framework.Renderer.Server
                 // ── CSM4: fit 4 cascades to the camera frustum, render into atlas slices 0-3 ──
                 var cc = csm.Value;
                 _csm.Compute(cc.View, cc.Proj, cc.Near, cc.Far,
-                    bestDirectionalShadowLight.Direction, ShadowAtlas.SliceSize, CsmComputer.MaxCascades);
+                    bestDirectionalShadowLight.Direction, _shadowAtlas.SliceSize, CsmComputer.MaxCascades);
                 for (int c = 0; c < CsmComputer.MaxCascades; c++) _csmCascadeVP[c] = _csm.CascadeVP[c];
                 _csmSplitDepths = new Vector4(_csm.SplitDepths[0], _csm.SplitDepths[1],
                                               _csm.SplitDepths[2], _csm.SplitDepths[3]);
@@ -3896,7 +3934,7 @@ namespace GameEditor.Framework.Renderer.Server
             float minY = centerLS.Y - boxHalf;
 
             // Texel-snap the box origin in light space so edges don't crawl when casters move.
-            float worldPerTexel = (2f * boxHalf) / ShadowAtlas.SliceSize;
+            float worldPerTexel = (2f * boxHalf) / _shadowAtlas.SliceSize;
             minX = MathF.Floor(minX / worldPerTexel) * worldPerTexel;
             minY = MathF.Floor(minY / worldPerTexel) * worldPerTexel;
             float maxX = minX + 2f * boxHalf;

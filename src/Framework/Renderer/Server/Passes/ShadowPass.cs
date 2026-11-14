@@ -106,37 +106,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             _passActionLoad = _passAction;
             _passActionLoad.depth.load_action = sg_load_action.SG_LOADACTION_LOAD;
 
-            _atlasDummyColorImage = sg_make_image(new sg_image_desc
-            {
-                type = sg_image_type.SG_IMAGETYPE_2D,
-                width = ShadowAtlas.SliceSize,
-                height = ShadowAtlas.SliceSize,
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-                sample_count = 1,
-                usage = { color_attachment = true },
-                label = "shadow-pass-dummy-color-atlas"
-            });
-            _atlasDummyColorView = sg_make_view(new sg_view_desc
-            {
-                color_attachment = new sg_image_view_desc { image = _atlasDummyColorImage },
-                label = "shadow-pass-dummy-color-atlas-view"
-            });
-
-            _cubeDummyColorImage = sg_make_image(new sg_image_desc
-            {
-                type = sg_image_type.SG_IMAGETYPE_2D,
-                width = CubeShadowArray.FaceSize,
-                height = CubeShadowArray.FaceSize,
-                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
-                sample_count = 1,
-                usage = { color_attachment = true },
-                label = "shadow-pass-dummy-color-cube"
-            });
-            _cubeDummyColorView = sg_make_view(new sg_view_desc
-            {
-                color_attachment = new sg_image_view_desc { image = _cubeDummyColorImage },
-                label = "shadow-pass-dummy-color-cube-view"
-            });
+            MakeDummies(ShadowAtlas.DefaultSliceSize, CubeShadowArray.DefaultFaceSize);
 
             // 1×1 sampleable placeholder for the skinned caster's joints-texture slot (never sampled
             // on the uniform path; the texture path binds the real per-character RGBA32F texture).
@@ -164,6 +134,79 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             });
 
             _initialized = true;
+        }
+
+        // The colour attachments a depth-only shadow pass needs, as large as the slices it draws into (G8.5: the quality
+        // level's shadow resolution) — made again when the size changes, the old ones freed.
+        private int _dummyAtlasSize, _dummyCubeSize;
+
+        /// <summary>The shadow passes draw into slices of these sizes from now on (the atlas's and the cube array's).</summary>
+        public void Resize(int atlasSize, int cubeSize)
+        {
+            if (!_initialized || (atlasSize == _dummyAtlasSize && cubeSize == _dummyCubeSize)) return;
+            FreeDummies();
+            MakeDummies(atlasSize, cubeSize);
+        }
+
+        private void MakeDummies(int atlasSize, int cubeSize)
+        {
+            _dummyAtlasSize = atlasSize;
+            _dummyCubeSize = cubeSize;
+            _atlasDummyColorImage = sg_make_image(new sg_image_desc
+            {
+                type = sg_image_type.SG_IMAGETYPE_2D,
+                width = atlasSize,
+                height = atlasSize,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                sample_count = 1,
+                usage = { color_attachment = true },
+                label = "shadow-pass-dummy-color-atlas"
+            });
+            _atlasDummyColorView = sg_make_view(new sg_view_desc
+            {
+                color_attachment = new sg_image_view_desc { image = _atlasDummyColorImage },
+                label = "shadow-pass-dummy-color-atlas-view"
+            });
+
+            _cubeDummyColorImage = sg_make_image(new sg_image_desc
+            {
+                type = sg_image_type.SG_IMAGETYPE_2D,
+                width = cubeSize,
+                height = cubeSize,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8,
+                sample_count = 1,
+                usage = { color_attachment = true },
+                label = "shadow-pass-dummy-color-cube"
+            });
+            _cubeDummyColorView = sg_make_view(new sg_view_desc
+            {
+                color_attachment = new sg_image_view_desc { image = _cubeDummyColorImage },
+                label = "shadow-pass-dummy-color-cube-view"
+            });
+        }
+
+        private void FreeDummies()
+        {
+            if (_atlasDummyColorView.id != 0)
+            {
+                sg_destroy_view(_atlasDummyColorView);
+                _atlasDummyColorView = default;
+            }
+            if (_atlasDummyColorImage.id != 0)
+            {
+                sg_destroy_image(_atlasDummyColorImage);
+                _atlasDummyColorImage = default;
+            }
+            if (_cubeDummyColorView.id != 0)
+            {
+                sg_destroy_view(_cubeDummyColorView);
+                _cubeDummyColorView = default;
+            }
+            if (_cubeDummyColorImage.id != 0)
+            {
+                sg_destroy_image(_cubeDummyColorImage);
+                _cubeDummyColorImage = default;
+            }
         }
 
         public void Shutdown()
@@ -194,26 +237,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 _shader = default;
             }
 
-            if (_atlasDummyColorView.id != 0)
-            {
-                sg_destroy_view(_atlasDummyColorView);
-                _atlasDummyColorView = default;
-            }
-            if (_atlasDummyColorImage.id != 0)
-            {
-                sg_destroy_image(_atlasDummyColorImage);
-                _atlasDummyColorImage = default;
-            }
-            if (_cubeDummyColorView.id != 0)
-            {
-                sg_destroy_view(_cubeDummyColorView);
-                _cubeDummyColorView = default;
-            }
-            if (_cubeDummyColorImage.id != 0)
-            {
-                sg_destroy_image(_cubeDummyColorImage);
-                _cubeDummyColorImage = default;
-            }
+            FreeDummies();
             if (_jointPlaceholderView.id != 0)
             {
                 sg_destroy_view(_jointPlaceholderView);

@@ -12,7 +12,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         public const int DirectionalCascades = 4;
         public const int SpotSlices = 8;
         public const int TotalSlices = DirectionalCascades + SpotSlices;
-        public const int SliceSize = 2048;
+        public const int DefaultSliceSize = 2048;
+        /// <summary>The size of a slice now (G8.5: the quality level's shadow resolution; <see cref="Resize"/>).</summary>
+        public int SliceSize { get; private set; } = DefaultSliceSize;
 
         private readonly sg_view[] _depthSliceViews = new sg_view[TotalSlices];
 
@@ -65,6 +67,17 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             if ((uint)slice >= (uint)TotalSlices)
                 throw new ArgumentOutOfRangeException(nameof(slice));
             return _depthSliceViews[slice];
+        }
+
+        /// <summary>Slices of <paramref name="size"/> from now on: the texture made again (its contents gone — the shadow
+        /// passes draw it every frame), the old one freed.</summary>
+        public void Resize(int size)
+        {
+            if (size == SliceSize) return;
+            bool was = IsValid;
+            Shutdown();
+            SliceSize = size;
+            if (was) Init();
         }
 
         public void Shutdown()

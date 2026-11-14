@@ -12,7 +12,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         public const int MaxPointShadowLights = 4;
         public const int FacesPerLight = 6;
         public const int TotalSlices = MaxPointShadowLights * FacesPerLight;
-        public const int FaceSize = 512;
+        public const int DefaultFaceSize = 512;
+        /// <summary>The size of a slice now (G8.5: the quality level's shadow resolution; <see cref="Resize"/>).</summary>
+        public int FaceSize { get; private set; } = DefaultFaceSize;
 
         private readonly sg_view[] _depthFaceViews = new sg_view[TotalSlices];
 
@@ -69,6 +71,17 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
             int slice = pointLightIndex * FacesPerLight + faceIndex;
             return _depthFaceViews[slice];
+        }
+
+        /// <summary>Slices of <paramref name="size"/> from now on: the texture made again (its contents gone — the shadow
+        /// passes draw it every frame), the old one freed.</summary>
+        public void Resize(int size)
+        {
+            if (size == FaceSize) return;
+            bool was = IsValid;
+            Shutdown();
+            FaceSize = size;
+            if (was) Init();
         }
 
         public void Shutdown()

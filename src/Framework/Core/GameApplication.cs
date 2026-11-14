@@ -207,8 +207,9 @@ namespace GameEditor.Framework.Core
             EnvironmentSettings.LoadInto(s, c);
             RenderingServer.ApplyEnvironment(s);
             RenderingServer.ShadowAmbientWeight = c.EnvironmentShadowAmbient;
-            RenderingServer.EnableCsm4          = c.EnvironmentCsm4;
-            RenderingServer.Path                = RenderingServer.PathOf(c.RenderingPath);
+            // G8.5: the target's default quality level — its path, light limit, shadows, HDR and render scale.
+            Scripting.Quality.Load(c, Scripting.Quality.DefaultOf(c, Scripting.Quality.ThisTarget));
+            Logger.Info($"[Quality] {Scripting.Quality.ThisTarget}: level {Scripting.Quality.Current.Name}");
             RenderingServer.Tonemapping         = RenderingServer.TonemapOf(c.EnvironmentTonemapping);
             RenderingServer.ExposureEV          = c.EnvironmentExposure;
         }
@@ -299,11 +300,15 @@ namespace GameEditor.Framework.Core
             //     full-screen copy): the common case, and the best one for a low-end phone;
             //   • see-through materials → the scene goes to an offscreen target, the refraction pass runs
             //     there, and the result is copied to the swapchain.
+            //   • a render scale under 1 (the quality level, G8.5) → the offscreen target at that share of the pixels,
+            //     stretched to the swapchain; the game's UI is drawn at full size over it.
+            bool scaled = RenderingServer.RenderScale < 1f;
+            int sw = RenderingServer.Scaled(width), sh = RenderingServer.Scaled(height);
             if (RenderingServer.HdrActive && width > 0 && height > 0)
             {
                 // G8.3: a tone curve or an exposure — the scene into an HDR target, tonemapped into the scene target
                 // (its depth kept for the sprites drawn after), copied to the swapchain under the game's UI.
-                _sceneTarget.Resize(width, height);
+                _sceneTarget.Resize(sw, sh);
                 var flags = RenderingServer.BeginScene(_sceneTarget, clear.colors[0].clear_value);
                 RenderingServer.RenderSkybox(viewProj, offscreen: true, hdr: true);
                 RenderingServer.SubmitView(viewProj, flags, allowShadowPassRendering: false, csm: csm);
@@ -315,11 +320,11 @@ namespace GameEditor.Framework.Core
                 Render();
                 Sokol.SG.sg_end_pass();
             }
-            else if (RenderingServer.SceneNeedsTransmission)
+            else if (scaled || RenderingServer.SceneNeedsTransmission)
             {
                 if (width > 0 && height > 0)
                 {
-                    _sceneTarget.Resize(width, height);
+                    _sceneTarget.Resize(sw, sh);
 
                     Sokol.SG.sg_begin_pass(_sceneTarget.MakePass(clear.colors[0].clear_value));
                     RenderingServer.RenderSkybox(viewProj, offscreen: true);
@@ -390,7 +395,7 @@ namespace GameEditor.Framework.Core
         private static string? _shotFolder;
 
         // An Android build is NativeAOT for linux-bionic, where OperatingSystem.IsAndroid() is false: sokol's native activity says it.
-        private static unsafe bool IsAndroid => sapp_android_get_native_activity() != null;
+        internal static unsafe bool IsAndroid => sapp_android_get_native_activity() != null;
 
         private static unsafe string ShotFolder()
         {

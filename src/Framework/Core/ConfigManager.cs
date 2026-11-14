@@ -159,13 +159,12 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"environmentRotation\": {config.EnvironmentRotation.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"environmentShowSkybox\": {(config.EnvironmentShowSkybox ? "true" : "false")},\n");
             sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
-            sb.Append($"  \"environmentCsm4\": {(config.EnvironmentCsm4 ? "true" : "false")},\n");
             sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
             sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
             sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"environmentTonemapping\": \"{Esc(config.EnvironmentTonemapping)}\",\n");
             sb.Append($"  \"environmentExposure\": {config.EnvironmentExposure.ToString(CultureInfo.InvariantCulture)},\n");
-            sb.Append($"  \"renderingPath\": \"{Esc(config.RenderingPath)}\"\n");
+            WriteQuality(sb, config);
             sb.Append('}');
             return Assets.AssetRefs.Stamp(sb.ToString());
         }
@@ -194,7 +193,7 @@ namespace GameEditor.Framework.Core
         {
             if (root.TryGetProperty("environmentTonemapping", out var etm)) cfg.EnvironmentTonemapping = etm.GetString() ?? cfg.EnvironmentTonemapping;
             if (root.TryGetProperty("environmentExposure", out var eex) && eex.TryGetSingle(out var exv)) cfg.EnvironmentExposure = exv;
-            if (root.TryGetProperty("renderingPath", out var rp))          cfg.RenderingPath     = rp.GetString()  ?? cfg.RenderingPath;
+            if (root.TryGetProperty("quality", out var q) && q.ValueKind == JsonValueKind.Object) ReadQuality(q, cfg);
             if (root.TryGetProperty("environmentMode", out var em))        cfg.EnvironmentMode   = em.GetString()  ?? cfg.EnvironmentMode;
             if (root.TryGetProperty("environmentFolder", out var ef))      cfg.EnvironmentFolder = ef.GetString()  ?? cfg.EnvironmentFolder;
             if (root.TryGetProperty("environmentFaces", out var efa))      cfg.EnvironmentFaces  = efa.GetString() ?? cfg.EnvironmentFaces;
@@ -203,11 +202,63 @@ namespace GameEditor.Framework.Core
             if (root.TryGetProperty("environmentShowSkybox", out var es) && (es.ValueKind == JsonValueKind.True || es.ValueKind == JsonValueKind.False))
                 cfg.EnvironmentShowSkybox = es.GetBoolean();
             if (root.TryGetProperty("environmentShadowAmbient", out var esa) && esa.TryGetSingle(out var sav)) cfg.EnvironmentShadowAmbient = sav;
-            if (root.TryGetProperty("environmentCsm4", out var c4) && (c4.ValueKind == JsonValueKind.True || c4.ValueKind == JsonValueKind.False))
-                cfg.EnvironmentCsm4 = c4.GetBoolean();
             if (root.TryGetProperty("environmentAmbientSource", out var eas)) cfg.EnvironmentAmbientSource = eas.GetString() ?? cfg.EnvironmentAmbientSource;
             if (root.TryGetProperty("environmentAmbientColor", out var eac))  cfg.EnvironmentAmbientColor  = eac.GetString() ?? cfg.EnvironmentAmbientColor;
             if (root.TryGetProperty("environmentAmbientEnergy", out var eae) && eae.TryGetSingle(out var aev)) cfg.EnvironmentAmbientEnergy = aev;
+        }
+
+        // ── G8.5: "quality" ─────────────────────────────────────────────────────────────
+        private static readonly (QualityTarget Target, string Key)[] QualityTargets =
+            { (QualityTarget.Desktop, "desktop"), (QualityTarget.Android, "android"), (QualityTarget.Ios, "ios"), (QualityTarget.Web, "web") };
+
+        private static void WriteQuality(StringBuilder sb, ProjectConfig c)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            sb.Append("  \"quality\": {\n    \"levels\": [\n");
+            for (int i = 0; i < c.QualityLevels.Count; i++)
+            {
+                var l = c.QualityLevels[i];
+                sb.Append($"      {{ \"name\": \"{Esc(l.Name)}\", \"renderingPath\": \"{Esc(l.RenderingPath)}\", \"maxLights\": {l.MaxLights}, ");
+                sb.Append($"\"cascades\": {l.Cascades}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
+                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)} }}");
+                sb.Append(i + 1 < c.QualityLevels.Count ? ",\n" : "\n");
+            }
+            sb.Append("    ],\n    \"defaults\": { ");
+            for (int i = 0; i < QualityTargets.Length; i++)
+            {
+                var (t, key) = QualityTargets[i];
+                string name = c.QualityDefaults.TryGetValue(t, out var n) ? n : QualityLevel.DefaultFor(t);
+                sb.Append($"\"{key}\": \"{Esc(name)}\"").Append(i + 1 < QualityTargets.Length ? ", " : " },\n");
+            }
+            sb.Append($"    \"editor\": \"{Esc(c.QualityEditor)}\"\n  }}\n");
+        }
+
+        private static void ReadQuality(JsonElement q, ProjectConfig cfg)
+        {
+            if (q.TryGetProperty("levels", out var levels) && levels.ValueKind == JsonValueKind.Array)
+            {
+                var list = new System.Collections.Generic.List<QualityLevel>();
+                foreach (var e in levels.EnumerateArray())
+                {
+                    if (e.ValueKind != JsonValueKind.Object) continue;
+                    var l = new QualityLevel();
+                    if (e.TryGetProperty("name", out var v) && v.ValueKind == JsonValueKind.String) l.Name = v.GetString()!;
+                    if (e.TryGetProperty("renderingPath", out v) && v.ValueKind == JsonValueKind.String) l.RenderingPath = v.GetString()!;
+                    if (e.TryGetProperty("maxLights", out v) && v.TryGetInt32(out int iv)) l.MaxLights = iv;
+                    if (e.TryGetProperty("cascades", out v) && v.TryGetInt32(out iv)) l.Cascades = iv >= 4 ? 4 : 1;
+                    if (e.TryGetProperty("shadowResolution", out v) && v.TryGetInt32(out iv)) l.ShadowResolution = iv;
+                    if (e.TryGetProperty("punctualShadows", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.PunctualShadows = v.GetBoolean();
+                    if (e.TryGetProperty("softShadows", out v) && v.TryGetInt32(out iv)) l.SoftShadows = iv;
+                    if (e.TryGetProperty("hdr", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.Hdr = v.GetBoolean();
+                    if (e.TryGetProperty("renderScale", out v) && v.TryGetSingle(out float fv)) l.RenderScale = fv;
+                    list.Add(l);
+                }
+                if (list.Count > 0) cfg.QualityLevels = list;
+            }
+            if (q.TryGetProperty("defaults", out var d) && d.ValueKind == JsonValueKind.Object)
+                foreach (var (t, key) in QualityTargets)
+                    if (d.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String) cfg.QualityDefaults[t] = v.GetString()!;
+            if (q.TryGetProperty("editor", out var ed) && ed.ValueKind == JsonValueKind.String) cfg.QualityEditor = ed.GetString()!;
         }
 
         private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
