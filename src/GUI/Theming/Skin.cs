@@ -60,6 +60,7 @@ public class Skin : Theme
     public override float   FontSizeBase    => Get(nameof(FontSizeBase),    _base.FontSizeBase);
     public override float   ButtonFontSize  => Get(nameof(ButtonFontSize),  _base.ButtonFontSize);
     public override float   LabelFontSize   => Get(nameof(LabelFontSize),   _base.LabelFontSize);
+    public override float   MenuFontSize    => Get(nameof(MenuFontSize),    _base.MenuFontSize);
     public override float   Padding         => Get(nameof(Padding),         _base.Padding);
     public override float   ItemSpacing     => Get(nameof(ItemSpacing),     _base.ItemSpacing);
 }

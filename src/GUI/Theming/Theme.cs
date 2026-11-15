@@ -22,6 +22,8 @@ public class Theme
     public virtual float LabelFontSize   => 14f;
     public virtual float TitleFontSize   => 20f;
     public virtual float SmallFontSize   => 12f;
+    /// <summary>The menu bar's headers and rows and a context menu's rows (a widget's own FontSize wins). Default: <see cref="SmallFontSize"/>.</summary>
+    public virtual float MenuFontSize    => SmallFontSize;
 
     // -------------------------------------------------------------------------
     // Background / surface colors

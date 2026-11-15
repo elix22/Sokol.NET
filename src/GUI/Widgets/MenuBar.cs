@@ -491,7 +491,7 @@ public class MenuBar : Widget
     private void ApplyFont(Renderer renderer, Theme theme)
     {
         renderer.SetFont(Font?.Name ?? theme.DefaultFont);
-        renderer.SetFontSize(FontSize > 0f ? FontSize : theme.SmallFontSize);
+        renderer.SetFontSize(FontSize > 0f ? FontSize : theme.MenuFontSize);
     }
 
     /// <summary>Returns the index of the drop-down item at <paramref name="localPos"/>, or -1.</summary>

@@ -85,6 +85,13 @@ public sealed class Screen : Widget
     public float LogicalWidth  { get; private set; }
     public float LogicalHeight { get; private set; }
 
+    /// <summary>
+    /// Framebuffer pixels per logical unit for pointer events, when the app draws its UI at a scale of its own (an
+    /// editor's Interface Scale: the DPI scale times the user's choice) — the value it passes to <see cref="Update"/>
+    /// and <see cref="Draw"/>. 0 (the default): the display's DPI scale, as before.
+    /// </summary>
+    public float PointerScale { get; set; }
+
     // ─── Safe area ───────────────────────────────────────────────────────────
     /// <summary>
     /// The display's safe-area insets in LOGICAL px — the band a notch, Dynamic Island, punch-hole

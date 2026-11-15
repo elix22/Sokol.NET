@@ -59,6 +59,7 @@ public sealed class InputRouter
 #else
         float dpi  = sapp_dpi_scale();
 #endif
+        if (_screen.PointerScale > 0f) dpi = _screen.PointerScale;   // the app's own UI scale (Screen.PointerScale)
 
         switch (ev->type)
         {
