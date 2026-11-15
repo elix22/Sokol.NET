@@ -161,6 +161,7 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"fixedTimestep\": {config.FixedTimestep.ToString(CultureInfo.InvariantCulture)},\n");
             if (config.DevelopmentBuild) sb.Append("  \"developmentBuild\": true,\n");
+            if (!config.HighDpi) sb.Append("  \"highDpi\": false,\n");
             if (config.Services.Count > 0)
             {
                 sb.Append("  \"services\": [");
@@ -253,6 +254,7 @@ namespace GameEditor.Framework.Core
             if (root.TryGetProperty("environmentShadowAmbient", out var esa) && esa.TryGetSingle(out var sav)) cfg.EnvironmentShadowAmbient = sav;
             if (root.TryGetProperty("fixedTimestep", out var fts) && fts.TryGetSingle(out var ftv) && ftv > 0f) cfg.FixedTimestep = ftv;
             if (root.TryGetProperty("developmentBuild", out var dvb) && dvb.ValueKind == JsonValueKind.True) cfg.DevelopmentBuild = true;
+            if (root.TryGetProperty("highDpi", out var hdp) && hdp.ValueKind == JsonValueKind.False) cfg.HighDpi = false;
             if (root.TryGetProperty("services", out var svc) && svc.ValueKind == JsonValueKind.Array)
                 foreach (var e in svc.EnumerateArray()) if (e.GetString() is { Length: > 0 } id && !cfg.Services.Contains(id)) cfg.Services.Add(id);
             if (root.TryGetProperty("serviceSettings", out var sst) && sst.ValueKind == JsonValueKind.Object)

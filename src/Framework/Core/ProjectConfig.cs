@@ -27,6 +27,9 @@ namespace GameEditor.Framework.Core
         public float  EnvironmentShadowAmbient { get; set; } = 0.4f;           // 0=physical, 1=shadows fully darken IBL ambient
         public float  FixedTimestep { get; set; } = 0.02f;                     // G10: Time.FixedDeltaTime (Project Settings ▸ Time)
         public bool   DevelopmentBuild { get; set; }                           // G11.1: a built game opens the player link (Build & Deploy)
+        /// <summary>Project Settings ▸ High DPI: the game drawn at the screen's full resolution (a Retina Mac, a phone, a web page on
+        /// a high-density screen); off: at its points, cheaper and softer. Written into the app file's sokol_main by the editor.</summary>
+        public bool   HighDpi { get; set; } = true;
         public List<string> Services { get; set; } = new();                    // G9: the game services added (speech, share, ...)
         public Dictionary<string, string> ServiceSettings { get; set; } = new(); // G9: their settings (AdMob ids, product ids, ...)
         public string EnvironmentAmbientSource { get; set; } = "sky";         // "sky" | "color" | "disabled"
