@@ -24,6 +24,7 @@ namespace GameEditor.Framework.Core
         public float  EnvironmentRotation  { get; set; } = 0f;                 // degrees about Y
         public bool   EnvironmentShowSkybox{ get; set; } = true;
         public float  EnvironmentShadowAmbient { get; set; } = 0.4f;           // 0=physical, 1=shadows fully darken IBL ambient
+        public float  FixedTimestep { get; set; } = 0.02f;                     // G10: Time.FixedDeltaTime (Project Settings ▸ Time)
         public string EnvironmentAmbientSource { get; set; } = "sky";         // "sky" | "color" | "disabled"
         public string EnvironmentAmbientColor  { get; set; } = "0.1 0.1 0.1"; // "r g b", used by "color"
         public float  EnvironmentAmbientEnergy { get; set; } = 1f;

@@ -207,6 +207,7 @@ namespace GameEditor.Framework.Core
             EnvironmentSettings.LoadInto(s, c);
             RenderingServer.ApplyEnvironment(s);
             RenderingServer.ShadowAmbientWeight = c.EnvironmentShadowAmbient;
+            Time.FixedDeltaTime = c.FixedTimestep;   // G10
             // G8.5: the target's default quality level — its path, light limit, shadows, HDR and render scale.
             Scripting.Quality.Load(c, Scripting.Quality.DefaultOf(c, Scripting.Quality.ThisTarget));
             Logger.Info($"[Quality] {Scripting.Quality.ThisTarget}: level {Scripting.Quality.Current.Name}");

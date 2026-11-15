@@ -217,6 +217,15 @@ namespace GameEditor.Framework.Scripting
         /// <summary>The real time of the frame being run, whatever <see cref="Scene.SceneManager.TimeScale"/> is.</summary>
         public static float UnscaledDeltaTime { get; private set; }
 
+        /// <summary>One fixed tick (G10): every running behaviour's OnFixedUpdate, in the order they run.</summary>
+        public static void FixedUpdateAll()
+        {
+            if (!_started) return;
+            int count = _running.Count;
+            for (int i = 0; i < count; i++)
+                SafeCall(_running[i].Behaviour, static beh => beh.OnFixedUpdate(), "OnFixedUpdate");
+        }
+
         public static void UpdateAll(float deltaTime)
         {
             if (!_started) return;

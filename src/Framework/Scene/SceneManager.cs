@@ -571,6 +571,8 @@ namespace GameEditor.Framework.Scene
 
                 // Start all registered behaviours
                 ScriptSystem.StartAll();
+                _fixedAccumulator = 0.0;   // the fixed tick from zero (G10)
+                Time.FixedTime = 0.0;
                 Logger.Info($"[SceneManager] Play started. {ScriptSystem.Count} script(s) running.");
             }
             else if (PlayMode == PlayModeState.Paused)
@@ -1055,8 +1057,30 @@ namespace GameEditor.Framework.Scene
             return found;
         }
 
+        // The fixed tick (G10): the game's time not yet given to OnFixedUpdate.
+        private static double _fixedAccumulator;
+
+        /// <summary>The fixed ticks the game's time has passed this frame (at most Time.MaximumFixedSteps; none while it
+        /// stands): ScriptSystem.FixedUpdateAll for each.</summary>
+        private static void FixedTick(float deltaTime)
+        {
+            if (PlayMode != PlayModeState.Playing) return;
+            _fixedAccumulator += Math.Max(0.0, (double)deltaTime * TimeScale);
+            float step = Time.FixedDeltaTime;
+            int n = 0;
+            while (_fixedAccumulator >= step && n < Time.MaximumFixedSteps)
+            {
+                ScriptSystem.FixedUpdateAll();
+                Time.FixedTime += step;
+                _fixedAccumulator -= step;
+                n++;
+            }
+            if (n == Time.MaximumFixedSteps && _fixedAccumulator >= step) _fixedAccumulator = 0.0;   // too far behind: let it go
+        }
+
         public static void UpdatePhysics(float deltaTime)
         {
+            FixedTick(deltaTime);   // the fixed ticks first, as the reference editor orders them
             StepWorlds(deltaTime);
             // The particles: after everything moved this frame, with the game's time - in a 2D game too, and held while it stands.
             if (PlayMode == PlayModeState.Playing) WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));

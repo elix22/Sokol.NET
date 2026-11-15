@@ -211,6 +211,11 @@ namespace GameEditor.Framework.Scripting
         /// <param name="deltaTime">Seconds elapsed since the previous frame.</param>
         public virtual void OnUpdate(float deltaTime) { }
 
+        /// <summary>Once each fixed tick (<see cref="Core.Time.FixedDeltaTime"/>, G10), before the frame's physics and
+        /// <see cref="OnUpdate"/>: several in a long frame, none while the game's time stands - a deterministic
+        /// simulation's step (the reference editor's FixedUpdate).</summary>
+        public virtual void OnFixedUpdate() { }
+
         /// <summary>Called when play mode stops or the entity is destroyed.</summary>
         public virtual void OnDestroy() { }
 
