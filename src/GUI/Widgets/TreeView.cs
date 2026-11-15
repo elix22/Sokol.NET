@@ -895,12 +895,19 @@ public class TreeView : Widget
     /// <summary>Wire format for in-tree reparent drags.</summary>
     public const string ReparentFormat = "sokol.treeview/reparent";
 
-    private TreeNode? NodeAtLocalY(float localY)
+    /// <summary>The node of the row at local Y; null below the last row.</summary>
+    protected TreeNode? NodeAtLocalY(float localY)
     {
         int idx = (int)((localY + _scrollY) / ItemHeight);
         if (idx < 0 || idx >= _flatRows.Count) return null;
         return _flatRows[idx].node;
     }
+
+    /// <summary>
+    /// Highlights <paramref name="node"/>'s row as the "drop into" target (null: none) — for a subclass that takes
+    /// drops of its own (a file dragged onto a row), with the look of a reparent drop.
+    /// </summary>
+    protected void ShowDropInto(TreeNode? node) => _dropInd = (-1f, 0, DropZone.Into, node);
 
     /// <summary>
     /// Resolves the drop zone from a local Y position.
