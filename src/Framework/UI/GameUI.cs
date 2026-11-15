@@ -919,7 +919,20 @@ namespace GameEditor.Framework.UI
         // An element that is a place only: something for its children to lie in.
         private sealed class PlaceWidget : Widget { }
 
-        // The race's map: the track's centre line fitted into the rectangle (north, +Z, up), a dot for each racer.
+        /// <summary>
+        /// Where world point (x, z) lies on a top view of the box minX..maxX × minZ..maxZ fitted (kept square, centred,
+        /// <paramref name="pad"/> inside) into a width × height rectangle: +X to the right and <b>+Z down</b> — what a camera
+        /// straight above sees in this right-handed, Y-up world (the editor's Top view). The race's mini map.
+        /// </summary>
+        public static System.Numerics.Vector2 TopViewPoint(float x, float z, float minX, float maxX, float minZ, float maxZ, float width, float height, float pad)
+        {
+            float w = MathF.Max(1f, maxX - minX), h = MathF.Max(1f, maxZ - minZ);
+            float scale = MathF.Min((width - 2 * pad) / w, (height - 2 * pad) / h);
+            float ox = (width - w * scale) * 0.5f, oy = (height - h * scale) * 0.5f;
+            return new System.Numerics.Vector2(ox + (x - minX) * scale, oy + (z - minZ) * scale);
+        }
+
+        // The race's map: the track's centre line fitted into the rectangle as seen from above (+Z down), a dot for each racer.
         private sealed class MiniMapWidget : Widget
         {
             public UIColor Road, Kart, Player;
@@ -928,7 +941,8 @@ namespace GameEditor.Framework.UI
             private int _version = -1;
             private readonly List<System.Numerics.Vector2> _line = new();
             private readonly List<(System.Numerics.Vector2 at, bool player)> _dots = new();
-            private float _minX, _maxZ, _scale = 1f, _ox, _oy, _w, _h;
+            private float _minX, _maxX, _minZ, _maxZ, _w, _h;
+            private const float Pad = 6f;
 
             public void Refresh(ECSWorld world)
             {
@@ -951,11 +965,7 @@ namespace GameEditor.Framework.UI
                         _line.Add(new System.Numerics.Vector2(p.X, p.Z));
                         minX = MathF.Min(minX, p.X); maxX = MathF.Max(maxX, p.X); minZ = MathF.Min(minZ, p.Z); maxZ = MathF.Max(maxZ, p.Z);
                     }
-                    float pad = 6f;
-                    float w = MathF.Max(1f, maxX - minX), h = MathF.Max(1f, maxZ - minZ);
-                    _scale = MathF.Min((Bounds.Width - 2 * pad) / w, (Bounds.Height - 2 * pad) / h);
-                    _minX = minX; _maxZ = maxZ;
-                    _ox = (Bounds.Width - w * _scale) * 0.5f; _oy = (Bounds.Height - h * _scale) * 0.5f;
+                    _minX = minX; _maxX = maxX; _minZ = minZ; _maxZ = maxZ;
                 }
                 _dots.Clear();
                 foreach (var r in Scene.Race.Racers)
@@ -967,7 +977,12 @@ namespace GameEditor.Framework.UI
                     }
             }
 
-            private GVec2 Map(System.Numerics.Vector2 p) => new(_ox + (p.X - _minX) * _scale, _oy + (_maxZ - p.Y) * _scale);
+            // Was +Z up (north up): a mirror of the world - the dots went round the other way to the karts (owner 2026-11-15).
+            private GVec2 Map(System.Numerics.Vector2 p)
+            {
+                var q = TopViewPoint(p.X, p.Y, _minX, _maxX, _minZ, _maxZ, Bounds.Width, Bounds.Height, Pad);
+                return new GVec2(q.X, q.Y);
+            }
 
             /// <summary>Where each racer's dot is drawn in the element (for a check).</summary>
             public int Dots => _dots.Count;

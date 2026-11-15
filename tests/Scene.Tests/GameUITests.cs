@@ -724,5 +724,47 @@ namespace Scene.Tests
             GameUI.Describe((e, kind, text, x, y, w, h, seen) => kinds[World.GetComponent<NameTag>(e).Name] = kind);
             return kinds;
         }
+
+        /// <summary>
+        /// The mini map is the world seen from above: each point lies on the map where a camera straight above (screen
+        /// right = +X) shows it - not mirrored (it drew +Z up, and the dots went round the track the other way to the karts).
+        /// </summary>
+        [Fact]
+        public void MiniMap_IsTheTopView_NotItsMirror()
+        {
+            var view = Matrix4x4.CreateLookAt(new Vector3(0, 50, 0), Vector3.Zero, -Vector3.UnitZ)
+                     * Matrix4x4.CreateOrthographic(40, 40, 0.1f, 100f);
+            Vector2 Camera(float x, float z)
+            {
+                var c = Vector4.Transform(new Vector4(x, 0, z, 1), view);
+                return new Vector2(c.X / c.W, -c.Y / c.W);   // screen: y down
+            }
+            Vector2 Map(float x, float z) => GameUI.TopViewPoint(x, z, -10, 10, -10, 10, 200, 200, 6);
+            Assert.True(Camera(1, 0).X > Camera(0, 0).X, "the camera above: +X to the right");
+            (float x, float z)[] points = [(-8, -3), (5, 9), (9, -9), (0, 0), (-2, 7)];
+            foreach (var a in points)
+                foreach (var b in points)
+                {
+                    if (a == b) continue;
+                    Vector2 c = Camera(b.x, b.z) - Camera(a.x, a.z), m = Map(b.x, b.z) - Map(a.x, a.z);
+                    Assert.True(MathF.Sign(c.X) == MathF.Sign(m.X) && MathF.Sign(c.Y) == MathF.Sign(m.Y), $"{a} -> {b}: camera {c}, map {m}");
+                }
+            // A kart going round the track one way goes round the map the same way (the signed area keeps its sign).
+            static float Area(Func<float, float, Vector2> f, (float x, float z)[] loop)
+            {
+                float sum = 0;
+                for (int i = 0; i < loop.Length; i++)
+                {
+                    Vector2 p = f(loop[i].x, loop[i].z), q = f(loop[(i + 1) % loop.Length].x, loop[(i + 1) % loop.Length].z);
+                    sum += p.X * q.Y - q.X * p.Y;
+                }
+                return sum;
+            }
+            (float x, float z)[] lap = [(8, 0), (0, 8), (-8, 0), (0, -8)];
+            Assert.Equal(MathF.Sign(Area(Camera, lap)), MathF.Sign(Area(Map, lap)));
+            // Fitted: the box's corners inside the rectangle, centred, the pad kept.
+            Assert.Equal(new Vector2(6, 6), Map(-10, -10));
+            Assert.Equal(new Vector2(194, 194), Map(10, 10));
+        }
     }
 }
