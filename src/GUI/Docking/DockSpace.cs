@@ -424,6 +424,13 @@ public sealed class DockSpace : Widget
             return true;
         }
 
+        // A right click on a tab: its menu (the app's: Open in New Window ...).
+        if (e.Button == MouseButton.Right)
+        {
+            var (rl, ri, _) = HitTabInternal(local, nearestFallback: false);
+            if (rl != null && ri >= 0) { Manager?.RaiseTabMenu(rl.Panels[ri], e.Position); return true; }
+        }
+
         // Tab hit? Use nearest-fallback so clicking in a small gap still works,
         // but not past the last tab's right edge.
         var (leaf, tabIdx, tabRect) = HitTabInternal(local, nearestFallback: true);

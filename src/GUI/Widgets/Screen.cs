@@ -175,6 +175,41 @@ public sealed class Screen : Widget
     /// so clicks on overlay regions outside the widget's Bounds still reach it.
     /// </summary>
     private static Widget? _activePopup;
+    private static Widget? _activePopupRoot;   // the root of the window it is drawn in (null: the main window)
+
+    /// <summary>
+    /// A widget drawn as the root of another OS window (an editor's panel in a window of its own): the same renderer,
+    /// the window's size and scale, inside a pass the caller began on that window's swapchain. Its popups (a menu
+    /// opened in it) are drawn in it, over it.
+    /// </summary>
+    public void DrawRoot(Widget root, float width, float height, float dpiScale)
+    {
+        if (Renderer == null || Renderer.VGContext == IntPtr.Zero) return;
+        Renderer.BeginFrame(width, height, dpiScale);
+        root.Bounds = new Rect(0, 0, width, height);
+        root.PerformLayout(Renderer, true);
+        root.Draw(Renderer);
+        if (_activePopup != null && ReferenceEquals(_activePopupRoot, root))
+        {
+            Renderer.Save();
+            var sp = _activePopup.ScreenPosition;
+            Renderer.Translate(sp.X, sp.Y);
+            _activePopup.DrawPopupOverlay(Renderer);
+            Renderer.Restore();
+        }
+        Renderer.EndFrame();
+    }
+
+    /// <summary>The widget under a point of a window's root: its popup first (one opened in that window), then its tree.</summary>
+    public Widget? HitTestIn(Widget root, Vector2 point)
+    {
+        if (ReferenceEquals(root, this)) return HitTestDeep(point);
+        if (_activePopup != null && ReferenceEquals(_activePopupRoot, root) && _activePopup.HitTest(_activePopup.ToLocal(point))) return _activePopup;
+        return root.HitTestDeep(point);
+    }
+
+    /// <summary>The root of the window the open popup is in (null: the main window, or none open).</summary>
+    public static Widget? ActivePopupRoot => _activePopup != null ? _activePopupRoot : null;
 
     private NotificationHost _notificationHost = new();
 
@@ -192,6 +227,8 @@ public sealed class Screen : Widget
     public static void SetActivePopup(Widget? popup)
     {
         _activePopup = popup;
+        // The window it opened in (another OS window's root while its events are dispatched; null: the main window).
+        _activePopupRoot = popup != null ? _instance?.Input?.HitRoot : null;
     }
 
     /// <summary>
@@ -404,7 +441,7 @@ public sealed class Screen : Widget
         //    frame finds them already in the atlas and never re-flushes it.
         if (drawActiveOverlay)
         {
-            if (_activePopup != null)
+            if (_activePopup != null && _activePopupRoot == null)
             {
                 Renderer.Save();
                 var sp = _activePopup.ScreenPosition;
@@ -424,7 +461,7 @@ public sealed class Screen : Widget
         }
         else
         {
-            if (_activePopup != null)
+            if (_activePopup != null && _activePopupRoot == null)
             {
                 Renderer.Save();
                 Renderer.SetGlobalAlpha(0f);
@@ -456,7 +493,7 @@ public sealed class Screen : Widget
     public void DrawActivePopupOverlay(float width, float height, float dpiScale)
     {
         if (Renderer == null || Renderer.VGContext == IntPtr.Zero) return;
-        if (_activePopup == null) return;
+        if (_activePopup == null || _activePopupRoot != null) return;
 
         Renderer.BeginFrame(width, height, dpiScale);
         var sp = _activePopup.ScreenPosition;
@@ -541,7 +578,7 @@ public sealed class Screen : Widget
     {
         // The open popup is drawn last, over everything — over a top overlay too: a drop-down opened inside a
         // dialog lies over the dialog's rows, and a click on one of its items is the drop-down's.
-        if (_activePopup != null)
+        if (_activePopup != null && _activePopupRoot == null)   // a popup of another window is not here
         {
             // Ask the popup to test the point using its own local coordinate space.
             var local = _activePopup.ToLocal(screenPoint);

@@ -51,6 +51,13 @@ public sealed class InputRouter
     /// <summary>The widget currently holding mouse capture, if any.</summary>
     public Widget? CapturedWidget => _captured;
 
+    /// <summary>The root the pointer's events hit while another OS window's events are dispatched (null: the main
+    /// window's Screen); with <see cref="PointerScaleOverride"/> its pixels per logical unit.</summary>
+    public Widget? HitRoot { get; set; }
+    public float PointerScaleOverride { get; set; }
+
+    private Widget? Hit(Vector2 p) => HitRoot != null ? _screen.HitTestIn(HitRoot, p) : _screen.HitTestDeep(p);
+
     public unsafe void Dispatch(sapp_event* ev)
     {
 
@@ -60,6 +67,7 @@ public sealed class InputRouter
         float dpi  = sapp_dpi_scale();
 #endif
         if (_screen.PointerScale > 0f) dpi = _screen.PointerScale;   // the app's own UI scale (Screen.PointerScale)
+        if (PointerScaleOverride > 0f) dpi = PointerScaleOverride;    // another OS window's own scale (§2)
 
         switch (ev->type)
         {
@@ -96,7 +104,7 @@ public sealed class InputRouter
                 _lastButton = btn; _lastClickX = pos.X; _lastClickY = pos.Y;
                 _lastClickTime = stm_sec(stm_now());
                 var me = new MouseEvent { Position = pos, Button = btn, Clicks = _clickCount, Modifiers = Mods(ev) };
-                var target = _screen.HitTestDeep(pos);
+                var target = Hit(pos);
                 // Dismiss any open popup (ComboBox dropdown, ColorPicker, etc.) if
                 // the click landed outside it.
                 Screen.DismissActivePopupIfNeeded(target);
@@ -133,7 +141,7 @@ public sealed class InputRouter
                 var me  = new MouseEvent { Position = pos, Scroll = new Vector2(ev->scroll_x, ev->scroll_y), Modifiers = Mods(ev) };
                 // Use HitTestDeep so active modal popups always capture scroll even
                 // when _hovered is stale (e.g. popup opened after last mouse-move).
-                var scrollTarget = _screen.HitTestDeep(pos) ?? _hovered;
+                var scrollTarget = Hit(pos) ?? _hovered;
                 while (scrollTarget != null)
                 {
                     if (scrollTarget.OnMouseScroll(Localize(scrollTarget, me))) break;
@@ -181,7 +189,7 @@ public sealed class InputRouter
 
     private void UpdateHovered(Vector2 pos, MouseEvent me)
     {
-        var newHover = _screen.HitTestDeep(pos);
+        var newHover = Hit(pos);
         if (newHover != _hovered)
         {
             _hovered?.OnMouseLeave(me);
@@ -400,7 +408,7 @@ public sealed class InputRouter
             case sapp_event_type.SAPP_EVENTTYPE_TOUCHES_BEGAN:
             {
                 var me = new MouseEvent { Position = pos, Button = MouseButton.Left, Clicks = 1 };
-                var target = _screen.HitTestDeep(pos);
+                var target = Hit(pos);
                 // Dismiss any open popup if touch landed outside it.
                 Screen.DismissActivePopupIfNeeded(target);
                 if (target != null)

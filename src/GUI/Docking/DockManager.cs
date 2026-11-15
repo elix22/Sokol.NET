@@ -80,6 +80,19 @@ public sealed class DockManager
         if (idx >= 0) panel.Owner.ActivePanelIndex = idx;
     }
 
+    /// <summary>A dock tab was right-clicked: its panel and the pointer (screen). The app shows its menu.</summary>
+    public event Action<DockPanel, Vector2>? TabMenuRequested;
+    internal void RaiseTabMenu(DockPanel panel, Vector2 at) => TabMenuRequested?.Invoke(panel, at);
+
+    /// <summary>Takes a panel out of the dock tree (or the floating overlay), keeping it registered: shown elsewhere
+    /// (another OS window), docked again with <see cref="Dock"/>.</summary>
+    public void Detach(DockPanel panel)
+    {
+        if (panel.IsFloating) FloatingHost.Remove(panel);
+        else if (panel.Owner != null) RootDockSpace.RemovePanel(panel);
+        LayoutChanged?.Invoke();
+    }
+
     /// <summary>Detach a panel from its docking tree leaf and put it into the floating overlay.</summary>
     public void Float(DockPanel panel, Rect floatingScreenBounds)
     {
