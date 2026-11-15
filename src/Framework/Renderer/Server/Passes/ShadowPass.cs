@@ -29,6 +29,9 @@ namespace GameEditor.Framework.Renderer.Server.Passes
 
         private sg_shader _shader;
         private sg_pipeline _pipeline;
+        // A point light's cube faces keep the front faces culled: shown right by point_shadow_check, and the far sides at a
+        // contact are not what its own bias was tuned for. (The directional cascades and spot lights cull back faces.)
+        private sg_pipeline _pointPipeline;
         private sg_pass_action _passAction;
         // Skinned caster: 80 B vertex (pos + joints + weights) + a bone UBO. Rendered into the
         // directional cascades with depth LOAD so the static casters' depth is preserved.
@@ -36,6 +39,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         // LOW_TIER (the GPU refused the full one, ShaderVariantCache.LowTier): no bone array, bones from the joint texture.
         private sg_shader _skinnedShader;
         private sg_pipeline _skinnedPipeline;
+        private sg_pipeline _skinnedPointPipeline;   // a point light's cube faces: front faces culled (see _pointPipeline)
         private bool _skinnedMade;
         private bool _skinnedLow;
         private sg_pass_action _passActionLoad;
@@ -63,7 +67,11 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 shader = _shader,
                 index_type = sg_index_type.SG_INDEXTYPE_UINT32,
-                cull_mode = sg_cull_mode.SG_CULLMODE_FRONT,
+                // Back faces culled: the casters' light-facing sides go into the map. Culling the front faces (as at first,
+                // against acne) stored their far sides - at a contact within the depth bias of the floor, so the floor beside
+                // an object's base read as lit: a white line between the object and its shadow. The normal-offset and depth
+                // biases keep lit surfaces clean (shadow_contact_check). The reference editor culls back faces too.
+                cull_mode = sg_cull_mode.SG_CULLMODE_BACK,
                 color_count = 1,
                 sample_count = 1,
                 depth = new sg_depth_state
@@ -92,6 +100,9 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             };
 
             _pipeline = sg_make_pipeline(desc);
+            desc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
+            desc.label = "shadow-caster-point-faces";
+            _pointPipeline = sg_make_pipeline(desc);
 
 
             _passAction = default;
@@ -219,6 +230,11 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 sg_destroy_pipeline(_skinnedPipeline);
                 _skinnedPipeline = default;
             }
+            if (_skinnedPointPipeline.id != 0)
+            {
+                sg_destroy_pipeline(_skinnedPointPipeline);
+                _skinnedPointPipeline = default;
+            }
             if (_skinnedShader.id != 0)
             {
                 sg_destroy_shader(_skinnedShader);
@@ -230,6 +246,11 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 sg_destroy_pipeline(_pipeline);
                 _pipeline = default;
+            }
+            if (_pointPipeline.id != 0)
+            {
+                sg_destroy_pipeline(_pointPipeline);
+                _pointPipeline = default;
             }
             if (_shader.id != 0)
             {
@@ -365,7 +386,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 shader       = _skinnedShader,
                 index_type   = sg_index_type.SG_INDEXTYPE_UINT32,
-                cull_mode    = sg_cull_mode.SG_CULLMODE_FRONT,
+                cull_mode    = sg_cull_mode.SG_CULLMODE_BACK,   // as the static casters (a character's feet on the floor)
                 color_count  = 1,
                 sample_count = 1,
                 depth = new sg_depth_state
@@ -392,6 +413,9 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sdesc.layout.attrs[SkinnedCaster.ATTR_shadow_caster_weights_0] = new sg_vertex_attr_state
             { buffer_index = 0, offset = 64, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
             _skinnedPipeline = sg_make_pipeline(sdesc);
+            sdesc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
+            sdesc.label = "shadow-caster-skinned-point-faces";
+            _skinnedPointPipeline = sg_make_pipeline(sdesc);
         }
 
         /// <summary>Renders skinned casters into one cube-map face of a point light (depth LOAD, on top of statics).</summary>
@@ -430,7 +454,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     // (uploaded by UpdateSkinnedAnimators before this pass). Else the uniform path.
                     // The caster's shader is made by the first skinned mesh that casts, not before.
                     if (!_skinnedMade) MakeSkinned();
-                    if (!applied) { sg_apply_pipeline(_skinnedPipeline); applied = true; }
+                    if (!applied) { sg_apply_pipeline(_skinnedPointPipeline); applied = true; }
                     bool useTex = entry.UsesTextureSkinning && entry.JointTextureView.id != 0;
                     if (_skinnedLow && !useTex) continue;   // LOW_TIER: no bone array — the joint texture comes next frame
                     var vsParams = new SkinnedCaster.shadow_caster_vs_params_t
@@ -500,7 +524,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         {
             if (!_initialized || !cubeArray.IsValid) return;
 
-            RenderSlice(world, meshRegistry, _cubeDummyColorView, cubeArray.GetDepthFaceView(pointLightIndex, faceIndex), in lightViewProj, out _);
+            RenderSlice(world, meshRegistry, _cubeDummyColorView, cubeArray.GetDepthFaceView(pointLightIndex, faceIndex), in lightViewProj, out _, point: true);
         }
 
         public int RenderPointFaceCounted(
@@ -513,7 +537,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         {
             if (!_initialized || !cubeArray.IsValid) return 0;
 
-            RenderSlice(world, meshRegistry, _cubeDummyColorView, cubeArray.GetDepthFaceView(pointLightIndex, faceIndex), in lightViewProj, out int draws);
+            RenderSlice(world, meshRegistry, _cubeDummyColorView, cubeArray.GetDepthFaceView(pointLightIndex, faceIndex), in lightViewProj, out int draws, point: true);
             return draws;
         }
 
@@ -523,7 +547,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sg_view colorView,
             sg_view depthSliceView,
             in Matrix4x4 lightViewProj,
-            out int drawCallCount)
+            out int drawCallCount,
+            bool point = false)
         {
             drawCallCount = 0;
             if (colorView.id == 0 || depthSliceView.id == 0) return;
@@ -541,7 +566,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sg_begin_pass(pass);
             try
             {
-                sg_apply_pipeline(_pipeline);
+                sg_apply_pipeline(point ? _pointPipeline : _pipeline);
 
                 foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>()
                                          .Enumerate<ActiveFlag, MeshRenderer, Transform>())
