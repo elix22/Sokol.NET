@@ -117,6 +117,7 @@ namespace GameEditor.Framework.Core
 
             Config = cfg;
             Logger.Info($"[GameApplication] Project '{cfg.ProjectName}' loaded.");
+            if (cfg.DevelopmentBuild) Diagnostics.PlayerLink.Start(cfg.ProjectName);   // G11.1: the editor can attach
 
             // Load default scene
             if (!string.IsNullOrEmpty(cfg.DefaultScene))
@@ -186,6 +187,7 @@ namespace GameEditor.Framework.Core
 
                 Config = cfg;
                 Logger.Info($"[GameApplication] Project '{cfg.ProjectName}' loaded from assets.");
+                if (cfg.DevelopmentBuild) Diagnostics.PlayerLink.Start(cfg.ProjectName);   // G11.1: the editor can attach
 
                 if (!string.IsNullOrEmpty(cfg.DefaultScene))
                     SceneManager.LoadSceneFromAssetsAsync(cfg.DefaultScene);
@@ -247,6 +249,7 @@ namespace GameEditor.Framework.Core
         public static void Update(float deltaTime)
         {
             SFilesystem.Update();
+            Diagnostics.PlayerLink.Update();   // G11.1: the editor's lines, on this thread
             SceneManager.TickLoadTimes();      // how long the scene took to load, once it has every file (G12.1)
 
             if (_screen != null)
