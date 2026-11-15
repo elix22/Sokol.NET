@@ -1195,7 +1195,9 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 view_proj  = viewProj,
                 camera_pos = new Vector4(cameraPos, 1f),
-                dir_shadow_vp = _hasDirectionalShadow ? _directionalShadowViewProj : Matrix4x4.Identity,
+                // Blinn-Phong samples one map: with four cascades the last (it reaches the whole shadow distance).
+                dir_shadow_vp = !_hasDirectionalShadow ? Matrix4x4.Identity
+                              : _csmCascadeCount == CsmComputer.MaxCascades ? _csmCascadeVP[CsmComputer.MaxCascades - 1] : _directionalShadowViewProj,
             };
 
             // PBR view-constant uniform blocks. Built lazily on the first PBR group so
@@ -1531,6 +1533,8 @@ namespace GameEditor.Framework.Renderer.Server
                 hasDirectionalShadowLight  = true;
             }
 
+            // The sun's map slice as Blinn-Phong reads it: with four cascades the last (the whole shadow distance), else the one map.
+            int sunSlice = hasDirectionalShadowLight && csm.HasValue && EnableCsm4 ? CsmComputer.MaxCascades - 1 : 0;
             for (int li = 0; li < _topLightCount; li++)
             {
                 if (hasDirectionalShadowLight && IsSameLight(in _topLights[li], in bestDirectionalShadowLight))
@@ -1544,7 +1548,7 @@ namespace GameEditor.Framework.Renderer.Server
                         _topLights[li].Range,
                         _topLights[li].InnerAngle,
                         _topLights[li].OuterAngle,
-                        0);
+                        sunSlice);
                 }
             }
 
@@ -1552,14 +1556,15 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 // ── CSM4: fit 4 cascades to the camera frustum, render into atlas slices 0-3 ──
                 var cc = csm.Value;
-                _csm.Compute(cc.View, cc.Proj, cc.Near, cc.Far,
-                    bestDirectionalShadowLight.Direction, _shadowAtlas.SliceSize, CsmComputer.MaxCascades);
+                // Fitted to the shadow distance, not the camera's far plane (1000 m: a first cascade of ~60 m, coarse and biased).
+                _csm.Compute(cc.View, cc.Proj, cc.Near, MathF.Max(cc.Near + 0.1f, MathF.Min(cc.Far, ShadowDistance)),
+                    bestDirectionalShadowLight.Direction, _shadowAtlas.SliceSize, CsmComputer.MaxCascades, cc.Far);
                 for (int c = 0; c < CsmComputer.MaxCascades; c++) _csmCascadeVP[c] = _csm.CascadeVP[c];
                 _csmSplitDepths = new Vector4(_csm.SplitDepths[0], _csm.SplitDepths[1],
                                               _csm.SplitDepths[2], _csm.SplitDepths[3]);
                 _csmCameraView             = cc.View;
                 _csmCascadeCount           = CsmComputer.MaxCascades;
-                _directionalShadowViewProj = _csmCascadeVP[0];   // blinn-phong samples slice 0 = cascade 0
+                _directionalShadowViewProj = _csmCascadeVP[0];   // cascade 0 (Blinn-Phong takes the last: dir_shadow_vp)
                 _hasDirectionalShadow      = true;
                 if (renderShadowPasses)
                 {
@@ -2777,7 +2782,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -2898,7 +2903,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_csm_params_t
             {
                 csm_split_depths = _csmSplitDepths,
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };
@@ -2988,7 +2994,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;   // cascade 0 = the slice-0 directional map
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
             if (!useTex)
             {
                 var bones = entry.Animator?.GetFinalBoneMatrices();
@@ -3106,7 +3112,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_csm_params_t
             {
                 csm_split_depths = new Vector4(1e9f, 1e9f, 1e9f, 1e9f), // CSM1 → always cascade 0
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };
@@ -3408,7 +3415,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
             ResolveMorphWeights(entry, mesh, out var mw0, out var mw1);
             vs.u_morphWeights[0] = mw0;
             vs.u_morphWeights[1] = mw1;
@@ -3528,7 +3535,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_csm_params_t
             {
                 csm_split_depths = new Vector4(1e9f, 1e9f, 1e9f, 1e9f),
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };
@@ -3615,7 +3623,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -3738,7 +3746,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_csm_params_t
             {
                 csm_split_depths = _csmSplitDepths,
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };
@@ -3827,7 +3836,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;   // cascade 0 = the slice-0 directional map
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
 
             var lights = new Csm1.Shaders.pbr_csm1_pbr_light_params_t();
             int n = _lightBuf.Count;
@@ -3947,7 +3956,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new Csm1.Shaders.pbr_csm1_pbr_csm_params_t
             {
                 csm_split_depths = new Vector4(1e9f, 1e9f, 1e9f, 1e9f), // CSM1 → always cascade 0
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };
@@ -4017,21 +4027,43 @@ namespace GameEditor.Framework.Renderer.Server
             }
         }
 
-        // The shadow comparison's depth bias. The single map (CSM1): ShadowBiasTexels texels of it, as a world size, in its
-        // depth units - not below the backend's floor. CSM4 (off by default): the constant tuned per backend (plan §CSM table).
-        private static float CsmBiasForBackend()
+        // The shadow comparison's depth bias, one a cascade: ShadowBiasTexels texels of it as a world size, in its depth
+        // units - not below the backend's floor. The single map (CSM1): its one value in all four.
+        private static Vector4 CsmCascadeBias()
         {
-            if (_csmCascadeCount == 1 && _dirShadowDepthRange > 0f)
-                return MathF.Max(CsmBiasFloor(), ShadowBiasTexels * _dirShadowTexelWorld / _dirShadowDepthRange);
-            return CsmBiasConstant();
+            if (_csmCascadeCount == 1)
+            {
+                float b = _dirShadowDepthRange > 0f ? MathF.Max(CsmBiasFloor(), ShadowBiasTexels * _dirShadowTexelWorld / _dirShadowDepthRange) : CsmBiasConstant();
+                return new Vector4(b);
+            }
+            Span<float> v = stackalloc float[4];
+            for (int c = 0; c < 4; c++)
+            {
+                int k = Math.Min(c, CsmComputer.MaxCascades - 1);
+                v[c] = _csm.DepthRange[k] > 0f ? MathF.Max(CsmBiasFloor(), ShadowBiasTexels * _csm.TexelWorld[k] / _csm.DepthRange[k]) : CsmBiasConstant();
+            }
+            return new Vector4(v[0], v[1], v[2], v[3]);
         }
+
+        /// <summary>
+        /// How far the cascades reach from the camera, world units (a quality level's Shadow Distance): they are fitted to
+        /// the nearer of it and the camera's far plane; the sun's shadow fades out over its last tenth.
+        /// </summary>
+        public static float ShadowDistance { get; set; } = 150f;
+
+        // The view depth where the sun's shadow starts to fade (the last tenth of the cascades' reach); none for one map.
+        private static float CsmFadeStart() => _csmCascadeCount > 1 ? 0.9f * _csm.SplitDepths[_csmCascadeCount - 1] : 1e30f;
 
         /// <summary>How far the shadow lookup is pushed along a surface's normal, in texels of the single map (a world size).</summary>
         public static float ShadowNormalOffsetTexels { get; set; } = 1.2f;
 
-        // The normal offset of the shadow lookup, world units: the single map's texels; CSM4 the constant it had (0.04).
-        private static float CsmNormalOffset() =>
-            _csmCascadeCount == 1 && _dirShadowTexelWorld > 0f ? ShadowNormalOffsetTexels * _dirShadowTexelWorld : 0.04f;
+        // The normal offset of the shadow lookup, world units, one a cascade: ShadowNormalOffsetTexels of its texels.
+        private static Vector4 CsmNormalOffsets()
+        {
+            if (_csmCascadeCount == 1) return new Vector4(_dirShadowTexelWorld > 0f ? ShadowNormalOffsetTexels * _dirShadowTexelWorld : 0.04f);
+            return new Vector4(ShadowNormalOffsetTexels * _csm.TexelWorld[0], ShadowNormalOffsetTexels * _csm.TexelWorld[1],
+                               ShadowNormalOffsetTexels * _csm.TexelWorld[2], ShadowNormalOffsetTexels * _csm.TexelWorld[3]);
+        }
 
         // The least depth bias a backend's depth buffer resolves (a few steps of it).
         private static float CsmBiasFloor() => sg_query_backend() == Sokol.SG.sg_backend.SG_BACKEND_GLES3 ? 0.0001f : 0.00002f;
@@ -4071,7 +4103,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
-            vs.csm_normal_offset = CsmNormalOffset();
+            vs.csm_normal_offsets = CsmNormalOffsets();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -4194,7 +4226,8 @@ namespace GameEditor.Framework.Renderer.Server
             var csm = new Csm4.Shaders.pbr_csm4_pbr_csm_params_t
             {
                 csm_split_depths = _csmSplitDepths,
-                csm_bias         = CsmBiasForBackend(),
+                csm_cascade_bias = CsmCascadeBias(),
+                csm_fade_start   = CsmFadeStart(),
                 csm_blend_band   = 0f,
                 csm_pcf_taps     = pcf,
             };

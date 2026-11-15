@@ -15,8 +15,10 @@ namespace GameEditor.Framework.Core
         public string RenderingPath    { get; set; } = "forward+";
         /// <summary>A view's light limit (Forward never over 32, Forward+ never over the GPU's).</summary>
         public int    MaxLights        { get; set; } = 256;
-        /// <summary>The directional shadow's cascades: 1 or 4.</summary>
-        public int    Cascades         { get; set; } = 1;
+        /// <summary>The directional shadow's cascades: 1 (one map around the casters) or 4 (fitted to what the camera sees).</summary>
+        public int    Cascades         { get; set; } = 4;
+        /// <summary>How far the cascades reach from the camera, world units (the sun's shadow fades out over its last tenth).</summary>
+        public float  ShadowDistance   { get; set; } = 150f;
         /// <summary>The shadow atlas's slice, in pixels (a point light's cube faces: a quarter).</summary>
         public int    ShadowResolution { get; set; } = 2048;
         /// <summary>Spot and point lights cast shadows.</summary>
@@ -37,8 +39,8 @@ namespace GameEditor.Framework.Core
         public static List<QualityLevel> Defaults() => new()
         {
             new QualityLevel { Name = "High" },
-            new QualityLevel { Name = "Medium", MaxLights = 32 },
-            new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, ShadowResolution = 1024,
+            new QualityLevel { Name = "Medium", MaxLights = 32, Cascades = 1, ShadowDistance = 100f },
+            new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, Cascades = 1, ShadowDistance = 50f, ShadowResolution = 1024,
                                PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f },
         };
 

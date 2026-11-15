@@ -88,6 +88,7 @@ namespace GameEditor.Framework.Scripting
             public int ShadowResolution;
             public bool PunctualShadows;
             public int ShadowQuality;     // RenderingServer's: 0 = 1 tap, 1 = 9, 2 = 25
+            public float ShadowDistance;  // how far the cascades reach, world units
             public bool Hdr;
             public float RenderScale;
         }
@@ -99,6 +100,7 @@ namespace GameEditor.Framework.Scripting
             Path             = string.Equals(l.RenderingPath?.Trim(), "forward", StringComparison.OrdinalIgnoreCase) ? RenderingPath.Forward : RenderingPath.ForwardPlus,
             MaxLights        = Math.Clamp(l.MaxLights, 1, 256),
             Csm4             = l.Cascades >= 4,
+            ShadowDistance   = Math.Clamp(l.ShadowDistance, 5f, 2000f),
             ShadowResolution = Math.Clamp(l.ShadowResolution, 256, 4096),
             PunctualShadows  = l.PunctualShadows,
             ShadowQuality    = l.SoftShadows >= 25 ? 2 : (l.SoftShadows >= 9 ? 1 : 0),
@@ -115,6 +117,7 @@ namespace GameEditor.Framework.Scripting
             RenderingServer.Path             = v.Path;
             RenderingServer.MaxLights        = v.MaxLights;
             RenderingServer.EnableCsm4       = v.Csm4;
+            RenderingServer.ShadowDistance   = v.ShadowDistance;
             RenderingServer.ShadowResolution = v.ShadowResolution;
             RenderingServer.PunctualShadows  = v.PunctualShadows;
             RenderingServer.ShadowQuality    = v.ShadowQuality;

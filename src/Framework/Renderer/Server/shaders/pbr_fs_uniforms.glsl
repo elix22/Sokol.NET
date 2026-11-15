@@ -145,7 +145,8 @@ layout(binding=5) uniform pbr_rendering_flags {
 #if CSM_CASCADES > 0
 layout(binding=6) uniform pbr_csm_params {
     vec4  csm_split_depths;     // x,y,z,w = cascade 0..3 split depths (view-space far edge)
-    float csm_bias;
+    vec4  csm_cascade_bias;     // each cascade's depth bias, in its depth units (texels of it as a world size)
+    float csm_fade_start;       // view depth where the sun's shadow starts to fade out (to the last split)
     float csm_blend_band;       // depth range over which to blend between cascades
     int   csm_pcf_taps;         // 1, 9, or 25
     float _csm_pad;

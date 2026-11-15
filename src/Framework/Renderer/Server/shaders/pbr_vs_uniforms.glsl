@@ -31,7 +31,7 @@
 layout(binding=0) uniform pbr_vs_params {
     mat4 view_proj;
     vec3 eye_pos;
-    float csm_normal_offset;   // world units: the shadow lookup pushed along the normal (RenderingServer.CsmNormalOffset)
+    float _pad0;
 
     // Morph-target weights (8 weights packed as 2 × vec4; used when MORPHING is defined).
     vec4 u_morphWeights[2];
@@ -42,6 +42,9 @@ layout(binding=0) uniform pbr_vs_params {
     int  _pad1;
     int  _pad2;
     int  _pad3;
+
+    // Each cascade's normal offset, world units: the shadow lookup pushed along the surface normal (RenderingServer).
+    vec4 csm_normal_offsets;
 
 #ifdef SKINNING
     // Bone matrices for Path A (use_uniform_skinning == 1).

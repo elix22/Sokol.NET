@@ -8,7 +8,7 @@
 //   light block (PBR):   lights_data[128] spot_shadow_vp[32] point_shadow_vp[96] ambient_num
 //                     →  lights_data[ 64] spot_shadow_vp[16] point_shadow_vp[24] ambient_num
 //   fs block (Blinn):    4 vec4 of material + camera, the same three arrays, ambient_sky[9]
-//   skinned vs block:    8 vec4, finalBonesMatrices[128], csm_vp[n]  →  8 vec4, finalBonesMatrices[1], csm_vp[n]
+//   skinned vs block:    9 vec4, finalBonesMatrices[128], csm_vp[n]  →  9 vec4, finalBonesMatrices[1], csm_vp[n]
 //
 // The numbers are the LOW_TIER ones of pbr_fs_uniforms.glsl / blinn_phong.glsl / pbr_vs_uniforms.glsl: 16 lights,
 // 4 spot-shadow matrices (atlas slices 4-7), 1 point-shadow light, no bone array (a skinned mesh reads its bones
@@ -35,7 +35,7 @@ namespace GameEditor.Framework.Renderer.Server
         private const int PbrLightVec4s   = LowLights + LowSpot + LowPoint + 1;          // 105
         private const int BlinnHeadVec4s  = 4, BlinnSkyVec4s = 9;
         private const int BlinnFsVec4s    = BlinnHeadVec4s + LowLights + LowSpot + LowPoint + BlinnSkyVec4s; // 117
-        private const int SkinVsHeadVec4s = 8;                                           // view_proj, eye_pos, morph weights, flags
+        private const int SkinVsHeadVec4s = 9;                                           // view_proj, eye_pos, morph weights, flags, csm_normal_offsets
 
         // One scratch block, big enough for every packed block (the largest is a skinned vs block with 4 cascades).
         private static readonly Vector4[] _scratch = new Vector4[128];

@@ -136,16 +136,17 @@ void main()
     // close occluder's shadow drops off the receiver. In texels of the map (RenderingServer.ShadowNormalOffsetTexels):
     // too small → acne, too large → light leak near contacts (a lit ring under a ball).
 #if CSM_CASCADES > 0
-    vec4 shadowWorldPos = vec4(v_Position + normalW * csm_normal_offset, 1.0);   // in texels of the map (RenderingServer)
+    // Each cascade's own offset (its texels): one position per cascade.
+    vec4 shadowWorldPos = vec4(v_Position + normalW * csm_normal_offsets.x, 1.0);
 #endif
 #if defined(CSM4)
     v_ShadowPos[0] = csm_vp[0] * shadowWorldPos;
-    v_ShadowPos[1] = csm_vp[1] * shadowWorldPos;
-    v_ShadowPos[2] = csm_vp[2] * shadowWorldPos;
-    v_ShadowPos[3] = csm_vp[3] * shadowWorldPos;
+    v_ShadowPos[1] = csm_vp[1] * vec4(v_Position + normalW * csm_normal_offsets.y, 1.0);
+    v_ShadowPos[2] = csm_vp[2] * vec4(v_Position + normalW * csm_normal_offsets.z, 1.0);
+    v_ShadowPos[3] = csm_vp[3] * vec4(v_Position + normalW * csm_normal_offsets.w, 1.0);
 #elif defined(CSM2)
     v_ShadowPos[0] = csm_vp[0] * shadowWorldPos;
-    v_ShadowPos[1] = csm_vp[1] * shadowWorldPos;
+    v_ShadowPos[1] = csm_vp[1] * vec4(v_Position + normalW * csm_normal_offsets.y, 1.0);
 #elif defined(CSM1)
     v_ShadowPos[0] = csm_vp[0] * shadowWorldPos;
 #endif

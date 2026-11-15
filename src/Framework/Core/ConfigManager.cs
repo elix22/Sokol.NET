@@ -276,7 +276,7 @@ namespace GameEditor.Framework.Core
             {
                 var l = c.QualityLevels[i];
                 sb.Append($"      {{ \"name\": \"{Esc(l.Name)}\", \"renderingPath\": \"{Esc(l.RenderingPath)}\", \"maxLights\": {l.MaxLights}, ");
-                sb.Append($"\"cascades\": {l.Cascades}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
+                sb.Append($"\"cascades\": {l.Cascades}, \"shadowDistance\": {l.ShadowDistance.ToString(System.Globalization.CultureInfo.InvariantCulture)}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
                 sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)} }}");
                 sb.Append(i + 1 < c.QualityLevels.Count ? ",\n" : "\n");
             }
@@ -303,6 +303,14 @@ namespace GameEditor.Framework.Core
                     if (e.TryGetProperty("renderingPath", out v) && v.ValueKind == JsonValueKind.String) l.RenderingPath = v.GetString()!;
                     if (e.TryGetProperty("maxLights", out v) && v.TryGetInt32(out int iv)) l.MaxLights = iv;
                     if (e.TryGetProperty("cascades", out v) && v.TryGetInt32(out iv)) l.Cascades = iv >= 4 ? 4 : 1;
+                    if (e.TryGetProperty("shadowDistance", out v) && v.TryGetSingle(out float sd)) l.ShadowDistance = Math.Clamp(sd, 5f, 2000f);
+                    else if (Defaults(l.Name) is { } was)
+                    {
+                        // A level written before the shadow distance (2026-11-15): the cascades of that time were coarse and
+                        // off by default - it takes the new default level's cascades and distance.
+                        l.Cascades = was.Cascades;
+                        l.ShadowDistance = was.ShadowDistance;
+                    }
                     if (e.TryGetProperty("shadowResolution", out v) && v.TryGetInt32(out iv)) l.ShadowResolution = iv;
                     if (e.TryGetProperty("punctualShadows", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.PunctualShadows = v.GetBoolean();
                     if (e.TryGetProperty("softShadows", out v) && v.TryGetInt32(out iv)) l.SoftShadows = iv;
@@ -317,6 +325,9 @@ namespace GameEditor.Framework.Core
                     if (d.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String) cfg.QualityDefaults[t] = v.GetString()!;
             if (q.TryGetProperty("editor", out var ed) && ed.ValueKind == JsonValueKind.String) cfg.QualityEditor = ed.GetString()!;
         }
+
+        private static QualityLevel? Defaults(string name) =>
+            QualityLevel.Defaults().Find(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase));
 
         private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }

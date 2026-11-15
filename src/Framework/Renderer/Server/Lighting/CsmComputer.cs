@@ -33,6 +33,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         // Read only the first [cascadeCount] entries after calling Compute().
         public readonly Matrix4x4[] CascadeVP  = new Matrix4x4[MaxCascades];
         public readonly float[]     SplitDepths = new float[MaxCascades];
+        /// <summary>Each cascade's texel (world units) and depth range: its shadow biases are sizes in its texels.</summary>
+        public readonly float[]     TexelWorld  = new float[MaxCascades];
+        public readonly float[]     DepthRange  = new float[MaxCascades];
 
         // Reused per-frame scratch — avoids allocations.
         private readonly Vector3[] _corners = new Vector3[8];
@@ -55,6 +58,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         /// <param name="lightDir">World-space direction the light is shining (normalised, points toward the scene).</param>
         /// <param name="shadowMapSize">Shadow atlas slice resolution (e.g. 2048) for texel snapping.</param>
         /// <param name="cascadeCount">Number of active cascades. Clamped to [1, MaxCascades].</param>
+        /// <param name="farClip">The camera's far plane (the frustum's corners are at it); 0: <paramref name="shadowRange"/>.</param>
         public void Compute(
             in Matrix4x4 cameraView,
             in Matrix4x4 cameraProj,
@@ -62,7 +66,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             float shadowRange,
             in Vector3 lightDir,
             int shadowMapSize,
-            int cascadeCount)
+            int cascadeCount,
+            float farClip = 0f)
         {
             cascadeCount = Math.Clamp(cascadeCount, 1, MaxCascades);
 
@@ -85,7 +90,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
                            : Vector3.UnitX;
 
             float prevSplit = nearClip;
-            float rangeInv  = 1f / (shadowRange - nearClip);
+            // The splits share out the shadow range; the slices are cut along the frustum's edges, which reach the far plane.
+            if (farClip <= nearClip) farClip = shadowRange;
+            float rangeInv  = 1f / (farClip - nearClip);
 
             // Hoisted out of the cascade loop: all 8 entries are overwritten every iteration,
             // so the buffer is reused rather than re-allocated on the stack per cascade.
@@ -161,6 +168,8 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
                 var lightProj = Matrix4x4.CreateOrthographicOffCenter(minX, maxX, minY, maxY, near, far);
                 CascadeVP[c] = lightView * lightProj;
+                TexelWorld[c] = MathF.Max(worldPerTexelX, worldPerTexelY);
+                DepthRange[c] = far - near;
                 prevSplit    = splitDepth;
             }
         }
