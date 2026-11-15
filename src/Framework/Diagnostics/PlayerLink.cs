@@ -37,6 +37,8 @@ namespace GameEditor.Framework.Diagnostics
         public static bool Connected => _connected;
         /// <summary>A line the editor sent, on the game's thread (in <see cref="Update"/>): its "t" and the whole line.</summary>
         public static event Action<string, string>? Received;
+        /// <summary>Once a frame, on the game's thread, after the editor's lines (the remote scene's check).</summary>
+        public static event Action? Frame;
 
         static string _hello = "";
         static volatile bool _connected;
@@ -65,6 +67,8 @@ namespace GameEditor.Framework.Diagnostics
             _hello = "{\"t\":\"hello\",\"app\":" + Str(app) + ",\"platform\":" + Str(Platform) +
                      ",\"os\":" + Str(System.Runtime.InteropServices.RuntimeInformation.OSDescription) + ",\"version\":1}";
             Profiler.Link();   // G11.3: recording and frames follow the attached editor
+            RemoteScene.Link();   // G11.5: the running scene for the editor's Remote view
+            Tests.Link();         // G11.6: the Test Runner lists and runs the game's tests
             Logger.OnLog += (level, text) => Keep("{\"t\":\"log\",\"l\":\"" + (level == LogLevel.Error ? "E" : level == LogLevel.Warning ? "W" : "I") + "\",\"x\":" + Str(text) + "}");
             Open();
         }
@@ -106,6 +110,8 @@ namespace GameEditor.Framework.Diagnostics
                 try { Received?.Invoke(t, line); }
                 catch (Exception e) { Logger.Error($"[PlayerLink] {t}: {e.Message}"); }
             }
+            try { Frame?.Invoke(); }
+            catch (Exception e) { Logger.Error($"[PlayerLink] frame: {e.Message}"); }
         }
 
         // The lines kept from `from` on, and the next sequence number.

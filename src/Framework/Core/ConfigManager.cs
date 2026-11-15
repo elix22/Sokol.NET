@@ -161,6 +161,23 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"environmentShadowAmbient\": {config.EnvironmentShadowAmbient.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"fixedTimestep\": {config.FixedTimestep.ToString(CultureInfo.InvariantCulture)},\n");
             if (config.DevelopmentBuild) sb.Append("  \"developmentBuild\": true,\n");
+            if (config.Services.Count > 0)
+            {
+                sb.Append("  \"services\": [");
+                for (int i = 0; i < config.Services.Count; i++) sb.Append(i > 0 ? ", " : "").Append('"').Append(Esc(config.Services[i])).Append('"');
+                sb.Append("],\n");
+            }
+            if (config.ServiceSettings.Count > 0)
+            {
+                sb.Append("  \"serviceSettings\": {");
+                bool firstSetting = true;
+                foreach (var kv in config.ServiceSettings)
+                {
+                    sb.Append(firstSetting ? "" : ", ").Append('"').Append(Esc(kv.Key)).Append("\": \"").Append(Esc(kv.Value)).Append('"');
+                    firstSetting = false;
+                }
+                sb.Append("},\n");
+            }
             sb.Append($"  \"environmentAmbientSource\": \"{Esc(config.EnvironmentAmbientSource)}\",\n");
             sb.Append($"  \"environmentAmbientColor\": \"{Esc(config.EnvironmentAmbientColor)}\",\n");
             sb.Append($"  \"environmentAmbientEnergy\": {config.EnvironmentAmbientEnergy.ToString(CultureInfo.InvariantCulture)},\n");
@@ -236,6 +253,10 @@ namespace GameEditor.Framework.Core
             if (root.TryGetProperty("environmentShadowAmbient", out var esa) && esa.TryGetSingle(out var sav)) cfg.EnvironmentShadowAmbient = sav;
             if (root.TryGetProperty("fixedTimestep", out var fts) && fts.TryGetSingle(out var ftv) && ftv > 0f) cfg.FixedTimestep = ftv;
             if (root.TryGetProperty("developmentBuild", out var dvb) && dvb.ValueKind == JsonValueKind.True) cfg.DevelopmentBuild = true;
+            if (root.TryGetProperty("services", out var svc) && svc.ValueKind == JsonValueKind.Array)
+                foreach (var e in svc.EnumerateArray()) if (e.GetString() is { Length: > 0 } id && !cfg.Services.Contains(id)) cfg.Services.Add(id);
+            if (root.TryGetProperty("serviceSettings", out var sst) && sst.ValueKind == JsonValueKind.Object)
+                foreach (var p in sst.EnumerateObject()) cfg.ServiceSettings[p.Name] = p.Value.GetString() ?? "";
             if (root.TryGetProperty("environmentAmbientSource", out var eas)) cfg.EnvironmentAmbientSource = eas.GetString() ?? cfg.EnvironmentAmbientSource;
             if (root.TryGetProperty("environmentAmbientColor", out var eac))  cfg.EnvironmentAmbientColor  = eac.GetString() ?? cfg.EnvironmentAmbientColor;
             if (root.TryGetProperty("environmentAmbientEnergy", out var eae) && eae.TryGetSingle(out var aev)) cfg.EnvironmentAmbientEnergy = aev;

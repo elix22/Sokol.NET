@@ -32,6 +32,14 @@ namespace GameEditor.Framework.Determinism
         public static void Clear() => _tests.Clear();
         public static int Count => _tests.Count;
 
+        /// <summary>The registered tests' names, in order (the Test Runner lists them).</summary>
+        public static List<string> Names()
+        {
+            var n = new List<string>(_tests.Count);
+            foreach (var t in _tests) n.Add(t.Name);
+            return n;
+        }
+
         public static List<Result> RunAll()
         {
             var results = new List<Result>(_tests.Count);

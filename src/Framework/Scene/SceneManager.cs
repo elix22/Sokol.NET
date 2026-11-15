@@ -571,7 +571,9 @@ namespace GameEditor.Framework.Scene
                 InitializePhysics();
                 Sound.Audio.StartScene(ECS.ECSWorld.Instance);
 
-                // Start all registered behaviours
+                // Start all registered behaviours (they register their tests again: none left from before, G11.6)
+                Diagnostics.Tests.Clear();
+                Determinism.GoldenTests.Clear();
                 ScriptSystem.StartAll();
                 _fixedAccumulator = 0.0;   // the fixed tick from zero (G10)
                 Time.FixedTime = 0.0;

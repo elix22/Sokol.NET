@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 namespace GameEditor.Framework.Core
 {
     /// <summary>
@@ -26,6 +27,8 @@ namespace GameEditor.Framework.Core
         public float  EnvironmentShadowAmbient { get; set; } = 0.4f;           // 0=physical, 1=shadows fully darken IBL ambient
         public float  FixedTimestep { get; set; } = 0.02f;                     // G10: Time.FixedDeltaTime (Project Settings ▸ Time)
         public bool   DevelopmentBuild { get; set; }                           // G11.1: a built game opens the player link (Build & Deploy)
+        public List<string> Services { get; set; } = new();                    // G9: the game services added (speech, share, ...)
+        public Dictionary<string, string> ServiceSettings { get; set; } = new(); // G9: their settings (AdMob ids, product ids, ...)
         public string EnvironmentAmbientSource { get; set; } = "sky";         // "sky" | "color" | "disabled"
         public string EnvironmentAmbientColor  { get; set; } = "0.1 0.1 0.1"; // "r g b", used by "color"
         public float  EnvironmentAmbientEnergy { get; set; } = 1f;
