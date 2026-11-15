@@ -72,7 +72,22 @@ namespace GameEditor.Framework.Renderer.Server.Profiling
         /// <summary>Start timing the given zone.</summary>
         public static void Begin(Zone zone)
         {
+            if (Diagnostics.Profiler.Enabled) Diagnostics.Profiler.Begin(ProfilerId(zone));   // G11.3: a sample of the frame
             if (Enabled) _starts[(int)zone] = Stopwatch.GetTimestamp();
+        }
+
+        // The profiler's sample name of each zone (made once).
+        private static readonly int[] _profilerIds = new int[(int)Zone._Count];
+        private static bool _profilerNamed;
+        private static int ProfilerId(Zone zone)
+        {
+            if (!_profilerNamed)
+            {
+                for (int z = 0; z < (int)Zone._Count; z++)
+                    _profilerIds[z] = Diagnostics.Profiler.Id("Render." + _names[z].Replace(" ", ""), Diagnostics.Profiler.Category.Rendering);
+                _profilerNamed = true;
+            }
+            return _profilerIds[(int)zone];
         }
 
         /// <summary>
@@ -81,6 +96,7 @@ namespace GameEditor.Framework.Renderer.Server.Profiling
         /// </summary>
         public static void End(Zone zone)
         {
+            if (Diagnostics.Profiler.Enabled) Diagnostics.Profiler.End();
             if (!Enabled) return;
             int z = (int)zone;
             _history[_frame, z] += Stopwatch.GetTimestamp() - _starts[z];

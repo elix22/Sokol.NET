@@ -1370,6 +1370,26 @@ namespace GameEditor.Framework.Renderer.Server
 
         public static void EndFrame() { FrameProfiler.EndFrame(); }
 
+        /// <summary>G11.3: the last committed frame's sokol stats as the profiler's counters (while it records). The stats are
+        /// turned on and off with recording.</summary>
+        public static void ReportProfilerCounters()
+        {
+            if (!_profilerHooked)
+            {
+                _profilerHooked = true;
+                Diagnostics.Profiler.StatsChanged += on => { if (on) sg_enable_stats(); else sg_disable_stats(); };
+                if (Diagnostics.Profiler.Enabled) sg_enable_stats();
+            }
+            if (!Diagnostics.Profiler.Enabled) return;
+            var st = sg_query_stats().prev_frame;
+            Diagnostics.Profiler.DrawCalls = (int)(st.num_draw + st.num_draw_ex);
+            Diagnostics.Profiler.SetPass = (int)st.num_apply_pipeline;
+            Diagnostics.Profiler.Passes = (int)st.num_passes;
+            Diagnostics.Profiler.Bindings = (int)st.num_apply_bindings;
+            Diagnostics.Profiler.UploadBytes = (long)st.size_update_buffer + st.size_append_buffer + st.size_update_image + st.size_apply_uniforms;
+        }
+        private static bool _profilerHooked;
+
         /// <summary>
         /// Draws a shadow atlas debug overlay in the bottom-right corner.
         /// Must be called inside an active <c>sg_begin_pass / sg_end_pass</c>.

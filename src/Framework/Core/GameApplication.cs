@@ -254,12 +254,14 @@ namespace GameEditor.Framework.Core
 
             if (_screen != null)
             {
+                Diagnostics.Profiler.Begin(_profUI);
                 float dpi = sapp_dpi_scale();
                 float logicalWidth = sapp_width() / MathF.Max(1f, dpi);
                 float logicalHeight = sapp_height() / MathF.Max(1f, dpi);
                 // The game's UI: the scene's UI entities as widgets over the whole picture.
                 UI.GameUI.Sync(ECS.ECSWorld.Instance, logicalWidth, logicalHeight, _screen.SafeAreaInsets);
                 _screen.Update(logicalWidth, logicalHeight, dpi);
+                Diagnostics.Profiler.End();
             }
 
             if (SceneManager.PlayMode == PlayModeState.Playing)
@@ -281,10 +283,12 @@ namespace GameEditor.Framework.Core
         /// </summary>
         public static unsafe void RunFrame(Sokol.SG.sg_pass_action clear)
         {
+            Diagnostics.Profiler.BeginFrame();   // G11.3: recorded while the profiler records
             AutoScreenshots();
             Input.InputManager.BeginFrame();
             Update((float)sapp_frame_duration());
 
+            Diagnostics.Profiler.Begin(_profRendering);
             RenderingServer.BeginFrame();
 
             int width = sapp_width(), height = sapp_height();
@@ -358,7 +362,13 @@ namespace GameEditor.Framework.Core
                 Sokol.SG.sg_end_pass();
             }
             Sokol.ScreenCapture.Commit();
+            Diagnostics.Profiler.End();
+            RenderingServer.ReportProfilerCounters();
+            Diagnostics.Profiler.EndFrame();
         }
+
+        private static readonly int _profRendering = Diagnostics.Profiler.Id("Rendering", Diagnostics.Profiler.Category.Rendering);
+        private static readonly int _profUI = Diagnostics.Profiler.Id("UI", Diagnostics.Profiler.Category.UI);
 
         /// <summary>
         /// A picture of the next frame as it is drawn (the scene and the game's UI), written as a PNG named

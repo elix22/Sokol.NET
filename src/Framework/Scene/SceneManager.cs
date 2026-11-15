@@ -13,6 +13,8 @@ using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Physics;
 using GameEditor.Framework.Scripting;
 
+using Profiler = GameEditor.Framework.Diagnostics.Profiler;
+
 namespace GameEditor.Framework.Scene
 {
     public static class SceneManager
@@ -1057,6 +1059,11 @@ namespace GameEditor.Framework.Scene
             return found;
         }
 
+        // The profiler's samples (G11.3).
+        private static readonly int _profFixed = Profiler.Id("Scripts.FixedUpdate", Profiler.Category.Scripts);
+        private static readonly int _profPhysics = Profiler.Id("Physics", Profiler.Category.Physics);
+        private static readonly int _profParticles = Profiler.Id("Particles", Profiler.Category.Others);
+
         // The fixed tick (G10): the game's time not yet given to OnFixedUpdate.
         private static double _fixedAccumulator;
 
@@ -1070,7 +1077,9 @@ namespace GameEditor.Framework.Scene
             int n = 0;
             while (_fixedAccumulator >= step && n < Time.MaximumFixedSteps)
             {
+                Profiler.Begin(_profFixed);
                 ScriptSystem.FixedUpdateAll();
+                Profiler.End();
                 Time.FixedTime += step;
                 _fixedAccumulator -= step;
                 n++;
@@ -1081,9 +1090,16 @@ namespace GameEditor.Framework.Scene
         public static void UpdatePhysics(float deltaTime)
         {
             FixedTick(deltaTime);   // the fixed ticks first, as the reference editor orders them
+            Profiler.Begin(_profPhysics);
             StepWorlds(deltaTime);
+            Profiler.End();
             // The particles: after everything moved this frame, with the game's time - in a 2D game too, and held while it stands.
-            if (PlayMode == PlayModeState.Playing) WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
+            if (PlayMode == PlayModeState.Playing)
+            {
+                Profiler.Begin(_profParticles);
+                WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
+                Profiler.End();
+            }
             // The shader graphs' Time node: the game's time (G8.10).
             if (PlayMode == PlayModeState.Playing) Renderer.Server.Materials.Graph.GraphClock.Advance(deltaTime * TimeScale);
         }

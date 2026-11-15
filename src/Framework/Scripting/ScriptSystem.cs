@@ -217,6 +217,11 @@ namespace GameEditor.Framework.Scripting
         /// <summary>The real time of the frame being run, whatever <see cref="Scene.SceneManager.TimeScale"/> is.</summary>
         public static float UnscaledDeltaTime { get; private set; }
 
+        // The profiler's samples (G11.3).
+        private static readonly int _profUpdate = Diagnostics.Profiler.Id("Scripts.Update", Diagnostics.Profiler.Category.Scripts);
+        private static readonly int _profAnimation = Diagnostics.Profiler.Id("Animation", Diagnostics.Profiler.Category.Animation);
+        private static readonly int _profAudio = Diagnostics.Profiler.Id("Audio", Diagnostics.Profiler.Category.Audio);
+
         /// <summary>One fixed tick (G10): every running behaviour's OnFixedUpdate, in the order they run.</summary>
         public static void FixedUpdateAll()
         {
@@ -234,6 +239,7 @@ namespace GameEditor.Framework.Scripting
             deltaTime *= Scene.SceneManager.TimeScale;
             Draw.BeginFrame(deltaTime);              // G8.4 D3: lines and shapes whose time is over, gone
 
+            Diagnostics.Profiler.Begin(_profUpdate);
             // Behaviours placed since the last pass start now. One that places another in its OnStart adds to the
             // list while it is walked: that one starts in this pass too.
             for (int i = 0; i < _pendingStart.Count; i++)
@@ -255,14 +261,19 @@ namespace GameEditor.Framework.Scripting
                 float dt = deltaTime;
                 SafeCall(_running[i].Behaviour, beh => beh.OnUpdate(dt), "OnUpdate");
             }
+            Diagnostics.Profiler.End();
 
             // After the scripts: sprite animations show the frame for this moment, a clip a script just chose too.
             Scene.SpriteAnimSystem.Update(ECS.ECSWorld.Instance, deltaTime);
             // And the animation players: a clip's pose for this moment (animation comes after the scripts' update), its events to the scripts.
             Animation.AnimationSystem.EventSink ??= DispatchAnimationEvent;
+            Diagnostics.Profiler.Begin(_profAnimation);
             Animation.AnimationSystem.Update(ECS.ECSWorld.Instance, deltaTime);
             Animation.AnimatorSystem.Update(ECS.ECSWorld.Instance, deltaTime);      // and the controllers' characters
+            Diagnostics.Profiler.End();
+            Diagnostics.Profiler.Begin(_profAudio);
             Sound.Audio.Update(ECS.ECSWorld.Instance, realTime);     // sound goes on while the game's time stands
+            Diagnostics.Profiler.End();
 
             // The end of the frame for scripts: entities handed to Destroy leave now, and a scene that was
             // asked for takes this one's place.

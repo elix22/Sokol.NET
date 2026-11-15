@@ -64,6 +64,7 @@ namespace GameEditor.Framework.Diagnostics
             Active = true;
             _hello = "{\"t\":\"hello\",\"app\":" + Str(app) + ",\"platform\":" + Str(Platform) +
                      ",\"os\":" + Str(System.Runtime.InteropServices.RuntimeInformation.OSDescription) + ",\"version\":1}";
+            Profiler.Link();   // G11.3: recording and frames follow the attached editor
             Logger.OnLog += (level, text) => Keep("{\"t\":\"log\",\"l\":\"" + (level == LogLevel.Error ? "E" : level == LogLevel.Warning ? "W" : "I") + "\",\"x\":" + Str(text) + "}");
             Open();
         }
