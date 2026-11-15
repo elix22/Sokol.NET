@@ -2777,6 +2777,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
+            vs.csm_normal_offset = CsmNormalOffset();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -2987,6 +2988,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;   // cascade 0 = the slice-0 directional map
+            vs.csm_normal_offset = CsmNormalOffset();
             if (!useTex)
             {
                 var bones = entry.Animator?.GetFinalBoneMatrices();
@@ -3406,6 +3408,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;
+            vs.csm_normal_offset = CsmNormalOffset();
             ResolveMorphWeights(entry, mesh, out var mw0, out var mw1);
             vs.u_morphWeights[0] = mw0;
             vs.u_morphWeights[1] = mw1;
@@ -3612,6 +3615,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = useTex ? 0 : 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
+            vs.csm_normal_offset = CsmNormalOffset();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -3823,6 +3827,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = 1,
             };
             vs.csm_vp[0] = _directionalShadowViewProj;   // cascade 0 = the slice-0 directional map
+            vs.csm_normal_offset = CsmNormalOffset();
 
             var lights = new Csm1.Shaders.pbr_csm1_pbr_light_params_t();
             int n = _lightBuf.Count;
@@ -4012,8 +4017,26 @@ namespace GameEditor.Framework.Renderer.Server
             }
         }
 
-        // Constant depth bias for the shadow comparison, tuned per backend (plan §CSM table).
-        private static float CsmBiasForBackend() => sg_query_backend() switch
+        // The shadow comparison's depth bias. The single map (CSM1): ShadowBiasTexels texels of it, as a world size, in its
+        // depth units - not below the backend's floor. CSM4 (off by default): the constant tuned per backend (plan §CSM table).
+        private static float CsmBiasForBackend()
+        {
+            if (_csmCascadeCount == 1 && _dirShadowDepthRange > 0f)
+                return MathF.Max(CsmBiasFloor(), ShadowBiasTexels * _dirShadowTexelWorld / _dirShadowDepthRange);
+            return CsmBiasConstant();
+        }
+
+        /// <summary>How far the shadow lookup is pushed along a surface's normal, in texels of the single map (a world size).</summary>
+        public static float ShadowNormalOffsetTexels { get; set; } = 1.2f;
+
+        // The normal offset of the shadow lookup, world units: the single map's texels; CSM4 the constant it had (0.04).
+        private static float CsmNormalOffset() =>
+            _csmCascadeCount == 1 && _dirShadowTexelWorld > 0f ? ShadowNormalOffsetTexels * _dirShadowTexelWorld : 0.04f;
+
+        // The least depth bias a backend's depth buffer resolves (a few steps of it).
+        private static float CsmBiasFloor() => sg_query_backend() == Sokol.SG.sg_backend.SG_BACKEND_GLES3 ? 0.0001f : 0.00002f;
+
+        private static float CsmBiasConstant() => sg_query_backend() switch
         {
             Sokol.SG.sg_backend.SG_BACKEND_METAL_MACOS or
             Sokol.SG.sg_backend.SG_BACKEND_METAL_IOS or
@@ -4048,6 +4071,7 @@ namespace GameEditor.Framework.Renderer.Server
                 use_uniform_skinning = 1,
             };
             vs.csm_vp[0] = _csmCascadeVP[0];
+            vs.csm_normal_offset = CsmNormalOffset();
             vs.csm_vp[1] = _csmCascadeVP[1];
             vs.csm_vp[2] = _csmCascadeVP[2];
             vs.csm_vp[3] = _csmCascadeVP[3];
@@ -4301,8 +4325,19 @@ namespace GameEditor.Framework.Renderer.Server
             float far  = centerDepth + radius + DepthExtension;
 
             Matrix4x4 proj = Matrix4x4.CreateOrthographicOffCenter(minX, maxX, minY, maxY, near, far);
+            _dirShadowTexelWorld = worldPerTexel;
+            _dirShadowDepthRange = far - near;
             return lightView * proj;
         }
+
+        // The single directional map's texel (world units) and depth range: its depth bias is a world size, in texels.
+        private static float _dirShadowTexelWorld, _dirShadowDepthRange;
+
+        /// <summary>
+        /// The directional shadow's depth bias in texels of its map (a world size). A fixed number in depth units grew with
+        /// the map's depth range (casters' extent + 50 m): ~5-6 cm of lit floor at a contact, a ring under a ball.
+        /// </summary>
+        public static float ShadowBiasTexels { get; set; } = 0.8f;
 
         /// <summary>
         /// World-space AABB of all active, visible, shadow-casting meshes.

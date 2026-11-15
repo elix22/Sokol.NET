@@ -133,11 +133,10 @@ void main()
     // Normal-offset bias: push the shadow-space position a few texels along the surface normal
     // so the receiver doesn't self-shadow. This carries most of the anti-acne bias spatially, so
     // the depth bias (fs_lighting.glsl) can stay small — which avoids the peter-panning where a
-    // close occluder's shadow drops off the receiver. Constant world offset; tune if acne or
-    // peter-panning reappears (too small → acne, too large → light leak near contacts).
+    // close occluder's shadow drops off the receiver. In texels of the map (RenderingServer.ShadowNormalOffsetTexels):
+    // too small → acne, too large → light leak near contacts (a lit ring under a ball).
 #if CSM_CASCADES > 0
-    const float CSM_NORMAL_OFFSET = 0.04;
-    vec4 shadowWorldPos = vec4(v_Position + normalW * CSM_NORMAL_OFFSET, 1.0);
+    vec4 shadowWorldPos = vec4(v_Position + normalW * csm_normal_offset, 1.0);   // in texels of the map (RenderingServer)
 #endif
 #if defined(CSM4)
     v_ShadowPos[0] = csm_vp[0] * shadowWorldPos;

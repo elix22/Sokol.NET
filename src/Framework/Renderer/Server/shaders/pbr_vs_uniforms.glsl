@@ -31,7 +31,7 @@
 layout(binding=0) uniform pbr_vs_params {
     mat4 view_proj;
     vec3 eye_pos;
-    float _pad0;
+    float csm_normal_offset;   // world units: the shadow lookup pushed along the normal (RenderingServer.CsmNormalOffset)
 
     // Morph-target weights (8 weights packed as 2 × vec4; used when MORPHING is defined).
     vec4 u_morphWeights[2];

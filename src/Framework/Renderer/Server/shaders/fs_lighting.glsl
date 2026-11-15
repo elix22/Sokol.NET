@@ -96,12 +96,13 @@ float sampleCsmShadow(vec3 worldPos, float view_depth, float ndotl)
 #else
     float receiver = ndc.z;
 #endif
-    // Depth bias — now SMALL because the normal-offset bias (pbr.glsl VS, CSM_NORMAL_OFFSET)
-    // carries most of the anti-acne work spatially. A large depth bias caused peter-panning
-    // (a close occluder's shadow dropping off the receiver), so the slope term is kept light;
-    // csm_bias is the near-perpendicular floor. If acne returns, raise CSM_NORMAL_OFFSET first.
+    // Depth bias — SMALL because the normal-offset bias (pbr.glsl VS, csm_normal_offset) carries most of the
+    // anti-acne work spatially. Both are sizes in texels of the map (RenderingServer.ShadowBiasTexels,
+    // ShadowNormalOffsetTexels), not fixed numbers: a fixed depth bias grew with the map's depth range (100 m
+    // and more) - a lit ring between a ball and its shadow. If acne returns, raise the normal offset first.
     float slope    = clamp(1.0 - ndotl, 0.0, 1.0);
-    float bias     = max(csm_bias, 0.0025 * slope);
+    const float CSM_SLOPE_BIAS = 2.0;   // a surface turned from the light: up to 3x the bias
+    float bias     = csm_bias * (1.0 + CSM_SLOPE_BIAS * slope);   // csm_bias: texels of the map as a world size (RenderingServer.ShadowBiasTexels)
     float slice    = float(cascade);
 
     vec2 texel = 1.0 / vec2(textureSize(sampler2DArray(shadow_atlas, shadow_atlas_smp), 0).xy);
