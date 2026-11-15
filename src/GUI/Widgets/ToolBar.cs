@@ -18,6 +18,14 @@ public sealed class ToolBarItem
     public ToolBarItemType Type    { get; set; } = ToolBarItemType.Button;
     public bool            Pressed { get; set; } = false;  // for Toggle type
     public bool            Enabled { get; set; } = true;
+    /// <summary>The label's colour for a state (Play green while playing, a failed build red); null: the theme's.
+    /// Shown also while the item is disabled - the state is still the state.</summary>
+    public UIColor?        StateColor { get; set; }
+    /// <summary>Busy: the label (a spinner glyph) drawn turning.</summary>
+    public bool            Spinning { get; set; }
+    /// <summary>A small count or mark at the item's top-right corner ("2": two devices); null or "": none.</summary>
+    public string?         Badge { get; set; }
+    public UIColor?        BadgeColor { get; set; }
     public Action?         OnClick { get; set; }
     /// <summary>Override the toolbar font for this item (e.g. "icons" for FA5 glyphs).</summary>
     public string?         FontName { get; set; }
@@ -213,7 +221,8 @@ public class ToolBar : Widget
             }
 
             // Label
-            var labelColor = !item.Enabled ? theme.TextDisabledColor
+            var labelColor = item.StateColor is { } state ? (item.Enabled ? state : state.WithAlpha(0.75f))
+                            : !item.Enabled ? theme.TextDisabledColor
                             : toggled   ? theme.AccentColor
                             : mouseDown ? theme.TextColor
                             : hov       ? theme.TextColor
@@ -227,9 +236,29 @@ public class ToolBar : Widget
                 renderer.SetFont(item.FontName);
                 renderer.SetFontSize(item.ItemFontSize > 0f ? item.ItemFontSize : (FontSize > 0f ? FontSize : theme.SmallFontSize));
             }
-            renderer.DrawText(cx, cy, item.Label, labelColor);
+            if (item.Spinning)
+            {
+                // a turning glyph: one turn a second
+                renderer.Save();
+                renderer.Translate(cx, cy);
+                renderer.Rotate((float)(Environment.TickCount64 % 1000 / 1000.0 * Math.PI * 2.0));
+                renderer.SetTextAlign(TextHAlign.Center, TextVAlign.Middle);
+                renderer.DrawText(0f, 0f, item.Label, labelColor);
+                renderer.Restore();
+            }
+            else renderer.DrawText(cx, cy, item.Label, labelColor);
             if (item.FontName != null)
                 ApplyFont(renderer, theme); // restore toolbar font
+            if (!string.IsNullOrEmpty(item.Badge))
+            {
+                renderer.SetFontSize(9f);
+                float bw = MathF.Max(12f, renderer.MeasureText(item.Badge) + 6f);
+                var br = new Rect(itemR.Right - bw + 2f, itemR.Y - 1f, bw, 12f);
+                renderer.FillRoundedRect(br, 6f, item.BadgeColor ?? theme.AccentColor);
+                renderer.SetTextAlign(TextHAlign.Center, TextVAlign.Middle);
+                renderer.DrawText(br.X + br.Width * 0.5f, br.Y + br.Height * 0.5f + 0.5f, item.Badge, UIColor.White);
+                ApplyFont(renderer, theme);
+            }
 
             pos += iw + 2f;
         }

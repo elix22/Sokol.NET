@@ -89,6 +89,8 @@ public class TextBox : Widget
     public Font?    Font             { get; set; }
     public float    FontSize         { get; set; } = 0f;
     public TextAlign Align           { get; set; } = TextAlign.Left;
+    /// <summary>The room between the box's edges and its text (a search box's icons sit in it).</summary>
+    public Thickness TextInsets      { get; set; } = new Thickness(4, 0, 4, 0);
 
     /// <summary>When true, typed and pasted characters are forced to uppercase as they're inserted, so the
     /// field reads back in capitals on every platform regardless of OS/soft-keyboard casing. Used for
@@ -133,7 +135,7 @@ public class TextBox : Widget
         var theme  = ThemeManager.Current;
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         float cr   = theme.InputCornerRadius;
-        var inner  = bounds.Deflate(new Thickness(4, 0, 4, 0));
+        var inner  = bounds.Deflate(TextInsets);
 
         _innerLeft  = inner.X;
         _innerWidth = inner.Width;
