@@ -130,7 +130,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sg_apply_uniforms(UB_cubemap_fs_cubemap_params,  SG_RANGE(ref fs));
             sg_apply_uniforms(UB_cubemap_tonemapping_params, SG_RANGE(ref tm));
 
-            sg_draw(0u, _indexCount, 1u);
+            Diagnostics.FrameDebugger.Pass = "Skybox";
+            if (Diagnostics.FrameDebugger.Draw("Skybox", (int)_indexCount, 1)) sg_draw(0u, _indexCount, 1u);
         }
 
         public void Shutdown()

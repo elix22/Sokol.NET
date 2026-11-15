@@ -177,7 +177,8 @@ namespace GameEditor.Framework.Renderer.Server.Sprites2D
                 bind.samplers[P.SMP_particles_particles_smp] = cmd.Nearest ? _nearest : _linear;
                 sg_apply_bindings(bind);
                 sg_apply_uniforms(P.UB_particles_particles_params, new sg_range { ptr = &vs, size = (nuint)sizeof(P.particles_particles_params_t) });
-                sg_draw(0, 6, (uint)cmd.Count);
+                Diagnostics.FrameDebugger.Pass = "Particles";
+                if (Diagnostics.FrameDebugger.Draw("particles", 6, cmd.Count)) sg_draw(0, 6, (uint)cmd.Count);
                 DrawCalls++;
             }
             QuadCount = _count;

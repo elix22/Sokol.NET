@@ -122,7 +122,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 views    = { [VIEW_screen_copy_src_tex] = srcView  },
                 samplers = { [SMP_screen_copy_src_smp]  = _sampler },
             });
-            sg_draw(0, 3, 1);
+            Diagnostics.FrameDebugger.Pass = "Post";
+            if (Diagnostics.FrameDebugger.Draw("Copy", 3, 1)) sg_draw(0, 3, 1);
         }
     }
 }

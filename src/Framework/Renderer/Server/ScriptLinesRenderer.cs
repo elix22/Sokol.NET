@@ -85,7 +85,8 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_pipeline(pip);
             sg_apply_uniforms(L.UB_lines_lines_vs_params, SG_RANGE(ref vs));
             sg_apply_bindings(new sg_bindings { vertex_buffers = { [0] = _vbuf }, vertex_buffer_offsets = { [0] = off } });
-            sg_draw(0, (uint)n, 1);
+            Diagnostics.FrameDebugger.Pass = "Lines";
+            if (Diagnostics.FrameDebugger.Draw("script lines", n, 1)) sg_draw(0, (uint)n, 1);
         }
 
         public static void Shutdown()

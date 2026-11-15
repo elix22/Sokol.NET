@@ -651,6 +651,7 @@ namespace GameEditor.Framework.Renderer.Server
             UpdateSkinnedAnimators(ECSWorld.Instance);
             Scene.WorldParticles.GatherMeshes();         // the mesh particles cast shadows this frame (G8.8 Q6)
 
+            Diagnostics.FrameDebugger.Pass = "Shadows";
             FrameProfiler.Begin(FrameProfiler.Zone.ShadowPass);
             CollectLightsAndShadows(ECSWorld.Instance, in viewProj, renderShadowPasses: true, csm, forDrawing: false);
             FrameProfiler.End(FrameProfiler.Zone.ShadowPass);
@@ -1207,6 +1208,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             // ── 6. Walk sorted groups ─────────────────────────────────────────────────────
 
+            Diagnostics.FrameDebugger.Pass = "Scene";
             FrameProfiler.Begin(FrameProfiler.Zone.DrawCalls);
             int instanceOffset = 0;
             int i = 0;
@@ -1358,7 +1360,8 @@ namespace GameEditor.Framework.Renderer.Server
                         },
                     });
 
-                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                    if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + (bpm ?? mat)?.Name, sub.IndexCount, groupSize, subAlpha ? "Blinn-Phong, blended" : "Blinn-Phong"))
+                        sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                     _stats.DrawCalls++;
                 }
 
@@ -2073,7 +2076,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }
@@ -2359,7 +2363,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                sg_draw(0u, (uint)sub.IndexCount, 1u);
+                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, 1, "PBR, transmission"))
+                    sg_draw(0u, (uint)sub.IndexCount, 1u);
                 _stats.DrawCalls++;
             }
         }
@@ -2739,7 +2744,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -2949,7 +2955,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3155,7 +3162,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3371,7 +3379,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3576,7 +3585,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3784,7 +3794,8 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            sg_draw(0u, (uint)mesh.IndexCount, 1u);
+            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+                sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3995,7 +4006,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }
@@ -4222,7 +4234,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }

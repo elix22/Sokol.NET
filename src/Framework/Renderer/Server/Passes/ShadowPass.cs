@@ -457,7 +457,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                         views    = { [SkinnedCaster.VIEW_u_jointsSampler_Tex] = useTex ? entry.JointTextureView : _jointPlaceholderView },
                         samplers = { [SkinnedCaster.SMP_u_jointsSampler_Smp]  = _jointSampler },
                     });
-                    sg_draw(0, (uint)mesh.IndexCount, 1);
+                    if (Diagnostics.FrameDebugger.Draw("shadow caster", mesh.IndexCount, 1)) sg_draw(0, (uint)mesh.IndexCount, 1);
                     draws++;
                 }
             }
@@ -570,7 +570,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                             index_buffer = prim.IndexBuffer,
                         });
 
-                        sg_draw(0, (uint)prim.IndexCount, 1);
+                        if (Diagnostics.FrameDebugger.Draw("shadow caster", prim.IndexCount, 1)) sg_draw(0, (uint)prim.IndexCount, 1);
                         drawCallCount++;
                         continue;
                     }
@@ -589,7 +589,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                             index_buffer = sub.IndexBuffer,
                         });
 
-                        sg_draw(0, (uint)sub.IndexCount, 1);
+                        if (Diagnostics.FrameDebugger.Draw("shadow caster", sub.IndexCount, 1)) sg_draw(0, (uint)sub.IndexCount, 1);
                         drawCallCount++;
                     }
                 }
@@ -618,7 +618,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     {
                         var vsp = new shadow_caster_vs_params_t { mvp = meshParticles[k].Model * lightViewProj };
                         sg_apply_uniforms(UB_shadow_caster_vs_params, SG_RANGE(ref vsp));
-                        sg_draw(0, (uint)indexCount, 1);
+                        if (Diagnostics.FrameDebugger.Draw("shadow caster", indexCount, 1)) sg_draw(0, (uint)indexCount, 1);
                         drawCallCount++;
                     }
                 }

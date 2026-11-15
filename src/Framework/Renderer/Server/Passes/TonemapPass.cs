@@ -117,7 +117,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 samplers = { [SMP_tonemap_pass_hdr_smp]  = _sampler, [SMP_tonemap_pass_bloom_smp] = _sampler },
             });
 
-            sg_draw(0, 3, 1);
+            Diagnostics.FrameDebugger.Pass = "Post";
+            if (Diagnostics.FrameDebugger.Draw("Tonemap", 3, 1)) sg_draw(0, 3, 1);
         }
     }
 }

@@ -274,7 +274,7 @@ namespace GameEditor.Framework.Renderer.Server
                     vertex_buffers = { [0] = _vbuf }, vertex_buffer_offsets = { [0] = off },
                     views = { [T3.VIEW_text3d_text_tex] = e.Tex }, samplers = { [T3.SMP_text3d_text_smp] = _sampler },
                 });
-                sg_draw(0, 6, 1);
+                if (Diagnostics.FrameDebugger.Draw("text glyph", 6, 1)) sg_draw(0, 6, 1);
             }
         }
 

@@ -133,7 +133,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             b.samplers[SMP_bloom_src_smp] = _sampler;
             if (high.id != 0) { b.views[VIEW_bloom_high_tex] = high; b.samplers[SMP_bloom_high_smp] = _sampler; }
             sg_apply_bindings(b);
-            sg_draw(0, 3, 1);
+            Diagnostics.FrameDebugger.Pass = "Post";
+            if (Diagnostics.FrameDebugger.Draw("Bloom", 3, 1)) sg_draw(0, 3, 1);
             sg_end_pass();
         }
 

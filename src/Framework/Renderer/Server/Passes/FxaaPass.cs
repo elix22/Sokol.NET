@@ -88,7 +88,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 views = { [VIEW_fxaa_src_tex] = source },
                 samplers = { [SMP_fxaa_src_smp] = _sampler },
             });
-            sg_draw(0, 3, 1);
+            Diagnostics.FrameDebugger.Pass = "Post";
+            if (Diagnostics.FrameDebugger.Draw("FXAA", 3, 1)) sg_draw(0, 3, 1);
         }
     }
 }
