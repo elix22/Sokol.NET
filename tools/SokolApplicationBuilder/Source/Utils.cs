@@ -1048,6 +1048,7 @@ namespace SokolApplicationBuilder
 
             var scriptTypes = new List<string>();
             var scriptFields = new Dictionary<string, List<(string Name, string Call)>>();
+            var dataFields = new Dictionary<string, List<(string Name, string Call)>>();   // §6: [DataAsset] classes
             try
             {
                 using var fs = new FileStream(dllPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -1066,6 +1067,13 @@ namespace SokolApplicationBuilder
                     var typeDef = mr.GetTypeDefinition(typeDefHandle);
 
                     if ((typeDef.Attributes & System.Reflection.TypeAttributes.Abstract) != 0) continue;
+                    if (HasDataAssetAttribute(mr, typeDef))
+                    {
+                        // §6: a data asset's class - made and set by generated code, as a script is.
+                        if (GetCSharpTypeName(mr, typeDef) is { } dataName && HasPublicParameterlessConstructor(mr, typeDef))
+                            dataFields[dataName] = SettableFields(mr, typeDefHandle, Path.GetDirectoryName(dllPath)!);
+                        continue;
+                    }
                     if (!DerivesFromGameBehaviour(mr, typeDef)) continue;
 
                     string? typeName = GetCSharpTypeName(mr, typeDef);
@@ -1105,6 +1113,20 @@ namespace SokolApplicationBuilder
             sb.AppendLine("    [ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");
+            foreach (var (t, fields) in dataFields)
+            {
+                const string scripting = "global::GameEditor.Framework.Scripting";
+                sb.AppendLine($"        {scripting}.DataAssets.Register<global::{t}>(static (object asset, string field, in {scripting}.ScriptFieldValue value) =>");
+                sb.AppendLine("        {");
+                sb.AppendLine($"            var s = (global::{t})asset;");
+                sb.AppendLine("            switch (field)");
+                sb.AppendLine("            {");
+                foreach (var (name, call) in fields)
+                    sb.AppendLine($"                case \"{name}\": return {scripting}.ScriptValue.{call}(ref s.@{name}, value);");
+                sb.AppendLine("                default: return false;");
+                sb.AppendLine("            }");
+                sb.AppendLine("        });");
+            }
             if (scriptTypes.Count == 0)
             {
                 sb.AppendLine("        // No GameBehaviour subclasses found.");
@@ -1242,11 +1264,45 @@ namespace SokolApplicationBuilder
             return fields;
         }
 
-        /// <summary>The ScriptValue method for a field of this signature, or null when a text cannot set it.</summary>
+        /// <summary>The ScriptValue method for a field of this signature, or null when a text cannot set it. A List&lt;T&gt;
+        /// or a T[] of such a T: Set (SetEnums for an enum's) - the list's overloads.</summary>
         private static string? FieldSetterCall(MetadataReader mr, BlobReader signature, string dllFolder)
         {
             if (signature.ReadSignatureHeader().Kind != SignatureKind.Field) return null;
-            switch (signature.ReadSignatureTypeCode())
+            var code = signature.ReadSignatureTypeCode();
+            if (code == SignatureTypeCode.SZArray)
+                return ListSetterCall(ElementSetterCall(mr, ref signature, signature.ReadSignatureTypeCode(), dllFolder));
+            if (code == SignatureTypeCode.GenericTypeInstance)
+            {
+                signature.ReadSignatureTypeCode();                        // a class
+                var generic = signature.ReadTypeHandle();
+                if (signature.ReadCompressedInteger() != 1 || generic.Kind != HandleKind.TypeReference) return null;
+                var list = mr.GetTypeReference((TypeReferenceHandle)generic);
+                if (mr.GetString(list.Namespace) != "System.Collections.Generic" || mr.GetString(list.Name) != "List`1") return null;
+                return ListSetterCall(ElementSetterCall(mr, ref signature, signature.ReadSignatureTypeCode(), dllFolder));
+            }
+            return ElementSetterCall(mr, ref signature, code, dllFolder);
+        }
+
+        private static string? ListSetterCall(string? element) => element switch { "Set" => "Set", "SetEnum" => "SetEnums", "SetScript" => "SetScripts", "SetData" => "Set", _ => null };
+
+        /// <summary>§6: the class is marked [DataAsset] (GameEditor.Framework.Scripting.DataAssetAttribute).</summary>
+        private static bool HasDataAssetAttribute(MetadataReader mr, TypeDefinition typeDef)
+        {
+            foreach (var h in typeDef.GetCustomAttributes())
+            {
+                var ctor = mr.GetCustomAttribute(h).Constructor;
+                if (ctor.Kind != HandleKind.MemberReference) continue;
+                var parent = mr.GetMemberReference((MemberReferenceHandle)ctor).Parent;
+                if (parent.Kind == HandleKind.TypeReference && mr.GetString(mr.GetTypeReference((TypeReferenceHandle)parent).Name) == "DataAssetAttribute") return true;
+            }
+            return false;
+        }
+
+        /// <summary>The ScriptValue method for a value of this type (after its type code), or null.</summary>
+        private static string? ElementSetterCall(MetadataReader mr, ref BlobReader signature, SignatureTypeCode code, string dllFolder)
+        {
+            switch (code)
             {
                 case SignatureTypeCode.Boolean: case SignatureTypeCode.Char: case SignatureTypeCode.Byte: case SignatureTypeCode.Int16:
                 case SignatureTypeCode.Int32: case SignatureTypeCode.UInt32: case SignatureTypeCode.Int64: case SignatureTypeCode.UInt64:
@@ -1259,7 +1315,12 @@ namespace SokolApplicationBuilder
             }
             var type = signature.ReadTypeHandle();
             if (type.Kind == HandleKind.TypeDefinition)
-                return IsEnum(mr, mr.GetTypeDefinition((TypeDefinitionHandle)type)) ? "SetEnum" : null;
+            {
+                var def = mr.GetTypeDefinition((TypeDefinitionHandle)type);
+                if (IsEnum(mr, def)) return "SetEnum";
+                if (HasDataAssetAttribute(mr, def)) return "SetData";              // §6: a data asset's key
+                return DerivesFromGameBehaviour(mr, def) ? "SetScript" : null;      // §6: a field of a script's type
+            }
             if (type.Kind != HandleKind.TypeReference) return null;
 
             var reference = mr.GetTypeReference((TypeReferenceHandle)type);
@@ -1270,6 +1331,8 @@ namespace SokolApplicationBuilder
                 case "System.Numerics.Matrix3x2": case "System.Numerics.Matrix4x4": case "GameEditor.Framework.Scene.Prefab":
                 case "Frent.Entity":
                     return "Set";
+                case "GameEditor.Framework.Scripting.EventChannel":
+                    return "SetData";                                                 // §6: the engine's own data asset
             }
             // An enum of another assembly (the engine's): that assembly lies beside the game's.
             if (reference.ResolutionScope.Kind != HandleKind.AssemblyReference) return null;
