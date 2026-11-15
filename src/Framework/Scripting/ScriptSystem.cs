@@ -107,6 +107,7 @@ namespace GameEditor.Framework.Scripting
                         TryCreateBehaviour(id, item);
                 }
             }
+            ApplyRefs();
             Logger.Info($"[ScriptSystem] Populated {_running.Count} behaviour(s) from scene.");
         }
 
@@ -128,6 +129,7 @@ namespace GameEditor.Framework.Scripting
                     foreach (var item in extra.Scripts)
                         TryCreateBehaviour(id, item, target);
             }
+            ApplyRefs();
         }
 
         /// <summary>
@@ -141,12 +143,93 @@ namespace GameEditor.Framework.Scripting
             {
                 if (_running[i].EntityId != entity) continue;
                 SafeCall(_running[i].Behaviour, static beh => beh.OnDestroy(), "OnDestroy");
+                EndEvents(_running[i].Behaviour);
                 _running.RemoveAt(i);
             }
+            for (int i = 0; i < _pendingStart.Count; i++)
+                if (_pendingStart[i].EntityId == entity) EndEvents(_pendingStart[i].Behaviour);
             _pendingStart.RemoveAll(entry => entry.EntityId == entity);   // never started: nothing to end
         }
 
+        // §6: the handlers a script added (GameBehaviour.On) end with it - the script itself, or the one a proxy wraps.
+        private static void EndEvents(GameBehaviour b)
+        {
+            Events.RemoveOwner(b);
+            if (b is IScriptProxy p) Events.RemoveOwner(p.Script);
+        }
+
+        // ── §6: a script of an entity, by its type ───────────────────────────
+
+        /// <summary>The first running script of type <typeparamref name="T"/> on <paramref name="entity"/> (one added this
+        /// frame too), or null. A type test, no reflection: a script of the editor's Play (wrapped) is found as itself.</summary>
+        public static T? Find<T>(Entity entity) where T : class => FindIn<T>(_running, entity) ?? FindIn<T>(_pendingStart, entity);
+
+        /// <summary>Every running script of type <typeparamref name="T"/> on <paramref name="entity"/>, into <paramref name="into"/>
+        /// (cleared first); how many.</summary>
+        public static int FindAll<T>(Entity entity, List<T> into) where T : class
+        {
+            into.Clear();
+            AllIn(_running, entity, into);
+            AllIn(_pendingStart, entity, into);
+            return into.Count;
+        }
+
+        private static T? FindIn<T>(List<(Entity EntityId, GameBehaviour Behaviour)> list, Entity entity) where T : class
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i].EntityId != entity) continue;
+                if (As<T>(list[i].Behaviour) is { } t) return t;
+            }
+            return null;
+        }
+
+        private static void AllIn<T>(List<(Entity EntityId, GameBehaviour Behaviour)> list, Entity entity, List<T> into) where T : class
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].EntityId == entity && As<T>(list[i].Behaviour) is { } t) into.Add(t);
+        }
+
+        private static T? As<T>(GameBehaviour b) where T : class => b as T ?? (b is IScriptProxy p ? p.Script as T : null);
+
         private static void TryCreateBehaviour(Entity id, ScriptComponent sc) => TryCreateBehaviour(id, sc, _running);
+
+        private static readonly List<(GameBehaviour Behaviour, string Type, Dictionary<string, Entity> Refs)> _refsLater = new();
+
+        // The references of the scripts just made: an entity, an element of a list of them, or (§6) a script of an
+        // entity. The entity, or none when it is no longer in the scene.
+        private static void ApplyRefs()
+        {
+            foreach (var (behaviour, type, refs) in _refsLater)
+            {
+                if (_setters.TryGetValue(type, out var set))
+                {
+                    foreach (var (key, pointed) in refs)
+                    {
+                        Entity live = !pointed.IsNull && pointed.IsAlive ? pointed : default;
+                        var (field, element) = ScriptValue.ElementKey(key);     // "Targets[2]": a list's element
+                        if (set(behaviour, field, element >= 0 ? new ScriptFieldValue(live, element) : new ScriptFieldValue(live))) FieldsSetByGeneratedCode++;
+                        else Logger.Warning($"[ScriptSystem] {type}.{field}: no field of type Entity (or of a script's type) of that name.");
+                    }
+                }
+                else behaviour.ApplySerializedReferences(refs);
+            }
+            _refsLater.Clear();
+        }
+
+        /// <summary>The first running script on <paramref name="entity"/> that is a <paramref name="type"/> (by name: the
+        /// reflection path of the editor's Play and the web page), or null.</summary>
+        internal static object? FindOfType(Entity entity, Type type)
+        {
+            foreach (var list in new[] { _running, _pendingStart })
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].EntityId != entity) continue;
+                    object b = list[i].Behaviour is IScriptProxy p ? p.Script : list[i].Behaviour;
+                    if (type.IsInstanceOfType(b)) return b;
+                }
+            return null;
+        }
 
         private static void TryCreateBehaviour(Entity id, ScriptComponent sc, List<(Entity EntityId, GameBehaviour Behaviour)> target)
         {
@@ -173,20 +256,9 @@ namespace GameEditor.Framework.Scripting
                     }
                     else behaviour.ApplySerializedProperties(sc.Properties);
                 }
-                if (sc.Refs != null && sc.Refs.Count > 0)
-                {
-                    // A field that points to an entity: the entity, or none when it is no longer in the scene.
-                    if (_setters.TryGetValue(sc.TypeName, out var set))
-                    {
-                        foreach (var (field, pointed) in sc.Refs)
-                        {
-                            Entity live = !pointed.IsNull && pointed.IsAlive ? pointed : default;
-                            if (set(behaviour, field, new ScriptFieldValue(live))) FieldsSetByGeneratedCode++;
-                            else Logger.Warning($"[ScriptSystem] {sc.TypeName}.{field}: no field of type Entity of that name.");
-                        }
-                    }
-                    else behaviour.ApplySerializedReferences(sc.Refs);
-                }
+                // §6: the references once every script of the scene (or of what came into it) is made - a field of a
+                // script's type is that entity's script, which may be made after this one.
+                if (sc.Refs != null && sc.Refs.Count > 0) _refsLater.Add((behaviour, sc.TypeName, sc.Refs));
                 target.Add((id, behaviour));
             }
             catch (Exception ex)
@@ -289,6 +361,8 @@ namespace GameEditor.Framework.Scripting
             _running.Clear();
             _pendingStart.Clear();
             _started = false;
+            Events.Clear();                         // §6: no handler outlives the game that added it
+            DataAssets.ForgetInstances();           // §6: the next Play reads the asset files as they are then
             Animation.AnimationSystem.Reset();      // its bindings name this game's entities
             Draw.Clear();
             Animation.AnimatorSystem.Reset();

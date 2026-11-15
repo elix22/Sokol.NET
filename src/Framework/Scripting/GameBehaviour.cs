@@ -20,10 +20,35 @@ namespace GameEditor.Framework.Scripting
     /// Attach to entities via a <see cref="ScriptComponent"/> whose TypeName matches
     /// the subclass name.
     /// </summary>
+    /// <summary>A stand-in for a script (the editor's Play wraps the script of a game it loaded): the script itself.</summary>
+    public interface IScriptProxy
+    {
+        object Script { get; }
+    }
+
     public abstract class GameBehaviour
     {
         /// <summary>The ECS entity this behaviour is attached to.</summary>
         public Entity EntityId { get; internal set; }
+
+        // ── §6: other scripts, events ───────────────────────────────────────
+
+        /// <summary>This entity's script of type <typeparamref name="T"/> (its first), or null: small scripts that work
+        /// together (PlayerInput, PlayerMovement, Health) instead of one big one.</summary>
+        protected T? GetScript<T>() where T : class => ScriptSystem.Find<T>(EntityId);
+
+        /// <summary>Another entity's script of type <typeparamref name="T"/>, or null.</summary>
+        protected T? GetScript<T>(Entity entity) where T : class => ScriptSystem.Find<T>(entity);
+
+        /// <summary>This entity's script of type <typeparamref name="T"/>: false when it has none.</summary>
+        protected bool TryGetScript<T>(out T script) where T : class => (script = ScriptSystem.Find<T>(EntityId)!) != null;
+
+        /// <summary>Another entity's script of type <typeparamref name="T"/>: false when it has none.</summary>
+        protected bool TryGetScript<T>(Entity entity, out T script) where T : class => (script = ScriptSystem.Find<T>(entity)!) != null;
+
+        /// <summary>Calls <paramref name="handler"/> on each <typeparamref name="T"/> published (<see cref="Events.Publish{T}"/>)
+        /// while this script runs: it is taken away when the script ends. Returns the handler (for <see cref="Events.Off{T}"/>).</summary>
+        protected System.Action<T> On<T>(System.Action<T> handler) => Events.On(handler, this);
 
         // ── ECS convenience ─────────────────────────────────────────────────
 
@@ -81,16 +106,39 @@ namespace GameEditor.Framework.Scripting
         /// </summary>
         public virtual void ApplySerializedReferences(Dictionary<string, Entity> references)
         {
-            foreach (var (name, target) in references)
+            foreach (var (name, target) in references) ApplyReference(this, this.GetType(), name, target);
+        }
+
+        /// <summary>
+        /// One reference of a scene's script, by reflection: a field of type Entity, or an element of a list or an array
+        /// of entities ("Targets[2]": the list as long as its text said, read before the references).
+        /// </summary>
+        public static void ApplyReference(object script, Type type, string key, Entity target)
+        {
+            var (name, index) = ScriptValue.ElementKey(key);
+            var fi = type.GetField(name, BindingFlags.Public | BindingFlags.Instance);
+            if (fi == null) return;
+            Entity live = !target.IsNull && target.IsAlive ? target : default;
+            if (index < 0)
             {
-                var fi = this.GetType().GetField(name, BindingFlags.Public | BindingFlags.Instance);
-                if (fi == null || fi.FieldType != typeof(Entity)) continue;
-                fi.SetValue(this, !target.IsNull && target.IsAlive ? target : default(Entity));
+                if (fi.FieldType == typeof(Entity)) fi.SetValue(script, live);
+                else if (typeof(GameBehaviour).IsAssignableFrom(fi.FieldType))       // §6: that entity's script of the field's type
+                    fi.SetValue(script, live.IsNull ? null : ScriptSystem.FindOfType(live, fi.FieldType));
+                return;
             }
+            System.Type? element = fi.FieldType.IsArray ? fi.FieldType.GetElementType()
+                          : fi.FieldType.IsGenericType && fi.FieldType.GetGenericTypeDefinition() == typeof(List<>) ? fi.FieldType.GetGenericArguments()[0] : null;
+            if (element == null || fi.GetValue(script) is not System.Collections.IList list || index >= list.Count) return;
+            if (element == typeof(Entity)) list[index] = live;
+            else if (typeof(GameBehaviour).IsAssignableFrom(element)) list[index] = live.IsNull ? null : ScriptSystem.FindOfType(live, element);
         }
 
         public static object? ParseFieldValue(Type t, string s)
         {
+            // A list or an array (§8): its elements, each read as a field of the element's type.
+            if ((t.IsArray && t.GetArrayRank() == 1) || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>)))
+                return ParseList(t, s);
+
             // Scalar numerics
             if (t == typeof(float))
                 return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out float f) ? f : null;
@@ -201,9 +249,33 @@ namespace GameEditor.Framework.Scripting
             if (t.IsEnum)
                 return Enum.TryParse(t, s, ignoreCase: true, out object? ev) ? ev : null;
 
+            // A data asset (§6): the one its key names, shared
+            if (!t.IsValueType && t != typeof(string) && DataAssets.IsDataAsset(t))
+                return DataAssets.Get(s, t);
+
             return null;
         }
         
+        // The reflection path only (the editor's Play, the web page): a game compiled ahead of time sets a list with
+        // ScriptValue.Set<T>, which the builder writes for each field.
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Not called in a game compiled ahead of time: ScriptValue.Set<T> sets its lists.")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "As above.")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "As above.")]
+        private static object? ParseList(Type t, string s)
+        {
+            Type element = t.IsArray ? t.GetElementType()! : t.GetGenericArguments()[0];
+            if (ScriptValue.Elements(s) is not { } items) return null;
+            var values = Array.CreateInstance(element, items.Count);
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (element == typeof(Entity) || items[i] == null) continue;       // none: an entity is set by its reference
+                object? v = element == typeof(string) ? items[i] : ParseFieldValue(element, items[i]!);
+                if (v == null && element.IsValueType) return null;             // no value of its type: the list is not set
+                values.SetValue(v, i);                                         // a prefab that is none: an empty slot
+            }
+            return t.IsArray ? values : Activator.CreateInstance(t, values);
+        }
+
         /// <summary>Called once when play mode starts. Use for initialization.</summary>
         public virtual void OnStart() { }
 

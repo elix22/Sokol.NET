@@ -234,10 +234,12 @@ namespace GameEditor.Framework.Scene
                                 times.Tracks = times.Now;
                                 // And the animation clips its players name: a clip plays from the game's first frame.
                                 Assets.ClipLibrary.LoadNamedIn(TextsOf(json, loaded), () => Assets.ControllerLibrary.LoadNamedIn(TextsOf(json, loaded), () =>
+                                    // §6: the data assets the scene and its prefabs name: a script's field has its asset from OnStart
+                                    Scripting.DataAssets.LoadNamedIn(TextsOf(json, loaded), () =>
                                 {
                                     times.Clips = times.Now;            // the clips and the controllers
                                     then(json, loaded);
-                                }));
+                                })));
                             }); }); });
                     }, freshMaps); });
                 }

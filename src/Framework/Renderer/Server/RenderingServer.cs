@@ -129,6 +129,33 @@ namespace GameEditor.Framework.Renderer.Server
         /// </summary>
         public static Vector3? PreviewSunDirection { get; set; }
 
+        // ── §9.2 (examples/GameEditor/docs/EDITOR_ENHANCEMENTS_DESIGN.md): a preview - a model or a material drawn alone ──
+
+        private static PreviewDraw[] _previewDraws = new PreviewDraw[64];
+        private static int _previewCount;
+        private static bool _preview;                 // SubmitMeshes / CollectLightsAndShadows: the preview's draws, not the scene
+        private static Vector3 _previewKeyLight;
+
+        /// <summary>
+        /// Draws <paramref name="draws"/> alone into the pass that is open (an editor's thumbnail): none of the scene - its
+        /// meshes, skinned characters, particles, lights, probes, lightmaps, sprites, texts - and no shadows; lit by one
+        /// directional key light from <paramref name="keyLight"/> (the direction the light travels) and the environment's
+        /// image light. Its own view slot (<paramref name="viewIndex"/>, 6 by default) keeps the scene views' lighting.
+        /// </summary>
+        public static void SubmitPreview(in Matrix4x4 viewProj, ReadOnlySpan<PreviewDraw> draws, Vector3 keyLight,
+                                         PipelineFlags basePipelineFlags = PipelineFlags.OffscreenRt, int viewIndex = 6)
+        {
+            if (!_initialized || draws.Length == 0) return;
+            if (_previewDraws.Length < draws.Length) _previewDraws = new PreviewDraw[draws.Length];
+            draws.CopyTo(_previewDraws);
+            _previewCount = draws.Length;
+            _previewKeyLight = keyLight.LengthSquared() > 1e-8f ? Vector3.Normalize(keyLight) : -Vector3.UnitY;
+            _preview = true;
+            _hdrPass = (basePipelineFlags & PipelineFlags.Hdr) != 0;
+            try { SubmitMeshes(in viewProj, basePipelineFlags, viewIndex, false, null); }
+            finally { _preview = false; _previewCount = 0; }
+        }
+
         // One-shot IBL diagnostics: logs the first few PBR draws (use_ibl state, material
         // metallic/roughness, bound env view ids) so a "no reflections" report is debuggable.
         private static int _pbrIblLogCount;
@@ -970,7 +997,7 @@ namespace GameEditor.Framework.Renderer.Server
             // ── 1b. Skinned characters (GPU skinning) ────────────────────────────────────
             // Drawn here, before the static-mesh early-returns below, so a scene with ONLY a
             // rigged character still renders. Opaque + depth-tested, so order vs. static is free.
-            DrawSkinnedEntities(world, in viewProj, cameraPos, basePipelineFlags);
+            if (!_preview) DrawSkinnedEntities(world, in viewProj, cameraPos, basePipelineFlags);
 
             // ── 2. Extract draw commands ──────────────────────────────────────────────────
 
@@ -979,7 +1006,7 @@ namespace GameEditor.Framework.Renderer.Server
             _probeSlotCount = 0;
             // Gate per-entity TryGetComponent<LodGroup> behind a cheap per-frame archetype check
             // so non-LOD scenes pay nothing for this feature on the hot path.
-            bool anyLodGroups = world.HasAnyComponent<LodGroup>();
+            bool anyLodGroups = !_preview && world.HasAnyComponent<LodGroup>();
             // Resolve this view's LOD-history bucket ONCE, with the view-index bounds check
             // here rather than per entity in the loop. A stray viewIndex yields a null bucket,
             // so the entity simply renders without LOD history (LOD 0) instead of faulting.
@@ -987,6 +1014,7 @@ namespace GameEditor.Framework.Renderer.Server
                 anyLodGroups && (uint)viewIndex < (uint)_prevLodLevel.Length
                     ? _prevLodLevel[viewIndex]
                     : null;
+            if (!_preview)
             foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>()
                                      .EnumerateWithEntities<ActiveFlag, MeshRenderer, Transform>())
             {
@@ -1077,7 +1105,26 @@ namespace GameEditor.Framework.Renderer.Server
             }
 
             // Mesh particles (G8.8 Q6): drawn as the scene's meshes - culled, sorted, lit, shadowed - their colour the tint.
-            int meshBatches = Scene.WorldParticles.GatherMeshes();
+            // §9.2: a preview's draws (its mesh's own materials, or the one given), none of the scene's.
+            for (int d = 0; d < _previewCount && _drawCount < RenderingConstants.MAX_DRAWS; d++)
+            {
+                ref readonly var pd = ref _previewDraws[d];
+                MeshResource? meshRes = _meshReg.GetByPath(pd.Mesh);
+                if (meshRes == null) continue;
+                ushort matId = 0;
+                if (!string.IsNullOrEmpty(pd.Material))
+                {
+                    matId = _matReg.GetIdByKey(pd.Material);
+                    if (matId == 0) matId = _matReg.GetFirstIdByMtlFile(pd.Material);
+                }
+                Matrix4x4 pm = pd.Model;
+                Aabb box = meshRes.LocalBounds.Transform(pm);
+                _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, 0, 0, 0x40000000u | (uint)d, box.Center, box.Extents.Length());
+                _cpuInst[_drawCount] = new InstanceData(in pm, new Vector4(1f, 1f, 1f, 0f));
+                _drawCount++;
+            }
+
+            int meshBatches = _preview ? 0 : Scene.WorldParticles.GatherMeshes();
             var batches = Scene.WorldParticles.MeshBatches;
             var meshParticles = Scene.WorldParticles.Meshes;
             for (int b = 0; b < meshBatches && _drawCount < RenderingConstants.MAX_DRAWS; b++)
@@ -1448,6 +1495,14 @@ namespace GameEditor.Framework.Renderer.Server
             float mainIntensity = 0f;                    // the strongest directional light: lit particles' (G8.8 Q6)
             Vector3 mainDir = -Vector3.UnitY, mainColor = Vector3.Zero;
 
+            if (_preview)
+            {
+                // §9.2: a preview's one key light, no shadow (none of the scene's lights).
+                var key = new Light(Lighting.LightType.Directional, Vector3.Zero, _previewKeyLight, Vector3.One, 1.0f, 0f);
+                TryInsertTopLight(in key, float.MaxValue);
+                anyDirectionalLight = true;
+            }
+            else
             foreach (var row in world.Query<ActiveFlag, LightComponent, Transform>()
                                      .EnumerateWithEntities<ActiveFlag, LightComponent, Transform>())
             {
@@ -1513,7 +1568,7 @@ namespace GameEditor.Framework.Renderer.Server
             _mainLightDir = mainDir; _mainLightColor = mainColor;
             // The particles' lights (G8.8 Q5): point lights, ranked with the scene's by the same importance - inside the quality
             // level's light limit and Forward+'s clusters; no shadows.
-            int particleLights = Scene.WorldParticles.GatherLights(world);
+            int particleLights = _preview ? 0 : Scene.WorldParticles.GatherLights(world);
             var lights = Scene.WorldParticles.Lights;
             for (int pi = 0; pi < particleLights; pi++)
             {

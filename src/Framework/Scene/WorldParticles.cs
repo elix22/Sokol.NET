@@ -427,7 +427,7 @@ namespace GameEditor.Framework.Scene
         {
             if (!ECSWorld.Instance.TryGetComponent<ParticlesComponent>(entity, out var c)) return;
             Pool p = Get(entity, in c);
-            if (p.Paused) { p.Paused = false; if (p.Playing) return; }
+            if (p.Paused) { p.Paused = false; if (p.Playing) return; p.HasLast = false; }   // paused: its last place is stale
             if (p.Playing) return;
             Begin(p, in c);
         }
@@ -451,6 +451,7 @@ namespace GameEditor.Framework.Scene
         {
             if (!ECSWorld.Instance.TryGetComponent<ParticlesComponent>(entity, out var c)) return;
             Pool p = Get(entity, in c);
+            if (p.Paused) p.HasLast = false;   // paused: its last place is stale
             p.Count = 0; p.Paused = false;
             ResetTrails(p);
             Begin(p, in c);
@@ -479,7 +480,9 @@ namespace GameEditor.Framework.Scene
         {
             p.Playing = true;
             p.Time = 0f;
-            p.Carry = 0f; p.DistanceCarry = 0f; p.HasLast = false;
+            // The emitter's last place is kept (every step tracks it, playing or not): its speed is known on the first step,
+            // which at a low frame rate already makes particles (Lifetime by Emitter Speed, Inherit Velocity).
+            p.Carry = 0f; p.DistanceCarry = 0f;
             p.NeedsPrewarm = c.Prewarm && c.Looping;
         }
 

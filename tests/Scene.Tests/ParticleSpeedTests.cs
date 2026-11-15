@@ -96,6 +96,31 @@ namespace Scene.Tests
         }
 
         [Fact]
+        public void A_moving_emitter_played_at_a_low_frame_rate_knows_its_speed_on_its_first_step()
+        {
+            // Steps of 0.1 s (a slow phone): the first step after Play already makes particles. The emitter's speed was lost
+            // on Play, and those lived their whole life (Android builds: life=1.00x).
+            const float Slow = 0.1f;
+            var p = ParticlesComponent.Base;
+            p.PlayOnAwake = false; p.Rate = 20f; p.Life = new Vector2(2f, 2f); p.Speed = Vector2.Zero; p.World = true; p.ShapeOn = false;
+            p.LifetimeBySpeedOn = true; p.LifetimeBySpeed = ParticleCurve.Line(1f, 0.5f); p.LifetimeSpeedRange = new Vector2(0f, 10f);
+            Entity carried = Emitter(p);
+            var ages = new float[256];
+            float oldest = 0f;
+            for (int i = 0; i < 40; i++)
+            {
+                var t = World.GetComponent<Transform>(carried);
+                t.Position = new Vector3(i * 10f * Slow, 0, 0);
+                World.AddComponent(carried, t);
+                if (i == 3) WorldParticles.Play(carried);
+                WorldParticles.Step(World, Slow);
+                int n = WorldParticles.CopyAges(carried, ages);
+                for (int k = 0; k < n; k++) oldest = MathF.Max(oldest, ages[k]);
+            }
+            Assert.InRange(oldest, 0.85f, 1.01f);
+        }
+
+        [Fact]
         public void The_by_speed_fields_are_written_and_read_back()
         {
             var p = Moving(3f);

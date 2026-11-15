@@ -41,6 +41,16 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 {
     public static class GltfImporter
     {
+        private static readonly Dictionary<string, (string Mesh, string? Material, Matrix4x4 World)[]> _placements = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// §9.2: a model's static meshes where its nodes put them (each primitive's key, its material's - a PBR material
+        /// is the draw's, not its sub-mesh's - and its node's world matrix), as
+        /// its last import or preload read them - a model drawn without entities (an editor's thumbnail). Null before
+        /// the model was read. Skinned and morphing meshes are not in it.
+        /// </summary>
+        public static (string Mesh, string? Material, Matrix4x4 World)[]? Placements(string path) =>
+            _placements.TryGetValue(path, out var p) ? p : null;
         /// <summary>
         /// Imports the glTF/GLB at <paramref name="assetsRelativePath"/> (e.g. "Models/Helmet.glb",
         /// resolved against the current project's Assets folder via SFilesystem). Registers all
@@ -305,6 +315,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                 }
 
                 RegisterResources(charMeshPtrs, out var primKeysByMesh, out var primMatsByMesh);
+                RecordPlacements(primKeysByMesh, primMatsByMesh);
 
                 // Character meshes register their GPU meshes + shared animator into
                 // SkinnedCharacterRegistry ALWAYS — even in preload (_buildEntities == false) — so a
@@ -336,6 +347,25 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                 // empty primKeys), so a mixed model renders both. Pure-static models use only this walk.
                 BuildNodes(container, primKeysByMesh, primMatsByMesh);
                 return container;
+            }
+
+            // §9.2: each static mesh node's primitives at the node's world matrix (Placements).
+            private void RecordPlacements(Dictionary<IntPtr, string[]> primKeysByMesh, Dictionary<IntPtr, string[]> primMatsByMesh)
+            {
+                var list = new List<(string, string?, Matrix4x4)>();
+                float* wm = stackalloc float[16];
+                for (int ni = 0; ni < (int)_data->nodes_count; ni++)
+                {
+                    cgltf_node* node = &_data->nodes[ni];
+                    if (node->mesh == null || !primKeysByMesh.TryGetValue((IntPtr)node->mesh, out var keys)) continue;
+                    cgltf_node_transform_world(in *node, wm);
+                    var world = new Matrix4x4(wm[0], wm[1], wm[2], wm[3], wm[4], wm[5], wm[6], wm[7],
+                                              wm[8], wm[9], wm[10], wm[11], wm[12], wm[13], wm[14], wm[15]);
+                    primMatsByMesh.TryGetValue((IntPtr)node->mesh, out var mats);
+                    for (int k = 0; k < keys.Length; k++)
+                        if (!string.IsNullOrEmpty(keys[k])) list.Add((keys[k], mats != null && k < mats.Length && !string.IsNullOrEmpty(mats[k]) ? mats[k] : null, world));
+                }
+                _placements[_path] = list.ToArray();
             }
 
             // Names of every skeleton-joint node across all skins — these are driven by CGltfAnimator,
