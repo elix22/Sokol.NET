@@ -101,7 +101,7 @@ namespace Scene.Tests
 
         static void Run(float seconds)
         {
-            for (int i = 0; i < (int)MathF.Round(seconds / Step); i++) SceneManager.UpdatePhysics(Step);
+            for (int i = 0; i < (int)MathF.Round(seconds / Step); i++) { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
         }
 
         [Fact]
@@ -137,7 +137,7 @@ namespace Scene.Tests
             int enter = 0, exit = 0, other = 0;
             for (int i = 0; i < 120; i++)
             {
-                SceneManager.UpdatePhysics(Step);
+                { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
                 int n = WorldParticles.CopyTriggered(e, ev);
                 for (int k = 0; k < n; k++)
                 {
@@ -171,7 +171,7 @@ namespace Scene.Tests
             float far0 = 0f, far1 = 0f;
             for (int i = 0; i < 240; i++)
             {
-                SceneManager.UpdatePhysics(Step);
+                { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
                 foreach (Vector3 at in Positions(bare)) far0 = MathF.Max(far0, at.Length());
                 foreach (Vector3 at in Positions(grown)) far1 = MathF.Max(far1, at.Length());
             }
@@ -212,10 +212,10 @@ namespace Scene.Tests
             Zone(Still(WindZoneMode.Spherical, 4f, 4f), new Vector3(-1, 0, 0));
             Entity near = Emitter(Floating(), Vector3.Zero), outside = Emitter(Floating(), new Vector3(10, 0, 0));
             SceneManager.Play();
-            SceneManager.UpdatePhysics(Step);
-            SceneManager.UpdatePhysics(Step);
+            { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
+            { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
             Vector3[] before = Velocities(near);
-            SceneManager.UpdatePhysics(Step);
+            { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
             Vector3[] after = Velocities(near);
             // One metre from the centre: 4 x (1 - 1/4) = 3 m/s/s, along +X (a step's change: those born in a step take the wind from the next).
             Assert.Equal(before.Length, after.Length);

@@ -229,7 +229,7 @@ namespace Scene.Tests
 
         static void Frames(int n, float dt)
         {
-            for (int i = 0; i < n; i++) { SceneManager.UpdatePhysics(dt); ScriptSystem.UpdateAll(dt); }
+            for (int i = 0; i < n; i++) { SceneManager.UpdatePhysics(dt); ScriptSystem.UpdateAll(dt); SceneManager.UpdateAfterScripts(dt); }
         }
 
         [Theory]

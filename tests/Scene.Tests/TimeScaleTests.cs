@@ -61,7 +61,7 @@ namespace Scene.Tests
 
         static void Run(int frames)
         {
-            for (int i = 0; i < frames; i++) { SceneManager.UpdatePhysics(Step); ScriptSystem.UpdateAll(Step); }
+            for (int i = 0; i < frames; i++) { SceneManager.UpdatePhysics(Step); ScriptSystem.UpdateAll(Step); SceneManager.UpdateAfterScripts(Step); }
         }
 
         [Fact]

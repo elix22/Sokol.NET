@@ -266,8 +266,7 @@ namespace GameEditor.Framework.Core
 
             if (SceneManager.PlayMode == PlayModeState.Playing)
             {
-                SceneManager.UpdatePhysics(deltaTime);
-                ScriptSystem.UpdateAll(deltaTime);
+                SceneManager.PlayFrame(deltaTime);   // physics, the scripts, then the particles
             }
         }
 

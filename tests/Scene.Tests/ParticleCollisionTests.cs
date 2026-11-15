@@ -77,7 +77,7 @@ namespace Scene.Tests
 
         static void Run(float seconds)
         {
-            for (int i = 0; i < (int)MathF.Round(seconds / Step); i++) SceneManager.UpdatePhysics(Step);
+            for (int i = 0; i < (int)MathF.Round(seconds / Step); i++) { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
         }
 
         [Fact]
@@ -90,7 +90,7 @@ namespace Scene.Tests
             bool up = false; Entity met = default;
             for (int i = 0; i < 180; i++)
             {
-                SceneManager.UpdatePhysics(Step);
+                { SceneManager.UpdatePhysics(Step); SceneManager.UpdateAfterScripts(Step); }
                 int n = WorldParticles.CopyCollisions(e, hits);
                 for (int k = 0; k < n; k++) { if (hits[k].Velocity.Y > 0.5f) up = true; met = hits[k].Other; }
             }

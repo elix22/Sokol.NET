@@ -1095,15 +1095,31 @@ namespace GameEditor.Framework.Scene
             Profiler.Begin(_profPhysics);
             StepWorlds(deltaTime);
             Profiler.End();
-            // The particles: after everything moved this frame, with the game's time - in a 2D game too, and held while it stands.
-            if (PlayMode == PlayModeState.Playing)
-            {
-                Profiler.Begin(_profParticles);
-                WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
-                Profiler.End();
-            }
-            // The shader graphs' Time node: the game's time (G8.10).
-            if (PlayMode == PlayModeState.Playing) Renderer.Server.Materials.Graph.GraphClock.Advance(deltaTime * TimeScale);
+        }
+
+        /// <summary>
+        /// After the scripts' OnUpdate (the reference editor's order: physics, the scripts, then the particles): the particles
+        /// with the game's time - in a 2D game too, held while it stands - so that an emitter a script moved this frame emits
+        /// from where it is now, at the speed it moved this frame; and the shader graphs' Time node (G8.10). Called by every
+        /// frame loop right after ScriptSystem.UpdateAll.
+        /// </summary>
+        public static void UpdateAfterScripts(float deltaTime)
+        {
+            if (PlayMode != PlayModeState.Playing) return;
+            Profiler.Begin(_profParticles);
+            WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
+            Profiler.End();
+            Renderer.Server.Materials.Graph.GraphClock.Advance(deltaTime * TimeScale);
+        }
+
+        /// <summary>One frame of play, in the reference editor's order: the fixed ticks and physics, the scripts' OnUpdate
+        /// (and OnLateUpdate), then the particles and what follows them. Every frame loop calls this (the game's, the editor's
+        /// Play, the automation's stepped frames).</summary>
+        public static void PlayFrame(float deltaTime)
+        {
+            UpdatePhysics(deltaTime);
+            Scripting.ScriptSystem.UpdateAll(deltaTime);
+            UpdateAfterScripts(deltaTime);
         }
 
         private static void StepWorlds(float deltaTime)

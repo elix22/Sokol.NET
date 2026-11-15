@@ -98,7 +98,7 @@ namespace Scene.Tests
         static void Run(float seconds)
         {
             int steps = (int)MathF.Round(seconds / Step);
-            for (int i = 0; i < steps; i++) { SceneManager.UpdatePhysics(Step); ScriptSystem.UpdateAll(Step); }
+            for (int i = 0; i < steps; i++) { SceneManager.UpdatePhysics(Step); ScriptSystem.UpdateAll(Step); SceneManager.UpdateAfterScripts(Step); }
         }
 
         static Vector3 At(Entity e) => World.GetComponent<Transform>(e).Position;
