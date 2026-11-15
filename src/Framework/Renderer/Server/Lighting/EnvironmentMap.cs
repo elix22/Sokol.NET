@@ -440,7 +440,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
             if (up >= 0f)
                 col = Vector3.Lerp(horizon, zenith, MathF.Pow(up, 0.5f));   // sky
             else
-                col = Vector3.Lerp(horizon, ground, MathF.Min(-up * 2.5f, 1f)); // ground
+                col = Vector3.Lerp(horizon, ground, MathF.Min(-up * 20f, 1f));  // ground: whole ~3 degrees below the horizon (as Godot's default sky; over ~24 degrees it looked like fog)
 
             // Sun: tight bright disc at low roughness, broad soft glow at high roughness.
             float sunDot    = MathF.Max(Vector3.Dot(dir, SunDir), 0f);
