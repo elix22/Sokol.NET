@@ -3253,19 +3253,22 @@ KeyAlias={keystoreInfo.KeyAlias}
                         try
                         {
                             var modelBuilder = new System.Text.StringBuilder();
+                            // A phone whose adb stopped answering must not hold every build: 10 s, then no name (as an error).
+                            using var modelTimeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
                             var modelResult = Cli.Wrap("adb")
                                 .WithArguments($"-s {deviceId} shell getprop ro.product.model")
                                 .WithStandardOutputPipe(PipeTarget.ToDelegate(line => modelBuilder.AppendLine(line)))
-                                .ExecuteAsync()
+                                .ExecuteAsync(modelTimeout.Token)
                                 .GetAwaiter()
                                 .GetResult();
                             model = modelBuilder.ToString().Trim();
 
                             var mfgBuilder = new System.Text.StringBuilder();
+                            using var mfgTimeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
                             var mfgResult = Cli.Wrap("adb")
                                 .WithArguments($"-s {deviceId} shell getprop ro.product.manufacturer")
                                 .WithStandardOutputPipe(PipeTarget.ToDelegate(line => mfgBuilder.AppendLine(line)))
-                                .ExecuteAsync()
+                                .ExecuteAsync(mfgTimeout.Token)
                                 .GetAwaiter()
                                 .GetResult();
                             manufacturer = mfgBuilder.ToString().Trim();
