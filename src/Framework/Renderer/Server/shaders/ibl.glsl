@@ -66,8 +66,20 @@ vec3 getDiffuseLight(vec3 n)
 }
 
 
+// A reflection probe's box projection (M8c, Lagarde): the reflected ray from the fragment met with the box's far side,
+// seen from the probe's capture point - a room's walls are reflected where they are.
+vec3 boxProject(vec3 p, vec3 r)
+{
+    vec3 tMax = (u_ReflBoxMax.xyz - p) / r;
+    vec3 tMin = (u_ReflBoxMin.xyz - p) / r;
+    vec3 tFar = max(tMin, tMax);   // a slab's far side: the larger distance (±0 and infinities included)
+    float t = min(min(tFar.x, tFar.y), tFar.z);
+    return p + r * t - u_ReflPos.xyz;
+}
+
 vec4 getSpecularSample(vec3 reflection, float lod)
 {
+    if (u_ReflPos.w > 0.5 && u_ReflBoxMin.w > 0.5) reflection = boxProject(v_Position, reflection);
     vec3 rotatedReflection = mat3(u_EnvRotation) * reflection;
     vec4 textureSample = textureLod(u_GGXEnvSampler, rotatedReflection, lod);
     textureSample.rgb *= u_EnvIntensity;

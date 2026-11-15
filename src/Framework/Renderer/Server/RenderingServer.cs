@@ -1065,6 +1065,9 @@ namespace GameEditor.Framework.Renderer.Server
                 ushort lodMask = (ushort)(drawFlags | (ushort)(lodIndex & 0xF));
                 // M8b: not lightmapped, with probes baked: its light from the probes at its centre (drawn on its own)
                 ushort probe = !lightmapped && GI.Lightmaps.HasProbes ? ProbeSlot(worldAabb.Center) : (ushort)0;
+                // M8c: without a probe slot, the reflection probe it reflects keeps its group apart (0x8000 + probe)
+                if (probe == 0 && GI.ReflectionProbes.Count > 0 && GI.ReflectionProbes.Choose(worldAabb.Center) is int rp and >= 0)
+                    probe = (ushort)(0x8000 | rp);
                 _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, lodMask, probe, (uint)entity.GetHashCode(), worldAabb.Center, worldRadius);
                 _cpuInst[_drawCount] = new InstanceData(
                     in model,
@@ -1255,9 +1258,11 @@ namespace GameEditor.Framework.Renderer.Server
 
                     // Pick the shadow-receiving variant: CSM4 (4 cascades, slices 0-3) when the
                     // camera supplied frustum data, else CSM1 (single slice-0 map), else no shadow.
-                    ushort groupProbe = _cmds[firstIdx].SortKey;   // M8b: the group's probe light, if any
-                    _probeOn = groupProbe != 0;
+                    ushort groupProbe = _cmds[firstIdx].SortKey;   // M8b: the group's probe light, if any; M8c: its reflection probe
+                    _probeOn = groupProbe != 0 && groupProbe < 0x8000;
                     if (_probeOn) { _probeSlots.AsSpan((groupProbe - 1) * 9, 9).CopyTo(_probeSH); ProbeDraws++; }
+                    _reflIndex = (groupProbe & 0x8000) != 0 ? groupProbe & 0x7FFF
+                               : _probeOn && GI.ReflectionProbes.Count > 0 ? GI.ReflectionProbes.Choose(_cmds[firstIdx].BoundsCenter) : -1;
                     if (_csmCascadeCount == 4)
                     {
                         DrawPbrCsm4Group(pbrMat, mesh, groupSize, pbrInstByteOffset,
@@ -1280,6 +1285,7 @@ namespace GameEditor.Framework.Renderer.Server
                             in pbrVs, in pbrLights, in pbrCam, in pbrIbl);
                     }
                     _probeOn = false;
+                    _reflIndex = -1;
 
                     instanceOffset += groupSize;
                     i += groupSize;
@@ -1840,6 +1846,12 @@ namespace GameEditor.Framework.Renderer.Server
 
         // Applies an IBL block with the current probe light in its last 9 vec4 (u_ProbeSH: the block's last member in
         // every PBR variant).
+        // ── Reflection probes (M8c, docs BAKED_GI_DESIGN.md §4.4): the probe the object drawn next reflects (-1: the sky)
+        private static int _reflIndex = -1;
+
+        private static sg_view GgxEnv(bool iblActive)
+            => _reflIndex >= 0 ? GI.ReflectionProbes.View(_reflIndex) : iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+
         private static unsafe void ApplyIbl<T>(int slot, ref T ibl) where T : unmanaged
         {
             fixed (T* p = &ibl)
@@ -1847,6 +1859,20 @@ namespace GameEditor.Framework.Renderer.Server
                 var dst = new Span<Vector4>((byte*)p + sizeof(T) - ProbeBytes, 9);
                 if (_probeOn) _probeSH.AsSpan().CopyTo(dst);
                 else dst.Clear();
+                // the reflection probe's box, capture point and cube (u_ReflBoxMin / Max / Pos, just before u_ProbeSH); its
+                // intensity, mip count and no turning (u_EnvIntensity @0, u_MipCount @8, u_EnvRotation @16: the sky's otherwise)
+                var refl = new Span<Vector4>((byte*)p + sizeof(T) - ProbeBytes - 48, 3);
+                if (_reflIndex >= 0)
+                {
+                    var d = GI.ReflectionProbes.Data(_reflIndex);
+                    refl[0] = new Vector4(d.Min, d.BoxProjection ? 1f : 0f);
+                    refl[1] = new Vector4(d.Max, 0f);
+                    refl[2] = new Vector4(d.Position, 1f);
+                    *(float*)p = d.Intensity;
+                    *(int*)((byte*)p + 8) = GI.ReflectionProbes.MipCount(_reflIndex);
+                    *(Matrix4x4*)((byte*)p + 16) = Matrix4x4.Identity;
+                }
+                else refl.Clear();
                 sg_apply_uniforms(slot, new sg_range { ptr = p, size = (nuint)sizeof(T) });
             }
         }
@@ -1970,7 +1996,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
             // IBL env slots: real prefiltered cubes + BRDF LUT when an environment is
             // loaded, else placeholders (never sampled because use_ibl == 0).
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -2269,7 +2295,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_view transTex  = mat.TransmissionMap.id != 0 ? mat.TransmissionMap : _texCache.PlaceholderWhite;
@@ -2471,6 +2497,7 @@ namespace GameEditor.Framework.Renderer.Server
                 // M8b: a character's light from the baked probes around its bounds' centre (the reference editor's)
                 _probeOn = GI.Lightmaps.HasProbes && GI.Lightmaps.SampleProbes(d.mesh.LocalBounds.Transform(d.model).Center, _probeSH);
                 if (_probeOn) ProbeCharacterDraws++;
+                _reflIndex = GI.ReflectionProbes.Count > 0 ? GI.ReflectionProbes.Choose(d.mesh.LocalBounds.Transform(d.model).Center) : -1;   // M8c
                 // Morphed primitives route to the skinning+morphing variants (extra morph-texture bind +
                 // weights uniform); non-morphed skinned chars keep the cheaper non-morph pipeline.
                 bool morph = d.mesh.HasMorph;
@@ -2490,6 +2517,7 @@ namespace GameEditor.Framework.Renderer.Server
                     else       DrawSkinned        (d.smr, d.entry, d.mesh, instByteOffset, basePipelineFlags, in viewProj, cameraPos);
                 }
                 _probeOn = false;
+                _reflIndex = -1;
             }
         }
 
@@ -2649,7 +2677,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -2861,7 +2889,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -3067,7 +3095,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -3281,7 +3309,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -3486,7 +3514,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -3694,7 +3722,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -3902,7 +3930,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;
@@ -4129,7 +4157,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view normalMap = mat.NormalMap.id            != 0 ? mat.NormalMap            : _texCache.PlaceholderNormal;
             sg_view occlusion = mat.OcclusionMap.id         != 0 ? mat.OcclusionMap         : _texCache.PlaceholderWhite;
             sg_view emissive  = mat.EmissiveMap.id          != 0 ? mat.EmissiveMap          : _texCache.PlaceholderBlack;
-            sg_view ggxEnv    = iblActive ? _environment!.SpecularCubeView : _texCache.PlaceholderCube;
+            sg_view ggxEnv    = GgxEnv(iblActive);   // the sky's, or the object's reflection probe's (M8c)
             sg_view lambEnv   = iblActive ? _environment!.DiffuseCubeView  : _texCache.PlaceholderCube;
             sg_view lut       = iblActive ? _environment!.GgxLutView        : _texCache.PlaceholderWhite;
             sg_sampler matSmp  = mat.Sampler.id != 0 ? mat.Sampler : _texCache.DefaultSampler;

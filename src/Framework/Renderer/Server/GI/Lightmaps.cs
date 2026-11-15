@@ -106,7 +106,17 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 light[p] = File.ReadAllBytes(Path.Combine(dir, data.Pages[p].Light));
                 if (data.Directional && data.Pages[p].Direction.Length > 0) dirs[p] = File.ReadAllBytes(Path.Combine(dir, data.Pages[p].Direction));
             }
-            Activate(folderKey, data, light, dirs);
+            var refl = new byte[data.ReflectionProbes.Count][][];
+            for (int r = 0; r < refl.Length; r++)
+            {
+                refl[r] = new byte[6][];
+                for (int k = 0; k < 6; k++)
+                {
+                    string f = Path.Combine(dir, data.ReflectionProbes[r].Faces[k]);
+                    refl[r][k] = File.Exists(f) ? File.ReadAllBytes(f) : Array.Empty<byte>();
+                }
+            }
+            Activate(folderKey, data, light, dirs, refl);
             return true;
         }
 
@@ -126,25 +136,29 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 {
                     if (ms != SFileLoadStatus.Success || asked != _version || !data.ReadMeshes(meshBytes)) return;
                     var light = new byte[data.Pages.Count][]; var dirs = new byte[data.Pages.Count][];
-                    int waiting = data.Pages.Count * (data.Directional ? 2 : 1);
-                    if (waiting == 0) { Activate(folderKey, data, light, dirs); return; }
+                    var refl = new byte[data.ReflectionProbes.Count][][];
+                    for (int r = 0; r < refl.Length; r++) refl[r] = new byte[6][];
+                    int waiting = data.Pages.Count * (data.Directional ? 2 : 1) + refl.Length * 6;
+                    if (waiting == 0) { Activate(folderKey, data, light, dirs, refl); return; }
                     void One(string name, byte[][] into, int p)
                         => SFilesystem.LoadFileAsync(folderKey + "/" + name, (_, b, st) =>
                         {
                             if (asked != _version) return;
                             if (st == SFileLoadStatus.Success) into[p] = b;
-                            if (--waiting == 0) Activate(folderKey, data, light, dirs);
+                            if (--waiting == 0) Activate(folderKey, data, light, dirs, refl);
                         });
                     for (int p = 0; p < data.Pages.Count; p++)
                     {
                         One(data.Pages[p].Light, light, p);
                         if (data.Directional) One(data.Pages[p].Direction, dirs, p);
                     }
+                    for (int r = 0; r < refl.Length; r++)
+                        for (int k = 0; k < 6; k++) One(data.ReflectionProbes[r].Faces[k], refl[r], k);
                 });
             });
         }
 
-        private static void Activate(string folderKey, LightingData data, byte[][] light, byte[][] dirs)
+        private static void Activate(string folderKey, LightingData data, byte[][] light, byte[][] dirs, byte[][][] refl)
         {
             var tex = RenderingServer.Textures;
             _light = new sg_view[data.Pages.Count];
@@ -166,6 +180,16 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 _pageOfMesh[meshId] = page;
             }
             foreach (int id in data.BakedLights) _bakedLights.Add(id);
+            // reflection probes (M8c): each one's six faces decoded, a mipped cube
+            var faces = new List<byte[][]>();
+            for (int r = 0; r < data.ReflectionProbes.Count; r++)
+            {
+                var one = new byte[6][];
+                for (int k = 0; k < 6 && one != null; k++)
+                    one[k] = refl[r][k] is { Length: > 0 } png && DecodeRgba(png, data.ReflectionProbes[r].Size) is { } rgba ? rgba : null!;
+                faces.Add(Array.TrueForAll(one, f => f != null) ? one : null!);
+            }
+            ReflectionProbes.Load("lightmap:" + folderKey, data.ReflectionProbes, faces);
             _probePos = new System.Numerics.Vector3[data.Probes.Count];
             _probePacked = new System.Numerics.Vector4[data.Probes.Count * 9];
             for (int i = 0; i < data.Probes.Count; i++)
@@ -176,7 +200,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
             _folderKey = folderKey;
             _data = data;
             _version++;
-            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_meshByScene.Count} lightmapped, {data.BakedLights.Count} baked light(s), {data.Probes.Count} probe(s)");
+            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_meshByScene.Count} lightmapped, {data.BakedLights.Count} baked light(s), {data.Probes.Count} probe(s), {ReflectionProbes.Count} reflection probe(s)");
         }
 
         /// <summary>Drops the loaded bake: its textures and meshes freed.</summary>
@@ -190,10 +214,20 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 if (p.Direction.Length > 0) RenderingServer.Textures.Release(TextureKey(_folderKey, p.Direction));
             }
             foreach (int id in _meshByScene.Keys) RenderingServer.Meshes.Remove(MeshKey(_folderKey, id));
+            ReflectionProbes.Unload();
             _meshByScene.Clear(); _pageOfMesh.Clear(); _bakedLights.Clear();
             _probePos = Array.Empty<System.Numerics.Vector3>(); _probePacked = Array.Empty<System.Numerics.Vector4>();
             _light = Array.Empty<sg_view>(); _dir = Array.Empty<sg_view>();
             _data = null; _folderKey = "";
+        }
+
+        private static unsafe byte[]? DecodeRgba(byte[] png, int size)
+        {
+            int w = 0, h = 0, ch = 0;
+            byte* px = Sokol.StbImage.stbi_load_csharp(in png[0], png.Length, ref w, ref h, ref ch, 4);
+            if (px == null) return null;
+            try { return w == size && h == size ? new Span<byte>(px, w * h * 4).ToArray() : null; }
+            finally { Sokol.StbImage.stbi_image_free_csharp(px); }
         }
 
         private static string TextureKey(string folderKey, string file) => "lightmap:" + folderKey + "/" + file;

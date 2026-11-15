@@ -110,6 +110,9 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
         // Mipped cube: mip 0 = the faces; higher mips = 2×2 box-filter downsamples
         // (a cheap stand-in for GGX roughness prefiltering, as in the reference).
+        /// <summary>A mipped cube from six RGBA8 sRGB faces (+X, -X, +Y, -Y, +Z, -Z): a reflection probe's (M8c).</summary>
+        internal static (sg_image, int) MippedCube(byte[][] faces, int baseSize, string label) => BuildMippedCubeFromFaces(faces, baseSize, label);
+
         private static (sg_image, int) BuildMippedCubeFromFaces(byte[][] faces, int baseSize, string label)
         {
             int mipCount = Math.Min((int)Math.Floor(Math.Log2(baseSize)) + 1, 8);
@@ -455,7 +458,7 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
 
         // Maps a cube face + face-local UV to a world-space direction
         // (sokol cube convention; ported from the CGltfViewer reference).
-        internal static Vector3 CubeDirection(int face, float u, float v)
+        public static Vector3 CubeDirection(int face, float u, float v)
         {
             float uc = 2f * u - 1f;
             float vc = 2f * v - 1f;

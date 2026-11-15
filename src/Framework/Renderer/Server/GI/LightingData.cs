@@ -33,6 +33,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public bool Directional;
         /// <summary>Light probes (M8b): where, and the radiance arriving there on SH L2 (9 colours).</summary>
         public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
+        /// <summary>Reflection probes (M8c): their boxes and their six face files.</summary>
+        public List<ReflectionProbeData> ReflectionProbes = new();
         /// <summary>Lightmapped entity (scene id) → its mesh (null until <see cref="ReadMeshes"/>).</summary>
         public Dictionary<int, ObjSubMesh[]> Meshes = new();
 
@@ -64,6 +66,29 @@ namespace GameEditor.Framework.Renderer.Server.GI
             File.WriteAllText(Path.Combine(folder, JsonFile), data.ToJson());
             File.WriteAllBytes(Path.Combine(folder, MeshFile), data.MeshBytes());
             return data;
+        }
+
+        /// <summary>
+        /// Adds reflection probes to the bake in <paramref name="folder"/> (M8c, after the lightmaps): each probe's six RGBA8
+        /// faces written as <c>ReflectionProbe-&lt;id&gt;_&lt;face&gt;.png</c> and LightingData.json written again with them.
+        /// </summary>
+        public static void WriteReflections(string folder, List<(ReflectionProbeData Probe, byte[][] Faces)> probes)
+        {
+            string json = Path.Combine(folder, JsonFile);
+            var data = Parse(File.ReadAllText(json)) ?? throw new InvalidDataException("no bake in " + folder);
+            foreach (var f in Directory.GetFiles(folder, "ReflectionProbe-*.png")) File.Delete(f);
+            data.ReflectionProbes.Clear();
+            string[] names = { "px", "nx", "py", "ny", "pz", "nz" };
+            foreach (var (p, faces) in probes)
+            {
+                for (int k = 0; k < 6; k++)
+                {
+                    p.Faces[k] = $"ReflectionProbe-{p.Id}_{names[k]}.png";
+                    File.WriteAllBytes(Path.Combine(folder, p.Faces[k]), EncodePngRgba(faces[k], p.Size, p.Size));
+                }
+                data.ReflectionProbes.Add(p);
+            }
+            File.WriteAllText(json, data.ToJson());
         }
 
         /// <summary>Linear light → RGBM bytes: rgb / (m × range), m in alpha (rounded up, never 0).</summary>
@@ -160,6 +185,19 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 w.WriteStartArray("bakedLights");
                 foreach (int id in BakedLights) w.WriteNumberValue(id);
                 w.WriteEndArray();
+                w.WriteStartArray("reflectionProbes");
+                foreach (var r in ReflectionProbes)
+                {
+                    w.WriteStartObject();
+                    w.WriteNumber("id", r.Id);
+                    void V(string n, Vector3 v) { w.WriteStartArray(n); w.WriteNumberValue(v.X); w.WriteNumberValue(v.Y); w.WriteNumberValue(v.Z); w.WriteEndArray(); }
+                    V("pos", r.Position); V("min", r.Min); V("max", r.Max);
+                    w.WriteBoolean("box", r.BoxProjection);
+                    w.WriteNumber("intensity", r.Intensity); w.WriteNumber("importance", r.Importance); w.WriteNumber("size", r.Size);
+                    w.WriteStartArray("faces"); foreach (var f in r.Faces) w.WriteStringValue(f); w.WriteEndArray();
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
                 w.WriteStartArray("probes");
                 foreach (var (pos, sh) in Probes)
                 {
@@ -221,6 +259,23 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         if (e.TryGetProperty("id", out var id) && e.TryGetProperty("page", out var pg)) d.EntityPage[id.GetInt32()] = pg.GetInt32();
                 if (r.TryGetProperty("bakedLights", out var bl))
                     foreach (var e in bl.EnumerateArray()) d.BakedLights.Add(e.GetInt32());
+                if (r.TryGetProperty("reflectionProbes", out var rps))
+                    foreach (var e in rps.EnumerateArray())
+                    {
+                        static Vector3 V(JsonElement e, string n) => e.TryGetProperty(n, out var a) && a.GetArrayLength() == 3 ? new Vector3(a[0].GetSingle(), a[1].GetSingle(), a[2].GetSingle()) : Vector3.Zero;
+                        var rp = new ReflectionProbeData
+                        {
+                            Id = e.TryGetProperty("id", out var id) ? id.GetInt32() : 0,
+                            Position = V(e, "pos"), Min = V(e, "min"), Max = V(e, "max"),
+                            BoxProjection = e.TryGetProperty("box", out var bx) && bx.ValueKind == JsonValueKind.True,
+                            Intensity = e.TryGetProperty("intensity", out var it) ? it.GetSingle() : 1f,
+                            Importance = e.TryGetProperty("importance", out var im) ? im.GetSingle() : 1f,
+                            Size = e.TryGetProperty("size", out var sz) ? sz.GetInt32() : 128,
+                        };
+                        if (e.TryGetProperty("faces", out var fs) && fs.GetArrayLength() == 6)
+                            for (int k = 0; k < 6; k++) rp.Faces[k] = fs[k].GetString() ?? "";
+                        d.ReflectionProbes.Add(rp);
+                    }
                 if (r.TryGetProperty("probes", out var pr))
                     foreach (var e in pr.EnumerateArray())
                     {
