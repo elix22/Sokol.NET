@@ -1777,6 +1777,27 @@ namespace GameEditor.Framework.Scene
             return false;
         }
 
+        /// <summary>Places the character's feet at <paramref name="position"/> at once (no collision on the way), at rest: a
+        /// trainee getting out of a vehicle, a restart.</summary>
+        public static bool TeleportCharacter(Entity entity, Vector3 position)
+        {
+            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
+            _vaults.Remove(entity);
+            _physics.SetCharacterHeld(h, true);
+            _physics.SetCharacterPosition(h, position);
+            _physics.SetCharacterHeld(h, false);
+            if (ECSWorld.Instance.TryGetComponentRef<Transform>(entity, out var tr)) tr.Value.Position = position;
+            return true;
+        }
+
+        /// <summary>Held: the character neither moves by itself nor falls (in a vehicle, a scripted move); let go: it moves again.</summary>
+        public static bool SetCharacterHeld(Entity entity, bool held)
+        {
+            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
+            _physics.SetCharacterHeld(h, held);
+            return true;
+        }
+
         /// <summary>True while the character is in a vault (its own moves wait).</summary>
         public static bool IsVaulting(Entity entity) => _vaults.ContainsKey(entity);
 

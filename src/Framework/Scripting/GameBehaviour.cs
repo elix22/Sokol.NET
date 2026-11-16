@@ -482,6 +482,14 @@ namespace GameEditor.Framework.Scripting
         protected bool IsVaulting()
             => SceneManager.IsVaulting(EntityId);
 
+        /// <summary>Places this character's feet at <paramref name="position"/> at once, at rest (out of a vehicle, a restart).</summary>
+        protected bool SetCharacterPosition(Vector3 position)
+            => SceneManager.TeleportCharacter(EntityId, position);
+
+        /// <summary>Held: this character neither moves by itself nor falls (in a vehicle); let go: it moves again.</summary>
+        protected bool SetCharacterHeld(bool held)
+            => SceneManager.SetCharacterHeld(EntityId, held);
+
         // ---- Vehicle helpers ------------------------------------------------
 
         protected bool SetVehicleInput(float steer, float throttle, float brake, float handBrake = 0f)

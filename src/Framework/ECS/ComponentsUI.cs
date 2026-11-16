@@ -131,8 +131,10 @@ namespace GameEditor.Framework.ECS.Components
         public float DeadZone;
         /// <summary>The ring's colour; the knob is drawn lighter.</summary>
         public Vector4 Color;
+        /// <summary>A knob is drawn where the finger holds it. Off: only the ring, the same touched or not (a fixed pad).</summary>
+        public bool Knob;
 
-        public static UIStick Default => new() { X = "Horizontal", Y = "Vertical", DeadZone = 0.15f, Color = new Vector4(1f, 1f, 1f, 0.35f) };
+        public static UIStick Default => new() { X = "Horizontal", Y = "Vertical", DeadZone = 0.15f, Color = new Vector4(1f, 1f, 1f, 0.35f), Knob = true };
     }
 
     public enum UILayoutDir { Column, Row }

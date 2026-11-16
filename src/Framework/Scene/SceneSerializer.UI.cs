@@ -84,7 +84,7 @@ namespace GameEditor.Framework.Scene
 
         private static string? WriteUIStick(ECSWorld world, Frent.Entity e)
             => world.TryGetComponent<UIStick>(e, out var s)
-                ? "{\"X\":\"" + Esc(s.X ?? "") + "\",\"Y\":\"" + Esc(s.Y ?? "") + "\",\"Dead\":" + F(s.DeadZone) + ",\"Color\":" + Four(s.Color) + "}" : null;
+                ? "{\"X\":\"" + Esc(s.X ?? "") + "\",\"Y\":\"" + Esc(s.Y ?? "") + "\",\"Dead\":" + F(s.DeadZone) + ",\"Color\":" + Four(s.Color) + ",\"Knob\":" + (s.Knob ? "true" : "false") + "}" : null;
 
         private static void ReadUIStick(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
         {
@@ -93,6 +93,7 @@ namespace GameEditor.Framework.Scene
             s.Y = Text(el, "Y", s.Y);
             s.DeadZone = Math.Clamp(Number(el, "Dead", s.DeadZone), 0f, 0.9f);
             Four(el, "Color", ref s.Color);
+            s.Knob = !el.TryGetProperty("Knob", out var knob) || knob.ValueKind != JsonValueKind.False;
             world.AddComponent(e, s);
         }
 

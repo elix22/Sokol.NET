@@ -685,6 +685,7 @@ namespace GameEditor.Framework.UI
                 case 6 when item.Widget is StickWidget stickWidget && world.TryGetComponent<UIStick>(e, out var st):
                     stickWidget.Ring = Colour(st.Color);
                     stickWidget.Knob = _stickState.TryGetValue(e, out var held) ? held.Knob : default;
+                    stickWidget.ShowKnob = st.Knob;
                     break;
                 case 5 when item.Widget is MiniMapWidget map && world.TryGetComponent<UIMiniMap>(e, out var mm):
                     map.Road = Colour(mm.Road); map.Kart = Colour(mm.Kart); map.Player = Colour(mm.Player);
@@ -1020,6 +1021,7 @@ namespace GameEditor.Framework.UI
         {
             public UIColor Ring;
             public GVec2 Knob;
+            public bool ShowKnob = true;
 
             public override void Draw(Sokol.GUI.Renderer renderer)
             {
@@ -1031,8 +1033,11 @@ namespace GameEditor.Framework.UI
                 renderer.SetStrokeColor(Ring);
                 renderer.SetStrokeWidth(MathF.Max(1.5f, r * 0.04f));
                 renderer.StrokeCircle(c, r - 1f);
-                renderer.SetFillColor(new UIColor(Ring.R, Ring.G, Ring.B, MathF.Min(1f, Ring.A * 2.2f)));
-                renderer.FillCircle(new GVec2(c.X + Knob.X, c.Y + Knob.Y), r * 0.42f);
+                if (ShowKnob)
+                {
+                    renderer.SetFillColor(new UIColor(Ring.R, Ring.G, Ring.B, MathF.Min(1f, Ring.A * 2.2f)));
+                    renderer.FillCircle(new GVec2(c.X + Knob.X, c.Y + Knob.Y), r * 0.42f);
+                }
                 base.Draw(renderer);
             }
         }
