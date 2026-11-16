@@ -208,6 +208,16 @@ public sealed class InputRouter
     /// </summary>
     internal void UpdateTooltip()
     {
+        // A dropdown or a menu open: no tooltip over its rows (its owner is what is hovered); the delay starts again
+        // when it closes
+        if (Screen.HasActivePopup)
+        {
+            _hoverStartTime = stm_sec(stm_now());
+            _tooltipShown = false;
+            TooltipControl.Shared.Hide();
+            return;
+        }
+
         var currentText = _hovered?.Tooltip;
 
         // If tooltip text changed (e.g. ToolBar item changed), reset the timer
