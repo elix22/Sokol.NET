@@ -183,6 +183,15 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                 cgltf_data* data = null;
                 cgltf_result r = cgltf_parse(options, (void*)_mainPin.AddrOfPinnedObject(),
                                              (nuint)buffer.Length, out data);
+                if (r == cgltf_result.cgltf_result_invalid_gltf && GltfSceneRoots.Fixed(buffer) is { } fixedFile)
+                {
+                    // A scene that lists a child node as a root (an exporter's slip cgltf refuses): read with its roots.
+                    _mainPin.Free();
+                    _mainPin = GCHandle.Alloc(fixedFile, GCHandleType.Pinned);
+                    r = cgltf_parse(options, (void*)_mainPin.AddrOfPinnedObject(), (nuint)fixedFile.Length, out data);
+                    if (r == cgltf_result.cgltf_result_success)
+                        Logger.Warning($"[glTF] '{_path}': its scene lists a child node as a root (the exporter's) - read from that node's root");
+                }
                 if (r != cgltf_result.cgltf_result_success || data == null) { Fail($"cgltf_parse failed ({r})"); return; }
                 _data = data;
                 Logger.Info($"[glTF] parsed '{_path}': {(int)data->meshes_count} mesh(es), "
