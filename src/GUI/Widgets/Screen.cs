@@ -417,11 +417,16 @@ public sealed class Screen : Widget
         // Drag ghost on top of popups/notifications, under tooltip.
         Drag.DrawGhost(Renderer);
 
-        // Draw tooltip overlay on top of everything else.
+        // Draw tooltip overlay on top of everything else. With a layer drawn after this frame (ImGui in the GameEditor)
+        // it is drawn invisibly here - its glyphs baked in this frame's atlas - and for real by DrawActivePopupOverlay,
+        // over that layer (the Scene view hid a tooltip that reached over it).
         var tip = TooltipControl.Shared;
+        _tooltipDeferred = !drawActiveOverlay && tip.Visible;
         if (tip.Visible)
         {
+            tip.Place(Renderer);
             Renderer.Save();
+            if (_tooltipDeferred) Renderer.SetGlobalAlpha(0f);
             Renderer.Translate(tip.Bounds.X, tip.Bounds.Y);
             tip.Draw(Renderer);
             Renderer.Restore();
@@ -485,22 +490,37 @@ public sealed class Screen : Widget
         }
     }
 
+    private bool _tooltipDeferred;   // the tooltip waits for DrawActivePopupOverlay (a layer is drawn between)
+
     /// <summary>
-    /// Draws the active popup overlay in a separate NanoVG pass.
+    /// Draws the active popup overlay, and the tooltip over it, in a separate NanoVG pass.
     /// Call this AFTER any layered rendering (e.g. ImGui) that should appear
-    /// below the popup, so the popup renders on top of those layers.
+    /// below the popup, so the popup and the tooltip render on top of those layers.
     /// </summary>
     public void DrawActivePopupOverlay(float width, float height, float dpiScale)
     {
         if (Renderer == null || Renderer.VGContext == IntPtr.Zero) return;
-        if (_activePopup == null || _activePopupRoot != null) return;
+        bool popup = _activePopup != null && _activePopupRoot == null;
+        var tip = TooltipControl.Shared;
+        bool tooltip = _tooltipDeferred && tip.Visible;
+        if (!popup && !tooltip) return;
 
         Renderer.BeginFrame(width, height, dpiScale);
-        var sp = _activePopup.ScreenPosition;
-        Renderer.Save();
-        Renderer.Translate(sp.X, sp.Y);
-        _activePopup.DrawPopupOverlay(Renderer);
-        Renderer.Restore();
+        if (popup)
+        {
+            var sp = _activePopup!.ScreenPosition;
+            Renderer.Save();
+            Renderer.Translate(sp.X, sp.Y);
+            _activePopup.DrawPopupOverlay(Renderer);
+            Renderer.Restore();
+        }
+        if (tooltip)
+        {
+            Renderer.Save();
+            Renderer.Translate(tip.Bounds.X, tip.Bounds.Y);
+            tip.Draw(Renderer);
+            Renderer.Restore();
+        }
         Renderer.EndFrame();
     }
 
