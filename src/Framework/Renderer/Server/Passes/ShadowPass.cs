@@ -643,12 +643,12 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             {
                 bool applied = false;
                 foreach (var row in world.Query<ActiveFlag, SkinnedMeshRenderer, Transform>()
-                                         .Enumerate<ActiveFlag, SkinnedMeshRenderer, Transform>())
+                                         .EnumerateWithEntities<ActiveFlag, SkinnedMeshRenderer, Transform>())
                 {
                     if (!row.Item1.Value.Active) continue;
                     ref readonly var smr = ref row.Item2.Value;
                     if (!smr.Visible || !smr.CastsShadows) continue;
-                    if (!SkinnedCharacterRegistry.TryGet(smr.CharacterKey, out var entry)) continue;
+                    if (!SkinnedCharacterRegistry.TryGetFor(world, row.Entity, smr.CharacterKey, out var entry)) continue;
                     if (!entry.Meshes.TryGetValue(smr.PrimIndex, out var mesh) || mesh.IndexCount == 0) continue;
                     ref readonly var tf = ref row.Item3.Value;
 

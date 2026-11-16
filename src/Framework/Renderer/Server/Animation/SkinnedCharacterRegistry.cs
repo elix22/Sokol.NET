@@ -1,5 +1,8 @@
 // SkinnedCharacterRegistry.cs — persistent home for the live GPU + animator objects of imported
-// skinned characters, keyed by source glTF path. Mirrors MeshRegistry's role for static meshes:
+// skinned characters, keyed by source glTF path. The model file's entry holds what every copy of the character shares
+// (GPU meshes, clips, skeleton); each copy in the scene - the entity its skinned meshes sit under - gets an entry of
+// its own with its own animator, joint texture and Driven flag (Phase H E1), so two people made from one .glb no
+// longer share one pose. Mirrors MeshRegistry's role for static meshes:
 // the SkinnedMeshRenderer component stores only serializable keys (path + primitive index), and the
 // live SkinnedMesh / CGltfAnimator are resolved from here at draw time. Because the registry is a
 // static that outlives the play/stop scene-snapshot round-trip, skinned characters survive Play→Stop
@@ -7,6 +10,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Frent;
+using GameEditor.Framework.ECS;
+using GameEditor.Framework.ECS.Components;
 using GameEditor.Framework.Renderer.Server.Resources;
 using static Sokol.SG;
 
@@ -16,16 +22,40 @@ namespace GameEditor.Framework.Renderer.Server.Animation
     {
         public sealed class Entry
         {
-            /// <summary>Shared animator for the whole character (drives every primitive's bones).</summary>
+            /// <summary>The character's animator (drives every primitive's bones). Each copy has its own; the first copy
+            /// takes the file entry's, so whoever asks without naming a copy (a script, a check) sees a live character.</summary>
             public CGltfAnimator? Animator;
             public int BoneCount;
+
+            /// <summary>The model file's entry this copy belongs to; null on the file's entry itself.</summary>
+            public Entry? File { get; private set; }
+
+            // The skeleton a copy's animator is made from (set by the importer on the file's entry).
+            internal List<CGltfNode>? Nodes;
+            internal Dictionary<string, BoneInfo>? BoneInfoMap;
+            // The file entry's animator is a copy's (the first one's) while that copy lives.
+            internal bool AnimatorTaken;
+
+            public Entry() { Clips = new(); Meshes = new(); }
+
+            // A copy: the file's meshes and clips shared, an animator of its own playing the first clip.
+            internal Entry(Entry file)
+            {
+                File = file;
+                Clips = file.Clips;
+                Meshes = file.Meshes;
+                BoneCount = file.BoneCount;
+                if (file.Animator != null && !file.AnimatorTaken) { Animator = file.Animator; file.AnimatorTaken = true; }
+                else if (file.Animator != null && file.Nodes != null && file.Clips.Count > 0)
+                    Animator = new CGltfAnimator(file.Clips[0].Clip, file.Nodes, file.BoneCount, file.BoneInfoMap);
+            }
 
             /// <summary>
             /// Every clip of the character's file, in the file's order, by a name that does not move between imports (G6 A0):
             /// its own, or <c>clip&lt;N&gt;</c> by its index when it has none; a repeated name gets <c>~2</c>, <c>~3</c>.
             /// Scenes store these names (<see cref="SkinnedMeshRenderer.Clip"/>).
             /// </summary>
-            public readonly List<(string Name, CGltfAnimation Clip)> Clips = new();
+            public readonly List<(string Name, CGltfAnimation Clip)> Clips;
 
             /// <summary>The clips' names, in the file's order.</summary>
             public IEnumerable<string> ClipNames { get { foreach (var c in Clips) yield return c.Name; } }
@@ -100,7 +130,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                 return smr.Playing;
             }
             /// <summary>Skinned GPU mesh per running primitive index.</summary>
-            public readonly Dictionary<int, SkinnedMesh> Meshes = new();
+            public readonly Dictionary<int, SkinnedMesh> Meshes;
 
             // ── >128-bone joint-matrix texture path ──────────────────────────────────────────────
             // The uniform path packs bones into finalBonesMatrices[MAX_BONES] (a fixed UBO array).
@@ -194,6 +224,12 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             {
                 foreach (var m in Meshes.Values) m.Destroy();
                 Meshes.Clear();
+                DestroyJointTexture();
+            }
+
+            /// <summary>Frees the joint texture only (a copy's own GPU object; its meshes are the file's).</summary>
+            internal void DestroyJointTexture()
+            {
                 if (JointTextureView.id != 0) { sg_destroy_view(JointTextureView); JointTextureView = default; }
                 if (JointTexture.id     != 0) { sg_destroy_image(JointTexture);    JointTexture     = default; }
                 _jointTexFrame = -1;
@@ -201,21 +237,74 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         }
 
         private static readonly Dictionary<string, Entry> _entries = new();
+        private static readonly Dictionary<(string Key, Entity Owner), Entry> _copies = new();
+        private static readonly List<(string Key, Entity Owner)> _gone = new();
 
         /// <summary>Gets the entry for <paramref name="key"/>, creating it (and freeing any prior
-        /// GPU meshes if it already existed, e.g. on re-import) so the caller can repopulate it.</summary>
+        /// GPU meshes if it already existed, e.g. on re-import) so the caller can repopulate it.
+        /// The copies of a re-imported file are dropped: they are made again from the new clips.</summary>
         public static Entry GetOrCreateFresh(string key)
         {
-            if (_entries.TryGetValue(key, out var e)) { e.DestroyMeshes(); e.Animator = null; }
+            if (_entries.TryGetValue(key, out var e)) { e.DestroyMeshes(); e.Animator = null; e.Nodes = null; e.BoneInfoMap = null; e.AnimatorTaken = false; }
             else _entries[key] = e = new Entry();
+            DropCopies(k => k == key);
             return e;
         }
 
+        /// <summary>The model file's entry (shared meshes and clips; its own animator is no copy's).</summary>
         public static bool TryGet(string key, out Entry entry) => _entries.TryGetValue(key, out entry!);
+
+        /// <summary>
+        /// The entry of one copy of a character: <paramref name="owner"/> is the entity its skinned meshes sit under
+        /// (<see cref="OwnerOf"/>). Made on first use, with its own animator; a file without clips has one entry for all.
+        /// </summary>
+        public static bool TryGet(string key, Entity owner, out Entry entry)
+        {
+            if (!_entries.TryGetValue(key, out var file)) { entry = null!; return false; }
+            if (file.Animator == null || owner.IsNull) { entry = file; return true; }
+            if (!_copies.TryGetValue((key, owner), out entry!)) _copies[(key, owner)] = entry = new Entry(file);
+            return true;
+        }
+
+        /// <summary>The copy a skinned mesh belongs to: the entity it sits under (the model's root), or itself.</summary>
+        public static Entity OwnerOf(ECSWorld world, Entity skinned)
+            => world.TryGetComponent<Transform>(skinned, out var t) && t.Parent is { } p && !p.IsNull && p.IsAlive ? p : skinned;
+
+        /// <summary>The copy a skinned mesh belongs to, resolved from its entity.</summary>
+        public static bool TryGetFor(ECSWorld world, Entity skinned, string key, out Entry entry)
+            => TryGet(key, OwnerOf(world, skinned), out entry);
+
+        /// <summary>Frees the copies whose entity is gone (once a frame; a copy's joint texture is a GPU object).</summary>
+        public static void ForgetGoneCopies()
+        {
+            if (_copies.Count == 0) return;
+            _gone.Clear();
+            foreach (var k in _copies.Keys) if (!k.Owner.IsAlive) _gone.Add(k);
+            foreach (var k in _gone) Drop(k);
+        }
+
+        private static void DropCopies(Func<string, bool> which)
+        {
+            _gone.Clear();
+            foreach (var k in _copies.Keys) if (which(k.Key)) _gone.Add(k);
+            foreach (var k in _gone) Drop(k);
+        }
+
+        private static void Drop((string Key, Entity Owner) k)
+        {
+            var c = _copies[k];
+            c.DestroyJointTexture();
+            if (c.File is { } f && ReferenceEquals(c.Animator, f.Animator)) f.AnimatorTaken = false;   // the next copy takes it
+            _copies.Remove(k);
+        }
+
+        /// <summary>The number of copies alive (a check reads it).</summary>
+        public static int CopyCount => _copies.Count;
 
         /// <summary>Frees every character's GPU meshes and drops all entries (full reset).</summary>
         public static void Clear()
         {
+            DropCopies(_ => true);
             foreach (var e in _entries.Values) e.DestroyMeshes();
             _entries.Clear();
         }

@@ -68,13 +68,13 @@ namespace GameEditor.Framework.Animation
             return run;
         }
 
-        /// <summary>The skinned character at or below <paramref name="root"/>: its first skinned mesh's.</summary>
+        /// <summary>The skinned character at or below <paramref name="root"/>: its first skinned mesh's copy (E1).</summary>
         public static SkinnedCharacterRegistry.Entry? CharacterOf(ECSWorld world, Entity root)
         {
             var below = new List<Entity> { root };
             for (int i = 0; i < below.Count; i++)
             {
-                if (world.TryGetComponent<SkinnedMeshRenderer>(below[i], out var s) && SkinnedCharacterRegistry.TryGet(s.CharacterKey ?? "", out var entry)) return entry;
+                if (world.TryGetComponent<SkinnedMeshRenderer>(below[i], out var s) && SkinnedCharacterRegistry.TryGetFor(world, below[i], s.CharacterKey ?? "", out var entry)) return entry;
                 foreach (var x in world.Entities)
                     if (world.TryGetComponent<Transform>(x, out var t) && t.Parent == below[i]) below.Add(x);
             }

@@ -536,6 +536,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     var ex = CGltfSkinExtractor.Extract(data, si);   // si < 0 → no-skin (morph/node) clips
                     var ent = SkinnedCharacterRegistry.GetOrCreateFresh(KeyFor(si));
                     ent.BoneCount = ex.BoneCount;
+                    ent.Nodes = ex.Nodes; ent.BoneInfoMap = ex.BoneInfoMap;   // each copy's own animator is made from these (E1)
                     ent.Animator  = ex.HasAnimations
                         ? new CGltfAnimator(ex.Animations[0], ex.Nodes, ex.BoneCount, ex.BoneInfoMap)
                         : null;

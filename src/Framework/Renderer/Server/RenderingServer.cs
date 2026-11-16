@@ -2753,14 +2753,16 @@ namespace GameEditor.Framework.Renderer.Server
         // casting; DrawSkinnedEntities re-runs it as a fallback (no-op once already advanced).
         private static void UpdateSkinnedAnimators(ECSWorld world)
         {
+            Animation.SkinnedCharacterRegistry.ForgetGoneCopies();
             if (!world.HasAnyComponent<Animation.SkinnedMeshRenderer>()) return;
             float dt = (float)Sokol.SApp.sapp_frame_duration();
             foreach (var row in world.Query<ActiveFlag, Animation.SkinnedMeshRenderer, Transform>()
-                                     .Enumerate<ActiveFlag, Animation.SkinnedMeshRenderer, Transform>())
+                                     .EnumerateWithEntities<ActiveFlag, Animation.SkinnedMeshRenderer, Transform>())
             {
                 if (!row.Item1.Value.Active) continue;
                 ref readonly var smr = ref row.Item2.Value;
-                if (!Animation.SkinnedCharacterRegistry.TryGet(smr.CharacterKey, out var entry)) continue;
+                // This copy of the character (E1): its own animator, not the model file's.
+                if (!Animation.SkinnedCharacterRegistry.TryGetFor(world, row.Entity, smr.CharacterKey, out var entry)) continue;
                 var anim = entry.Animator;
                 if (anim != null && anim.LastUpdatedFrame != _animationFrame)
                 {
@@ -2799,8 +2801,8 @@ namespace GameEditor.Framework.Renderer.Server
                 if (!row.Item1.Value.Active) continue;
                 ref readonly var smr = ref row.Item2.Value;
                 if (!smr.Visible) continue;
-                // Resolve the live mesh + shared animator from the registry (the component holds only keys).
-                if (!Animation.SkinnedCharacterRegistry.TryGet(smr.CharacterKey, out var entry)) continue;
+                // Resolve the live mesh + this copy's animator from the registry (the component holds only keys).
+                if (!Animation.SkinnedCharacterRegistry.TryGetFor(world, row.Entity, smr.CharacterKey, out var entry)) continue;
                 if (!entry.Meshes.TryGetValue(smr.PrimIndex, out var mesh) || mesh.IndexCount == 0) continue;
                 ref readonly var tf = ref row.Item3.Value;
 
