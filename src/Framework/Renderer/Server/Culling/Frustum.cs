@@ -95,6 +95,41 @@ namespace GameEditor.Framework.Renderer.Server
                 && PlaneTestAabb(in _far,    in aabb);
         }
 
+        /// <summary>
+        /// The box swept along <paramref name="dir"/> without end - a caster's shadow, cast by a light that shines that way -
+        /// is not fully outside the frustum: a plane can rule it out only when the sweep does not go into it (the box is
+        /// outside it and moving along the light keeps it so). Conservative: a shadow it keeps may still miss the frustum.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool SweptIntersects(in Aabb aabb, Vector3 dir)
+        {
+            return SweptPlaneTest(in _left,   in aabb, dir)
+                && SweptPlaneTest(in _right,  in aabb, dir)
+                && SweptPlaneTest(in _bottom, in aabb, dir)
+                && SweptPlaneTest(in _top,    in aabb, dir)
+                && SweptPlaneTest(in _near,   in aabb, dir)
+                && SweptPlaneTest(in _far,    in aabb, dir);
+        }
+
+        /// <summary>
+        /// How far the box goes along <paramref name="dir"/> before it is wholly past the far plane (a shadow map's far
+        /// side: nothing beyond it is drawn into the map); infinity when it never gets there.
+        /// </summary>
+        public float SweepToFar(in Aabb aabb, Vector3 dir)
+        {
+            float along = Vector3.Dot(_far.Normal, dir);
+            if (along >= -1e-6f) return float.PositiveInfinity;
+            float px = _far.Normal.X >= 0f ? aabb.Max.X : aabb.Min.X;
+            float py = _far.Normal.Y >= 0f ? aabb.Max.Y : aabb.Min.Y;
+            float pz = _far.Normal.Z >= 0f ? aabb.Max.Z : aabb.Min.Z;
+            float inside = _far.Normal.X * px + _far.Normal.Y * py + _far.Normal.Z * pz + _far.D;
+            return MathF.Max(0f, inside / -along);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool SweptPlaneTest(in FrustumPlane p, in Aabb aabb, Vector3 dir) =>
+            Vector3.Dot(p.Normal, dir) > 0f || PlaneTestAabb(in p, in aabb);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool PlaneTestAabb(in FrustumPlane p, in Aabb aabb)
         {

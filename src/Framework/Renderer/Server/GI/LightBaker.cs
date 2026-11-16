@@ -47,6 +47,9 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public LightingSettings Settings = new();
         /// <summary>Light probe positions (world, M8b): each baked as SH L2 of the light arriving there.</summary>
         public List<Vector3> Probes = new();
+        /// <summary>The Mixed directional light (scene id) whose shadow on the lightmapped surfaces is baked into the
+        /// shadowmask (a page beside each lightmap: its visibility per texel); -1: none.</summary>
+        public int ShadowmaskLight = -1;
     }
 
     /// <summary>A lightmap page: per texel the light a white diffuse surface there gives back (irradiance / π, linear) and,
@@ -57,14 +60,21 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public Vector3[] Light = Array.Empty<Vector3>();
         public Vector4[] Direction = Array.Empty<Vector4>();
         public bool[] Covered = Array.Empty<bool>();   // a surface's texel (not padding)
+        /// <summary>The shadowmask (with <see cref="BakeResult.ShadowmaskLight"/>): per texel the share of the sun it sees,
+        /// 0 (in the shadow of the lightmapped surfaces) .. 1; empty without one.</summary>
+        public float[] Mask = Array.Empty<float>();
     }
 
     public sealed class BakedEntity
     {
         public int SceneId;
         public int Page;
-        /// <summary>Its mesh with the lightmap UV (0..1 on its page) in <c>Uv1</c>.</summary>
+        /// <summary>Its mesh with the lightmap UV (0..1 on its page) in <c>Uv1</c> (the bake's own: its texels, tests).</summary>
         public ObjSubMesh[] Mesh = Array.Empty<ObjSubMesh>();
+        /// <summary>Its layout (<see cref="BakeResult.Groups"/>) and that layout's place on its page (texels): its UV on the
+        /// page = (layout UV + Offset) / page size.</summary>
+        public int Group = -1;
+        public Vector2 Offset;
     }
 
     public sealed class BakeResult
@@ -75,6 +85,11 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
         public long Rays;
         public double Seconds;
+        /// <summary>The light whose shadow is in the pages' <see cref="LightmapPage.Mask"/> (scene id); -1: no shadowmask.</summary>
+        public int ShadowmaskLight = -1;
+        /// <summary>The lightmap layouts: a source mesh's sub-meshes with their lightmap UV in texels (<c>Uv1</c>), one a mesh
+        /// at a scale - its instances share it (drawn instanced, each with its place on its page).</summary>
+        public List<ObjSubMesh[]> Groups = new();
     }
 
     /// <summary>
@@ -93,18 +108,38 @@ namespace GameEditor.Framework.Renderer.Server.GI
             var s = input.Settings;
             var result = new BakeResult();
 
-            // ── UVs: each mesh unwrapped, the rectangles packed into pages ──
+            // ── UVs: one layout a source mesh at a scale (10 % steps) and a Scale In Lightmap - unwrapped in its own space
+            // scaled, so every instance of it (turned or moved) shares it and is drawn instanced; the rectangles packed ──
             var unwrapped = new List<(BakeMesh Mesh, LightmapUnwrap.Result Uv)>();
+            var groupOf = new List<int>();
+            var groupIndex = new Dictionary<(ObjSubMesh[], int, int, int, int), int>(new GroupKeyComparer());
+            var groupResult = new List<LightmapUnwrap.Result?>();
             foreach (var m in input.Meshes)
             {
-                var r = LightmapUnwrap.Unwrap(m.Source, m.World, s.Resolution * MathF.Max(0.01f, m.ScaleInLightmap), s.Padding, s.MaxLightmapSize);
-                if (r.Charts > 0) unwrapped.Add((m, r));
+                var (key, scale) = GroupOf(m);
+                if (!groupIndex.TryGetValue(key, out int g))
+                {
+                    var r = LightmapUnwrap.Unwrap(m.Source, Matrix4x4.CreateScale(scale), s.Resolution * MathF.Max(0.01f, m.ScaleInLightmap), s.Padding, s.MaxLightmapSize);
+                    g = groupResult.Count;
+                    groupResult.Add(r.Charts > 0 ? r : null);
+                    groupIndex[key] = g;
+                }
+                if (groupResult[g] is not { } uvs) continue;
+                unwrapped.Add((m, uvs));
+                groupOf.Add(g);
             }
+            // the layouts used, renumbered in order
+            var groupOut = new Dictionary<int, int>();
+            foreach (int g in groupOf)
+                if (!groupOut.ContainsKey(g)) { groupOut[g] = result.Groups.Count; result.Groups.Add(groupResult[g]!.SubMeshes); }
             var rects = new (int W, int H)[unwrapped.Count];
             for (int i = 0; i < rects.Length; i++) rects[i] = (unwrapped[i].Uv.Width, unwrapped[i].Uv.Height);
             var at = LightmapUnwrap.PackPages(rects, s.MaxLightmapSize, out var pageSizes);
+            int sunAt = input.Lights.FindIndex(l => l.SceneId == input.ShadowmaskLight && l.Mode == LightMode.Mixed && l.Type == LightType.Directional);
+            if (input.ShadowmaskLight >= 0 && sunAt >= 0) result.ShadowmaskLight = input.ShadowmaskLight;
             foreach (int size in pageSizes)
-                result.Pages.Add(new LightmapPage { Size = size, Light = new Vector3[size * size], Direction = new Vector4[size * size], Covered = new bool[size * size] });
+                result.Pages.Add(new LightmapPage { Size = size, Light = new Vector3[size * size], Direction = new Vector4[size * size], Covered = new bool[size * size],
+                                                    Mask = sunAt >= 0 ? new float[size * size] : Array.Empty<float>() });
 
             // ── each entity's final mesh (UV on its page) and the scene's triangles ──
             var corners = new List<Vector3>();
@@ -130,7 +165,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         triUv0.Add((v[src.Indices[t]].Uv, v[src.Indices[t + 1]].Uv, v[src.Indices[t + 2]].Uv));
                     }
                 }
-                result.Entities.Add(new BakedEntity { SceneId = m.SceneId, Page = at[i].Page, Mesh = mesh });
+                result.Entities.Add(new BakedEntity { SceneId = m.SceneId, Page = at[i].Page, Mesh = mesh, Group = groupOut[groupOf[i]], Offset = new Vector2(at[i].X, at[i].Y) });
             }
             var bvh = new Bvh(corners.ToArray());
             var ctx = new Context(input, bvh, triMaterial.ToArray(), triUv0.ToArray());
@@ -184,6 +219,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         if (tx.Owner[i] < 0) continue;
                         var rng = new Rng((uint)(pageIndex * 73856093) ^ (uint)(i * 19349663) ^ 0x9E3779B9u);
                         Texel(ctx, tx.Pos[i], tx.Nrm[i], ref rng, out direct[i], out bounce[i], out var dir, ref localRays);
+                        if (sunAt >= 0) page.Mask[i] = SunVisibility(ctx, tx.Pos[i], tx.Nrm[i], input.Lights[sunAt].Direction, ref rng, ref localRays);
                         if (directional)
                         {
                             float w = 0.5f * Vector3.Dot(tx.Nrm[i], dir) + 0.5f;
@@ -208,6 +244,27 @@ namespace GameEditor.Framework.Renderer.Server.GI
             result.Rays = rays;
             result.Seconds = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds;
             return result;
+        }
+
+        // A mesh's layout group: its source (the registry's copy, one a mesh), its world scale in 10 % steps, its Scale In
+        // Lightmap; and the scale it is unwrapped at.
+        private static ((ObjSubMesh[], int, int, int, int) Key, Vector3 Scale) GroupOf(BakeMesh m)
+        {
+            var w = m.World;
+            var s = new Vector3(new Vector3(w.M11, w.M12, w.M13).Length(), new Vector3(w.M21, w.M22, w.M23).Length(), new Vector3(w.M31, w.M32, w.M33).Length());
+            const float Step = 1.1f;
+            static int Q(float v) => (int)MathF.Round(MathF.Log(MathF.Max(v, 1e-4f)) / MathF.Log(Step));
+            int qx = Q(s.X), qy = Q(s.Y), qz = Q(s.Z);
+            var scale = new Vector3(MathF.Pow(Step, qx), MathF.Pow(Step, qy), MathF.Pow(Step, qz));
+            return ((m.Source, qx, qy, qz, (int)MathF.Round(m.ScaleInLightmap * 100f)), scale);
+        }
+
+        private sealed class GroupKeyComparer : IEqualityComparer<(ObjSubMesh[], int, int, int, int)>
+        {
+            public bool Equals((ObjSubMesh[], int, int, int, int) a, (ObjSubMesh[], int, int, int, int) b)
+                => ReferenceEquals(a.Item1, b.Item1) && a.Item2 == b.Item2 && a.Item3 == b.Item3 && a.Item4 == b.Item4 && a.Item5 == b.Item5;
+            public int GetHashCode((ObjSubMesh[], int, int, int, int) k)
+                => HashCode.Combine(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(k.Item1), k.Item2, k.Item3, k.Item4, k.Item5);
         }
 
         // ── the scene, read-only while threads trace it ─────────────────────────────────
@@ -362,6 +419,26 @@ namespace GameEditor.Framework.Renderer.Server.GI
             if (len > 1f) dir /= len;
         }
 
+        // The shadowmask's texel: the share of rays toward the sun (spread over its disc, ~0.6°) that leave the scene; a
+        // surface turned away from it sees none.
+        private static float SunVisibility(Context ctx, Vector3 pos, Vector3 n, Vector3 lightDir, ref Rng rng, ref long rays)
+        {
+            var toL = -Vector3.Normalize(lightDir);
+            if (Vector3.Dot(n, toL) <= 0f) return 0f;
+            Vector3 t = MathF.Abs(toL.X) > 0.5f ? Vector3.Normalize(Vector3.Cross(toL, Vector3.UnitY)) : Vector3.Normalize(Vector3.Cross(toL, Vector3.UnitX));
+            Vector3 b = Vector3.Cross(toL, t);
+            int count = Math.Clamp(ctx.Input.Settings.DirectSamples, 1, 64), seen = 0;
+            var o = pos + n * Eps;
+            for (int k = 0; k < count; k++)
+            {
+                float phi = 2f * MathF.PI * rng.Float(), r = 0.01f * MathF.Sqrt(rng.Float());
+                var w = Vector3.Normalize(toL + t * (MathF.Cos(phi) * r) + b * (MathF.Sin(phi) * r));
+                rays++;
+                if (!ctx.Bvh.Occluded(o, w, 1e6f)) seen++;
+            }
+            return (float)seen / count;
+        }
+
         // A probe: radiance from directions spread evenly over the sphere (the sky, the bounces × Indirect Intensity) and
         // each Baked light as a lobe toward it (π × colour × attenuation: convolved, a surface facing it gets the
         // shader's NdotL·att·I·colour), projected on SH L2.
@@ -500,7 +577,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     {
                         int i = y * size + x;
                         if (filled[i]) continue;
-                        var sum = Vector3.Zero; var dsum = Vector4.Zero; int n = 0;
+                        var sum = Vector3.Zero; var dsum = Vector4.Zero; float msum = 0f; int n = 0;
+                        bool mask = page.Mask.Length > 0;
                         for (int dy = -1; dy <= 1; dy++)
                             for (int dx = -1; dx <= 1; dx++)
                             {
@@ -509,9 +587,11 @@ namespace GameEditor.Framework.Renderer.Server.GI
                                 int j = ny * size + nx;
                                 if (!filled[j]) continue;
                                 sum += page.Light[j]; dsum += page.Direction[j]; n++;
+                                if (mask) msum += page.Mask[j];
                             }
                         if (n == 0) continue;
                         page.Light[i] = sum / n; page.Direction[i] = dsum / n;
+                        if (mask) page.Mask[i] = msum / n;
                         next[i] = true;
                     }
                 filled = next;

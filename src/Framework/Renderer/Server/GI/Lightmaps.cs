@@ -18,11 +18,12 @@ namespace GameEditor.Framework.Renderer.Server.GI
     {
         private static LightingData? _data;
         private static string _folderKey = "";
-        private static sg_view[] _light = Array.Empty<sg_view>(), _dir = Array.Empty<sg_view>();
-        private static readonly Dictionary<int, MeshResource> _meshByScene = new();
-        private static readonly Dictionary<ushort, int> _pageOfMesh = new();
+        private static sg_view[] _light = Array.Empty<sg_view>(), _dir = Array.Empty<sg_view>(), _mask = Array.Empty<sg_view>();
+        private static readonly Dictionary<int, (MeshResource Mesh, int Page, System.Numerics.Vector3 St)> _entity = new();
+        private static readonly List<string> _meshKeys = new();
         private static readonly HashSet<int> _bakedLights = new();
         private static int _version;
+        private static sg_buffer _meshVertices, _meshIndices;   // every lightmapped mesh's, shared (MeshRegistry.RegisterShared)
         private static System.Numerics.Vector3[] _probePos = Array.Empty<System.Numerics.Vector3>();
         private static System.Numerics.Vector4[] _probePacked = Array.Empty<System.Numerics.Vector4>();   // 9 a probe
 
@@ -65,6 +66,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public static bool Active => _data != null;
         public static bool Directional => _data?.Directional == true;
         public static int PageCount => _light.Length;
+        /// <summary>The Mixed sun (scene id) whose shadow on the lightmapped surfaces the bake's shadowmask holds; -1 none.</summary>
+        public static int ShadowmaskLight => _data?.ShadowmaskLight ?? -1;
         /// <summary>Grows each time a bake is loaded or unloaded (the editor's views follow it).</summary>
         public static int Version => _version;
 
@@ -77,14 +80,21 @@ namespace GameEditor.Framework.Renderer.Server.GI
             return k;
         }
 
-        /// <summary>A lightmapped entity's own mesh, or null.</summary>
-        public static MeshResource? MeshFor(int sceneId) => _data != null && _meshByScene.TryGetValue(sceneId, out var m) ? m : null;
+        /// <summary>A lightmapped entity's mesh (its layout, shared by the instances of its source), or null.</summary>
+        public static MeshResource? MeshFor(int sceneId) => _data != null && _entity.TryGetValue(sceneId, out var e) ? e.Mesh : null;
 
-        /// <summary>The page a mesh is lightmapped on (-1: none).</summary>
-        public static int PageOf(ushort meshId) => _data != null && _pageOfMesh.TryGetValue(meshId, out int p) ? p : -1;
+        /// <summary>A lightmapped entity's mesh, page and its UV's place there (page UV = mesh UV × st.X + st.YZ).</summary>
+        public static bool Lookup(int sceneId, out MeshResource mesh, out int page, out System.Numerics.Vector3 st)
+        {
+            if (_data != null && _entity.TryGetValue(sceneId, out var e)) { (mesh, page, st) = e; return true; }
+            mesh = null!; page = -1; st = default;
+            return false;
+        }
 
         public static sg_view LightView(int page) => (uint)page < (uint)_light.Length ? _light[page] : default;
         public static sg_view DirectionView(int page) => (uint)page < (uint)_dir.Length ? _dir[page] : default;
+        /// <summary>A page's shadowmask (the sun's visibility in red; a white placeholder when the page has none).</summary>
+        public static sg_view MaskView(int page) => (uint)page < (uint)_mask.Length ? _mask[page] : default;
 
         /// <summary>A Baked light of the loaded bake (drawn by the maps, not in real time).</summary>
         public static bool IsBakedLight(int sceneId) => _data != null && _bakedLights.Contains(sceneId);
@@ -100,11 +110,12 @@ namespace GameEditor.Framework.Renderer.Server.GI
             if (!File.Exists(json)) return false;
             var data = LightingData.Parse(File.ReadAllText(json));
             if (data == null || !data.ReadMeshes(File.ReadAllBytes(Path.Combine(dir, LightingData.MeshFile)))) return false;
-            var light = new byte[data.Pages.Count][]; var dirs = new byte[data.Pages.Count][];
+            var light = new byte[data.Pages.Count][]; var dirs = new byte[data.Pages.Count][]; var masks = new byte[data.Pages.Count][];
             for (int p = 0; p < data.Pages.Count; p++)
             {
                 light[p] = File.ReadAllBytes(Path.Combine(dir, data.Pages[p].Light));
                 if (data.Directional && data.Pages[p].Direction.Length > 0) dirs[p] = File.ReadAllBytes(Path.Combine(dir, data.Pages[p].Direction));
+                if (data.Pages[p].Mask.Length > 0 && File.Exists(Path.Combine(dir, data.Pages[p].Mask))) masks[p] = File.ReadAllBytes(Path.Combine(dir, data.Pages[p].Mask));
             }
             var refl = new byte[data.ReflectionProbes.Count][][];
             for (int r = 0; r < refl.Length; r++)
@@ -116,7 +127,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     refl[r][k] = File.Exists(f) ? File.ReadAllBytes(f) : Array.Empty<byte>();
                 }
             }
-            Activate(folderKey, data, light, dirs, refl);
+            Activate(folderKey, data, light, dirs, masks, refl);
             return true;
         }
 
@@ -135,22 +146,24 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 SFilesystem.LoadFileAsync(folderKey + "/" + LightingData.MeshFile, (_, meshBytes, ms) =>
                 {
                     if (ms != SFileLoadStatus.Success || asked != _version || !data.ReadMeshes(meshBytes)) return;
-                    var light = new byte[data.Pages.Count][]; var dirs = new byte[data.Pages.Count][];
+                    var light = new byte[data.Pages.Count][]; var dirs = new byte[data.Pages.Count][]; var masks = new byte[data.Pages.Count][];
                     var refl = new byte[data.ReflectionProbes.Count][][];
                     for (int r = 0; r < refl.Length; r++) refl[r] = new byte[6][];
                     int waiting = data.Pages.Count * (data.Directional ? 2 : 1) + refl.Length * 6;
-                    if (waiting == 0) { Activate(folderKey, data, light, dirs, refl); return; }
+                    foreach (var pg in data.Pages) if (pg.Mask.Length > 0) waiting++;
+                    if (waiting == 0) { Activate(folderKey, data, light, dirs, masks, refl); return; }
                     void One(string name, byte[][] into, int p)
                         => SFilesystem.LoadFileAsync(folderKey + "/" + name, (_, b, st) =>
                         {
                             if (asked != _version) return;
                             if (st == SFileLoadStatus.Success) into[p] = b;
-                            if (--waiting == 0) Activate(folderKey, data, light, dirs, refl);
+                            if (--waiting == 0) Activate(folderKey, data, light, dirs, masks, refl);
                         });
                     for (int p = 0; p < data.Pages.Count; p++)
                     {
                         One(data.Pages[p].Light, light, p);
                         if (data.Directional) One(data.Pages[p].Direction, dirs, p);
+                        if (data.Pages[p].Mask.Length > 0) One(data.Pages[p].Mask, masks, p);
                     }
                     for (int r = 0; r < refl.Length; r++)
                         for (int k = 0; k < 6; k++) One(data.ReflectionProbes[r].Faces[k], refl[r], k);
@@ -158,26 +171,37 @@ namespace GameEditor.Framework.Renderer.Server.GI
             });
         }
 
-        private static void Activate(string folderKey, LightingData data, byte[][] light, byte[][] dirs, byte[][][] refl)
+        private static void Activate(string folderKey, LightingData data, byte[][] light, byte[][] dirs, byte[][] masks, byte[][][] refl)
         {
             var tex = RenderingServer.Textures;
             _light = new sg_view[data.Pages.Count];
             _dir = new sg_view[data.Pages.Count];
+            _mask = new sg_view[data.Pages.Count];
             for (int p = 0; p < data.Pages.Count; p++)
             {
                 _light[p] = light[p] is { Length: > 0 } lb ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Light), lb, srgb: false) : tex.PlaceholderBlack;
                 _dir[p] = dirs[p] is { Length: > 0 } db ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Direction), db, srgb: false) : tex.PlaceholderWhite;
+                _mask[p] = masks[p] is { Length: > 0 } mb ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Mask), mb, srgb: false) : tex.PlaceholderWhite;
             }
-            foreach (var (id, subs) in data.Meshes)
+            // every lightmapped mesh in one buffer pair (one pair each emptied sokol's pool in a scene of hundreds)
+            // the layouts (a bake of before them: each entity's own mesh, under its scene id)
+            var shared = new List<(string Key, ObjSubMesh[] SubMeshes, Aabb Bounds)>();
+            var meshAt = new Dictionary<int, int>();
+            foreach (var (key, subs) in data.Meshes)
             {
-                if (!data.EntityPage.TryGetValue(id, out int page)) continue;
                 var bmin = new System.Numerics.Vector3(float.MaxValue); var bmax = new System.Numerics.Vector3(float.MinValue);
                 foreach (var sm in subs) foreach (var v in sm.Vertices) { bmin = System.Numerics.Vector3.Min(bmin, v.Position); bmax = System.Numerics.Vector3.Max(bmax, v.Position); }
-                ushort meshId = RenderingServer.Meshes.RegisterOrReplaceMesh(MeshKey(folderKey, id), subs, new Aabb(bmin, bmax));
-                if (RenderingServer.Meshes.GetById(meshId) is not { } res) continue;
-                // the source mesh's sub-mesh materials, by name (the renderer resolves them by key)
-                _meshByScene[id] = res;
-                _pageOfMesh[meshId] = page;
+                meshAt[key] = shared.Count;
+                shared.Add((MeshKey(folderKey, key), subs, new Aabb(bmin, bmax)));
+                _meshKeys.Add(MeshKey(folderKey, key));
+            }
+            var (meshIds, vb, ib) = RenderingServer.Meshes.RegisterShared(shared, "lightmap:" + folderKey);
+            _meshVertices = vb; _meshIndices = ib;
+            foreach (var (id, page) in data.EntityPage)
+            {
+                var (meshKey, st) = data.EntityMesh.TryGetValue(id, out var em) ? em : (id, new System.Numerics.Vector3(1f, 0f, 0f));
+                if (!meshAt.TryGetValue(meshKey, out int k) || RenderingServer.Meshes.GetById(meshIds[k]) is not { } res) continue;
+                _entity[id] = (res, page, st);
             }
             foreach (int id in data.BakedLights) _bakedLights.Add(id);
             // reflection probes (M8c): each one's six faces decoded, a mipped cube
@@ -200,7 +224,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
             _folderKey = folderKey;
             _data = data;
             _version++;
-            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_meshByScene.Count} lightmapped, {data.BakedLights.Count} baked light(s), {data.Probes.Count} probe(s), {ReflectionProbes.Count} reflection probe(s)");
+            Logger.Info($"[Lightmaps] '{folderKey}': {data.Pages.Count} page(s), {_entity.Count} lightmapped ({_meshKeys.Count} mesh(es)), {data.BakedLights.Count} baked light(s), {data.Probes.Count} probe(s), {ReflectionProbes.Count} reflection probe(s){(data.ShadowmaskLight >= 0 ? ", a shadowmask" : "")}");
         }
 
         /// <summary>Drops the loaded bake: its textures and meshes freed.</summary>
@@ -212,12 +236,15 @@ namespace GameEditor.Framework.Renderer.Server.GI
             {
                 RenderingServer.Textures.Release(TextureKey(_folderKey, p.Light));
                 if (p.Direction.Length > 0) RenderingServer.Textures.Release(TextureKey(_folderKey, p.Direction));
+                if (p.Mask.Length > 0) RenderingServer.Textures.Release(TextureKey(_folderKey, p.Mask));
             }
-            foreach (int id in _meshByScene.Keys) RenderingServer.Meshes.Remove(MeshKey(_folderKey, id));
+            foreach (string key in _meshKeys) RenderingServer.Meshes.Remove(key);
+            MeshRegistry.FreeShared(_meshVertices, _meshIndices);
+            _meshVertices = default; _meshIndices = default;
             ReflectionProbes.Unload();
-            _meshByScene.Clear(); _pageOfMesh.Clear(); _bakedLights.Clear();
+            _entity.Clear(); _meshKeys.Clear(); _bakedLights.Clear();
             _probePos = Array.Empty<System.Numerics.Vector3>(); _probePacked = Array.Empty<System.Numerics.Vector4>();
-            _light = Array.Empty<sg_view>(); _dir = Array.Empty<sg_view>();
+            _light = Array.Empty<sg_view>(); _dir = Array.Empty<sg_view>(); _mask = Array.Empty<sg_view>();
             _data = null; _folderKey = "";
         }
 

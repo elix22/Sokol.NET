@@ -75,6 +75,14 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     Shadows = lc.CastsShadows,
                 });
             }
+            // the shadowmask's light: the strongest Mixed sun that casts shadows (the renderer's own pick among them)
+            float sunIntensity = float.MinValue;
+            foreach (var row in world.Query<ActiveFlag, LightComponent, Transform>().EnumerateWithEntities<ActiveFlag, LightComponent, Transform>())
+            {
+                ref readonly var lc = ref row.Item2.Value;
+                if (!row.Item1.Value.Active || !lc.Enabled || lc.Mode != LightMode.Mixed || lc.Type != GameEditor.Framework.ECS.Components.LightType.Directional || !lc.CastsShadows) continue;
+                if (lc.Intensity > sunIntensity) { sunIntensity = lc.Intensity; input.ShadowmaskLight = (int)world.GetSceneId(row.Entity); }
+            }
             // the light probes (M8b): every active Light Probe Group's, in world space
             foreach (var row in world.Query<ActiveFlag, LightProbeGroup, Transform>().EnumerateWithEntities<ActiveFlag, LightProbeGroup, Transform>())
             {

@@ -29,6 +29,14 @@ namespace GameEditor.Framework.Core
         public bool   Hdr              { get; set; } = true;
         /// <summary>The 3D scene's pixels, a share of the view's: 0.5–1.</summary>
         public float  RenderScale      { get; set; } = 1f;
+        /// <summary>Forward: the most spot / point lights an object is lit by - those of the view's most important that reach
+        /// it (directional lights always); 0: every light of the view on every pixel. Forward+ is not limited (a pixel is
+        /// lit by its cluster's lights).</summary>
+        public int    PerObjectLights  { get; set; } = 0;
+        /// <summary>A baked Mixed sun's shadow on lightmapped (static) objects comes from the bake's shadowmask; its real-time
+        /// map holds only the moving casters (an empty one is not sampled). Moving objects get no shadow of the static ones.
+        /// Off: every caster in real time (a shadowmask is not used).</summary>
+        public bool   Shadowmask       { get; set; }
 
         public QualityLevel Clone() => (QualityLevel)MemberwiseClone();
 
@@ -39,13 +47,17 @@ namespace GameEditor.Framework.Core
         /// pixels of before); at Medium a scene whose every pixel is a lit, shadowed surface took 117 ms a frame (8 fps) and
         /// 40 point lamps 76 ms, GPU-bound. Mobile - half the 3D's pixels (the count of before High DPI; the UI stays sharp)
         /// and one shadow tap - draws them in 25 and 23 ms (40 fps), with Medium's 32 lights, cascade, shadow distance and
-        /// map, HDR and spot / point shadows (Forward lost to Forward+ there: 40 lamps 114 against 46 ms at 0.75).
+        /// map, HDR and spot / point shadows. Forward (owner, the same day: a town with a sun and a few lamps ran much faster
+        /// on the phones with it): Forward+ costs every pixel its cluster's lookups (a float texture) whatever the lights,
+        /// and pays back only where many small lights overlap (40 lamps on one floor: Forward+ 46 against Forward 114 ms).
         /// </summary>
         public static List<QualityLevel> Defaults() => new()
         {
             new QualityLevel { Name = "High" },
             new QualityLevel { Name = "Medium", MaxLights = 32, Cascades = 1, ShadowDistance = 100f },
-            new QualityLevel { Name = "Mobile", MaxLights = 32, Cascades = 1, ShadowDistance = 100f, SoftShadows = 1, RenderScale = 0.5f },
+            new QualityLevel { Name = "Mobile", RenderingPath = "forward", MaxLights = 32, Cascades = 1, ShadowDistance = 100f,
+                               SoftShadows = 1, RenderScale = 0.5f, PerObjectLights = 4,
+                               Shadowmask = true },
             new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, Cascades = 1, ShadowDistance = 50f, ShadowResolution = 1024,
                                PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f },
         };

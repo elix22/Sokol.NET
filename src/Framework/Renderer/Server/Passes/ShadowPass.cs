@@ -25,6 +25,178 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             public sg_buffer VertexBuffer;
             public sg_buffer IndexBuffer;
             public int IndexCount;
+            public Aabb Bounds;   // local: the slice's culling
+        }
+
+        // ── Instanced static casters (2026-11-16) ─────────────────────────────────────
+        // A slice drew every caster of the world, each sub-mesh a draw of its own (a town of 1,030 objects: 1,562 draws a
+        // map, 6,248 with four cascades). Now a caster outside the slice's light frustum is left out (it gives the map no
+        // pixel: the picture is the same), and the rest are drawn one instanced draw per sub-mesh.
+        private sg_shader _instShader;
+        private sg_pipeline _instPipeline, _instPointPipeline;
+        private InstanceBuffer? _instances;
+        private int _instancesThisFrame;
+        private const int InstanceCapacity = RenderingConstants.MAX_VIEWS * RenderingConstants.MAX_DRAWS;   // the buffer's, per frame
+
+        private struct CasterDraw
+        {
+            public sg_buffer Vb, Ib;
+            public int IndexCount;
+            public Matrix4x4 Model;
+            public ulong Key;   // the sub-mesh: its vertex and index buffers
+        }
+        private CasterDraw[] _draws = new CasterDraw[1024];
+        private ulong[] _keys = new ulong[1024];
+        private int[] _order = new int[1024];
+        private int _drawCount;
+
+        // ── The frame's casters and receivers, gathered once (every slice and view of the frame uses them) ─────────
+        // Gathered once a frame - the ECS walked once, a mesh found by its path through a cache (a primitive's name was parsed
+        // for every caster of every slice) - and their world matrices and boxes worked out in parallel (on the web in order).
+        private struct Caster
+        {
+            public Transform Tf;
+            public MeshResource? Mesh;
+            public PrimitiveShadowMesh Prim;
+            public bool IsPrim, Casts, Receives, BoxKnown, InSlice, Lightmapped;
+            public Matrix4x4 Model;
+            public Aabb Box;   // world
+        }
+        private Caster[] _casters = new Caster[1024];
+
+        /// <summary>The maps rendered now leave out the lightmapped casters (the shadowmask holds their shadow: the sun's maps
+        /// of a view whose level uses it).</summary>
+        public bool SkipLightmapped { get; set; }
+        private int _casterCount;
+        private bool _castersReady;
+        private ECSWorld? _castersWorld;
+        private readonly Dictionary<string, (bool IsPrim, string Key)> _meshKinds = new();
+
+        /// <summary>The frame starts: the instance buffer is appended to anew, the casters gathered again.</summary>
+        public void BeginFrame()
+        {
+            _instances?.BeginFrame();
+            _instancesThisFrame = 0;
+            _castersReady = false;
+        }
+
+        private void EnsureCasters(ECSWorld world, MeshRegistry meshRegistry)
+        {
+            if (_castersReady && ReferenceEquals(_castersWorld, world)) return;
+            _casterCount = 0;
+            bool baked = GI.Lightmaps.Active;
+            foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>().EnumerateWithEntities<ActiveFlag, MeshRenderer, Transform>())
+            {
+                if (!row.Item1.Value.Active) continue;
+                ref readonly var mr = ref row.Item2.Value;
+                if (!mr.Visible || (!mr.CastsShadows && !mr.ReceivesShadows) || mr.MeshPath == null) continue;
+                if (!_meshKinds.TryGetValue(mr.MeshPath, out var kind))
+                {
+                    kind = PrimitiveMeshSpec.TryParse(mr.MeshPath, out var spec) ? (true, PrimitiveMeshSpec.ToMeshPath(spec)) : (false, mr.MeshPath);
+                    _meshKinds[mr.MeshPath] = kind;
+                }
+                var c = new Caster { Tf = row.Item3.Value, IsPrim = kind.IsPrim, Casts = mr.CastsShadows, Receives = mr.ReceivesShadows,
+                                     Lightmapped = baked && mr.ContributeGI && GI.Lightmaps.MeshFor(world.GetSceneId(row.Entity)) != null };
+                if (kind.IsPrim)
+                {
+                    c.Prim = GetOrCreatePrimitiveShadowMesh(kind.Key);
+                    if (c.Prim.IndexCount == 0 || c.Prim.VertexBuffer.id == 0 || c.Prim.IndexBuffer.id == 0) continue;
+                }
+                else
+                {
+                    c.Mesh = meshRegistry.GetByPath(mr.MeshPath);   // looked up each frame: a mesh loads later, or again
+                    if (c.Mesh == null || c.Mesh.SubMeshes == null || c.Mesh.SubMeshes.Length == 0) continue;
+                }
+                if (_casterCount == _casters.Length) Array.Resize(ref _casters, _casters.Length * 2);
+                _casters[_casterCount++] = c;
+            }
+            var casters = _casters;
+            Concurrency.ParallelWork.For(_casterCount, 128, (from, to) =>
+            {
+                for (int i = from; i < to; i++)
+                {
+                    ref var c = ref casters[i];
+                    c.Model = Transform.GetWorldMatrix(world, c.Tf);
+                    Aabb local = c.IsPrim ? c.Prim.Bounds : c.Mesh!.LocalBounds;
+                    c.BoxKnown = local.Min.X <= local.Max.X;
+                    if (c.BoxKnown) c.Box = local.Transform(c.Model);
+                }
+            });
+            _castersReady = true;
+            _castersWorld = world;
+        }
+
+        private void AddDraw(sg_buffer vb, sg_buffer ib, int indexCount, in Matrix4x4 model)
+        {
+            if (_drawCount == _draws.Length)
+            {
+                Array.Resize(ref _draws, _draws.Length * 2);
+                Array.Resize(ref _keys, _draws.Length);
+                Array.Resize(ref _order, _draws.Length);
+            }
+            _draws[_drawCount] = new CasterDraw { Vb = vb, Ib = ib, IndexCount = indexCount, Model = model,
+                                                  Key = ((ulong)vb.id << 32) | ib.id };
+            _drawCount++;
+        }
+
+        // The view the sun's maps are made for (its camera) and the sun's direction: a caster whose shadow cannot reach
+        // that view is left out too. Set for the sun's slices only (a spot's or a point's map is bounded by its range).
+        private Frustum _receivers;
+        private Vector3 _sunDir;
+        private bool _cullByReceivers;
+
+        private Aabb _receiverBox;      // the shadow receivers the camera sees, one box round them all
+        private bool _receiverBoxKnown; // false: not limited (a skinned mesh receives - its bounds are not known here)
+
+        /// <summary>The sun's slices that follow are for this camera: a caster whose shadow cannot fall on a receiver in its
+        /// view is left out.</summary>
+        public void SetReceivers(ECSWorld world, MeshRegistry meshRegistry, in Matrix4x4 cameraViewProj, Vector3 lightDirection)
+        {
+            _receivers = Frustum.ExtractFromViewProj(in cameraViewProj);
+            _sunDir = lightDirection;
+            _cullByReceivers = lightDirection.LengthSquared() > 1e-8f;
+
+            // Where a shadow can show: the receivers in the view (a camera's frustum reaches under the floor, where nothing
+            // receives - a caster whose shadow went only there was drawn).
+            _receiverBoxKnown = !world.HasAnyComponent<SkinnedMeshRenderer>();
+            if (!_receiverBoxKnown) return;
+            EnsureCasters(world, meshRegistry);
+            var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+            for (int i = 0; i < _casterCount; i++)
+            {
+                ref readonly var c = ref _casters[i];
+                if (!c.Receives) continue;
+                if (!c.BoxKnown) { _receiverBoxKnown = false; return; }   // a receiver of no known size: not limited
+                if (!_receivers.Intersects(in c.Box)) continue;
+                lo = Vector3.Min(lo, c.Box.Min); hi = Vector3.Max(hi, c.Box.Max);
+            }
+            _receiverBox = new Aabb(lo, hi);   // none in view: an empty box - no shadow can be seen
+        }
+
+        /// <summary>The slices that follow are not the sun's: no camera test.</summary>
+        public void ClearReceivers() => _cullByReceivers = false;
+
+        // A caster's world box: in the slice's light frustum, and (the sun's slices) its shadow able to reach the camera's
+        // view. A box with no size (not known) is drawn.
+        private bool InSlice(in Frustum frustum, in Aabb box, bool known)
+        {
+            if (!known) return true;
+            if (!frustum.Intersects(in box)) return false;
+            if (!_cullByReceivers) return true;
+            // Its shadow: the box swept along the sun to the map's far side (beyond it the map holds nothing), in the view.
+            float t = frustum.SweepToFar(in box, _sunDir);
+            if (float.IsPositiveInfinity(t)) return _receivers.SweptIntersects(in box, _sunDir);
+            var end = _sunDir * t;
+            var lo = Vector3.Min(box.Min, box.Min + end);
+            var hi = Vector3.Max(box.Max, box.Max + end);
+            if (_receiverBoxKnown)
+            {
+                // only the part of it where a receiver in the view is
+                lo = Vector3.Max(lo, _receiverBox.Min);
+                hi = Vector3.Min(hi, _receiverBox.Max);
+                if (lo.X > hi.X || lo.Y > hi.Y || lo.Z > hi.Z) return false;
+            }
+            return _receivers.Intersects(new Aabb(lo, hi));
         }
 
         private sg_shader _shader;
@@ -103,6 +275,32 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             desc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
             desc.label = "shadow-caster-point-faces";
             _pointPipeline = sg_make_pipeline(desc);
+
+            // The instanced casters: the vertices' positions (buffer 0, as above) and InstanceData per instance (buffer 1).
+            _instShader = sg_make_shader(shadow_caster_instanced_shader_desc(sg_query_backend()));
+            var idesc = desc;
+            idesc.shader = _instShader;
+            idesc.cull_mode = sg_cull_mode.SG_CULLMODE_BACK;
+            idesc.label = "shadow-caster-instanced";
+            idesc.layout = default;
+            idesc.layout.buffers[0].stride = 56;
+            idesc.layout.buffers[1].stride = 80;
+            idesc.layout.buffers[1].step_func = sg_vertex_step.SG_VERTEXSTEP_PER_INSTANCE;
+            idesc.layout.attrs[ATTR_shadow_caster_instanced_in_pos] = new sg_vertex_attr_state
+                { buffer_index = 0, offset = 0, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT3 };
+            idesc.layout.attrs[ATTR_shadow_caster_instanced_in_model_0] = new sg_vertex_attr_state
+                { buffer_index = 1, offset = 0, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            idesc.layout.attrs[ATTR_shadow_caster_instanced_in_model_1] = new sg_vertex_attr_state
+                { buffer_index = 1, offset = 16, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            idesc.layout.attrs[ATTR_shadow_caster_instanced_in_model_2] = new sg_vertex_attr_state
+                { buffer_index = 1, offset = 32, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            idesc.layout.attrs[ATTR_shadow_caster_instanced_in_model_3] = new sg_vertex_attr_state
+                { buffer_index = 1, offset = 48, format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4 };
+            _instPipeline = sg_make_pipeline(idesc);
+            idesc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
+            idesc.label = "shadow-caster-instanced-point-faces";
+            _instPointPipeline = sg_make_pipeline(idesc);
+            _instances = new InstanceBuffer(RenderingConstants.MAX_DRAWS);
 
 
             _passAction = default;
@@ -257,6 +455,11 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 sg_destroy_shader(_shader);
                 _shader = default;
             }
+            if (_instPipeline.id != 0) { sg_destroy_pipeline(_instPipeline); _instPipeline = default; }
+            if (_instPointPipeline.id != 0) { sg_destroy_pipeline(_instPointPipeline); _instPointPipeline = default; }
+            if (_instShader.id != 0) { sg_destroy_shader(_instShader); _instShader = default; }
+            _instances?.Dispose();
+            _instances = null;
 
             FreeDummies();
             if (_jointPlaceholderView.id != 0)
@@ -566,58 +769,34 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             sg_begin_pass(pass);
             try
             {
-                sg_apply_pipeline(point ? _pointPipeline : _pipeline);
-
-                foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>()
-                                         .Enumerate<ActiveFlag, MeshRenderer, Transform>())
+                // The static casters in the slice's light frustum, then drawn: instanced, one draw per sub-mesh.
+                var frustum = Frustum.ExtractFromViewProj(in lightViewProj);
+                EnsureCasters(world, meshRegistry);
+                var casters = _casters;
+                bool skipLightmapped = SkipLightmapped;
+                Concurrency.ParallelWork.For(_casterCount, 128, (from, to) =>
                 {
-                    if (!row.Item1.Value.Active) continue;
-                    ref readonly var mr = ref row.Item2.Value;
-                    if (!mr.Visible || !mr.CastsShadows) continue;
-                    ref readonly var tf = ref row.Item3.Value;
-
-                    Matrix4x4 model = Transform.GetWorldMatrix(world, tf);
-                    var vsParams = new shadow_caster_vs_params_t
+                    for (int i = from; i < to; i++)
                     {
-                        mvp = model * lightViewProj
-                    };
-                    sg_apply_uniforms(UB_shadow_caster_vs_params, SG_RANGE(ref vsParams));
-
-                    if (PrimitiveMeshSpec.TryParse(mr.MeshPath, out var primSpec))
-                    {
-                        PrimitiveShadowMesh prim = GetOrCreatePrimitiveShadowMesh(PrimitiveMeshSpec.ToMeshPath(primSpec));
-                        if (prim.IndexCount == 0 || prim.VertexBuffer.id == 0 || prim.IndexBuffer.id == 0)
-                            continue;
-
-                        sg_apply_bindings(new sg_bindings
-                        {
-                            vertex_buffers = { [0] = prim.VertexBuffer },
-                            index_buffer = prim.IndexBuffer,
-                        });
-
-                        if (Diagnostics.FrameDebugger.Draw("shadow caster", prim.IndexCount, 1)) sg_draw(0, (uint)prim.IndexCount, 1);
-                        drawCallCount++;
-                        continue;
+                        ref var c = ref casters[i];
+                        c.InSlice = c.Casts && !(skipLightmapped && c.Lightmapped) && InSlice(in frustum, in c.Box, c.BoxKnown);
                     }
-
-                    MeshResource? mesh = meshRegistry.GetByPath(mr.MeshPath);
-                    if (mesh == null || mesh.SubMeshes == null || mesh.SubMeshes.Length == 0) continue;
-
-                    foreach (MeshSubResource sub in mesh.SubMeshes)
+                });
+                _drawCount = 0;
+                for (int i = 0; i < _casterCount; i++)
+                {
+                    ref readonly var c = ref _casters[i];
+                    if (!c.InSlice) continue;
+                    if (c.IsPrim) { AddDraw(c.Prim.VertexBuffer, c.Prim.IndexBuffer, c.Prim.IndexCount, in c.Model); continue; }
+                    foreach (MeshSubResource sub in c.Mesh!.SubMeshes)
                     {
-                        if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0)
-                            continue;
-
-                        sg_apply_bindings(new sg_bindings
-                        {
-                            vertex_buffers = { [0] = sub.VertexBuffer },
-                            index_buffer = sub.IndexBuffer,
-                        });
-
-                        if (Diagnostics.FrameDebugger.Draw("shadow caster", sub.IndexCount, 1)) sg_draw(0, (uint)sub.IndexCount, 1);
-                        drawCallCount++;
+                        if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0) continue;
+                        AddDraw(sub.VertexBuffer, sub.IndexBuffer, sub.IndexCount, in c.Model);
                     }
                 }
+                drawCallCount += DrawGathered(in lightViewProj, point);
+
+                sg_apply_pipeline(point ? _pointPipeline : _pipeline);
 
                 // Mesh particles that cast shadows (G8.8 Q6), as gathered this frame.
                 var meshBatches = Scene.WorldParticles.MeshBatches;
@@ -653,6 +832,57 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 sg_end_pass();
             }
         }
+
+        // The gathered casters: grouped by sub-mesh, their model matrices appended to the instance buffer, a draw per group.
+        // Past the buffer's room for the frame (a scene of very many casters and lights): a draw each, as before.
+        private int DrawGathered(in Matrix4x4 lightViewProj, bool point)
+        {
+            if (_drawCount == 0) return 0;
+            for (int i = 0; i < _drawCount; i++) { _keys[i] = _draws[i].Key; _order[i] = i; }
+            Array.Sort(_keys, _order, 0, _drawCount);
+            int draws = 0;
+            if (_instances != null && _instancePipelineOk && _instancesThisFrame + _drawCount <= InstanceCapacity)
+            {
+                _instances.ResetStaging();
+                for (int i = 0; i < _drawCount; i++)
+                    _instances.TryAppend(new InstanceData(in _draws[_order[i]].Model, Vector4.Zero));
+                int baseOffset = _instances.Flush();
+                _instancesThisFrame += _drawCount;
+                sg_apply_pipeline(point ? _instPointPipeline : _instPipeline);
+                var p = new shadow_caster_instanced_vs_params_t { light_view_proj = lightViewProj };
+                sg_apply_uniforms(UB_shadow_caster_instanced_vs_params, SG_RANGE(ref p));
+                const int InstanceBytes = 80;
+                for (int i = 0; i < _drawCount;)
+                {
+                    int j = i + 1;
+                    while (j < _drawCount && _keys[j] == _keys[i]) j++;
+                    ref readonly var d = ref _draws[_order[i]];
+                    sg_apply_bindings(new sg_bindings
+                    {
+                        vertex_buffers = { [0] = d.Vb, [1] = _instances.Buffer },
+                        vertex_buffer_offsets = { [1] = baseOffset + i * InstanceBytes },
+                        index_buffer = d.Ib,
+                    });
+                    if (Diagnostics.FrameDebugger.Draw("shadow casters", d.IndexCount, j - i)) sg_draw(0, (uint)d.IndexCount, (uint)(j - i));
+                    draws++;
+                    i = j;
+                }
+                return draws;
+            }
+            sg_apply_pipeline(point ? _pointPipeline : _pipeline);
+            for (int i = 0; i < _drawCount; i++)
+            {
+                ref readonly var d = ref _draws[_order[i]];
+                var vsParams = new shadow_caster_vs_params_t { mvp = d.Model * lightViewProj };
+                sg_apply_uniforms(UB_shadow_caster_vs_params, SG_RANGE(ref vsParams));
+                sg_apply_bindings(new sg_bindings { vertex_buffers = { [0] = d.Vb }, index_buffer = d.Ib });
+                if (Diagnostics.FrameDebugger.Draw("shadow caster", d.IndexCount, 1)) sg_draw(0, (uint)d.IndexCount, 1);
+                draws++;
+            }
+            return draws;
+        }
+
+        private bool _instancePipelineOk => _instPipeline.id != 0 && sg_query_pipeline_state(_instPipeline) == sg_resource_state.SG_RESOURCESTATE_VALID;
 
         private PrimitiveShadowMesh GetOrCreatePrimitiveShadowMesh(string key)
         {
@@ -696,6 +926,9 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 label = "shadow-prim-ibuf"
             });
             created.IndexCount = inds.Length;
+            var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+            foreach (var v in verts) { lo = Vector3.Min(lo, v); hi = Vector3.Max(hi, v); }
+            created.Bounds = new Aabb(lo, hi);
 
             _primitiveMeshes[key] = created;
             return created;

@@ -138,7 +138,7 @@ layout(binding=5) uniform pbr_rendering_flags {
     float ambient_strength; // fallback ambient when IBL is off
     float tonemap_type;     // G8.3, a GPU without float targets: the curve in the shader's own output (0 none, 2 ACES, 3 Neutral)
     float tonemap_exposure; // ... and the exposure (× before the curve; 1 = none)
-    float lightmap_mode;    // M8a: 0 none, 1 a lightmap, 2 a directional lightmap (static variants only)
+    float lightmap_mode;    // M8a: 0 none, 1 a lightmap, 2 a directional lightmap (static variants only); + 4: the shadowmask
 };
 
 // ─── CSM (binding=6, conditional) ────────────────────────────────────────────
@@ -248,6 +248,11 @@ vec4 cluster_texel(int i) { return texelFetch(sampler2D(cluster_tex, cluster_smp
 #define LIGHTMAPS 1
 layout(binding=13) uniform texture2D u_LightmapTexture;
 layout(binding=14) uniform texture2D u_LightmapDirTexture;
+// The shadowmask (the quality level's): the bake's sun visibility (red) - its shadow on this surface of the lightmapped
+// ones, which its real-time map then leaves out.
+#if CSM_CASCADES == 0
+layout(binding=15) uniform texture2D u_ShadowmaskTexture;
+#endif
 #endif
 
 // Combined-sampler macros required by ibl.glsl

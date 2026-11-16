@@ -40,11 +40,60 @@ namespace GameEditor.Framework.Renderer.Server
         // One scratch block, big enough for every packed block (the largest is a skinned vs block with 4 cascades).
         private static readonly Vector4[] _scratch = new Vector4[128];
 
+        // The lights of the draws applied now (RenderingServer.PerObjectLights): their indices in the view's list, 5 bits each,
+        // the count in bits 40-43; off: every light of the block.
+        private static ulong _objectLights;
+        private static bool _objectLightsOn;
+        private static Vector4[] _objectBlock = new Vector4[512];
+
+        /// <summary>The draws that follow are lit by these lights of the view's only (a set of RenderingServer's).</summary>
+        public static void SetObjectLights(ulong set) { _objectLights = set; _objectLightsOn = true; }
+
+        /// <summary>The draws that follow are lit by every light of the block.</summary>
+        public static void ClearObjectLights() => _objectLightsOn = false;
+
+        // A copy of the block whose light array holds the set's lights only (first, in order) and whose count says so.
+        private static ReadOnlySpan<Vector4> WithObjectLights(ReadOnlySpan<Vector4> s, int lightsAt, int countAt)
+        {
+            if (_objectBlock.Length < s.Length) _objectBlock = new Vector4[s.Length];
+            Span<Vector4> d = _objectBlock.AsSpan(0, s.Length);
+            s.CopyTo(d);
+            int count = (int)((_objectLights >> 40) & 0xF);
+            for (int k = 0; k < count; k++)
+            {
+                int li = (int)((_objectLights >> (5 * k)) & 31);
+                s.Slice(lightsAt + li * 4, 4).CopyTo(d.Slice(lightsAt + k * 4, 4));
+            }
+            d[countAt].W = count;
+            return d;
+        }
+
+        private static unsafe void ApplySpan(int slot, ReadOnlySpan<Vector4> s)
+        {
+            fixed (Vector4* p = s) sg_apply_uniforms(slot, new sg_range { ptr = p, size = (nuint)(s.Length * sizeof(Vector4)) });
+        }
+
+        /// <summary>A whole PBR light block, as the renderer built it once for the view or a light set: applied as it is, or
+        /// packed for LOW_TIER.</summary>
+        public static void ApplyPbrBlock(int slot, Vector4[] block, bool low)
+        {
+            ReadOnlySpan<Vector4> s = block;
+            if (!low) { ApplySpan(slot, s); return; }
+            Span<Vector4> d = _scratch;
+            s.Slice(0, LowLights).CopyTo(d);
+            s.Slice(FullLights, LowSpot).CopyTo(d.Slice(LowLights));
+            s.Slice(FullLights + FullSpot, LowPoint).CopyTo(d.Slice(LowLights + LowSpot));
+            d[LowLights + LowSpot + LowPoint] = s[FullLights + FullSpot + FullPoint];   // ambient_num
+            ApplyScratch(slot, PbrLightVec4s);
+        }
+
         /// <summary>The PBR light block (binding 2): <c>sg_apply_uniforms</c> with the full block, or packed for LOW_TIER.</summary>
         public static void ApplyPbrLights<T>(int slot, in T full, bool low) where T : unmanaged
         {
-            if (!low) { sg_apply_uniforms(slot, Range(in full)); return; }
+            if (!low && !_objectLightsOn) { sg_apply_uniforms(slot, Range(in full)); return; }
             ReadOnlySpan<Vector4> s = AsVec4(in full);
+            if (_objectLightsOn) s = WithObjectLights(s, 0, FullLights + FullSpot + FullPoint);
+            if (!low) { ApplySpan(slot, s); return; }
             Span<Vector4> d = _scratch;
             s.Slice(0, LowLights).CopyTo(d);
             s.Slice(FullLights, LowSpot).CopyTo(d.Slice(LowLights));
@@ -56,8 +105,10 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>The Blinn-Phong fragment block (binding 1): full, or packed for LOW_TIER.</summary>
         public static void ApplyBlinnFs<T>(int slot, in T full, bool low) where T : unmanaged
         {
-            if (!low) { sg_apply_uniforms(slot, Range(in full)); return; }
+            if (!low && !_objectLightsOn) { sg_apply_uniforms(slot, Range(in full)); return; }
             ReadOnlySpan<Vector4> s = AsVec4(in full);
+            if (_objectLightsOn) s = WithObjectLights(s, BlinnHeadVec4s, 2);   // ambient_num: the head's third vec4
+            if (!low) { ApplySpan(slot, s); return; }
             Span<Vector4> d = _scratch;
             int h = BlinnHeadVec4s;
             s.Slice(0, h).CopyTo(d);

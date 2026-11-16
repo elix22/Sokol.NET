@@ -165,6 +165,94 @@ namespace Scene.Tests
             throw new Exception($"{world} not on the plane");
         }
 
+        // The shadowmask's value at a world point of the plane (y = 0), as At reads the light.
+        static float MaskAt(BakeResult r, int sceneId, Vector3 world)
+        {
+            var e = r.Entities.Find(x => x.SceneId == sceneId)!;
+            var page = r.Pages[e.Page];
+            var sm = e.Mesh[0];
+            for (int t = 0; t < sm.Indices.Length; t += 3)
+            {
+                var a = sm.Vertices[sm.Indices[t]]; var b = sm.Vertices[sm.Indices[t + 1]]; var c = sm.Vertices[sm.Indices[t + 2]];
+                Vector2 P = new(world.X, world.Z), A = new(a.Position.X, a.Position.Z), B = new(b.Position.X, b.Position.Z), C = new(c.Position.X, c.Position.Z);
+                float d = (B.Y - C.Y) * (A.X - C.X) + (C.X - B.X) * (A.Y - C.Y);
+                float w0 = ((B.Y - C.Y) * (P.X - C.X) + (C.X - B.X) * (P.Y - C.Y)) / d;
+                float w1 = ((C.Y - A.Y) * (P.X - C.X) + (A.X - C.X) * (P.Y - C.Y)) / d;
+                float w2 = 1 - w0 - w1;
+                if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+                var uv = a.Uv1 * w0 + b.Uv1 * w1 + c.Uv1 * w2;
+                int x = (int)(uv.X * page.Size), y = (int)(uv.Y * page.Size);
+                return page.Mask[y * page.Size + x];
+            }
+            throw new Exception($"{world} not on the plane");
+        }
+
+        [Fact]
+        public void A_mixed_suns_shadowmask_is_dark_in_the_boxs_shadow_and_bright_in_the_open_and_bakes_no_direct_light()
+        {
+            var input = new BakeInput { Settings = Quick(16, 0) };
+            input.Meshes.Add(new BakeMesh { SceneId = 1, Source = new[] { Plane(3f) }, Materials = new[] { new BakeMaterial { Albedo = new Vector3(0.8f) } } });
+            Assert.True(PrimitiveMeshSpec.TryParse("prim:box;w=1;h=1;d=1;tiles=1", out var spec));
+            var (p, ix) = PrimitiveMeshGeometry.GetMeshTriangles(spec);
+            var bv = new ObjVertex[p.Length];
+            for (int i = 0; i < p.Length; i++) bv[i] = new ObjVertex { Position = p[i], Normal = Vector3.Normalize(p[i]) };
+            input.Meshes.Add(new BakeMesh { SceneId = 2, World = Matrix4x4.CreateTranslation(0, 0.5f, 0), Source = new[] { new ObjSubMesh { MaterialName = "", Vertices = bv, Indices = ix } },
+                                            Materials = new[] { new BakeMaterial { Albedo = new Vector3(0.8f) } } });
+            // a Mixed sun toward +X and down: its shadow on the box's +X side, in the mask only
+            input.Lights.Add(new BakeLight { SceneId = 9, Type = LightType.Directional, Mode = LightMode.Mixed, Direction = Vector3.Normalize(new Vector3(1, -1, 0)), Color = new Vector3(1f), Shadows = true, IndirectMultiplier = 1f });
+            var none = LightBaker.Bake(input);
+            Assert.Equal(-1, none.ShadowmaskLight);                      // not asked for: no mask
+            Assert.Empty(none.Pages[0].Mask);
+
+            input.ShadowmaskLight = 9;
+            var r = LightBaker.Bake(input);
+            Assert.Equal(9, r.ShadowmaskLight);
+            float shadowed = MaskAt(r, 1, new Vector3(1.0f, 0, 0)), open = MaskAt(r, 1, new Vector3(-1.0f, 0, 0));
+            Assert.True(shadowed < 0.05f && open > 0.95f, $"the mask: +X side {shadowed}, -X side {open}");
+            Assert.True(At(r, 1, new Vector3(-1.0f, 0, 0)).X < 0.001f, "the Mixed sun's direct light is drawn, not baked");
+            // the padding carries the mask too (no dark seam where bilinear filtering reads it)
+            var page = r.Pages[0];
+            int padded = 0;
+            for (int i = 0; i < page.Mask.Length; i++) if (!page.Covered[i] && page.Mask[i] > 0.5f) padded++;
+            Assert.True(padded > 0, "the open floor's mask spreads into its padding");
+
+            // a Realtime or Baked light is no shadowmask's
+            input.Lights[0] = input.Lights[0] with { Mode = LightMode.Baked };
+            Assert.Equal(-1, LightBaker.Bake(input).ShadowmaskLight);
+        }
+
+        [Fact]
+        public void Instances_of_a_mesh_at_one_scale_share_a_lightmap_layout_each_with_its_own_place()
+        {
+            var input = new BakeInput { Settings = Quick(4, 0) };
+            Assert.True(PrimitiveMeshSpec.TryParse("prim:box;w=1;h=1;d=1;tiles=1", out var spec));
+            var (p, ix) = PrimitiveMeshGeometry.GetMeshTriangles(spec);
+            var bv = new ObjVertex[p.Length];
+            for (int i = 0; i < p.Length; i++) bv[i] = new ObjVertex { Position = p[i], Normal = Vector3.Normalize(p[i]) };
+            var box = new[] { new ObjSubMesh { MaterialName = "", Vertices = bv, Indices = ix } };   // one source, as the registry's copy
+            var mat = new[] { new BakeMaterial { Albedo = new Vector3(0.8f) } };
+            input.Meshes.Add(new BakeMesh { SceneId = 1, World = Matrix4x4.CreateTranslation(-3, 0.5f, 0), Source = box, Materials = mat });
+            input.Meshes.Add(new BakeMesh { SceneId = 2, World = Matrix4x4.CreateRotationY(0.7f) * Matrix4x4.CreateTranslation(3, 0.5f, 2), Source = box, Materials = mat });
+            input.Meshes.Add(new BakeMesh { SceneId = 3, World = Matrix4x4.CreateScale(2f) * Matrix4x4.CreateTranslation(0, 1f, -4), Source = box, Materials = mat });
+            var r = LightBaker.Bake(input);
+            var e1 = r.Entities.Find(e => e.SceneId == 1)!; var e2 = r.Entities.Find(e => e.SceneId == 2)!; var e3 = r.Entities.Find(e => e.SceneId == 3)!;
+            Assert.Equal(e1.Group, e2.Group);                 // moved and turned: the same layout (drawn instanced)
+            Assert.NotEqual(e1.Group, e3.Group);              // twice the size: a layout of its own (twice the texels)
+            Assert.Equal(2, r.Groups.Count);
+            Assert.NotEqual(e1.Offset, e2.Offset);            // each its own place
+            // each entity's page UV = the layout's UV (texels) + its place, over the page's size
+            foreach (var e in new[] { e1, e2, e3 })
+            {
+                float size = r.Pages[e.Page].Size;
+                var layout = r.Groups[e.Group][0].Vertices; var own = e.Mesh[0].Vertices;
+                for (int k = 0; k < own.Length; k++)
+                {
+                    var want = (layout[k].Uv1 + e.Offset) / size;
+                    Assert.True(Vector2.Distance(own[k].Uv1, want) < 1e-5f, $"entity {e.SceneId} vertex {k}: {own[k].Uv1} vs {want}");
+                }
+            }
+        }
+
         [Fact]
         public void A_shadow_falls_where_the_sun_sends_it_in_the_world()
         {

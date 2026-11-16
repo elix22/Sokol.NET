@@ -190,6 +190,91 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             return existing.Id;
         }
 
+        /// <summary>
+        /// Registers many meshes in ONE vertex buffer and ONE index buffer (a bake's lightmapped meshes: one each a renderer,
+        /// hundreds of them - a buffer pair each emptied sokol's pool and the rest did not draw). Each sub-mesh is a range of
+        /// the index buffer (<see cref="MeshSubResource.IndexStart"/>), its indices moved by its vertices' place. A key
+        /// already registered is replaced. Returns each mesh's id (0: not registered) and the two buffers - the caller's to
+        /// free (<see cref="FreeShared"/>) after removing the meshes.
+        /// </summary>
+        public (ushort[] Ids, sg_buffer Vertices, sg_buffer Indices) RegisterShared(IReadOnlyList<(string Key, ObjSubMesh[] SubMeshes, Aabb Bounds)> meshes, string label)
+        {
+            var ids = new ushort[meshes.Count];
+            long vertexCount = 0, indexCount = 0;
+            foreach (var m in meshes) foreach (var sm in m.SubMeshes) { vertexCount += sm.Vertices.Length; indexCount += sm.Indices.Length; }
+            if (vertexCount == 0 || indexCount == 0 || vertexCount > uint.MaxValue || !sg_isvalid()) return (ids, default, default);
+            var vertices = new ObjVertex[vertexCount];
+            var indices = new uint[indexCount];
+            int vAt = 0, iAt = 0;
+            var ranges = new (int Start, int Count)[meshes.Count][];
+            for (int k = 0; k < meshes.Count; k++)
+            {
+                var subs = meshes[k].SubMeshes;
+                ranges[k] = new (int, int)[subs.Length];
+                for (int s = 0; s < subs.Length; s++)
+                {
+                    subs[s].Vertices.CopyTo(vertices, vAt);
+                    var src = subs[s].Indices;
+                    for (int i = 0; i < src.Length; i++) indices[iAt + i] = src[i] + (uint)vAt;
+                    ranges[k][s] = (iAt, src.Length);
+                    vAt += subs[s].Vertices.Length;
+                    iAt += src.Length;
+                }
+            }
+            var vb = sg_make_buffer(new sg_buffer_desc
+            {
+                data  = SG_RANGE(vertices.AsSpan()),
+                usage = new sg_buffer_usage { vertex_buffer = true, immutable = true },
+                label = label + ":vb"
+            });
+            var ib = sg_make_buffer(new sg_buffer_desc
+            {
+                data  = SG_RANGE(indices.AsSpan()),
+                usage = new sg_buffer_usage { index_buffer = true, immutable = true },
+                label = label + ":ib"
+            });
+            for (int k = 0; k < meshes.Count; k++)
+            {
+                var (key, subs, bounds) = meshes[k];
+                if (subs.Length == 0) continue;
+                var subResources = new MeshSubResource[subs.Length];
+                for (int s = 0; s < subs.Length; s++)
+                    subResources[s] = new MeshSubResource
+                    {
+                        VertexBuffer = vb, IndexBuffer = ib, IndexStart = ranges[k][s].Start, IndexCount = ranges[k][s].Count,
+                        SharedBuffers = true, MaterialName = subs[s].MaterialName, MaterialKey = ""
+                    };
+                if (_byPath.TryGetValue(key, out var existing))
+                {
+                    foreach (var old in existing.SubMeshes) old.Destroy();
+                    existing.SubMeshes = subResources;
+                    existing.LocalBounds = bounds;
+                    existing.Cpu = KeepCpuCopies ? subs : null;
+                    ids[k] = existing.Id;
+                    continue;
+                }
+                if (_nextId >= _byId.Length) break;
+                ushort id = _nextId++;
+                var res = new MeshResource
+                {
+                    Id = id, SourcePath = key, MtlLib = "", SubMeshes = subResources, LocalBounds = bounds, RefCount = 1,
+                    Cpu = KeepCpuCopies ? subs : null
+                };
+                _byPath[key] = res;
+                _byId[id] = res;
+                ids[k] = id;
+            }
+            return (ids, vb, ib);
+        }
+
+        /// <summary>Frees the buffers <see cref="RegisterShared"/> made (once the meshes in them are removed).</summary>
+        public static void FreeShared(sg_buffer vertices, sg_buffer indices)
+        {
+            if (!sg_isvalid()) return;
+            if (vertices.id != 0) sg_destroy_buffer(vertices);
+            if (indices.id != 0) sg_destroy_buffer(indices);
+        }
+
         /// <summary>The keys of the registered meshes that start with <paramref name="prefix"/> ("Models/ship.glb#m").</summary>
         public List<string> KeysWithPrefix(string prefix)
         {

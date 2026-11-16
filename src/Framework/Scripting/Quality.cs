@@ -95,6 +95,8 @@ namespace GameEditor.Framework.Scripting
             public float ShadowDistance;  // how far the cascades reach, world units
             public bool Hdr;
             public float RenderScale;
+            public int PerObjectLights;   // Forward: the most spot / point lights an object is lit by; 0 = all
+            public bool Shadowmask;       // a baked Mixed sun's shadow on lightmapped objects from the bake's mask
         }
 
         /// <summary>The renderer's values of a level.</summary>
@@ -110,6 +112,8 @@ namespace GameEditor.Framework.Scripting
             ShadowQuality    = l.SoftShadows >= 25 ? 2 : (l.SoftShadows >= 9 ? 1 : 0),
             Hdr              = l.Hdr,
             RenderScale      = Math.Clamp(l.RenderScale, 0.5f, 1f),
+            PerObjectLights  = Math.Clamp(l.PerObjectLights, 0, 8),
+            Shadowmask       = l.Shadowmask,
         };
 
         /// <summary>The current level's values given to the renderer (again: after a value of it changed).</summary>
@@ -127,6 +131,8 @@ namespace GameEditor.Framework.Scripting
             RenderingServer.ShadowQuality    = v.ShadowQuality;
             RenderingServer.HdrAllowed       = v.Hdr;
             RenderingServer.RenderScale      = v.RenderScale;
+            RenderingServer.PerObjectLights  = v.PerObjectLights;
+            RenderingServer.Shadowmask       = v.Shadowmask;
         }
 
         private static int IndexOf(List<QualityLevel> levels, string? name)

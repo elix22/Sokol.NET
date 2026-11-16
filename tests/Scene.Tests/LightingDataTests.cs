@@ -57,10 +57,46 @@ namespace Scene.Tests
                 Assert.Equal(new Vector2(0.25f, 0.75f), back[0].Vertices[0].Uv1);
                 Assert.Equal(new uint[] { 0, 1, 2 }, back[0].Indices);
 
+                // A bake of before the shared layouts: each entity its own mesh, its UV the page's (place 1, 0, 0).
+                Assert.False(data.EntityMesh.ContainsKey(42));
+                // Shared layouts: the layouts as the meshes, each entity's layout and place on its page.
+                var groups = new BakeResult();
+                groups.Pages.Add(new LightmapPage { Size = 64, Light = new Vector3[64 * 64], Direction = new Vector4[64 * 64], Covered = new bool[64 * 64] });
+                groups.Groups.Add(mesh);
+                groups.Entities.Add(new BakedEntity { SceneId = 5, Page = 0, Group = 0, Offset = new Vector2(16, 32) });
+                groups.Entities.Add(new BakedEntity { SceneId = 6, Page = 0, Group = 0, Offset = new Vector2(48, 0) });
+                string gdir = dir + "_groups";
+                try
+                {
+                    LightingData.Write(gdir, groups, Array.Empty<int>(), directional: false);
+                    var gd = LightingData.Parse(File.ReadAllText(Path.Combine(gdir, LightingData.JsonFile)))!;
+                    Assert.True(gd.ReadMeshes(File.ReadAllBytes(Path.Combine(gdir, LightingData.MeshFile))));
+                    Assert.Single(gd.Meshes);                               // one layout for both
+                    Assert.Equal((0, new Vector3(1f / 64, 0.25f, 0.5f)), gd.EntityMesh[5]);
+                    Assert.Equal((0, new Vector3(1f / 64, 0.75f, 0f)), gd.EntityMesh[6]);
+                }
+                finally { if (Directory.Exists(gdir)) Directory.Delete(gdir, true); }
+
+                // A shadowmask: a page of its own (grey, opaque), named in the json with its light.
+                Assert.Equal(-1, data.ShadowmaskLight);
+                Assert.Equal("", data.Pages[0].Mask);
+                page.Mask = new float[16];
+                for (int i = 0; i < 16; i++) page.Mask[i] = i < 8 ? 0f : 1f;
+                bake.ShadowmaskLight = 5;
+                LightingData.Write(dir, bake, new[] { 7 }, directional: true);
+                var masked = LightingData.Parse(File.ReadAllText(Path.Combine(dir, LightingData.JsonFile)))!;
+                Assert.Equal(5, masked.ShadowmaskLight);
+                Assert.Equal("Lightmap-0_shadowmask.png", masked.Pages[0].Mask);
+                Assert.True(File.Exists(Path.Combine(dir, "Lightmap-0_shadowmask.png")));
+                var bytes = LightingData.EncodeMask(page.Mask);
+                Assert.Equal(new byte[] { 0, 0, 0, 255 }, bytes[..4]);
+                Assert.Equal(new byte[] { 255, 255, 255, 255 }, bytes[^4..]);
+
                 // A second bake replaces the first's files (none of an older page left behind).
-                bake.Pages.Clear(); bake.Pages.Add(new LightmapPage { Size = 2, Light = new Vector3[4], Direction = new Vector4[4], Covered = new bool[4] });
+                bake.Pages.Clear(); bake.Pages.Add(new LightmapPage { Size = 2, Light = new Vector3[4], Direction = new Vector4[4], Covered = new bool[4] }); bake.ShadowmaskLight = -1;
                 LightingData.Write(dir, bake, Array.Empty<int>(), directional: false);
                 Assert.False(File.Exists(Path.Combine(dir, "Lightmap-0_dir.png")));
+                Assert.False(File.Exists(Path.Combine(dir, "Lightmap-0_shadowmask.png")));
             }
             finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
         }

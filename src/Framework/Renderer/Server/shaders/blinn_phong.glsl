@@ -57,7 +57,8 @@ out vec4 fs_custom;
 out vec4 fs_shadow_pos;
 
 void main() {
-    mat4 model = mat4(in_model_0, in_model_1, in_model_2, in_model_3);
+    // the rows' w (0 in an affine model) carry a lightmapped instance's lightmap place (PBR reads it): cleared here
+    mat4 model = mat4(vec4(in_model_0.xyz, 0.0), vec4(in_model_1.xyz, 0.0), vec4(in_model_2.xyz, 0.0), in_model_3);
 
     vec4 wpos    = model * vec4(in_pos, 1.0);
     gl_Position  = view_proj * wpos;

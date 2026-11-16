@@ -45,10 +45,23 @@ public static unsafe class Shaders
                 ATTR_shadow_caster_skinned_low_shadow_caster_in_pos => 0
                 ATTR_shadow_caster_skinned_low_shadow_caster_joints_0 => 1
                 ATTR_shadow_caster_skinned_low_shadow_caster_weights_0 => 2
+        Shader program: 'shadow_caster_instanced':
+            Get shader desc: shadow_caster_skinned_low_shadow_caster_instanced_shader_desc(sg_query_backend());
+            Vertex Shader: shadow_caster_instanced_vs
+            Fragment Shader: shadow_caster_fs
+            Attributes:
+                ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_pos => 0
+                ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_0 => 1
+                ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_1 => 2
+                ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_2 => 3
+                ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_3 => 4
         Bindings:
             Uniform block 'shadow_caster_vs_params':
                 C struct: shadow_caster_skinned_low_shadow_caster_vs_params_t
                 Bind slot: UB_shadow_caster_skinned_low_shadow_caster_vs_params => 0
+            Uniform block 'shadow_caster_instanced_vs_params':
+                C struct: shadow_caster_skinned_low_shadow_caster_instanced_vs_params_t
+                Bind slot: UB_shadow_caster_skinned_low_shadow_caster_instanced_vs_params => 0
             Texture 'u_jointsSampler_Tex':
                 Image type: SG_IMAGETYPE_2D
                 Sample type: SG_IMAGESAMPLETYPE_UNFILTERABLE_FLOAT
@@ -61,7 +74,13 @@ public static unsafe class Shaders
     public const int ATTR_shadow_caster_skinned_low_shadow_caster_in_pos = 0;
     public const int ATTR_shadow_caster_skinned_low_shadow_caster_joints_0 = 1;
     public const int ATTR_shadow_caster_skinned_low_shadow_caster_weights_0 = 2;
+    public const int ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_pos = 0;
+    public const int ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_0 = 1;
+    public const int ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_1 = 2;
+    public const int ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_2 = 3;
+    public const int ATTR_shadow_caster_skinned_low_shadow_caster_instanced_in_model_3 = 4;
     public const int UB_shadow_caster_skinned_low_shadow_caster_vs_params = 0;
+    public const int UB_shadow_caster_skinned_low_shadow_caster_instanced_vs_params = 0;
     public const int VIEW_shadow_caster_skinned_low_u_jointsSampler_Tex = 0;
     public const int SMP_shadow_caster_skinned_low_u_jointsSampler_Smp = 0;
     
@@ -81,6 +100,12 @@ public static unsafe class Shaders
         }
         #pragma warning restore 169
         public finalBonesMatricesCollection finalBonesMatrices;
+    };
+    
+[StructLayout(LayoutKind.Sequential)]
+    public struct shadow_caster_skinned_low_shadow_caster_instanced_vs_params_t {
+        public shadow_caster_skinned_low_shadow_caster_instanced_vs_params_t(){}
+        public System.Numerics.Matrix4x4 light_view_proj;
     };
     /*
         #version 300 es
@@ -327,6 +352,58 @@ public static unsafe class Shaders
             0x6f,    0x69,    0x64,    0x20,    0x6d,    0x61,    0x69,    0x6e,    0x28,    0x29,    0x0a,    0x7b,    0x0a,    0x7d,    0x0a,    0x0a,    
             0x00,    
 };
+    /*
+        #version 300 es
+
+        uniform vec4 shadow_caster_instanced_vs_params[4];
+        layout(location = 1) in vec4 in_model_0;
+        layout(location = 2) in vec4 in_model_1;
+        layout(location = 3) in vec4 in_model_2;
+        layout(location = 4) in vec4 in_model_3;
+        layout(location = 0) in vec3 in_pos;
+
+        void main()
+        {
+            gl_Position = mat4(shadow_caster_instanced_vs_params[0], shadow_caster_instanced_vs_params[1], shadow_caster_instanced_vs_params[2], shadow_caster_instanced_vs_params[3]) * (mat4(in_model_0, in_model_1, in_model_2, in_model_3) * vec4(in_pos, 1.0));
+        }
+
+    */
+    static readonly byte[] shadow_caster_skinned_low_shadow_caster_instanced_vs_source_glsl300es = {
+            0x23,    0x76,    0x65,    0x72,    0x73,    0x69,    0x6f,    0x6e,    0x20,    0x33,    0x30,    0x30,    0x20,    0x65,    0x73,    0x0a,    
+            0x0a,    0x75,    0x6e,    0x69,    0x66,    0x6f,    0x72,    0x6d,    0x20,    0x76,    0x65,    0x63,    0x34,    0x20,    0x73,    0x68,    
+            0x61,    0x64,    0x6f,    0x77,    0x5f,    0x63,    0x61,    0x73,    0x74,    0x65,    0x72,    0x5f,    0x69,    0x6e,    0x73,    0x74,    
+            0x61,    0x6e,    0x63,    0x65,    0x64,    0x5f,    0x76,    0x73,    0x5f,    0x70,    0x61,    0x72,    0x61,    0x6d,    0x73,    0x5b,    
+            0x34,    0x5d,    0x3b,    0x0a,    0x6c,    0x61,    0x79,    0x6f,    0x75,    0x74,    0x28,    0x6c,    0x6f,    0x63,    0x61,    0x74,    
+            0x69,    0x6f,    0x6e,    0x20,    0x3d,    0x20,    0x31,    0x29,    0x20,    0x69,    0x6e,    0x20,    0x76,    0x65,    0x63,    0x34,    
+            0x20,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    0x64,    0x65,    0x6c,    0x5f,    0x30,    0x3b,    0x0a,    0x6c,    0x61,    0x79,    
+            0x6f,    0x75,    0x74,    0x28,    0x6c,    0x6f,    0x63,    0x61,    0x74,    0x69,    0x6f,    0x6e,    0x20,    0x3d,    0x20,    0x32,    
+            0x29,    0x20,    0x69,    0x6e,    0x20,    0x76,    0x65,    0x63,    0x34,    0x20,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    0x64,    
+            0x65,    0x6c,    0x5f,    0x31,    0x3b,    0x0a,    0x6c,    0x61,    0x79,    0x6f,    0x75,    0x74,    0x28,    0x6c,    0x6f,    0x63,    
+            0x61,    0x74,    0x69,    0x6f,    0x6e,    0x20,    0x3d,    0x20,    0x33,    0x29,    0x20,    0x69,    0x6e,    0x20,    0x76,    0x65,    
+            0x63,    0x34,    0x20,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    0x64,    0x65,    0x6c,    0x5f,    0x32,    0x3b,    0x0a,    0x6c,    
+            0x61,    0x79,    0x6f,    0x75,    0x74,    0x28,    0x6c,    0x6f,    0x63,    0x61,    0x74,    0x69,    0x6f,    0x6e,    0x20,    0x3d,    
+            0x20,    0x34,    0x29,    0x20,    0x69,    0x6e,    0x20,    0x76,    0x65,    0x63,    0x34,    0x20,    0x69,    0x6e,    0x5f,    0x6d,    
+            0x6f,    0x64,    0x65,    0x6c,    0x5f,    0x33,    0x3b,    0x0a,    0x6c,    0x61,    0x79,    0x6f,    0x75,    0x74,    0x28,    0x6c,    
+            0x6f,    0x63,    0x61,    0x74,    0x69,    0x6f,    0x6e,    0x20,    0x3d,    0x20,    0x30,    0x29,    0x20,    0x69,    0x6e,    0x20,    
+            0x76,    0x65,    0x63,    0x33,    0x20,    0x69,    0x6e,    0x5f,    0x70,    0x6f,    0x73,    0x3b,    0x0a,    0x0a,    0x76,    0x6f,    
+            0x69,    0x64,    0x20,    0x6d,    0x61,    0x69,    0x6e,    0x28,    0x29,    0x0a,    0x7b,    0x0a,    0x20,    0x20,    0x20,    0x20,    
+            0x67,    0x6c,    0x5f,    0x50,    0x6f,    0x73,    0x69,    0x74,    0x69,    0x6f,    0x6e,    0x20,    0x3d,    0x20,    0x6d,    0x61,    
+            0x74,    0x34,    0x28,    0x73,    0x68,    0x61,    0x64,    0x6f,    0x77,    0x5f,    0x63,    0x61,    0x73,    0x74,    0x65,    0x72,    
+            0x5f,    0x69,    0x6e,    0x73,    0x74,    0x61,    0x6e,    0x63,    0x65,    0x64,    0x5f,    0x76,    0x73,    0x5f,    0x70,    0x61,    
+            0x72,    0x61,    0x6d,    0x73,    0x5b,    0x30,    0x5d,    0x2c,    0x20,    0x73,    0x68,    0x61,    0x64,    0x6f,    0x77,    0x5f,    
+            0x63,    0x61,    0x73,    0x74,    0x65,    0x72,    0x5f,    0x69,    0x6e,    0x73,    0x74,    0x61,    0x6e,    0x63,    0x65,    0x64,    
+            0x5f,    0x76,    0x73,    0x5f,    0x70,    0x61,    0x72,    0x61,    0x6d,    0x73,    0x5b,    0x31,    0x5d,    0x2c,    0x20,    0x73,    
+            0x68,    0x61,    0x64,    0x6f,    0x77,    0x5f,    0x63,    0x61,    0x73,    0x74,    0x65,    0x72,    0x5f,    0x69,    0x6e,    0x73,    
+            0x74,    0x61,    0x6e,    0x63,    0x65,    0x64,    0x5f,    0x76,    0x73,    0x5f,    0x70,    0x61,    0x72,    0x61,    0x6d,    0x73,    
+            0x5b,    0x32,    0x5d,    0x2c,    0x20,    0x73,    0x68,    0x61,    0x64,    0x6f,    0x77,    0x5f,    0x63,    0x61,    0x73,    0x74,    
+            0x65,    0x72,    0x5f,    0x69,    0x6e,    0x73,    0x74,    0x61,    0x6e,    0x63,    0x65,    0x64,    0x5f,    0x76,    0x73,    0x5f,    
+            0x70,    0x61,    0x72,    0x61,    0x6d,    0x73,    0x5b,    0x33,    0x5d,    0x29,    0x20,    0x2a,    0x20,    0x28,    0x6d,    0x61,    
+            0x74,    0x34,    0x28,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    0x64,    0x65,    0x6c,    0x5f,    0x30,    0x2c,    0x20,    0x69,    
+            0x6e,    0x5f,    0x6d,    0x6f,    0x64,    0x65,    0x6c,    0x5f,    0x31,    0x2c,    0x20,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    
+            0x64,    0x65,    0x6c,    0x5f,    0x32,    0x2c,    0x20,    0x69,    0x6e,    0x5f,    0x6d,    0x6f,    0x64,    0x65,    0x6c,    0x5f,    
+            0x33,    0x29,    0x20,    0x2a,    0x20,    0x76,    0x65,    0x63,    0x34,    0x28,    0x69,    0x6e,    0x5f,    0x70,    0x6f,    0x73,    
+            0x2c,    0x20,    0x31,    0x2e,    0x30,    0x29,    0x29,    0x3b,    0x0a,    0x7d,    0x0a,    0x0a,    0x00,    
+};
     public static unsafe sg_shader_desc shadow_caster_skinned_low_shadow_caster_shader_desc(sg_backend backend) {
         if (backend == SG_BACKEND_GLES3) {
             sg_shader_desc desc = default(sg_shader_desc);
@@ -375,6 +452,34 @@ public static unsafe class Shaders
             desc.texture_sampler_pairs[0].sampler_slot = 0;
             desc.texture_sampler_pairs[0].glsl_name = "u_jointsSampler_Tex_u_jointsSampler_Smp";
             desc.label = "shadow_caster_skinned_low_shadow_caster_shader";
+            return desc;
+        }
+        return default(sg_shader_desc);
+    }
+    public static unsafe sg_shader_desc shadow_caster_skinned_low_shadow_caster_instanced_shader_desc(sg_backend backend) {
+        if (backend == SG_BACKEND_GLES3) {
+            sg_shader_desc desc = default(sg_shader_desc);
+            desc.vertex_func.source = System.Text.Encoding.UTF8.GetString(shadow_caster_skinned_low_shadow_caster_instanced_vs_source_glsl300es);
+            desc.vertex_func.entry = "main";
+            desc.fragment_func.source = System.Text.Encoding.UTF8.GetString(shadow_caster_skinned_low_shadow_caster_fs_source_glsl300es);
+            desc.fragment_func.entry = "main";
+            desc.attrs[0].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+            desc.attrs[0].glsl_name = "in_pos";
+            desc.attrs[1].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+            desc.attrs[1].glsl_name = "in_model_0";
+            desc.attrs[2].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+            desc.attrs[2].glsl_name = "in_model_1";
+            desc.attrs[3].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+            desc.attrs[3].glsl_name = "in_model_2";
+            desc.attrs[4].base_type = SG_SHADERATTRBASETYPE_FLOAT;
+            desc.attrs[4].glsl_name = "in_model_3";
+            desc.uniform_blocks[0].stage = SG_SHADERSTAGE_VERTEX;
+            desc.uniform_blocks[0].layout = SG_UNIFORMLAYOUT_STD140;
+            desc.uniform_blocks[0].size = 64;
+            desc.uniform_blocks[0].glsl_uniforms[0].type = SG_UNIFORMTYPE_FLOAT4;
+            desc.uniform_blocks[0].glsl_uniforms[0].array_count = 4;
+            desc.uniform_blocks[0].glsl_uniforms[0].glsl_name = "shadow_caster_instanced_vs_params";
+            desc.label = "shadow_caster_skinned_low_shadow_caster_instanced_shader";
             return desc;
         }
         return default(sg_shader_desc);
@@ -493,6 +598,68 @@ public static unsafe class Shaders
         return -1;
     }
     public static int shadow_caster_skinned_low_shadow_caster_storageimage_slot(string simg_name) {
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_attr_slot(string attr_name) {
+        if (attr_name == "in_pos") {
+            return 0;
+        }
+        if (attr_name == "in_model_0") {
+            return 1;
+        }
+        if (attr_name == "in_model_1") {
+            return 2;
+        }
+        if (attr_name == "in_model_2") {
+            return 3;
+        }
+        if (attr_name == "in_model_3") {
+            return 4;
+        }
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_texture_slot(string tex_name) {
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_sampler_slot(string smp_name) {
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_uniformblock_slot(string ub_name) {
+        if (ub_name == "shadow_caster_instanced_vs_params") {
+            return 0;
+        }
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_uniformblock_size(string ub_name) {
+        if (ub_name == "shadow_caster_instanced_vs_params") {
+            return Marshal.SizeOf<shadow_caster_skinned_low_shadow_caster_instanced_vs_params_t>();
+        }
+        return 0;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_uniform_offset(string ub_name, string u_name) {
+        if (ub_name == "shadow_caster_instanced_vs_params") {
+            if (u_name == "light_view_proj") {
+                return 0;
+            }
+        }
+        return -1;
+    }
+    public static sg_glsl_shader_uniform shadow_caster_skinned_low_shadow_caster_instanced_uniform_desc(string ub_name, string u_name) {
+        sg_glsl_shader_uniform res = default;
+        if (ub_name == "shadow_caster_instanced_vs_params") {
+            if (u_name == "light_view_proj") {
+                res.type = SG_UNIFORMTYPE_MAT4;
+                res.array_count = 0;
+                res.glsl_name = "light_view_proj";
+                return res;
+            }
+        }
+        return res;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_storagebuffer_slot(string sbuf_name) {
+        return -1;
+    }
+    public static int shadow_caster_skinned_low_shadow_caster_instanced_storageimage_slot(string simg_name) {
         return -1;
     }
 }

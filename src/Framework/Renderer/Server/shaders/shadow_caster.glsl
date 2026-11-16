@@ -93,3 +93,25 @@ void main()
 @end
 
 @program shadow_caster shadow_caster_vs shadow_caster_fs
+
+// The static casters of a shadow slice, instanced: one draw per sub-mesh for every object that uses it. The model matrix
+// comes per instance (the color pass's InstanceData: 4 rows, then a vec4 this pass does not read), the light's
+// view-projection once for the slice.
+@vs shadow_caster_instanced_vs
+layout(binding=0) uniform shadow_caster_instanced_vs_params
+{
+    mat4 light_view_proj;
+};
+layout(location=0) in vec3 in_pos;
+layout(location=1) in vec4 in_model_0;
+layout(location=2) in vec4 in_model_1;
+layout(location=3) in vec4 in_model_2;
+layout(location=4) in vec4 in_model_3;
+void main()
+{
+    mat4 model = mat4(in_model_0, in_model_1, in_model_2, in_model_3);
+    gl_Position = light_view_proj * (model * vec4(in_pos, 1.0));
+}
+@end
+
+@program shadow_caster_instanced shadow_caster_instanced_vs shadow_caster_fs

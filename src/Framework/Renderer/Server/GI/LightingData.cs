@@ -23,14 +23,20 @@ namespace GameEditor.Framework.Renderer.Server.GI
         private const uint MeshMagic = 0x424D4C53;   // "SLMB"
         private const int Version = 1;
 
-        public sealed class Page { public string Light = ""; public string Direction = ""; public int Size; }
+        public sealed class Page { public string Light = ""; public string Direction = ""; public string Mask = ""; public int Size; }
 
         public List<Page> Pages = new();
         /// <summary>Lightmapped entity (scene id) → its page.</summary>
         public Dictionary<int, int> EntityPage = new();
+        /// <summary>Lightmapped entity (scene id) → its mesh in <see cref="Meshes"/> (a layout its instances share; a bake of
+        /// before them: its own, under its scene id) and its UV's place on its page: page UV = mesh UV × X + (Y, Z).</summary>
+        public Dictionary<int, (int Mesh, Vector3 St)> EntityMesh = new();
         /// <summary>The Baked lights (scene ids): not drawn on lightmapped surfaces, their light is in the maps.</summary>
         public List<int> BakedLights = new();
         public bool Directional;
+        /// <summary>The Mixed sun (scene id) whose shadow on the lightmapped surfaces each page's <see cref="Page.Mask"/> holds
+        /// (<c>Lightmap-n_shadowmask.png</c>: its visibility in red); -1: no shadowmask.</summary>
+        public int ShadowmaskLight = -1;
         /// <summary>Light probes (M8b): where, and the radiance arriving there on SH L2 (9 colours).</summary>
         public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
         /// <summary>Reflection probes (M8c): their boxes and their six face files.</summary>
@@ -50,7 +56,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     if (name.StartsWith("Lightmap-", StringComparison.Ordinal) || name == JsonFile || name == MeshFile) File.Delete(f);
                 }
             Directory.CreateDirectory(folder);
-            var data = new LightingData { Directional = directional };
+            var data = new LightingData { Directional = directional, ShadowmaskLight = bake.ShadowmaskLight };
             data.BakedLights.AddRange(bakedLights);
             for (int p = 0; p < bake.Pages.Count; p++)
             {
@@ -59,9 +65,25 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 File.WriteAllBytes(Path.Combine(folder, entry.Light), EncodePngRgba(EncodeRgbm(page.Light), page.Size, page.Size));
                 if (directional)
                     File.WriteAllBytes(Path.Combine(folder, entry.Direction), EncodePngRgba(EncodeUnit(page.Direction), page.Size, page.Size));
+                if (bake.ShadowmaskLight >= 0 && page.Mask.Length == page.Size * page.Size)
+                {
+                    entry.Mask = $"Lightmap-{p}_shadowmask.png";
+                    File.WriteAllBytes(Path.Combine(folder, entry.Mask), EncodePngRgba(EncodeMask(page.Mask), page.Size, page.Size));
+                }
                 data.Pages.Add(entry);
             }
-            foreach (var e in bake.Entities) { data.EntityPage[e.SceneId] = e.Page; data.Meshes[e.SceneId] = e.Mesh; }
+            if (bake.Groups.Count > 0)
+            {
+                for (int g = 0; g < bake.Groups.Count; g++) data.Meshes[g] = bake.Groups[g];
+                foreach (var e in bake.Entities)
+                {
+                    float size = bake.Pages[e.Page].Size;
+                    data.EntityPage[e.SceneId] = e.Page;
+                    data.EntityMesh[e.SceneId] = (e.Group, new Vector3(1f / size, e.Offset.X / size, e.Offset.Y / size));
+                }
+            }
+            else
+                foreach (var e in bake.Entities) { data.EntityPage[e.SceneId] = e.Page; data.Meshes[e.SceneId] = e.Mesh; }
             data.Probes.AddRange(bake.Probes);
             File.WriteAllText(Path.Combine(folder, JsonFile), data.ToJson());
             File.WriteAllBytes(Path.Combine(folder, MeshFile), data.MeshBytes());
@@ -107,6 +129,14 @@ namespace GameEditor.Framework.Renderer.Server.GI
         }
 
         public static Vector3 DecodeRgbm(byte r, byte g, byte bl, byte a) => new Vector3(r, g, bl) / 255f * (a / 255f * RgbmRange);
+
+        /// <summary>A shadowmask page: the visibility in r, g and b (a texture of any loader shows it grey), alpha 255.</summary>
+        public static byte[] EncodeMask(float[] mask)
+        {
+            var b = new byte[mask.Length * 4];
+            for (int i = 0; i < mask.Length; i++) { byte m = Byte(mask[i]); b[i * 4] = m; b[i * 4 + 1] = m; b[i * 4 + 2] = m; b[i * 4 + 3] = 255; }
+            return b;
+        }
 
         private static byte[] EncodeUnit(Vector4[] v)
         {
@@ -169,18 +199,29 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 w.WriteStartObject();
                 w.WriteNumber("version", Version);
                 w.WriteBoolean("directional", Directional);
+                if (ShadowmaskLight >= 0) w.WriteNumber("shadowmaskLight", ShadowmaskLight);
                 w.WriteStartArray("pages");
                 foreach (var p in Pages)
                 {
                     w.WriteStartObject();
                     w.WriteString("light", p.Light);
                     if (p.Direction.Length > 0) w.WriteString("dir", p.Direction);
+                    if (p.Mask.Length > 0) w.WriteString("mask", p.Mask);
                     w.WriteNumber("size", p.Size);
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
                 w.WriteStartArray("entities");
-                foreach (var (id, page) in EntityPage) { w.WriteStartObject(); w.WriteNumber("id", id); w.WriteNumber("page", page); w.WriteEndObject(); }
+                foreach (var (id, page) in EntityPage)
+                {
+                    w.WriteStartObject(); w.WriteNumber("id", id); w.WriteNumber("page", page);
+                    if (EntityMesh.TryGetValue(id, out var em))
+                    {
+                        w.WriteNumber("mesh", em.Mesh);
+                        w.WriteStartArray("st"); w.WriteNumberValue(em.St.X); w.WriteNumberValue(em.St.Y); w.WriteNumberValue(em.St.Z); w.WriteEndArray();
+                    }
+                    w.WriteEndObject();
+                }
                 w.WriteEndArray();
                 w.WriteStartArray("bakedLights");
                 foreach (int id in BakedLights) w.WriteNumberValue(id);
@@ -247,16 +288,23 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 var r = doc.RootElement;
                 if (r.ValueKind != JsonValueKind.Object || !r.TryGetProperty("pages", out var pages)) return null;
                 var d = new LightingData { Directional = r.TryGetProperty("directional", out var dir) && dir.ValueKind == JsonValueKind.True };
+                if (r.TryGetProperty("shadowmaskLight", out var sml) && sml.TryGetInt32(out int smId)) d.ShadowmaskLight = smId;
                 foreach (var p in pages.EnumerateArray())
                     d.Pages.Add(new Page
                     {
                         Light = p.TryGetProperty("light", out var l) ? l.GetString() ?? "" : "",
                         Direction = p.TryGetProperty("dir", out var dd) ? dd.GetString() ?? "" : "",
+                        Mask = p.TryGetProperty("mask", out var mk) ? mk.GetString() ?? "" : "",
                         Size = p.TryGetProperty("size", out var s) && s.TryGetInt32(out int sz) ? sz : 0,
                     });
                 if (r.TryGetProperty("entities", out var ents))
                     foreach (var e in ents.EnumerateArray())
-                        if (e.TryGetProperty("id", out var id) && e.TryGetProperty("page", out var pg)) d.EntityPage[id.GetInt32()] = pg.GetInt32();
+                        if (e.TryGetProperty("id", out var id) && e.TryGetProperty("page", out var pg))
+                        {
+                            d.EntityPage[id.GetInt32()] = pg.GetInt32();
+                            if (e.TryGetProperty("mesh", out var mk) && e.TryGetProperty("st", out var st) && st.GetArrayLength() == 3)
+                                d.EntityMesh[id.GetInt32()] = (mk.GetInt32(), new Vector3(st[0].GetSingle(), st[1].GetSingle(), st[2].GetSingle()));
+                        }
                 if (r.TryGetProperty("bakedLights", out var bl))
                     foreach (var e in bl.EnumerateArray()) d.BakedLights.Add(e.GetInt32());
                 if (r.TryGetProperty("reflectionProbes", out var rps))

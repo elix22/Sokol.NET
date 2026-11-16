@@ -57,7 +57,15 @@ namespace GameEditor.Framework.Renderer.Server.Lighting
         public readonly Vector4 DirectionRange; // xyz = direction; w = range
         public readonly Vector4 ColorIntensity; // xyz = color; w = intensity
         public readonly Vector4 SpotShadow;     // x = cos(innerAngle); y = cos(outerAngle);
-                                                // z = shadowIndex (-1 = no shadow); w = pad
+                                                // z = shadowIndex (-1 = no shadow); w = 1: the shadowmask's sun
+
+        private GpuLight(Vector4 positionType, Vector4 directionRange, Vector4 colorIntensity, Vector4 spotShadow)
+        {
+            PositionType = positionType; DirectionRange = directionRange; ColorIntensity = colorIntensity; SpotShadow = spotShadow;
+        }
+
+        /// <summary>This light marked as the sun whose shadow on lightmapped surfaces the bake's shadowmask holds.</summary>
+        public GpuLight WithShadowmask() => new(PositionType, DirectionRange, ColorIntensity, new Vector4(SpotShadow.X, SpotShadow.Y, SpotShadow.Z, 1f));
 
         public GpuLight(in Light l)
         {

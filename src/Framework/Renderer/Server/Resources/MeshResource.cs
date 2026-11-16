@@ -13,6 +13,11 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         public sg_buffer VertexBuffer;
         public sg_buffer IndexBuffer;
         public int       IndexCount;
+        /// <summary>Its first index in <see cref="IndexBuffer"/>: 0, or its place in buffers it shares with other meshes
+        /// (<see cref="SharedBuffers"/>: a bake's lightmapped meshes, one buffer pair for all).</summary>
+        public int       IndexStart;
+        /// <summary>The buffers are shared (their owner frees them, not this sub-mesh).</summary>
+        public bool      SharedBuffers;
         public string    MaterialName = "";
         /// <summary>Pre-computed registry key ("mtllib#materialName"). Empty when either part is absent.
         /// Read by RenderingServer.ResolveSubMeshMaterial — avoids per-frame string allocation.</summary>
@@ -20,6 +25,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
         public void Destroy()
         {
+            if (SharedBuffers) { VertexBuffer = default; IndexBuffer = default; return; }
             if (VertexBuffer.id != 0) { sg_destroy_buffer(VertexBuffer); VertexBuffer = default; }
             if (IndexBuffer.id  != 0) { sg_destroy_buffer(IndexBuffer);  IndexBuffer  = default; }
         }

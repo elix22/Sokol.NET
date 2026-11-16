@@ -84,8 +84,10 @@ out vec4 v_ShadowPos[CSM_CASCADES];
 
 void main()
 {
-    // Build model matrix from per-instance attributes.
-    mat4 model = mat4(in_model_0, in_model_1, in_model_2, in_model_3);
+    // Build model matrix from per-instance attributes. Its rows' w (0 in an affine model) carry a lightmapped instance's
+    // place on its lightmap page (scale, offset): read, then cleared.
+    vec3 lm_st = vec3(in_model_0.w, in_model_1.w, in_model_2.w);
+    mat4 model = mat4(vec4(in_model_0.xyz, 0.0), vec4(in_model_1.xyz, 0.0), vec4(in_model_2.xyz, 0.0), in_model_3);
 
     // ── Morph targets ──────────────────────────────────────────────────────
     vec3 morphedPosition = position;
@@ -126,6 +128,7 @@ void main()
 
     v_TexCoord0 = texcoord_0;
     v_TexCoord1 = texcoord_1;  // 2nd UV set (e.g. AO); the vertex carries (0,0) if the mesh has none
+    if (lm_st.x > 0.0) v_TexCoord1 = texcoord_1 * lm_st.x + lm_st.yz;   // a lightmapped instance: its place on its page
     v_Color     = vec4(1.0);   // no vertex color in base layout
     v_Custom    = in_custom;
 
@@ -507,10 +510,11 @@ void main()
 #ifdef LIGHTMAPS
     // A baked lightmap (M8a): the diffuse light from it - the sky's and the bounces', and Baked lights' - in place of
     // the sky's diffuse light; the reflection stays the sky's.
-    if (lightmap_mode > 0.5) {
+    float lm_kind = lightmap_mode > 3.5 ? lightmap_mode - 4.0 : lightmap_mode;   // + 4: the shadowmask (below)
+    if (lm_kind > 0.5) {
         vec4 lm = texture(sampler2D(u_LightmapTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
         vec3 baked = lm.rgb * (lm.a * 8.0);
-        if (lightmap_mode > 1.5) {
+        if (lm_kind > 1.5) {
             vec4 ld = texture(sampler2D(u_LightmapDirTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
             baked *= (dot(n, ld.xyz - 0.5) + 0.5) / max(1e-4, ld.w);
         }
@@ -534,6 +538,11 @@ void main()
 
     vec3 color = vec3(0.0);
     float g_minShadow = 1.0;   // diagnostics: min shadow factor across all punctual lights
+#if defined(LIGHTMAPS) && CSM_CASCADES == 0
+    // the shadowmask, read once (a fetch inside the light loop ran for every light on a phone's GPU, used or not)
+    float g_shadowmask = 1.0;
+    if (lightmap_mode > 3.5) g_shadowmask = texture(sampler2D(u_ShadowmaskTexture, u_GGXLUTSampler_Raw), v_TexCoord1).r;
+#endif
 
 #ifdef TRANSMISSION
     g_surfaceColorBeforeMix = f_diffuse_ibl + f_specular_ibl;
@@ -619,6 +628,11 @@ void main()
                 // shadow_ambient_weight that noise showed in the ambient as jagged dark patches.
                 g_minShadow = min(g_minShadow, smoothstep(0.0, 0.15, dot(n, l)));
             }
+#endif
+#if defined(LIGHTMAPS) && CSM_CASCADES == 0
+            // the shadowmask: the sun's shadow of the static casters from the bake (its real-time map, when there is one,
+            // holds the moving ones; without moving casters the view draws without it). The sun: the light marked (w).
+            if (ltype_i == LIGHT_TYPE_DIRECTIONAL && LIGHT_DATA(i, 3).w > 0.5) shadow = min(shadow, g_shadowmask);
 #endif
 #if !defined(TRANSMISSION)
             if (ltype_i == LIGHT_TYPE_SPOT) {

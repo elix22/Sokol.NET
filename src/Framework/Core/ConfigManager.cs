@@ -277,7 +277,7 @@ namespace GameEditor.Framework.Core
                 var l = c.QualityLevels[i];
                 sb.Append($"      {{ \"name\": \"{Esc(l.Name)}\", \"renderingPath\": \"{Esc(l.RenderingPath)}\", \"maxLights\": {l.MaxLights}, ");
                 sb.Append($"\"cascades\": {l.Cascades}, \"shadowDistance\": {l.ShadowDistance.ToString(System.Globalization.CultureInfo.InvariantCulture)}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
-                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)} }}");
+                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)}, \"perObjectLights\": {l.PerObjectLights}, \"shadowmask\": {(l.Shadowmask ? "true" : "false")} }}");
                 sb.Append(i + 1 < c.QualityLevels.Count ? ",\n" : "\n");
             }
             sb.Append("    ],\n    \"defaults\": { ");
@@ -316,6 +316,10 @@ namespace GameEditor.Framework.Core
                     if (e.TryGetProperty("softShadows", out v) && v.TryGetInt32(out iv)) l.SoftShadows = iv;
                     if (e.TryGetProperty("hdr", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.Hdr = v.GetBoolean();
                     if (e.TryGetProperty("renderScale", out v) && v.TryGetSingle(out float fv)) l.RenderScale = fv;
+                    if (e.TryGetProperty("perObjectLights", out v) && v.TryGetInt32(out iv)) l.PerObjectLights = Math.Clamp(iv, 0, 8);
+                    else if (Defaults(l.Name) is { } known) l.PerObjectLights = known.PerObjectLights;   // a level of before the value
+                    if (e.TryGetProperty("shadowmask", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.Shadowmask = v.ValueKind == JsonValueKind.True;
+                    else if (Defaults(l.Name) is { } known2) l.Shadowmask = known2.Shadowmask;
                     list.Add(l);
                 }
                 if (list.Count > 0) cfg.QualityLevels = list;

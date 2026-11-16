@@ -373,6 +373,174 @@ namespace GameEditor.Framework.Renderer.Server
         // Shadow quality: 0 = 1-tap sharp, 1 = 3×3 PCF medium (default), 2 = 5×5 PCF soft.
         public static int ShadowQuality { get; set; } = 1;
 
+        /// <summary>
+        /// Forward (not Forward+): the most spot / point lights an object is lit by - the view's most important that reach
+        /// its bounds; directional lights always. 0: every light of the view on every pixel (each light costs every pixel:
+        /// a Galaxy A71, 13 ms a frame a lamp). Objects of one light set are drawn together; each draw's light block holds
+        /// its set's lights only.
+        /// </summary>
+        public static int PerObjectLights { get; set; }
+
+        /// <summary>
+        /// The quality level's Shadowmask: with a bake whose shadowmask is of the view's sun (a Mixed light), the sun's shadow
+        /// on lightmapped surfaces comes from the mask and its real-time maps hold only the casters that are not lightmapped;
+        /// a map left with none is not sampled. Off: every caster in real time.
+        /// </summary>
+        public static bool Shadowmask { get; set; }
+        private static bool _shadowmaskView;   // this view's sun is the bake's shadowmask light (and the level uses it)
+        private static bool _sunMapEmpty;      // ... and its maps have no caster: the shaders do not sample them
+        private static int _sunShadowDraws;    // the draws into the sun's maps, the last view that drew them
+
+        private static readonly int[] _cmdLightSet = new int[RenderingConstants.MAX_DRAWS];   // 0: all the view's lights
+        // Each draw's lightmap page + 1 (0: not lightmapped): a group's draws share one; the group's, while it draws.
+        private static readonly int[] _cmdLmPage = new int[RenderingConstants.MAX_DRAWS];
+        private static int _groupLmPage = -1;
+        private static readonly ulong[] _cmdLightKey = new ulong[RenderingConstants.MAX_DRAWS];   // its set's key (0: all)
+
+        // ── The light blocks of a view's draws, built once (a draw built its own - 260 vec4 - every time) ────────────
+        // The PBR block's layout (pbr_fs_uniforms.glsl): 32 lights × 4, spot shadows 8 × 4, point shadows 24 × 4, ambient_num.
+        private const int PbrBlockVec4s = 128 + 32 + 96 + 1;
+        private static readonly Vector4[] _viewLightBlock = new Vector4[PbrBlockVec4s];
+        private static int _lightsVersion, _viewBlockVersion = -1;
+        private static Vector4[][] _setBlocks = new Vector4[16][];
+        private static int[] _setBlockVersion = new int[16];
+        private static bool _mainWalk;      // the main walk of a view's draws: its blocks are applied (ApplyViewLights)
+        private static int _groupLightSet;  // the group drawn now: its light set (0: all)
+
+        private static Vector4[] ViewLightBlock()
+        {
+            if (_viewBlockVersion == _lightsVersion) return _viewLightBlock;
+            var b = _viewLightBlock;
+            Array.Clear(b);
+            int n = _lightBuf.Count;
+            var span = _lightBuf.ActiveSpan;
+            for (int l = 0; l < n; l++)
+            {
+                b[l * 4 + 0] = span[l].PositionType;
+                b[l * 4 + 1] = span[l].DirectionRange;
+                b[l * 4 + 2] = span[l].ColorIntensity;
+                b[l * 4 + 3] = span[l].SpotShadow;
+            }
+            for (int si = 0; si < ShadowAtlas.SpotSlices; si++)
+            {
+                var m = _spotShadowViewProj[si];
+                int o = 128 + si * 4;
+                b[o + 0] = new Vector4(m.M11, m.M12, m.M13, m.M14);
+                b[o + 1] = new Vector4(m.M21, m.M22, m.M23, m.M24);
+                b[o + 2] = new Vector4(m.M31, m.M32, m.M33, m.M34);
+                b[o + 3] = new Vector4(m.M41, m.M42, m.M43, m.M44);
+            }
+            for (int pi = 0; pi < _pointShadowViewProj.Length && pi < 24; pi++)
+            {
+                var m = _pointShadowViewProj[pi];
+                int o = 160 + pi * 4;
+                b[o + 0] = new Vector4(m.M11, m.M12, m.M13, m.M14);
+                b[o + 1] = new Vector4(m.M21, m.M22, m.M23, m.M24);
+                b[o + 2] = new Vector4(m.M31, m.M32, m.M33, m.M34);
+                b[o + 3] = new Vector4(m.M41, m.M42, m.M43, m.M44);
+            }
+            b[256] = new Vector4(0f, 0f, 0f, n);
+            _viewBlockVersion = _lightsVersion;
+            return b;
+        }
+
+        // A light set's block: the view's, its light array holding the set's lights only (in order), its count the set's.
+        private static Vector4[] SetLightBlock(int id)
+        {
+            if (id >= _setBlocks.Length)
+            {
+                Array.Resize(ref _setBlocks, Math.Max(id + 1, _setBlocks.Length * 2));
+                Array.Resize(ref _setBlockVersion, _setBlocks.Length);
+            }
+            var d = _setBlocks[id] ??= new Vector4[PbrBlockVec4s];
+            if (_setBlockVersion[id] == _lightsVersion) return d;
+            var full = ViewLightBlock();
+            full.CopyTo(d, 0);
+            ulong key = _lightSets[id];
+            int count = (int)((key >> 40) & 0xF);
+            for (int k = 0; k < count; k++)
+            {
+                int li = (int)((key >> (5 * k)) & 31);
+                Array.Copy(full, li * 4, d, k * 4, 4);
+            }
+            d[256].W = count;
+            _setBlockVersion[id] = _lightsVersion;
+            return d;
+        }
+
+        private static void ApplyViewLights(int slot)
+        {
+            var block = _groupLightSet > 0 ? SetLightBlock(_groupLightSet) : ViewLightBlock();
+            LowTierUniforms.ApplyPbrBlock(slot, block, _shaderCache.CurrentLow);
+        }
+        private static readonly Dictionary<ulong, int> _lightSetIds = new();
+        private static readonly List<ulong> _lightSets = new() { 0 };
+
+        // Each visible draw's light set: its index into _lightSets (0 = all). A set is its lights' indices in the view's
+        // list (5 bits each, in the list's order: most important first), its count in bits 40-43.
+        private static void AssignObjectLights(int visibleCount)
+        {
+            _lightSetIds.Clear();
+            _lightSets.Clear();
+            _lightSets.Add(0);
+            _lightsVersion++;   // the sets' blocks are old
+            int limit = PerObjectLights, n = _lightBuf.Count;
+            bool on = limit > 0 && !ViewIsClustered && n > 0;
+            if (!on)
+            {
+                for (int j = 0; j < visibleCount; j++) _cmdLightSet[_visible[j]] = 0;
+                return;
+            }
+            // Each draw's key, in parallel (native; in order on the web): it reads the lights and writes its own key only.
+            Concurrency.ParallelWork.For(visibleCount, 128, (from, to) =>
+            {
+                var lights = _lightBuf.ActiveSpan;
+                for (int j = from; j < to; j++) _cmdLightKey[_visible[j]] = LightSetKey(_visible[j], lights, n, limit);
+            });
+            // The keys' ids, in order (one dictionary).
+            for (int j = 0; j < visibleCount; j++)
+            {
+                int idx = _visible[j];
+                ulong key = _cmdLightKey[idx];
+                if (key == 0) { _cmdLightSet[idx] = 0; continue; }
+                if (!_lightSetIds.TryGetValue(key, out int id))
+                {
+                    id = _lightSets.Count;
+                    _lightSets.Add(key);
+                    _lightSetIds[key] = id;
+                }
+                _cmdLightSet[idx] = id;
+            }
+        }
+
+        // A draw's light set: the directional lights and the first `limit` spot / point lights that reach its bounds, in
+        // the view's order; 0 when that is every light of the view.
+        private static ulong LightSetKey(int idx, ReadOnlySpan<GpuLight> lights, int n, int limit)
+        {
+            {
+                Vector3 c = _cmds[idx].BoundsCenter;
+                float r = _cmds[idx].BoundsRadius;
+                ulong key = 0;
+                int count = 0, locals = 0;
+                bool all = true;
+                for (int li = 0; li < n && li < 32; li++)
+                {
+                    var pt = lights[li].PositionType;
+                    bool take;
+                    if ((int)(pt.W + 0.5f) == 0) take = true;   // directional
+                    else
+                    {
+                        float reach = lights[li].DirectionRange.W + r;
+                        take = locals < limit && Vector3.DistanceSquared(c, new Vector3(pt.X, pt.Y, pt.Z)) < reach * reach;
+                        if (take) locals++;
+                    }
+                    if (take && count < 8) { key |= (ulong)li << (5 * count); count++; }
+                    else all = false;
+                }
+                return all ? 0UL : key | ((ulong)count << 40);
+            }
+        }
+
         // ── The quality level's values (G8.5, examples/GameEditor/docs/QUALITY_TIERS_DESIGN.md; set by Quality.Apply) ──
         /// <summary>A view's light limit: Forward never more than 32, Forward+ never more than the GPU's (256 / 32).</summary>
         public static int MaxLights { get; set; } = MaxSelectableLights;
@@ -650,6 +818,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             if (!_initialized) return;
             _instanceBuf.BeginFrame();
+            _shadowPass.BeginFrame();   // its instanced casters' buffer, appended to anew
             Sprites2D.SpriteRenderSystem.BeginFrame();
             _skinnedInstanceBuf.BeginFrame();
             _transmissionInstanceBuf.BeginFrame();
@@ -662,7 +831,7 @@ namespace GameEditor.Framework.Renderer.Server
             if (Scene.SceneManager.PlayMode == PlayModeState.Stopped) GameEditor.Framework.Renderer.Server.Materials.Graph.GraphClock.Advance(Math.Min(Sokol.SApp.sapp_frame_duration(), 0.1));
             if (!PostEffects.Bloom.On)                     // G8.9a: bloom off - its targets freed
                 foreach (var b in _bloomOf.Values) if (b.LiveImages > 0) b.Free();
-            _lightBuf.Reset();
+            _lightBuf.Reset(); _lightsVersion++;
             _stats.Reset();
             _drawCount = 0;
             _probeSlotCount = 0;
@@ -1028,7 +1197,9 @@ namespace GameEditor.Framework.Renderer.Server
                 if (meshRes == null) continue;
                 // M8a: a lightmapped entity draws its own mesh (the same shape, its lightmap UV in texcoord_1)
                 bool lightmapped = false;
-                if (mr.ContributeGI && GI.Lightmaps.Active && GI.Lightmaps.MeshFor(world.GetSceneId(row.Entity)) is { } lit)
+                int lmPage = -1;
+                Vector3 lmSt = default;
+                if (mr.ContributeGI && GI.Lightmaps.Active && GI.Lightmaps.Lookup((int)world.GetSceneId(row.Entity), out var lit, out lmPage, out lmSt))
                 {
                     lightmapped = true;
                     for (int s = 0; s < lit.SubMeshes.Length && s < meshRes.SubMeshes.Length; s++)
@@ -1098,8 +1269,13 @@ namespace GameEditor.Framework.Renderer.Server
                 if (probe == 0 && GI.ReflectionProbes.Count > 0 && GI.ReflectionProbes.Choose(worldAabb.Center) is int rp and >= 0)
                     probe = (ushort)(0x8000 | rp);
                 _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, lodMask, probe, (uint)entity.GetHashCode(), worldAabb.Center, worldRadius);
+                // instanced lightmaps: its UV's place on its page in the model's spare column (an affine model has 0 there;
+                // the shaders read it and clear it)
+                Matrix4x4 instModel = model;
+                if (lightmapped) { instModel.M14 = lmSt.X; instModel.M24 = lmSt.Y; instModel.M34 = lmSt.Z; }
+                _cmdLmPage[_drawCount] = lightmapped ? lmPage + 1 : 0;
                 _cpuInst[_drawCount] = new InstanceData(
-                    in model,
+                    in instModel,
                     new Vector4(1f, 1f, 1f, mr.ReceivesShadows ? 1f : 0f));
                 _drawCount++;
             }
@@ -1120,6 +1296,7 @@ namespace GameEditor.Framework.Renderer.Server
                 Matrix4x4 pm = pd.Model;
                 Aabb box = meshRes.LocalBounds.Transform(pm);
                 _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, 0, 0, 0x40000000u | (uint)d, box.Center, box.Extents.Length());
+                _cmdLmPage[_drawCount] = 0;
                 _cpuInst[_drawCount] = new InstanceData(in pm, new Vector4(1f, 1f, 1f, 0f));
                 _drawCount++;
             }
@@ -1144,6 +1321,7 @@ namespace GameEditor.Framework.Renderer.Server
                     Matrix4x4 pm = mp.Model;
                     Aabb box = meshRes.LocalBounds.Transform(pm);
                     _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, 0, 0, 0x80000000u | (uint)k, box.Center, box.Extents.Length());
+                    _cmdLmPage[_drawCount] = 0;
                     _cpuInst[_drawCount] = new InstanceData(in pm, new Vector4(mp.Tint.X, mp.Tint.Y, mp.Tint.Z, 1f));
                     _drawCount++;
                 }
@@ -1167,6 +1345,9 @@ namespace GameEditor.Framework.Renderer.Server
             // behind a blended one (drawn earlier, depth-write off) re-writes depth+colour over it.
             // Within transparent, far→near (back-to-front) is required for correct alpha blending.
 
+            AssignObjectLights(visibleCount);   // Forward: each object's lights (PerObjectLights)
+            if ((uint)viewIndex < (uint)_viewLightSets.Length) _viewLightSets[viewIndex] = _lightSets.Count - 1;
+            if ((uint)viewIndex < (uint)_viewSunShadow.Length) _viewSunShadow[viewIndex] = (_shadowmaskView, _sunShadowDraws, _csmCascadeCount);
             FrameProfiler.Begin(FrameProfiler.Zone.Sort);
             for (int j = 0; j < visibleCount; j++)
             {
@@ -1208,7 +1389,8 @@ namespace GameEditor.Framework.Renderer.Server
                 }
                 else
                 {
-                    _sortKeys[idx] = opaqueKey;
+                    _sortKeys[idx] = opaqueKey | ((ulong)(_cmdLightSet[idx] & 0xFFFF) << 32)   // one light set's draws together
+                                   | ((ulong)(_cmdLmPage[idx] & 0x7FFF) << 48);                  // ... and one lightmap page's
                 }
                 _sortOrder[j] = idx;
             }
@@ -1261,6 +1443,7 @@ namespace GameEditor.Framework.Renderer.Server
             FrameProfiler.Begin(FrameProfiler.Zone.DrawCalls);
             int instanceOffset = 0;
             int i = 0;
+            _mainWalk = true;
 
             while (i < submitCount)
             {
@@ -1276,8 +1459,15 @@ namespace GameEditor.Framework.Renderer.Server
                       && _cmds[_sortOrder[i + groupSize]].MeshId     == curMesh
                       && ((_cmds[_sortOrder[i + groupSize]].LodMask & DrawFlagDisableSubMeshMaterial) != 0) == disableSubMeshMaterial
                       && (_cmds[_sortOrder[i + groupSize]].LodMask & 0x0F) == curLod
-                      && _cmds[_sortOrder[i + groupSize]].SortKey == _cmds[firstIdx].SortKey)   // M8b: one probe light a group
+                      && _cmds[_sortOrder[i + groupSize]].SortKey == _cmds[firstIdx].SortKey   // M8b: one probe light a group
+                      && _cmdLightSet[_sortOrder[i + groupSize]] == _cmdLightSet[firstIdx]      // one light set a group
+                      && _cmdLmPage[_sortOrder[i + groupSize]] == _cmdLmPage[firstIdx])         // one lightmap page a group
                     groupSize++;
+                _groupLmPage = _cmdLmPage[firstIdx] - 1;
+                int lightSet = _cmdLightSet[firstIdx];
+                _groupLightSet = lightSet;
+                if (lightSet > 0) LowTierUniforms.SetObjectLights(_lightSets[lightSet]);   // its draws: their lights only
+                else LowTierUniforms.ClearObjectLights();
 
                 Material?     mat  = _matReg.GetById(curMat);
                 MeshResource? mesh = _meshReg.GetById(curMesh);
@@ -1409,14 +1599,18 @@ namespace GameEditor.Framework.Renderer.Server
                         },
                     });
 
-                    if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + (bpm ?? mat)?.Name, sub.IndexCount, groupSize, subAlpha ? "Blinn-Phong, blended" : "Blinn-Phong"))
-                        sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                    if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + (bpm ?? mat)?.Name, sub.IndexCount, groupSize, subAlpha ? "Blinn-Phong, blended" : "Blinn-Phong"))
+                        sg_draw((uint)sub.IndexStart, (uint)sub.IndexCount, (uint)groupSize);
                     _stats.DrawCalls++;
                 }
 
                 instanceOffset += groupSize;
                 i += groupSize;
             }
+            LowTierUniforms.ClearObjectLights();   // the passes after this one: every light
+            _mainWalk = false;
+            _groupLightSet = 0;
+            _groupLmPage = -1;
             FrameProfiler.End(FrameProfiler.Zone.DrawCalls);
         }
 
@@ -1472,7 +1666,7 @@ namespace GameEditor.Framework.Renderer.Server
         {
             Matrix4x4.Invert(cameraViewProj, out var _invCamVP);
             Vector3 cameraPos = EyeOf(in _invCamVP);   // for ranking the lights by distance
-            _lightBuf.Reset();
+            _lightBuf.Reset(); _lightsVersion++;
             _topLightCount = 0;
             // Forward+ for this view: a perspective camera (csm), the project's path, a GPU that draws the full shaders.
             ViewIsClustered = Path == RenderingPath.ForwardPlus && csm.HasValue && ShaderVariantCache.ClusteredAllowed;
@@ -1491,6 +1685,7 @@ namespace GameEditor.Framework.Renderer.Server
             Light bestDirectionalShadowLight = default;
             float bestDirectionalShadowScore = float.NegativeInfinity;
             bool hasDirectionalShadowLight = false;
+            int bestDirectionalMixedId = -1;   // the sun's scene id when it is a Mixed light (the shadowmask's)
             bool anyDirectionalLight = false;
             float mainIntensity = 0f;                    // the strongest directional light: lit particles' (G8.8 Q6)
             Vector3 mainDir = -Vector3.UnitY, mainColor = Vector3.Zero;
@@ -1552,6 +1747,7 @@ namespace GameEditor.Framework.Renderer.Server
                     bestDirectionalShadowScore = importance;
                     bestDirectionalShadowLight = l;
                     hasDirectionalShadowLight = true;
+                    bestDirectionalMixedId = lc.Mode == GameEditor.Framework.ECS.Components.LightMode.Mixed ? (int)world.GetSceneId(row.Entity) : -1;
                 }
 
                 // PunctualShadows off (the quality level): spot and point lights are lit without their shadows (G8.5).
@@ -1607,46 +1803,75 @@ namespace GameEditor.Framework.Renderer.Server
                 }
             }
 
-            if (hasDirectionalShadowLight && csm.HasValue && EnableCsm4)
+            // The sun's maps are for this view's camera: a caster whose shadow cannot fall in it is not drawn into them.
+            if (hasDirectionalShadowLight && renderShadowPasses) _shadowPass.SetReceivers(world, _meshReg, in cameraViewProj, bestDirectionalShadowLight.Direction);
+            // Shadowmask: lightmapped surfaces take the sun's shadow from the bake; its maps hold the other casters only.
+            _shadowmaskView = Shadowmask && !_preview && hasDirectionalShadowLight && bestDirectionalMixedId >= 0
+                              && GI.Lightmaps.ShadowmaskLight == bestDirectionalMixedId;
+            _shadowPass.SkipLightmapped = _shadowmaskView;
+            int sunDraws = 0;
+            // The shadowmask holds the static casters' shadow only where nothing moves: a moving caster in the map means
+            // the map's variants (no mask in them - on a phone's GPU the mask there cost the sun's shadow 20 - 50 ms), so
+            // the map is drawn again with every caster and the view is drawn as without the mask.
+            for (int sunPass = 0; sunPass < 2; sunPass++)
             {
-                // ── CSM4: fit 4 cascades to the camera frustum, render into atlas slices 0-3 ──
-                var cc = csm.Value;
-                // Fitted to the shadow distance, not the camera's far plane (1000 m: a first cascade of ~60 m, coarse and biased).
-                _csm.Compute(cc.View, cc.Proj, cc.Near, MathF.Max(cc.Near + 0.1f, MathF.Min(cc.Far, ShadowDistance)),
-                    bestDirectionalShadowLight.Direction, _shadowAtlas.SliceSize, CsmComputer.MaxCascades, cc.Far);
-                for (int c = 0; c < CsmComputer.MaxCascades; c++) _csmCascadeVP[c] = _csm.CascadeVP[c];
-                _csmSplitDepths = new Vector4(_csm.SplitDepths[0], _csm.SplitDepths[1],
-                                              _csm.SplitDepths[2], _csm.SplitDepths[3]);
-                _csmCameraView             = cc.View;
-                _csmCascadeCount           = CsmComputer.MaxCascades;
-                _directionalShadowViewProj = _csmCascadeVP[0];   // cascade 0 (Blinn-Phong takes the last: dir_shadow_vp)
-                _hasDirectionalShadow      = true;
-                if (renderShadowPasses)
+                if (hasDirectionalShadowLight && csm.HasValue && EnableCsm4)
                 {
-                    _stats.ShadowDrawCalls += _shadowPass.RenderDirectionalCsmCounted(
-                        world, _meshReg, _shadowAtlas, 0, _csmCascadeVP.AsSpan(0, CsmComputer.MaxCascades));
-                    // Skinned characters cast into the same cascades (depth LOAD, on top of statics).
-                    if (world.HasAnyComponent<Animation.SkinnedMeshRenderer>())
-                        _stats.ShadowDrawCalls += _shadowPass.RenderSkinnedDirectionalCsm(
-                            world, _shadowAtlas, 0, _csmCascadeVP.AsSpan(0, CsmComputer.MaxCascades));
+                    // ── CSM4: fit 4 cascades to the camera frustum, render into atlas slices 0-3 ──
+                    var cc = csm.Value;
+                    // Fitted to the shadow distance, not the camera's far plane (1000 m: a first cascade of ~60 m, coarse and biased).
+                    _csm.Compute(cc.View, cc.Proj, cc.Near, MathF.Max(cc.Near + 0.1f, MathF.Min(cc.Far, ShadowDistance)),
+                        bestDirectionalShadowLight.Direction, _shadowAtlas.SliceSize, CsmComputer.MaxCascades, cc.Far);
+                    for (int c = 0; c < CsmComputer.MaxCascades; c++) _csmCascadeVP[c] = _csm.CascadeVP[c];
+                    _csmSplitDepths = new Vector4(_csm.SplitDepths[0], _csm.SplitDepths[1],
+                                                  _csm.SplitDepths[2], _csm.SplitDepths[3]);
+                    _csmCameraView             = cc.View;
+                    _csmCascadeCount           = CsmComputer.MaxCascades;
+                    _directionalShadowViewProj = _csmCascadeVP[0];   // cascade 0 (Blinn-Phong takes the last: dir_shadow_vp)
+                    _hasDirectionalShadow      = true;
+                    if (renderShadowPasses)
+                    {
+                        sunDraws += _shadowPass.RenderDirectionalCsmCounted(
+                            world, _meshReg, _shadowAtlas, 0, _csmCascadeVP.AsSpan(0, CsmComputer.MaxCascades));
+                        // Skinned characters cast into the same cascades (depth LOAD, on top of statics).
+                        if (world.HasAnyComponent<Animation.SkinnedMeshRenderer>())
+                            sunDraws += _shadowPass.RenderSkinnedDirectionalCsm(
+                                world, _shadowAtlas, 0, _csmCascadeVP.AsSpan(0, CsmComputer.MaxCascades));
+                    }
                 }
-            }
-            else if (hasDirectionalShadowLight && TryComputeCasterBounds(world, out var casterMin, out var casterMax))
-            {
-                // ── CSM1: single caster-fit map (camera-independent) into atlas slice 0 ──
-                _directionalShadowViewProj = BuildDirectionalShadowViewProj(in bestDirectionalShadowLight, casterMin, casterMax);
-                _csmCascadeCount           = 1;
-                _hasDirectionalShadow      = true;
-                if (renderShadowPasses)
+                else if (hasDirectionalShadowLight && TryComputeCasterBounds(world, out var casterMin, out var casterMax))
                 {
-                    _stats.ShadowDrawCalls += _shadowPass.RenderDirectionalCounted(world, _meshReg, _shadowAtlas, 0, in _directionalShadowViewProj);
-                    if (world.HasAnyComponent<Animation.SkinnedMeshRenderer>())
-                        _stats.ShadowDrawCalls += _shadowPass.RenderSkinnedDirectionalCsm(
-                            world, _shadowAtlas, 0,
-                            System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(ref _directionalShadowViewProj, 1));
+                    // ── CSM1: single caster-fit map (camera-independent) into atlas slice 0 ──
+                    _directionalShadowViewProj = BuildDirectionalShadowViewProj(in bestDirectionalShadowLight, casterMin, casterMax);
+                    _csmCascadeCount           = 1;
+                    _hasDirectionalShadow      = true;
+                    if (renderShadowPasses)
+                    {
+                        sunDraws += _shadowPass.RenderDirectionalCounted(world, _meshReg, _shadowAtlas, 0, in _directionalShadowViewProj);
+                        if (world.HasAnyComponent<Animation.SkinnedMeshRenderer>())
+                            sunDraws += _shadowPass.RenderSkinnedDirectionalCsm(
+                                world, _shadowAtlas, 0,
+                                System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(ref _directionalShadowViewProj, 1));
+                    }
                 }
+                if (!(_shadowmaskView && sunDraws > 0)) break;
+                _shadowmaskView = false;
+                _shadowPass.SkipLightmapped = false;
+                sunDraws = 0;
             }
 
+            _shadowPass.SkipLightmapped = false;
+            if (renderShadowPasses)
+            {
+                _stats.ShadowDrawCalls += sunDraws;
+                _sunShadowDraws = sunDraws;
+                _sunMapEmpty = _shadowmaskView && sunDraws == 0;   // a view that only reuses the maps keeps their state
+            }
+            else _shadowmaskView = _shadowmaskView && _sunMapEmpty;
+            // No moving caster: the shadowmask is the sun's whole shadow - the view draws with the variants without its map
+            // (a phone's GPU paid most of the sun's shadow in them, not in the map).
+            if (_shadowmaskView) { _hasDirectionalShadow = false; _csmCascadeCount = 0; }
+            _shadowPass.ClearReceivers();   // the spots' and points' maps: their own range bounds them
             for (int si = 0; si < _spotShadowTopCount; si++)
             {
                 Entity sid = _spotShadowTopEntities[si];
@@ -1731,11 +1956,14 @@ namespace GameEditor.Framework.Renderer.Server
                 }
             }
 
-            _lightBuf.Reset();
+            _lightBuf.Reset(); _lightsVersion++;
+            int maskedSun = -1;   // the shadowmask's sun among the view's lights (marked for the shaders)
             for (int li = 0; li < _topLightCount; li++)
             {
                 _lightBuf.Add(in _topLights[li]);
+                if (_shadowmaskView && maskedSun < 0 && IsSameLight(in _topLights[li], in bestDirectionalShadowLight)) maskedSun = li;
             }
+            if (maskedSun >= 0) _lightBuf.ActiveSpan[maskedSun] = _lightBuf.ActiveSpan[maskedSun].WithShadowmask();
 
             // Forward+: every selected light (in the order the shader reads them) into the view's cluster grid — when a
             // view is drawn next (not for the shadow maps alone: a texture is updated once a frame).
@@ -1743,6 +1971,7 @@ namespace GameEditor.Framework.Renderer.Server
             {
                 var cc = csm!.Value;
                 for (int li = 0; li < _topLightCount; li++) _clusterLights[li] = new GpuLight(in _topLights[li]);
+                if (maskedSun >= 0) _clusterLights[maskedSun] = _clusterLights[maskedSun].WithShadowmask();
                 var span = new ReadOnlySpan<GpuLight>(_clusterLights, 0, _topLightCount);
                 if (_clusterData!.Builder.Build(cc.View, cc.Proj, cc.Near, cc.Far, span))
                 {
@@ -1763,12 +1992,42 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>The lights the view drawn last is lit by (Forward: at most 32; Forward+: its limit).</summary>
         public static int ViewLights { get; private set; }
         private static readonly (bool Clustered, int Lights)[] _viewLighting = new (bool, int)[RenderingConstants.MAX_VIEWS];
+        private static readonly int[] _viewLightSets = new int[RenderingConstants.MAX_VIEWS];
+
+        /// <summary>A view's light sets last drawn (PerObjectLights: the objects lit by fewer than all its lights), 0: none.</summary>
+        public static int LightSetsOf(int viewIndex) => (uint)viewIndex < (uint)_viewLightSets.Length ? _viewLightSets[viewIndex] : 0;
+        private static readonly (bool, int, int)[] _viewSunShadow = new (bool, int, int)[RenderingConstants.MAX_VIEWS];
+        /// <summary>A view's sun shadow last drawn: its shadowmask in use, the draws into its real-time maps (instanced: one a
+        /// mesh a map; skinned included), the cascades its draws read (0: none - the shadowmask alone, or no sun shadow).</summary>
+        public static (bool Shadowmask, int Draws, int Cascades) SunShadowOf(int viewIndex)
+            => (uint)viewIndex < (uint)_viewSunShadow.Length ? _viewSunShadow[viewIndex] : default;
         /// <summary>How view <paramref name="viewIndex"/> was lit when last drawn: Forward+ or Forward, and by how many lights.</summary>
         public static (bool Clustered, int Lights) LightingOf(int viewIndex)
             => (uint)viewIndex < (uint)_viewLighting.Length ? _viewLighting[viewIndex] : default;
 
-        private static void BuildFsParams(Material? mat, Vector3 cameraPos,
-                                          out blinn_phong_fs_params_t fs)
+        // The Blinn-Phong block of the view's draws (lights, shadows, sky, camera), built once; a draw sets its material rows.
+        private static blinn_phong_fs_params_t _blinnBlock;
+        private static int _blinnBlockVersion = -1;
+        private static Vector3 _blinnBlockCam;
+
+        private static void BuildFsParams(Material? mat, Vector3 cameraPos, out blinn_phong_fs_params_t fs)
+        {
+            if (_blinnBlockVersion != _lightsVersion || _blinnBlockCam != cameraPos)
+            {
+                BuildFsBlock(null, cameraPos, out _blinnBlock);
+                _blinnBlockVersion = _lightsVersion;
+                _blinnBlockCam = cameraPos;
+            }
+            fs = _blinnBlock;
+            if (mat is BlinnPhongMaterial bpm)
+            {
+                fs.material_kd_alpha = new Vector4(bpm.DiffuseColor,  bpm.Opacity);
+                fs.material_ks_shin  = new Vector4(bpm.SpecularColor, bpm.Shininess);
+            }
+        }
+
+        private static void BuildFsBlock(Material? mat, Vector3 cameraPos,
+                                         out blinn_phong_fs_params_t fs)
         {
             fs = new blinn_phong_fs_params_t();
 
@@ -2049,9 +2308,10 @@ namespace GameEditor.Framework.Renderer.Server
 
             bool iblActive = _environment is { IsLoaded: true };
             // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
-            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+            int lmPage = _groupLmPage;   // the group's lightmap page (its draws share it)
             sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
             sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
+            sg_view lmMask  = lmPage >= 0 ? GI.Lightmaps.MaskView(lmPage) : _texCache.PlaceholderWhite;
             var flags = new pbr_pbr_rendering_flags_t
             {
                 use_ibl             = iblActive ? 1 : 0,
@@ -2061,13 +2321,14 @@ namespace GameEditor.Framework.Renderer.Server
                 tonemap_type        = FallbackType,
                 tonemap_exposure    = FallbackExposure,      // LDR RGBA8 target → tonemap + sRGB in-shader
                 ambient_strength    = 0.4f,
-                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,   // dielectric diffuse ambient (pbr.glsl:489) + IBL-off fallback
+                lightmap_mode       = lmPage < 0 ? 0f : (GI.Lightmaps.Directional ? 2f : 1f) + (_shadowmaskView ? 4f : 0f),   // dielectric diffuse ambient (pbr.glsl:489) + IBL-off fallback; + 4: the shadowmask
             };
 
             sg_apply_uniforms(UB_pbr_pbr_vs_params,       SG_RANGE(ref Unsafe.AsRef(in vs)));
             if (graphPipe.id != 0) ApplyGraphMaterial(UB_pbr_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(UB_pbr_pbr_material_params, SG_RANGE(ref matParams));
-            LowTierUniforms.ApplyPbrLights(UB_pbr_pbr_light_params, in lights, _shaderCache.CurrentLow);
+            if (_mainWalk) ApplyViewLights(UB_pbr_pbr_light_params);
+            else LowTierUniforms.ApplyPbrLights(UB_pbr_pbr_light_params, in lights, _shaderCache.CurrentLow);
             { var iblDraw = ibl; ApplyIbl(UB_pbr_pbr_ibl_params, ref iblDraw); }
             sg_apply_uniforms(UB_pbr_pbr_camera_params,   SG_RANGE(ref Unsafe.AsRef(in cam)));
             sg_apply_uniforms(UB_pbr_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -2119,6 +2380,7 @@ namespace GameEditor.Framework.Renderer.Server
                         [VIEW_pbr_u_GGXLUTTexture]            = lut,
                         [VIEW_pbr_u_LightmapTexture]    = lmLight,
                         [VIEW_pbr_u_LightmapDirTexture] = lmDir,
+                        [VIEW_pbr_u_ShadowmaskTexture]  = lmMask,
                         [VIEW_pbr_shadow_atlas]              = _shadowAtlas.TextureView,
                         [VIEW_pbr_cube_shadow_array]         = _cubeShadows.TextureView,
                     },
@@ -2136,8 +2398,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
-                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw((uint)sub.IndexStart, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }
@@ -2423,8 +2685,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, 1, "PBR, transmission"))
-                    sg_draw(0u, (uint)sub.IndexCount, 1u);
+                if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, 1, "PBR, transmission"))
+                    sg_draw((uint)sub.IndexStart, (uint)sub.IndexCount, 1u);
                 _stats.DrawCalls++;
             }
         }
@@ -2804,7 +3066,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3017,7 +3279,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3226,7 +3488,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3443,7 +3705,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3651,7 +3913,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3862,7 +4124,7 @@ namespace GameEditor.Framework.Renderer.Server
                 },
             }));
 
-            if (Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
+            if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
                 sg_draw(0u, (uint)mesh.IndexCount, 1u);
             _stats.DrawCalls++;
         }
@@ -3895,6 +4157,8 @@ namespace GameEditor.Framework.Renderer.Server
 
             var lights = new Csm1.Shaders.pbr_csm1_pbr_light_params_t();
             int n = _lightBuf.Count;
+            if (!_mainWalk)   // the main walk applies the view's block, built once (ApplyViewLights)
+            {
             var span = _lightBuf.ActiveSpan;
             for (int l = 0; l < n; l++)
             {
@@ -3925,6 +4189,7 @@ namespace GameEditor.Framework.Renderer.Server
                 lights.point_shadow_vp[pb + 3] = new Vector4(pm.M41, pm.M42, pm.M43, pm.M44);
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
+            }
 
             var cam = new Csm1.Shaders.pbr_csm1_pbr_camera_params_t { u_Camera = cameraPos };
 
@@ -3988,11 +4253,13 @@ namespace GameEditor.Framework.Renderer.Server
 
             // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
 
-            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+            int lmPage = _groupLmPage;   // the group's lightmap page (its draws share it)
 
             sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
 
             sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
+
+            sg_view lmMask  = lmPage >= 0 ? GI.Lightmaps.MaskView(lmPage) : _texCache.PlaceholderWhite;
 
             var flags = new Csm1.Shaders.pbr_csm1_pbr_rendering_flags_t
             {
@@ -4004,7 +4271,7 @@ namespace GameEditor.Framework.Renderer.Server
                 tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
 
-                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,
+                lightmap_mode       = lmPage < 0 ? 0f : (GI.Lightmaps.Directional ? 2f : 1f) + (_shadowmaskView ? 4f : 0f),   // + 4: the sun's shadow × the mask
             };
 
             int pcf = ShadowQuality >= 2 ? 25 : (ShadowQuality >= 1 ? 9 : 1);
@@ -4020,7 +4287,8 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_vs_params,       SG_RANGE(ref vs));
             if (graphPipe.id != 0) ApplyGraphMaterial(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_material_params, SG_RANGE(ref matParams));
-            LowTierUniforms.ApplyPbrLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
+            if (_mainWalk) ApplyViewLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params);
+            else LowTierUniforms.ApplyPbrLights(Csm1.Shaders.UB_pbr_csm1_pbr_light_params, in lights, _shaderCache.CurrentLow);
             ApplyIbl(Csm1.Shaders.UB_pbr_csm1_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm1.Shaders.UB_pbr_csm1_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -4076,8 +4344,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
-                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw((uint)sub.IndexStart, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }
@@ -4165,6 +4433,8 @@ namespace GameEditor.Framework.Renderer.Server
 
             var lights = new Csm4.Shaders.pbr_csm4_pbr_light_params_t();
             int n = _lightBuf.Count;
+            if (!_mainWalk)   // the main walk applies the view's block, built once (ApplyViewLights)
+            {
             var span = _lightBuf.ActiveSpan;
             for (int l = 0; l < n; l++)
             {
@@ -4195,6 +4465,7 @@ namespace GameEditor.Framework.Renderer.Server
                 lights.point_shadow_vp[pb + 3] = new Vector4(pm.M41, pm.M42, pm.M43, pm.M44);
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
+            }
 
             var cam = new Csm4.Shaders.pbr_csm4_pbr_camera_params_t { u_Camera = cameraPos };
 
@@ -4258,11 +4529,13 @@ namespace GameEditor.Framework.Renderer.Server
 
             // M8a: a lightmapped entity's own mesh is on a lightmap page: its light from there (docs BAKED_GI_DESIGN.md §3.5)
 
-            int lmPage = GI.Lightmaps.PageOf(mesh.Id);
+            int lmPage = _groupLmPage;   // the group's lightmap page (its draws share it)
 
             sg_view lmLight = lmPage >= 0 ? GI.Lightmaps.LightView(lmPage) : _texCache.PlaceholderBlack;
 
             sg_view lmDir   = lmPage >= 0 && GI.Lightmaps.Directional ? GI.Lightmaps.DirectionView(lmPage) : _texCache.PlaceholderWhite;
+
+            sg_view lmMask  = lmPage >= 0 ? GI.Lightmaps.MaskView(lmPage) : _texCache.PlaceholderWhite;
 
             var flags = new Csm4.Shaders.pbr_csm4_pbr_rendering_flags_t
             {
@@ -4274,7 +4547,7 @@ namespace GameEditor.Framework.Renderer.Server
                 tonemap_exposure    = FallbackExposure,
                 ambient_strength    = 0.4f,
 
-                lightmap_mode       = lmPage < 0 ? 0f : GI.Lightmaps.Directional ? 2f : 1f,
+                lightmap_mode       = lmPage < 0 ? 0f : (GI.Lightmaps.Directional ? 2f : 1f) + (_shadowmaskView ? 4f : 0f),   // + 4: the sun's shadow × the mask
             };
 
             int pcf = ShadowQuality >= 2 ? 25 : (ShadowQuality >= 1 ? 9 : 1);
@@ -4290,7 +4563,8 @@ namespace GameEditor.Framework.Renderer.Server
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_vs_params,       SG_RANGE(ref vs));
             if (graphPipe.id != 0) ApplyGraphMaterial(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, ref matParams, mat.Graph!, graphVariant);
             else sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_material_params, SG_RANGE(ref matParams));
-            LowTierUniforms.ApplyPbrLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
+            if (_mainWalk) ApplyViewLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params);
+            else LowTierUniforms.ApplyPbrLights(Csm4.Shaders.UB_pbr_csm4_pbr_light_params, in lights, _shaderCache.CurrentLow);
             ApplyIbl(Csm4.Shaders.UB_pbr_csm4_pbr_ibl_params, ref ibl);
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_camera_params,   SG_RANGE(ref cam));
             sg_apply_uniforms(Csm4.Shaders.UB_pbr_csm4_pbr_rendering_flags, SG_RANGE(ref flags));
@@ -4346,8 +4620,8 @@ namespace GameEditor.Framework.Renderer.Server
                     },
                 }));
 
-                if (Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
-                    sg_draw(0u, (uint)sub.IndexCount, (uint)groupSize);
+                if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw(System.IO.Path.GetFileName(mesh.SourcePath) + " / " + mat.Name, sub.IndexCount, groupSize, "PBR" + (blend ? ", blended" : "") + (mat.DoubleSided ? ", double-sided" : "")))
+                    sg_draw((uint)sub.IndexStart, (uint)sub.IndexCount, (uint)groupSize);
                 _stats.DrawCalls++;
             }
         }

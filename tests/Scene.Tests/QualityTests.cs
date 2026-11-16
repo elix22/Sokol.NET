@@ -27,10 +27,14 @@ namespace Scene.Tests
             // Medium (phones, the web) and Low: one map around the casters; their distances for when they are set to 4.
             Assert.Equal((1, 100f), (cfg.QualityLevels[1].Cascades, cfg.QualityLevels[1].ShadowDistance));
             Assert.Equal((1, 50f), (cfg.QualityLevels[3].Cascades, cfg.QualityLevels[3].ShadowDistance));
-            // Mobile (Android): Medium's path, lights, cascade, distance, map, spot / point shadows and HDR - one shadow tap, half
-            // the 3D's pixels (a Galaxy A71: a full-screen shadowed surface 117 -> 25 ms a frame, 40 lamps 76 -> 23 ms).
+            // Mobile (Android): Medium's lights, cascade, distance, map, spot / point shadows and HDR - Forward, one shadow tap,
+            // half the 3D's pixels (a Galaxy A71: a full-screen shadowed surface 117 -> 25 ms a frame).
             var mobile = cfg.QualityLevels[2];
-            Assert.Equal(("forward+", 32, 1, 100f, 2048, true, 1, true, 0.5f),
+            Assert.Equal(4, mobile.PerObjectLights);   // Forward: an object lit by its 4 most important lamps (each costs every pixel)
+            Assert.Equal(0, cfg.QualityLevels[1].PerObjectLights);
+            // Mobile: a baked Mixed sun's shadow on static objects from the shadowmask (its map: the moving ones); the others real time
+            Assert.Equal((false, false, true, false), (cfg.QualityLevels[0].Shadowmask, cfg.QualityLevels[1].Shadowmask, mobile.Shadowmask, cfg.QualityLevels[3].Shadowmask));
+            Assert.Equal(("forward", 32, 1, 100f, 2048, true, 1, true, 0.5f),
                 (mobile.RenderingPath, mobile.MaxLights, mobile.Cascades, mobile.ShadowDistance, mobile.ShadowResolution, mobile.PunctualShadows,
                  mobile.SoftShadows, mobile.Hdr, mobile.RenderScale));
             var low = cfg.QualityLevels[3];
@@ -54,6 +58,17 @@ namespace Scene.Tests
             Assert.Equal(0.85f, read.QualityLevels[1].RenderScale, 3);
             Assert.Equal(80f, read.QualityLevels[1].ShadowDistance, 3);
             Assert.Equal((25, 4096), (read.QualityLevels[4].SoftShadows, read.QualityLevels[4].ShadowResolution));
+            Assert.Equal(4, read.QualityLevels[2].PerObjectLights);
+            // A level written before "perObjectLights": a default level's name takes its value, another none.
+            var older = ConfigManager.LoadFromMemory(Encoding.UTF8.GetBytes(
+                "{ \"quality\": { \"levels\": [ { \"name\": \"Mobile\", \"renderingPath\": \"forward\" }, { \"name\": \"Mine\" } ] } }"))!;
+            Assert.Equal((4, 0), (older.QualityLevels[0].PerObjectLights, older.QualityLevels[1].PerObjectLights));
+            Assert.Equal((true, false), (older.QualityLevels[0].Shadowmask, older.QualityLevels[1].Shadowmask));
+            Assert.True(read.QualityLevels[2].Shadowmask);
+            cfg.QualityLevels[2].Shadowmask = false;
+            cfg.QualityLevels[0].Shadowmask = true;
+            var flipped = ConfigManager.LoadFromMemory(Encoding.UTF8.GetBytes(ConfigManager.Serialize(cfg)))!;
+            Assert.Equal((true, false), (flipped.QualityLevels[0].Shadowmask, flipped.QualityLevels[2].Shadowmask));
             Assert.Equal("Low", Quality.DefaultOf(read, QualityTarget.Web));
             Assert.Equal("High", Quality.DefaultOf(read, QualityTarget.Desktop));
             Assert.Equal("Ultra", read.QualityEditor);
@@ -83,7 +98,9 @@ namespace Scene.Tests
             // needs the native library, not loaded in these tests).
             var levels = QualityLevel.Defaults();
             var mobile = Quality.ValuesOf(levels[2]);
-            Assert.Equal((RenderingPath.ForwardPlus, 32, false, 2048, true, 0, true, 0.5f),
+            Assert.Equal(4, mobile.PerObjectLights);
+            Assert.Equal(8, Quality.ValuesOf(new QualityLevel { PerObjectLights = 99 }).PerObjectLights);   // clamped
+            Assert.Equal((RenderingPath.Forward, 32, false, 2048, true, 0, true, 0.5f),
                 (mobile.Path, mobile.MaxLights, mobile.Csm4, mobile.ShadowResolution, mobile.PunctualShadows, mobile.ShadowQuality, mobile.Hdr, mobile.RenderScale));
             var low = Quality.ValuesOf(levels[3]);
             Assert.Equal((RenderingPath.Forward, 8, false, 1024, false, 0, false, 0.75f),
