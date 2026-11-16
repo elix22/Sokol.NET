@@ -220,6 +220,14 @@ namespace GameEditor.Framework.ECS.Components
         public ushort Layer;
         /// <summary>Bitmask of layers this character collides with.</summary>
         public ushort LayerMask;
+        /// <summary>The highest step it walks up without a jump, in metres (Virtual mode; 0 = none). Phase H E2.</summary>
+        public float StepUp;
+        /// <summary>How far down it keeps to the floor walking off a small step or down a slope, in metres (Virtual mode;
+        /// 0 = it leaves the floor and falls). Phase H E2.</summary>
+        public float StickToFloor;
+        /// <summary>The capsule's height while crouched, in metres (Virtual mode; 0 = it does not crouch). Standing up again
+        /// waits until there is room above. Phase H E2.</summary>
+        public float CrouchHeight;
 
         public static CharacterComponent Default => new CharacterComponent
         {
@@ -235,7 +243,28 @@ namespace GameEditor.Framework.ECS.Components
             ShapeOffset        = Vector3.Zero,
             Layer              = 1,
             LayerMask          = 0xFFFF,
+            StepUp             = 0.4f,    // Jolt's own defaults: a character made before E2 moves as it did
+            StickToFloor       = 0.5f,
+            CrouchHeight       = 0f,
         };
+    }
+
+    /// <summary>
+    /// A place a character may vault over something (Phase H E2; IP rule C12/C12a: the marker only ALLOWS the move). A box
+    /// of <see cref="Size"/> around the entity, turned with it; a character whose feet are inside it and who faces within
+    /// <see cref="MaxAngle"/> of the entity's forward (+Z) may vault: one fixed move of <see cref="Distance"/> along its own
+    /// facing, rising <see cref="Height"/> at the middle, taking <see cref="Seconds"/>. Nothing aims it.
+    /// </summary>
+    public struct VaultMarker
+    {
+        public Vector3 Size;
+        public float Distance;
+        public float Height;
+        public float Seconds;
+        /// <summary>Degrees either side of the marker's forward the character may face; 180 = any way.</summary>
+        public float MaxAngle;
+
+        public static VaultMarker Default => new VaultMarker { Size = new Vector3(2f, 2f, 1.5f), Distance = 2f, Height = 1f, Seconds = 0.5f, MaxAngle = 60f };
     }
 
     public struct ScriptComponent

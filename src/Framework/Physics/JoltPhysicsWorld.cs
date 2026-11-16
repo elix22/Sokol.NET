@@ -74,6 +74,12 @@ namespace GameEditor.Framework.Physics
             public required JPH.CapsuleShape                           InnerCapsuleShapeObj;
             public required JPH.CharacterVsCharacterCollisionSimple    Cvsc;
             public Vector3 DesiredVelocity;
+            // Phase H E2: the step up and the stick to the floor; the crouched shapes (null: it does not crouch); held by a
+            // scripted move.
+            public float StepUp, StickToFloor;
+            public JPH.RotatedTranslatedShape? CrouchRts, CrouchInnerRts;
+            public JPH.CapsuleShape? CrouchCapsule, CrouchInnerCapsule;
+            public bool Crouched, Held;
             private bool _disposed;
             public void Dispose()
             {
@@ -85,6 +91,8 @@ namespace GameEditor.Framework.Physics
                 CapsuleShapeObj.Dispose();
                 InnerRotTransShape.Dispose();
                 InnerCapsuleShapeObj.Dispose();
+                CrouchRts?.Dispose(); CrouchCapsule?.Dispose();
+                CrouchInnerRts?.Dispose(); CrouchInnerCapsule?.Dispose();
             }
         }
 
@@ -814,7 +822,7 @@ namespace GameEditor.Framework.Physics
                 cvsc.Add(character);
                 character.SetCharacterVsCharacterCollision(cvsc);
 
-                _charStates[h] = new CharState
+                var cs = new CharState
                 {
                     Character            = character,
                     RotTransShape        = rotTrans,
@@ -823,7 +831,20 @@ namespace GameEditor.Framework.Physics
                     InnerCapsuleShapeObj = innerCapsule,
                     Cvsc                 = cvsc,
                     DesiredVelocity      = Vector3.Zero,
+                    StepUp               = MathF.Max(0f, desc.StepUp),
+                    StickToFloor         = MathF.Max(0f, desc.StickToFloor),
                 };
+                // The crouched capsule: the same radius, shorter, its base still at the feet.
+                if (desc.CrouchHeight > 0f && desc.CrouchHeight < desc.Height)
+                {
+                    float crouchHalf = MathF.Max(0f, desc.CrouchHeight * 0.5f - desc.Radius);
+                    using var crouchOffset = new JPH.Vec3(desc.ShapeOffset.X, crouchHalf + desc.Radius + desc.ShapeOffset.Y, desc.ShapeOffset.Z);
+                    cs.CrouchCapsule      = new JPH.CapsuleShape(crouchHalf, desc.Radius);
+                    cs.CrouchRts          = new JPH.RotatedTranslatedShape(crouchOffset, identRot, cs.CrouchCapsule);
+                    cs.CrouchInnerCapsule = new JPH.CapsuleShape(crouchHalf * InnerFraction, innerR);
+                    cs.CrouchInnerRts     = new JPH.RotatedTranslatedShape(crouchOffset, identRot, cs.CrouchInnerCapsule);
+                }
+                _charStates[h] = cs;
             }
 
             return new CharacterHandle(h);
@@ -896,6 +917,36 @@ namespace GameEditor.Framework.Physics
                 using var r = kstate.Character.GetRotation();
                 kstate.Character.SetPositionAndRotation(p, r, JPH.EActivation.Activate);
             }
+        }
+
+        public bool SetCharacterCrouched(CharacterHandle handle, bool crouched)
+        {
+            if (_physics == null || !_charStates.TryGetValue(handle.Value, out var state) || state.CrouchRts == null) return !crouched;
+            if (state.Crouched == crouched) return true;
+            _charTempAlloc ??= new JPH.TempAllocatorImpl(4 * 1024 * 1024);
+            using var bpFilter    = _physics.GetDefaultBroadPhaseLayerFilter(ObjLayerMoving);
+            using var layerFilter = _physics.GetDefaultLayerFilter(ObjLayerMoving);
+            using var bodyFilter  = new JPH.BodyFilter();
+            using var shapeFilter = new JPH.ShapeFilter();
+            var shape = crouched ? (JPH.RotatedTranslatedShape)state.CrouchRts : state.RotTransShape;
+            // Standing up is refused while anything is in the way of the taller shape (Jolt's own test: the shape may
+            // overlap by no more than the penetration slop, 1.5 x 0.02 m as its character sample does).
+            if (!state.Character.SetShape(shape, 0.03f, bpFilter, layerFilter, bodyFilter, shapeFilter, _charTempAlloc)) return false;
+            state.Character.SetInnerBodyShape(crouched ? state.CrouchInnerRts! : state.InnerRotTransShape);
+            state.Crouched = crouched;
+            return true;
+        }
+
+        public bool IsCharacterCrouched(CharacterHandle handle)
+            => _charStates.TryGetValue(handle.Value, out var state) && state.Crouched;
+
+        public void SetCharacterHeld(CharacterHandle handle, bool held)
+        {
+            if (!_charStates.TryGetValue(handle.Value, out var state) || state.Held == held) return;
+            state.Held = held;
+            using var zero = new JPH.Vec3(0f, 0f, 0f);
+            state.Character.SetLinearVelocity(zero);
+            state.DesiredVelocity = Vector3.Zero;
         }
 
         public bool IsCharacterGrounded(CharacterHandle handle)
@@ -1282,6 +1333,7 @@ namespace GameEditor.Framework.Physics
             foreach (var state in _charStates.Values)
             {
                 var ch = state.Character;
+                if (state.Held) { state.DesiredVelocity = Vector3.Zero; continue; }   // a scripted move places it (E2)
 
                 ch.UpdateGroundVelocity();
 
@@ -1320,6 +1372,9 @@ namespace GameEditor.Framework.Physics
                 using var newVelJph = new JPH.Vec3(newVel.X, newVel.Y, newVel.Z);
                 ch.SetLinearVelocity(newVelJph);
 
+                // Its own step up and stick to the floor (E2); 0 turns each off (Jolt tests them for zero).
+                extSettings.mWalkStairsStepUp.Set(0f, state.StepUp, 0f);
+                extSettings.mStickToFloorStepDown.Set(0f, -state.StickToFloor, 0f);
                 ch.ExtendedUpdate(dt, gravVec, extSettings, bpFilter, layerFilter, bodyFilter, shapeFilter, _charTempAlloc);
 
                 // Desired velocity is consumed each physics step; caller refreshes it every frame.

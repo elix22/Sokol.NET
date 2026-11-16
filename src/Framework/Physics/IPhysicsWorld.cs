@@ -152,6 +152,12 @@ namespace GameEditor.Framework.Physics
         public bool IsKinematic;
         public ushort Layer;
         public ushort LayerMask;
+        /// <summary>The highest step walked up without a jump, metres (Virtual mode; 0 = none).</summary>
+        public float StepUp;
+        /// <summary>How far down it keeps to the floor, metres (Virtual mode; 0 = never).</summary>
+        public float StickToFloor;
+        /// <summary>Capsule height while crouched, metres (Virtual mode; 0 = it does not crouch).</summary>
+        public float CrouchHeight;
     }
 
     /// <summary>Opaque handle to a physics constraint.</summary>
@@ -267,6 +273,13 @@ namespace GameEditor.Framework.Physics
         Quaternion      GetCharacterRotation(CharacterHandle handle);
         void            SetCharacterPosition(CharacterHandle handle, Vector3 position);
         bool            IsCharacterGrounded(CharacterHandle handle);
+        /// <summary>Crouches (the shorter capsule) or stands. False when it cannot: no crouch height, or no room above to
+        /// stand - it stays crouched. Virtual mode only (Phase H E2).</summary>
+        bool            SetCharacterCrouched(CharacterHandle handle, bool crouched);
+        bool            IsCharacterCrouched(CharacterHandle handle);
+        /// <summary>Held: it neither moves by itself nor falls - a scripted move (a vault) places it. Let go: it moves again,
+        /// at rest. Virtual mode only (Phase H E2).</summary>
+        void            SetCharacterHeld(CharacterHandle handle, bool held);
         Vector3         GetCharacterGroundNormal(CharacterHandle handle);
 
         // ── Vehicle controllers ──────────────────────────────────────────────

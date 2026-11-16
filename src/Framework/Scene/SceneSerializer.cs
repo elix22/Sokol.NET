@@ -414,6 +414,9 @@ namespace GameEditor.Framework.Scene
                       .Append(",\"OfsZ\":").Append(F(chComp.ShapeOffset.Z))
                       .Append(",\"Layer\":").Append(chComp.Layer)
                       .Append(",\"Mask\":").Append(chComp.LayerMask)
+                      .Append(",\"StepUp\":").Append(F(chComp.StepUp))
+                      .Append(",\"Stick\":").Append(F(chComp.StickToFloor))
+                      .Append(",\"Crouch\":").Append(F(chComp.CrouchHeight))
                       .Append('}');
                 }
 
@@ -712,6 +715,9 @@ namespace GameEditor.Framework.Scene
                         charEl.TryGetProperty("OfsZ", out var ozEl) ? ozEl.GetSingle() : 0f),
                     Layer              = charEl.TryGetProperty("Layer",    out var lEl)    ? (ushort)lEl.GetInt32()           : CharacterComponent.Default.Layer,
                     LayerMask          = charEl.TryGetProperty("Mask",     out var mkEl)   ? (ushort)mkEl.GetInt32()          : CharacterComponent.Default.LayerMask,
+                    StepUp             = charEl.TryGetProperty("StepUp",   out var suEl)   ? suEl.GetSingle()                 : CharacterComponent.Default.StepUp,
+                    StickToFloor       = charEl.TryGetProperty("Stick",    out var sfEl)   ? sfEl.GetSingle()                 : CharacterComponent.Default.StickToFloor,
+                    CrouchHeight       = charEl.TryGetProperty("Crouch",   out var crEl)   ? crEl.GetSingle()                 : CharacterComponent.Default.CrouchHeight,
                 });
             }
 

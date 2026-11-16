@@ -466,6 +466,22 @@ namespace GameEditor.Framework.Scripting
         protected bool TryGetCharacterGroundNormal(out Vector3 normal)
             => SceneManager.TryGetCharacterGroundNormal(EntityId, out normal);
 
+        /// <summary>Crouches (the character's Crouch Height) or stands; false when it cannot - no room above to stand, it stays
+        /// crouched (Phase H E2).</summary>
+        protected bool SetCrouched(bool crouched)
+            => SceneManager.SetCharacterCrouched(EntityId, crouched);
+
+        protected bool IsCrouched()
+            => SceneManager.IsCharacterCrouched(EntityId);
+
+        /// <summary>Vaults when the character stands inside a Vault Marker facing its way: one fixed move along
+        /// <paramref name="facing"/> (Phase H E2). False when no marker allows it.</summary>
+        protected bool TryVault(Vector3 facing)
+            => SceneManager.TryVault(EntityId, facing);
+
+        protected bool IsVaulting()
+            => SceneManager.IsVaulting(EntityId);
+
         // ---- Vehicle helpers ------------------------------------------------
 
         protected bool SetVehicleInput(float steer, float throttle, float brake, float handBrake = 0f)

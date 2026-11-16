@@ -743,6 +743,7 @@ namespace GameEditor.Framework.Scene
             {
                 if (_entityToCharHandle.Remove(e, out var character))
                 {
+                    _vaults.Remove(e);
                     _physics!.DestroyCharacter(character);
                     _charHandleToEntity.Remove(character.Value);
                 }
@@ -1155,6 +1156,7 @@ namespace GameEditor.Framework.Scene
                 _physics.MoveKinematic(handle, kmWorldPos, kmWorldRot, deltaTime);
             }
 
+            StepVaults(deltaTime);
             _physics.Step(deltaTime);
 
             // Post-step: sync physics positions/rotations back to Transform for dynamic bodies only.
@@ -1326,13 +1328,15 @@ namespace GameEditor.Framework.Scene
         /// <summary>The 3D body an entity has in the world that plays.</summary>
         internal static bool TryGetBody(Entity entity, out PhysicsBodyHandle body) => _entityToHandle.TryGetValue(entity, out body);
 
-        // Before each fixed step of the 3D world: the computer's drivers choose their karts' inputs, then every kart drives.
+        // Before each fixed step of the 3D world: the computer's drivers choose their karts' inputs, then every kart drives,
+        // then every aircraft flies.
         private static void StepKarts(float dt)
         {
             Race.Step(dt);
             ItemSystem.Step(dt);
             DriverSystem.Step(dt);
             KartSystem.Step(dt);
+            AircraftSystem.Step(dt);   // Phase H E17
         }
 
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
@@ -1512,6 +1516,9 @@ namespace GameEditor.Framework.Scene
                 IsKinematic        = cc.Mode == CharacterMode.Kinematic,
                 Layer              = cc.Layer,
                 LayerMask          = cc.LayerMask,
+                StepUp             = cc.StepUp,
+                StickToFloor       = cc.StickToFloor,
+                CrouchHeight       = cc.CrouchHeight,
             };
             var charHandle = _physics!.CreateCharacter(charDesc);
             _entityToCharHandle[entity] = charHandle;
@@ -1683,6 +1690,7 @@ namespace GameEditor.Framework.Scene
                 _physics?.DestroyCharacter(charHandle);
             _entityToCharHandle.Clear();
             _charHandleToEntity.Clear();
+            _vaults.Clear();
 
             // Destroy vehicle controllers.
             foreach (var (_, vHandle) in _entityToVehicleHandle)
@@ -1708,6 +1716,84 @@ namespace GameEditor.Framework.Scene
             if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
             _physics.SetCharacterLinearVelocity(h, velocity);
             return true;
+        }
+
+        /// <summary>Crouches or stands the character (its CrouchHeight capsule). False when it cannot: no crouch height, or
+        /// no room above to stand - it stays crouched (Phase H E2).</summary>
+        public static bool SetCharacterCrouched(Entity entity, bool crouched)
+        {
+            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
+            return _physics.SetCharacterCrouched(h, crouched);
+        }
+
+        public static bool IsCharacterCrouched(Entity entity)
+            => _physics != null && _entityToCharHandle.TryGetValue(entity, out var h) && _physics.IsCharacterCrouched(h);
+
+        // ---- Vault (Phase H E2; IP rules C12 / C12a) --------------------------
+        // A vault is one fixed move: the marker the feet stand in only ALLOWS it; the move goes a fixed distance straight
+        // along the character's own facing, rising and falling once, the character held (no collision, no gravity) until it
+        // lands. Nothing aims it at the obstacle or corrects it.
+
+        private sealed class VaultRun
+        {
+            public Vector3 From, To;
+            public float Height, Seconds, Time;
+        }
+
+        private static readonly Dictionary<Entity, VaultRun> _vaults = new();
+
+        /// <summary>
+        /// Starts a vault when the character stands on the ground inside a <see cref="VaultMarker"/>'s box, facing within its
+        /// MaxAngle of the marker's forward. <paramref name="facing"/> is the character's facing (flattened); the vault goes
+        /// along it. False (nothing happens) otherwise.
+        /// </summary>
+        public static bool TryVault(Entity entity, Vector3 facing)
+        {
+            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h) || _vaults.ContainsKey(entity)) return false;
+            if (!_physics.IsCharacterGrounded(h)) return false;
+            facing.Y = 0f;
+            if (facing.LengthSquared() < 1e-8f) return false;
+            facing = Vector3.Normalize(facing);
+            Vector3 feet = _physics.GetCharacterPosition(h);
+            var world = ECSWorld.Instance;
+            if (!world.HasAnyComponent<VaultMarker>()) return false;
+            foreach (var row in world.Query<VaultMarker, Transform>().Enumerate<VaultMarker, Transform>())
+            {
+                var m = row.Item1.Value;
+                if (!Matrix4x4.Decompose(Transform.GetWorldMatrix(world, row.Item2.Value), out _, out var rot, out var pos)) continue;
+                var local = Vector3.Transform(feet - pos, Quaternion.Inverse(rot));
+                if (MathF.Abs(local.X) > m.Size.X * 0.5f || MathF.Abs(local.Y) > m.Size.Y * 0.5f || MathF.Abs(local.Z) > m.Size.Z * 0.5f) continue;
+                var fwd = Vector3.Transform(Vector3.UnitZ, rot);
+                fwd.Y = 0f;
+                if (fwd.LengthSquared() < 1e-8f) continue;
+                float cos = Vector3.Dot(Vector3.Normalize(fwd), facing);
+                if (cos < MathF.Cos(Math.Clamp(m.MaxAngle, 0f, 180f) * MathF.PI / 180f) - 1e-5f) continue;
+                _vaults[entity] = new VaultRun { From = feet, To = feet + facing * MathF.Max(0f, m.Distance), Height = MathF.Max(0f, m.Height), Seconds = MathF.Max(0.05f, m.Seconds) };
+                _physics.SetCharacterHeld(h, true);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>True while the character is in a vault (its own moves wait).</summary>
+        public static bool IsVaulting(Entity entity) => _vaults.ContainsKey(entity);
+
+        private static readonly List<Entity> _vaultsDone = new();
+
+        // Before the physics step: each vault's place along its arc; the last step lets the character go, at rest.
+        private static void StepVaults(float dt)
+        {
+            if (_vaults.Count == 0 || _physics == null) return;
+            _vaultsDone.Clear();
+            foreach (var (e, run) in _vaults)
+            {
+                if (!_entityToCharHandle.TryGetValue(e, out var h)) { _vaultsDone.Add(e); continue; }
+                run.Time += dt;
+                float s = MathF.Min(1f, run.Time / run.Seconds);
+                _physics.SetCharacterPosition(h, Vector3.Lerp(run.From, run.To, s) + Vector3.UnitY * (run.Height * 4f * s * (1f - s)));
+                if (s >= 1f) { _physics.SetCharacterHeld(h, false); _vaultsDone.Add(e); }
+            }
+            foreach (var e in _vaultsDone) _vaults.Remove(e);
         }
 
         public static bool IsCharacterGrounded(Entity entity)
