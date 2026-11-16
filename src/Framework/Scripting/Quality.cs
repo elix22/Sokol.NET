@@ -76,7 +76,11 @@ namespace GameEditor.Framework.Scripting
         public static string DefaultOf(ProjectConfig config, QualityTarget t)
         {
             string name = config.QualityDefaults.TryGetValue(t, out var n) ? n : QualityLevel.DefaultFor(t);
-            return IndexOf(config.QualityLevels, name) >= 0 ? name : (config.QualityLevels.Count > 0 ? config.QualityLevels[0].Name : name);
+            if (IndexOf(config.QualityLevels, name) >= 0) return name;
+            // A table of before the Mobile level (2026-11-16) that names no default for Android: its phone level, Medium.
+            if (string.Equals(name, QualityLevel.DefaultFor(t), StringComparison.OrdinalIgnoreCase) && t != QualityTarget.Desktop
+                && IndexOf(config.QualityLevels, "Medium") >= 0) return "Medium";
+            return config.QualityLevels.Count > 0 ? config.QualityLevels[0].Name : name;
         }
 
         /// <summary>What a level sets in the renderer (a plain struct: NativeAOT).</summary>

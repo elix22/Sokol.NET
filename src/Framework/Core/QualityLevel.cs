@@ -34,17 +34,24 @@ namespace GameEditor.Framework.Core
 
         /// <summary>
         /// A new project's levels: High is the desktop picture of before the levels, Medium a phone's (Forward+ is limited
-        /// to 32 lights on a phone and in a browser anyway), Low draws less.
+        /// to 32 lights on a phone and in a browser anyway), Mobile an Android phone's, Low draws less.
+        /// Mobile (2026-11-16): a Galaxy A71 (Adreno 618) draws at its screen's 2309 × 1080 since High DPI (four times the
+        /// pixels of before); at Medium a scene whose every pixel is a lit, shadowed surface took 117 ms a frame (8 fps) and
+        /// 40 point lamps 76 ms, GPU-bound. Mobile - half the 3D's pixels (the count of before High DPI; the UI stays sharp)
+        /// and one shadow tap - draws them in 25 and 23 ms (40 fps), with Medium's 32 lights, cascade, shadow distance and
+        /// map, HDR and spot / point shadows (Forward lost to Forward+ there: 40 lamps 114 against 46 ms at 0.75).
         /// </summary>
         public static List<QualityLevel> Defaults() => new()
         {
             new QualityLevel { Name = "High" },
             new QualityLevel { Name = "Medium", MaxLights = 32, Cascades = 1, ShadowDistance = 100f },
+            new QualityLevel { Name = "Mobile", MaxLights = 32, Cascades = 1, ShadowDistance = 100f, SoftShadows = 1, RenderScale = 0.5f },
             new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, Cascades = 1, ShadowDistance = 50f, ShadowResolution = 1024,
                                PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f },
         };
 
-        /// <summary>A new project's default level per target (desktop, Android, iOS, web).</summary>
-        public static string DefaultFor(QualityTarget t) => t == QualityTarget.Desktop ? "High" : "Medium";
+        /// <summary>A new project's default level per target: desktop High, Android Mobile, iOS and web Medium.</summary>
+        public static string DefaultFor(QualityTarget t) =>
+            t == QualityTarget.Desktop ? "High" : t == QualityTarget.Android ? "Mobile" : "Medium";
     }
 }

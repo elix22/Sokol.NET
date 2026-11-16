@@ -22,14 +22,19 @@ void main()
 
 layout(binding=0) uniform texture2D src_tex;
 layout(binding=0) uniform sampler   src_smp;
+layout(binding=0) uniform screen_copy_params {
+    vec2 dst_size;   // the target's pixels: the source is stretched over it (a scene drawn at a render scale under 1)
+};
 
 out vec4 frag_color;
 
 void main()
 {
     // Reconstruct UV from window-space fragment position (backend-orientation safe,
-    // mirrors tonemap_pass.glsl) so the copy preserves the source's texel layout.
-    vec2 uv = gl_FragCoord.xy / vec2(textureSize(sampler2D(src_tex, src_smp), 0));
+    // mirrors tonemap_pass.glsl) so the copy preserves the source's texel layout - over the
+    // TARGET's pixels: divided by the source's size, a smaller source (render scale 0.75) was
+    // drawn 1:1 into the window's corner and its edge smeared over the rest.
+    vec2 uv = gl_FragCoord.xy / dst_size;
     frag_color = texture(sampler2D(src_tex, src_smp), uv);
 }
 

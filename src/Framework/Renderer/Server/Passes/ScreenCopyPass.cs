@@ -88,12 +88,12 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         }
 
         /// <summary>Draws a fullscreen triangle copying <paramref name="srcView"/> into the active pass.</summary>
-        public void Render(sg_view srcView) => Blit(_pipeline, srcView);
+        public void Render(sg_view srcView) => Blit(_pipeline, srcView, SizeOf(srcView));
 
         /// <summary>The same into a target of <paramref name="format"/> (RGBA8, or the HDR format of an HDR scene's copy).</summary>
         public void Render(sg_view srcView, sg_pixel_format format)
         {
-            if (format == SG_PIXELFORMAT_RGBA8) { Blit(_pipeline, srcView); return; }
+            if (format == SG_PIXELFORMAT_RGBA8) { Blit(_pipeline, srcView, SizeOf(srcView)); return; }
             if (_hdrPipeline.id == 0)
                 _hdrPipeline = sg_make_pipeline(new sg_pipeline_desc
                 {
@@ -104,16 +104,24 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     sample_count = 1,
                     label = "screen-copy-hdr-pipeline",
                 });
-            Blit(_hdrPipeline, srcView);
+            Blit(_hdrPipeline, srcView, SizeOf(srcView));
         }
 
         /// <summary>
         /// Copies <paramref name="srcView"/> into the active SWAPCHAIN pass (swapchain-format pipeline).
         /// Lets a standalone app present its offscreen-rendered scene to the backbuffer.
         /// </summary>
-        public void RenderToSwapchain(sg_view srcView) => Blit(_swapchainPipeline, srcView);
+        public void RenderToSwapchain(sg_view srcView, int dstWidth, int dstHeight) =>
+            Blit(_swapchainPipeline, srcView, new System.Numerics.Vector2(dstWidth, dstHeight));
 
-        private void Blit(sg_pipeline pip, sg_view srcView)
+        // A copy into a target of the source's own size (the offscreen copies).
+        private static System.Numerics.Vector2 SizeOf(sg_view view)
+        {
+            var img = sg_query_view_image(view);
+            return new System.Numerics.Vector2(sg_query_image_width(img), sg_query_image_height(img));
+        }
+
+        private unsafe void Blit(sg_pipeline pip, sg_view srcView, System.Numerics.Vector2 dstSize)
         {
             if (pip.id == 0) return;
             sg_apply_pipeline(pip);
@@ -122,6 +130,10 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 views    = { [VIEW_screen_copy_src_tex] = srcView  },
                 samplers = { [SMP_screen_copy_src_smp]  = _sampler },
             });
+            var p = new screen_copy_screen_copy_params_t();
+            p.dst_size[0] = dstSize.X;
+            p.dst_size[1] = dstSize.Y;
+            sg_apply_uniforms(UB_screen_copy_screen_copy_params, SG_RANGE(ref p));
             Diagnostics.FrameDebugger.Pass = "Post";
             if (Diagnostics.FrameDebugger.Draw("Copy", 3, 1)) sg_draw(0, 3, 1);
         }

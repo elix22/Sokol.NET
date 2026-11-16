@@ -326,7 +326,7 @@ namespace GameEditor.Framework.Core
 
                 Sokol.ScreenCapture.BeginFrame(clear);
                 if (fxaa) RenderingServer.BlitToSwapchainFxaa(_sceneTarget.TexView, sw, sh, width, height);
-                else RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
+                else RenderingServer.BlitToSwapchain(_sceneTarget.TexView, width, height);
                 Render();
                 Sokol.SG.sg_end_pass();
             }
@@ -348,7 +348,7 @@ namespace GameEditor.Framework.Core
                 if (_sceneTarget.IsValid && fxaa)
                     RenderingServer.BlitToSwapchainFxaa(_sceneTarget.TexView, _sceneTarget.Width, _sceneTarget.Height, width, height);
                 else if (_sceneTarget.IsValid)
-                    RenderingServer.BlitToSwapchain(_sceneTarget.TexView);
+                    RenderingServer.BlitToSwapchain(_sceneTarget.TexView, width, height);
                 Render();
                 Sokol.SG.sg_end_pass();
             }

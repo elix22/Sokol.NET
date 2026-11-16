@@ -107,28 +107,23 @@ float sampleCsmShadow(vec3 worldPos, float view_depth, float ndotl)
 
     vec2 texel = 1.0 / vec2(textureSize(sampler2DArray(shadow_atlas, shadow_atlas_smp), 0).xy);
 
+    // 1 tap, or 3×3 / 5×5 in one loop whose size is a uniform (pcfR: 1 or 2) - the compiler cannot unroll it. The two
+    // kernels written as fixed loops were unrolled and sat in the program whichever ran: on a phone's GPU (Adreno 618) a
+    // shadowed surface's every pixel was slower for them, a full-screen one 23 ms a frame.
     float vis;
-    if (csm_pcf_taps >= 25) {
-        vis = 0.0;
-        for (int y = -2; y <= 2; y++)
-        for (int x = -2; x <= 2; x++) {
-            vec2 s = uv + vec2(float(x), float(y)) * texel * 1.5;
-            vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
-                           vec4(s, slice, receiver - bias));
-        }
-        vis /= 25.0;
-    } else if (csm_pcf_taps >= 9) {
-        vis = 0.0;
-        for (int y = -1; y <= 1; y++)
-        for (int x = -1; x <= 1; x++) {
-            vec2 s = uv + vec2(float(x), float(y)) * texel;
-            vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
-                           vec4(s, slice, receiver - bias));
-        }
-        vis /= 9.0;
+    if (csm_pcf_taps < 9) {
+        vis = texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp), vec4(uv, slice, receiver - bias));
     } else {
-        vis = texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
-                      vec4(uv, slice, receiver - bias));
+        int   pcfR    = csm_pcf_taps >= 25 ? 2 : 1;
+        float pcfStep = csm_pcf_taps >= 25 ? 1.5 : 1.0;
+        vis = 0.0;
+        for (int y = -pcfR; y <= pcfR; y++)
+        for (int x = -pcfR; x <= pcfR; x++) {
+            vec2 s = uv + vec2(float(x), float(y)) * texel * pcfStep;
+            vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+                           vec4(s, slice, receiver - bias));
+        }
+        vis /= float((2 * pcfR + 1) * (2 * pcfR + 1));
     }
     // The shadow distance's last part: the sun's shadow fades out to the last split (none beyond it).
     float fadeEnd = csm_split_depths[CSM_CASCADES - 1];

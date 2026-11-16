@@ -707,14 +707,14 @@ namespace GameEditor.Framework.Renderer.Server
         /// opaque scene, which the swapchain backbuffer cannot provide). Call inside the swapchain
         /// <c>sg_begin_pass / sg_end_pass</c>; draw 2D/UI overlays after it.
         /// </summary>
-        public static void BlitToSwapchain(sg_view sceneColorView)
+        public static void BlitToSwapchain(sg_view sceneColorView, int dstWidth, int dstHeight)
         {
             if (!_initialized) return;
-            _screenCopyPass.RenderToSwapchain(sceneColorView);
+            _screenCopyPass.RenderToSwapchain(sceneColorView, dstWidth, dstHeight);
         }
 
         /// <summary>
-        /// <see cref="BlitToSwapchain(sg_view)"/> through FXAA (G8.9c): the scene target (<paramref name="srcW"/> ×
+        /// <see cref="BlitToSwapchain(sg_view, int, int)"/> through FXAA (G8.9c): the scene target (<paramref name="srcW"/> ×
         /// <paramref name="srcH"/>) over the whole swapchain (<paramref name="dstW"/> × <paramref name="dstH"/>), its edges
         /// smoothed. Inside the swapchain's pass, before the game's UI.
         /// </summary>
