@@ -224,7 +224,7 @@ public sealed class ContextMenu : Widget
             }
 
             _drawn.Add(new DrawnMenuItem(parentPath == null ? item.Label : parentPath + "/" + item.Label,
-                new Rect(sp.X + rect.X, sp.Y + y, rect.Width, ItemH), item.Enabled, item.SubItems is { Count: > 0 }));
+                new Rect(sp.X + rect.X, sp.Y + y, rect.Width, ItemH), item.Enabled, item.SubItems is { Count: > 0 }, item.IsChecked));
 
             if (i == hoveredIdx && item.Enabled)
                 renderer.FillRoundedRect(new Rect(rect.X + 1, y, rect.Width - 2, ItemH), 2f, theme.SelectionColor);

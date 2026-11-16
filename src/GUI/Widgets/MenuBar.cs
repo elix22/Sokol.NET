@@ -12,7 +12,11 @@ public sealed class MenuItem
     public string?       Shortcut  { get; set; }
     public bool          IsSep     { get; set; }
     public bool          Enabled   { get; set; } = true;
-    public bool          IsChecked { get; set; }
+    /// <summary>Drawn with a check mark: <see cref="Checked"/>'s answer when set, else the value given.</summary>
+    public bool          IsChecked { get => Checked?.Invoke() ?? _isChecked; set => _isChecked = value; }
+    private bool _isChecked;
+    /// <summary>Asked each time the item is drawn (a state that changes elsewhere: a panel shown or closed).</summary>
+    public Func<bool>?   Checked   { get; set; }
     public Action?       OnClick   { get; set; }
     /// <summary>Non-null → this item opens a sub-menu.</summary>
     public List<MenuItem>? SubItems { get; set; }
@@ -24,7 +28,7 @@ public sealed class MenuItem
 /// A menu row (or menu-bar header) as it was last drawn, in screen space. Lets UI automation find a
 /// menu item by its label path ("File/New Scene", "3D Object/Box") and click it with real input.
 /// </summary>
-public readonly record struct DrawnMenuItem(string Path, Rect ScreenRect, bool Enabled, bool HasSubItems);
+public readonly record struct DrawnMenuItem(string Path, Rect ScreenRect, bool Enabled, bool HasSubItems, bool Checked = false);
 
 /// <summary>
 /// Horizontal menu bar with drop-down menus.
@@ -152,7 +156,7 @@ public class MenuBar : Widget
             }
             var  rowR       = new Rect(ddX, y, ddW, itemH);
             _drawn.Add(new DrawnMenuItem(_menus[_openIdx].Header + "/" + item.Label,
-                new Rect(sp.X + ddX, sp.Y + y, ddW, itemH), item.Enabled, item.SubItems != null));
+                new Rect(sp.X + ddX, sp.Y + y, ddW, itemH), item.Enabled, item.SubItems != null, item.IsChecked));
             bool isSubOpen  = i == _openSubItemIdx;
             bool isHov      = isSubOpen || rowR.Contains(new Vector2(_lastMousePos.X, _lastMousePos.Y));
             if (isHov && item.Enabled)

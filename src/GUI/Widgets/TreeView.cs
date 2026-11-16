@@ -343,6 +343,11 @@ public class TreeView : Widget
         return true;
     }
 
+    /// <summary>The point (local) is on the vertical scrollbar - shown while the rows overflow. A subclass that handles a
+    /// press itself leaves this one to the tree (its drag scrolls).</summary>
+    protected bool OnScrollbar(Vector2 local) =>
+        _flatRows.Count * ItemHeight > Bounds.Height && local.X >= Bounds.Width - ThemeManager.Current.ScrollBarWidth;
+
     public override bool OnMouseDown(MouseEvent e)
     {
         if (e.Button == MouseButton.Right)
@@ -356,10 +361,7 @@ public class TreeView : Widget
         _mousePos = e.LocalPosition;
 
         // Scrollbar click → start drag
-        float sb     = ThemeManager.Current.ScrollBarWidth;
-        float totalH = _flatRows.Count * ItemHeight;
-        float h      = Bounds.Height;
-        if (totalH > h && _mousePos.X >= Bounds.Width - sb)
+        if (OnScrollbar(_mousePos))
         {
             _sbDragging        = true;
             _sbDragStartY      = e.Position.Y;
@@ -961,8 +963,7 @@ public class TreeView : Widget
         // Don't start a node drag when the press is on the scrollbar gutter — otherwise
         // dragging the scrollbar reparents whatever row sits at that Y. Mirrors the
         // scrollbar hit-test in OnMouseDown.
-        float sb = ThemeManager.Current.ScrollBarWidth;
-        if (_flatRows.Count * ItemHeight > Bounds.Height && localPos.X >= Bounds.Width - sb)
+        if (OnScrollbar(localPos))
             return null;
         var node = NodeAtLocalY(localPos.Y);
         if (node == null || node == _root) return null;
