@@ -181,7 +181,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
             {
                 _light[p] = light[p] is { Length: > 0 } lb ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Light), lb, srgb: false) : tex.PlaceholderBlack;
                 _dir[p] = dirs[p] is { Length: > 0 } db ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Direction), db, srgb: false) : tex.PlaceholderWhite;
-                _mask[p] = masks[p] is { Length: > 0 } mb ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Mask), mb, srgb: false) : tex.PlaceholderWhite;
+                _mask[p] = masks[p] is { Length: > 0 } mb ? tex.LoadFromBytes(TextureKey(folderKey, data.Pages[p].Mask), mb, srgb: false, redOnly: true) : tex.PlaceholderWhite;
             }
             // every lightmapped mesh in one buffer pair (one pair each emptied sokol's pool in a scene of hundreds)
             // the layouts (a bake of before them: each entity's own mesh, under its scene id)

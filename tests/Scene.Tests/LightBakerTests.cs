@@ -165,8 +165,9 @@ namespace Scene.Tests
             throw new Exception($"{world} not on the plane");
         }
 
-        // The shadowmask's value at a world point of the plane (y = 0), as At reads the light.
-        static float MaskAt(BakeResult r, int sceneId, Vector3 world)
+        // The shadowmask's value at a world point of the plane (y = 0), as At reads the light (its texel), or filtered
+        // between the four nearest texels as the GPU reads it.
+        static float MaskAt(BakeResult r, int sceneId, Vector3 world, bool bilinear = false)
         {
             var e = r.Entities.Find(x => x.SceneId == sceneId)!;
             var page = r.Pages[e.Page];
@@ -181,16 +182,23 @@ namespace Scene.Tests
                 float w2 = 1 - w0 - w1;
                 if (w0 < 0 || w1 < 0 || w2 < 0) continue;
                 var uv = a.Uv1 * w0 + b.Uv1 * w1 + c.Uv1 * w2;
-                int x = (int)(uv.X * page.Size), y = (int)(uv.Y * page.Size);
-                return page.Mask[y * page.Size + x];
+                int ms = page.MaskSize;
+                if (!bilinear) return page.Mask[(int)(uv.Y * ms) * ms + (int)(uv.X * ms)];
+                float fx = uv.X * ms - 0.5f, fy = uv.Y * ms - 0.5f;
+                int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+                float tx = fx - x0, ty = fy - y0;
+                float M(int x, int y) => page.Mask[Math.Clamp(y, 0, ms - 1) * ms + Math.Clamp(x, 0, ms - 1)];
+                return (M(x0, y0) * (1 - tx) + M(x0 + 1, y0) * tx) * (1 - ty) + (M(x0, y0 + 1) * (1 - tx) + M(x0 + 1, y0 + 1) * tx) * ty;
             }
             throw new Exception($"{world} not on the plane");
         }
 
-        [Fact]
-        public void A_mixed_suns_shadowmask_is_dark_in_the_boxs_shadow_and_bright_in_the_open_and_bakes_no_direct_light()
+        // A floor (3 x 3, scene id 1), a 1 m box on it (2) and a Mixed sun (9) toward +X and down: the box's shadow on
+        // the floor's +X side, from x = 0.5 to 1.5 (|z| < 0.5) - in the mask only.
+        static BakeInput SunAndBox(int shadowmaskScale)
         {
             var input = new BakeInput { Settings = Quick(16, 0) };
+            input.Settings.ShadowmaskScale = shadowmaskScale;
             input.Meshes.Add(new BakeMesh { SceneId = 1, Source = new[] { Plane(3f) }, Materials = new[] { new BakeMaterial { Albedo = new Vector3(0.8f) } } });
             Assert.True(PrimitiveMeshSpec.TryParse("prim:box;w=1;h=1;d=1;tiles=1", out var spec));
             var (p, ix) = PrimitiveMeshGeometry.GetMeshTriangles(spec);
@@ -198,8 +206,14 @@ namespace Scene.Tests
             for (int i = 0; i < p.Length; i++) bv[i] = new ObjVertex { Position = p[i], Normal = Vector3.Normalize(p[i]) };
             input.Meshes.Add(new BakeMesh { SceneId = 2, World = Matrix4x4.CreateTranslation(0, 0.5f, 0), Source = new[] { new ObjSubMesh { MaterialName = "", Vertices = bv, Indices = ix } },
                                             Materials = new[] { new BakeMaterial { Albedo = new Vector3(0.8f) } } });
-            // a Mixed sun toward +X and down: its shadow on the box's +X side, in the mask only
             input.Lights.Add(new BakeLight { SceneId = 9, Type = LightType.Directional, Mode = LightMode.Mixed, Direction = Vector3.Normalize(new Vector3(1, -1, 0)), Color = new Vector3(1f), Shadows = true, IndirectMultiplier = 1f });
+            return input;
+        }
+
+        [Fact]
+        public void A_mixed_suns_shadowmask_is_dark_in_the_boxs_shadow_and_bright_in_the_open_and_bakes_no_direct_light()
+        {
+            var input = SunAndBox(1);   // the mask's texels the light's (Covered below is the light page's)
             var none = LightBaker.Bake(input);
             Assert.Equal(-1, none.ShadowmaskLight);                      // not asked for: no mask
             Assert.Empty(none.Pages[0].Mask);
@@ -219,6 +233,32 @@ namespace Scene.Tests
             // a Realtime or Baked light is no shadowmask's
             input.Lights[0] = input.Lights[0] with { Mode = LightMode.Baked };
             Assert.Equal(-1, LightBaker.Bake(input).ShadowmaskLight);
+        }
+
+        [Fact]
+        public void A_shadowmask_scale_of_two_bakes_the_mask_at_twice_the_lights_texels_with_a_sharper_edge()
+        {
+            float EdgeWidth(int scale, out BakeResult r)
+            {
+                var input = SunAndBox(scale);
+                input.ShadowmaskLight = 9;
+                r = LightBaker.Bake(input);
+                // across the shadow's side edge (z = 0.5, at x = 1), filtered as the GPU reads it: the run of partly lit
+                float width = 0f;
+                for (float z = 0.1f; z <= 0.9f; z += 0.002f)
+                {
+                    float m = MaskAt(r, 1, new Vector3(1.0f, 0, z), bilinear: true);
+                    if (m > 0.1f && m < 0.9f) width += 0.002f;
+                }
+                return width;
+            }
+            float one = EdgeWidth(1, out var r1), two = EdgeWidth(2, out var r2);
+            Assert.Equal(r1.Pages[0].Size, r1.Pages[0].MaskSize);
+            Assert.Equal(2 * r2.Pages[0].Size, r2.Pages[0].MaskSize);
+            Assert.Equal(r2.Pages[0].MaskSize * r2.Pages[0].MaskSize, r2.Pages[0].Mask.Length);
+            Assert.Equal(r1.Pages[0].Light, r2.Pages[0].Light);   // the light pages are not changed by it
+            Assert.True(one > 0f && two < 0.7f * one, $"the edge's width: x1 {one:F3}, x2 {two:F3} (world units)");
+            Assert.True(MaskAt(r2, 1, new Vector3(1.0f, 0, 0)) < 0.05f && MaskAt(r2, 1, new Vector3(-1.0f, 0, 0)) > 0.95f, "x2: dark in the shadow, lit in the open");
         }
 
         [Fact]

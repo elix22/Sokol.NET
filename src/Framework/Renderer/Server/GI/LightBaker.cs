@@ -61,8 +61,10 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public Vector4[] Direction = Array.Empty<Vector4>();
         public bool[] Covered = Array.Empty<bool>();   // a surface's texel (not padding)
         /// <summary>The shadowmask (with <see cref="BakeResult.ShadowmaskLight"/>): per texel the share of the sun it sees,
-        /// 0 (in the shadow of the lightmapped surfaces) .. 1; empty without one.</summary>
+        /// 0 (in the shadow of the lightmapped surfaces) .. 1; empty without one. <see cref="MaskSize"/> texels a side: the
+        /// page's own UVs at Shadowmask Scale times its density (sharper sun shadow edges than the light's texels).</summary>
         public float[] Mask = Array.Empty<float>();
+        public int MaskSize;
     }
 
     public sealed class BakedEntity
@@ -101,6 +103,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
     public static class LightBaker
     {
         private const float Eps = 1e-3f;
+        /// <summary>A shadowmask page's largest side: 2048, the size every GLES3 / WebGL2 GPU must take.</summary>
+        public const int MaxMaskSize = 2048;
 
         public static BakeResult Bake(BakeInput input, Action<float>? progress = null, CancellationToken cancel = default)
         {
@@ -138,8 +142,13 @@ namespace GameEditor.Framework.Renderer.Server.GI
             int sunAt = input.Lights.FindIndex(l => l.SceneId == input.ShadowmaskLight && l.Mode == LightMode.Mixed && l.Type == LightType.Directional);
             if (input.ShadowmaskLight >= 0 && sunAt >= 0) result.ShadowmaskLight = input.ShadowmaskLight;
             foreach (int size in pageSizes)
+            {
+                // the mask page: Shadowmask Scale times the light page's texels, at most MaxMaskSize (a page larger than
+                // that keeps its own size)
+                int maskSize = sunAt >= 0 ? Math.Max(size, Math.Min(size * s.ShadowmaskScale, MaxMaskSize)) : 0;
                 result.Pages.Add(new LightmapPage { Size = size, Light = new Vector3[size * size], Direction = new Vector4[size * size], Covered = new bool[size * size],
-                                                    Mask = sunAt >= 0 ? new float[size * size] : Array.Empty<float>() });
+                                                    Mask = new float[maskSize * maskSize], MaskSize = maskSize });
+            }
 
             // ── each entity's final mesh (UV on its page) and the scene's triangles ──
             var corners = new List<Vector3>();
@@ -200,8 +209,10 @@ namespace GameEditor.Framework.Renderer.Server.GI
             }
 
             // ── light per texel ──
+            // progress: a light row 4 units, a mask row 1 (a few shadow rays a texel against hundreds)
             long totalRows = 0, doneRows = 0, rays = 0;
-            foreach (var tx in pages) totalRows += tx.Size;
+            foreach (var tx in pages) totalRows += 4L * tx.Size;
+            foreach (var pg in result.Pages) totalRows += pg.MaskSize;
             bool directional = s.DirectionalMode == DirectionalMode.Directional;
             for (int p = 0; p < pages.Count; p++)
             {
@@ -219,7 +230,6 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         if (tx.Owner[i] < 0) continue;
                         var rng = new Rng((uint)(pageIndex * 73856093) ^ (uint)(i * 19349663) ^ 0x9E3779B9u);
                         Texel(ctx, tx.Pos[i], tx.Nrm[i], ref rng, out direct[i], out bounce[i], out var dir, ref localRays);
-                        if (sunAt >= 0) page.Mask[i] = SunVisibility(ctx, tx.Pos[i], tx.Nrm[i], input.Lights[sunAt].Direction, ref rng, ref localRays);
                         if (directional)
                         {
                             float w = 0.5f * Vector3.Dot(tx.Nrm[i], dir) + 0.5f;
@@ -227,7 +237,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                         }
                     }
                     Interlocked.Add(ref rays, localRays);
-                    long d = Interlocked.Increment(ref doneRows);
+                    long d = Interlocked.Add(ref doneRows, 4);
                     progress?.Invoke((float)d / Math.Max(1, totalRows));
                 });
                 cancel.ThrowIfCancellationRequested();
@@ -239,6 +249,44 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     page.Covered[i] = true;
                 }
                 Dilate(tx, page, s.Padding + 2);
+            }
+
+            // ── the shadowmask: the sun's visibility per texel of its own (denser) page, the same UVs ──
+            if (sunAt >= 0)
+            {
+                var sunDir = input.Lights[sunAt].Direction;
+                for (int p = 0; p < result.Pages.Count; p++)
+                {
+                    var page = result.Pages[p];
+                    var mt = new Texels(page.MaskSize);
+                    for (int i = 0; i < unwrapped.Count; i++)
+                    {
+                        var e = result.Entities[i];
+                        if (e.Page != p) continue;
+                        var m = unwrapped[i].Mesh;
+                        var nm = Matrix4x4.Invert(m.World, out var inv) ? Matrix4x4.Transpose(inv) : Matrix4x4.Identity;
+                        foreach (var sm in e.Mesh)
+                            for (int t = 0; t + 2 < sm.Indices.Length; t += 3)
+                                Raster(mt, i, sm.Vertices[sm.Indices[t]], sm.Vertices[sm.Indices[t + 1]], sm.Vertices[sm.Indices[t + 2]], m.World, nm);
+                    }
+                    int pageIndex = p;
+                    Parallel.For(0, mt.Size, new ParallelOptions { CancellationToken = cancel }, y =>
+                    {
+                        long localRays = 0;
+                        for (int x = 0; x < mt.Size; x++)
+                        {
+                            int i = y * mt.Size + x;
+                            if (mt.Owner[i] < 0) continue;
+                            var rng = new Rng((uint)(pageIndex * 83492791) ^ (uint)(i * 19349663) ^ 0x7F4A7C15u);
+                            page.Mask[i] = SunVisibility(ctx, mt.Pos[i], mt.Nrm[i], sunDir, ref rng, ref localRays);
+                        }
+                        Interlocked.Add(ref rays, localRays);
+                        long d = Interlocked.Increment(ref doneRows);
+                        progress?.Invoke((float)d / Math.Max(1, totalRows));
+                    });
+                    cancel.ThrowIfCancellationRequested();
+                    DilateMask(mt, page.Mask, (s.Padding + 2) * page.MaskSize / page.Size);
+                }
             }
             progress?.Invoke(1f);
             result.Rays = rays;
@@ -577,8 +625,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                     {
                         int i = y * size + x;
                         if (filled[i]) continue;
-                        var sum = Vector3.Zero; var dsum = Vector4.Zero; float msum = 0f; int n = 0;
-                        bool mask = page.Mask.Length > 0;
+                        var sum = Vector3.Zero; var dsum = Vector4.Zero; int n = 0;
                         for (int dy = -1; dy <= 1; dy++)
                             for (int dx = -1; dx <= 1; dx++)
                             {
@@ -587,11 +634,41 @@ namespace GameEditor.Framework.Renderer.Server.GI
                                 int j = ny * size + nx;
                                 if (!filled[j]) continue;
                                 sum += page.Light[j]; dsum += page.Direction[j]; n++;
-                                if (mask) msum += page.Mask[j];
                             }
                         if (n == 0) continue;
                         page.Light[i] = sum / n; page.Direction[i] = dsum / n;
-                        if (mask) page.Mask[i] = msum / n;
+                        next[i] = true;
+                    }
+                filled = next;
+            }
+        }
+
+        // ── the mask's charts spread into their padding, on the mask's own texels ──
+        private static void DilateMask(Texels tx, float[] mask, int iterations)
+        {
+            int size = tx.Size;
+            var filled = new bool[mask.Length];
+            for (int i = 0; i < filled.Length; i++) filled[i] = tx.Owner[i] >= 0;
+            for (int it = 0; it < iterations; it++)
+            {
+                var next = (bool[])filled.Clone();
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++)
+                    {
+                        int i = y * size + x;
+                        if (filled[i]) continue;
+                        float sum = 0f; int n = 0;
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++)
+                            {
+                                int nx = x + dx, ny = y + dy;
+                                if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+                                int j = ny * size + nx;
+                                if (!filled[j]) continue;
+                                sum += mask[j]; n++;
+                            }
+                        if (n == 0) continue;
+                        mask[i] = sum / n;
                         next[i] = true;
                     }
                 filled = next;

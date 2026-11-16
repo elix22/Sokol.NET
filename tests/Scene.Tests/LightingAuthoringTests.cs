@@ -80,6 +80,7 @@ namespace Scene.Tests
             Assert.Equal(40f, s.Resolution);
             Assert.Equal(1024, s.MaxLightmapSize);
             Assert.Equal(DirectionalMode.Directional, s.DirectionalMode);
+            Assert.Equal(2, s.ShadowmaskScale);
             Assert.Equal("{}", s.ToJson());
 
             s.ApplyTo(scene);
@@ -100,6 +101,18 @@ namespace Scene.Tests
             Assert.Equal(10f, back.Resolution);
             Assert.Equal(DirectionalMode.NonDirectional, back.DirectionalMode);
             Assert.Equal(512, back.IndirectSamples);
+        }
+
+        [Fact]
+        public void Shadowmask_scale_is_one_two_or_four_and_round_trips()
+        {
+            var s = new LightingSettings { ShadowmaskScale = 4 };
+            Assert.Equal("{\"shadowmaskScale\":4}", s.ToJson());
+            Assert.Equal(4, LightingSettings.Parse(s.ToJson()).ShadowmaskScale);
+            Assert.Equal(1, LightingSettings.Parse("{\"shadowmaskScale\":1}").ShadowmaskScale);
+            Assert.Equal(2, LightingSettings.Parse("{\"shadowmaskScale\":3}").ShadowmaskScale);    // between: the lower step
+            Assert.Equal(4, LightingSettings.Parse("{\"shadowmaskScale\":99}").ShadowmaskScale);
+            Assert.Equal(1, LightingSettings.Parse("{\"shadowmaskScale\":0}").ShadowmaskScale);
         }
 
         [Fact]

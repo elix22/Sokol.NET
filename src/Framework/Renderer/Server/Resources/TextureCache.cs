@@ -71,7 +71,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// sample — required for PBR base-colour and emissive maps (colour data); leave false
         /// for data maps (normal, metallic-roughness, occlusion).
         /// </summary>
-        public sg_view LoadFromBytes(string key, ReadOnlySpan<byte> data, bool srgb = false)
+        public sg_view LoadFromBytes(string key, ReadOnlySpan<byte> data, bool srgb = false, bool redOnly = false)
         {
             if (_map.TryGetValue(key, out var existing))
             {
@@ -109,11 +109,19 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 pixelSpan = new ReadOnlySpan<byte>(pixels, w * h * 4);
             }
 
+            // redOnly: the red channel alone, one byte a texel (R8: a quarter of the memory - a lightmap's shadowmask)
+            byte[]? red = null;
+            if (redOnly)
+            {
+                red = GC.AllocateUninitializedArray<byte>(w * h, pinned: true);   // pinned: SG_RANGE takes its address
+                for (int i = 0; i < red.Length; i++) red[i] = pixelSpan[i * 4];
+                pixelSpan = red;
+            }
             var imgDesc = new sg_image_desc
             {
                 width        = w,
                 height       = h,
-                pixel_format = srgb ? SG_PIXELFORMAT_SRGB8A8 : SG_PIXELFORMAT_RGBA8,
+                pixel_format = redOnly ? SG_PIXELFORMAT_R8 : srgb ? SG_PIXELFORMAT_SRGB8A8 : SG_PIXELFORMAT_RGBA8,
                 label        = key
             };
             imgDesc.data.mip_levels[0] = SG_RANGE(pixelSpan);

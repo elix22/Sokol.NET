@@ -65,10 +65,11 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 File.WriteAllBytes(Path.Combine(folder, entry.Light), EncodePngRgba(EncodeRgbm(page.Light), page.Size, page.Size));
                 if (directional)
                     File.WriteAllBytes(Path.Combine(folder, entry.Direction), EncodePngRgba(EncodeUnit(page.Direction), page.Size, page.Size));
-                if (bake.ShadowmaskLight >= 0 && page.Mask.Length == page.Size * page.Size)
+                int maskSize = page.MaskSize > 0 ? page.MaskSize : page.Size;
+                if (bake.ShadowmaskLight >= 0 && page.Mask.Length == maskSize * maskSize)
                 {
                     entry.Mask = $"Lightmap-{p}_shadowmask.png";
-                    File.WriteAllBytes(Path.Combine(folder, entry.Mask), EncodePngRgba(EncodeMask(page.Mask), page.Size, page.Size));
+                    File.WriteAllBytes(Path.Combine(folder, entry.Mask), EncodePngRgba(EncodeMask(page.Mask), maskSize, maskSize));
                 }
                 data.Pages.Add(entry);
             }
