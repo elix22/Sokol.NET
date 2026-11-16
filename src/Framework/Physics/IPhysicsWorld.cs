@@ -256,6 +256,10 @@ namespace GameEditor.Framework.Physics
         bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hit);
         int OverlapSphere(Vector3 center, float radius, List<PhysicsBodyHandle> results, int maxResults = 64);
         int OverlapBox(Vector3 center, Vector3 halfExtents, Quaternion rotation, List<PhysicsBodyHandle> results, int maxResults = 64);
+        /// <summary>One sphere cast: a sphere of <paramref name="radius"/> moved from <paramref name="start"/> by <paramref name="delta"/>;
+        /// the fraction of the way before it first touches a body (1: nothing met). Sensors are never met; with
+        /// <paramref name="staticOnly"/> only static bodies are (Phase H E3: the camera's boom).</summary>
+        float CastSphere(Vector3 start, Vector3 delta, float radius, bool staticOnly);
 
         ConstraintHandle CreateConstraint(ConstraintDesc desc);
         void             DestroyConstraint(ConstraintHandle handle);

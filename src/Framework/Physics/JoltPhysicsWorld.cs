@@ -707,6 +707,14 @@ namespace GameEditor.Framework.Physics
             return true;
         }
 
+        public float CastSphere(Vector3 start, Vector3 delta, float radius, bool staticOnly)
+        {
+            if (_physics == null || radius <= 0f || delta.LengthSquared() < 1e-12f) return 1f;
+            using var s = new JPH.Vec3(start.X, start.Y, start.Z);
+            using var d = new JPH.Vec3(delta.X, delta.Y, delta.Z);
+            return _physics.CastSphere(s, d, radius, new JPH.BodyID(), staticOnly);   // a default BodyID is the invalid one: none skipped
+        }
+
         public int OverlapSphere(Vector3 center, float radius, List<PhysicsBodyHandle> results, int maxResults = 64)
         {
             results.Clear();

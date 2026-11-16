@@ -1214,6 +1214,8 @@ namespace GameEditor.Framework.Scene
             Race.Update(deltaTime);
             // A camera that follows a kart: after the karts moved this frame.
             ChaseCameraSystem.Update(deltaTime);
+            // A third-person camera (Phase H E3): after its target moved this frame.
+            FollowCameraSystem.Update(deltaTime);
         }
 
         public static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out Entity hitEntity, out RaycastHit hit)
