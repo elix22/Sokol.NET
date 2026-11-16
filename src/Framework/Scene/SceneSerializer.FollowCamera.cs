@@ -19,7 +19,7 @@ namespace GameEditor.Framework.Scene
             if (!world.TryGetComponent<FollowCameraComponent>(e, out var c)) return null;
             return "{\"Target\":\"" + Esc(c.Target ?? "") + "\",\"Distance\":" + F(c.Distance) + ",\"Height\":" + F(c.Height) + ",\"Pitch\":" + F(c.Pitch)
                  + ",\"Fov\":" + F(c.Fov) + ",\"Smoothing\":" + F(c.Smoothing) + ",\"Radius\":" + F(c.Radius) + ",\"MinDistance\":" + F(c.MinDistance)
-                 + ",\"DistanceScale\":" + F(c.DistanceScale) + "}";
+                 + ",\"DistanceScale\":" + F(c.DistanceScale) + ",\"FollowAngle\":" + F(c.FollowAngle) + "}";
         }
 
         private static void ReadFollowCamera(ECSWorld world, Frent.Entity e, JsonElement el, Func<int, Frent.Entity> resolve)
@@ -34,6 +34,7 @@ namespace GameEditor.Framework.Scene
             c.Radius = MathF.Max(0f, Number(el, "Radius", c.Radius));
             c.MinDistance = MathF.Max(0f, Number(el, "MinDistance", c.MinDistance));
             c.DistanceScale = MathF.Max(0.01f, Number(el, "DistanceScale", c.DistanceScale));
+            c.FollowAngle = Math.Clamp(Number(el, "FollowAngle", c.FollowAngle), 0f, 180f);
             world.AddComponent(e, c);
         }
 

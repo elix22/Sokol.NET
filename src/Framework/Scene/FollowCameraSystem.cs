@@ -56,7 +56,13 @@ namespace GameEditor.Framework.Scene
                 Vector3 moved = at - c.LastTarget;
                 moved.Y = 0f;
                 c.LastTarget = at;
-                float wantHeading = fixedHeading ?? (moved.Length() / dt > 0.5f ? MathF.Atan2(moved.X, moved.Z) : c.Heading);
+                float wantHeading = c.Heading;
+                if (fixedHeading is { } fh) wantHeading = fh;
+                else if (moved.Length() / dt > 0.5f)
+                {
+                    float travel = MathF.Atan2(moved.X, moved.Z);
+                    if (MathF.Abs(Wrap(travel - c.Heading)) <= Math.Clamp(c.FollowAngle, 0f, 180f) * (MathF.PI / 180f) + 1e-4f) wantHeading = travel;
+                }
                 c.Heading += Wrap(wantHeading - c.Heading) * k;
                 c.Heading = Wrap(c.Heading);
 

@@ -29,6 +29,10 @@ namespace GameEditor.Framework.ECS.Components
         public float MinDistance;
         /// <summary>The player's distance setting: near / far (1 = as authored).</summary>
         public float DistanceScale;
+        /// <summary>Degrees either side of the camera's forward within which the target's travel turns the camera; travel
+        /// farther round (sideways, back) leaves the heading as it is. 180: any travel turns it. A move control read
+        /// relative to the camera would otherwise run its target in circles when held sideways.</summary>
+        public float FollowAngle;
 
         /// <summary>Degrees added to the field of view this frame by a script (sprinting widens it a little); not saved.</summary>
         public float ExtraFov;
@@ -40,7 +44,7 @@ namespace GameEditor.Framework.ECS.Components
 
         public static FollowCameraComponent Default => new()
         {
-            Target = "", Distance = 4.5f, Height = 1.6f, Pitch = 15f, Fov = 60f, Smoothing = 0.35f, Radius = 0.25f, MinDistance = 0.8f, DistanceScale = 1f,
+            Target = "", Distance = 4.5f, Height = 1.6f, Pitch = 15f, Fov = 60f, Smoothing = 0.35f, Radius = 0.25f, MinDistance = 0.8f, DistanceScale = 1f, FollowAngle = 180f,
         };
     }
 
