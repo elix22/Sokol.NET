@@ -1049,6 +1049,10 @@ namespace SokolApplicationBuilder
             var scriptTypes = new List<string>();
             var scriptFields = new Dictionary<string, List<(string Name, string Call)>>();
             var dataFields = new Dictionary<string, List<(string Name, string Call)>>();   // §6: [DataAsset] classes
+            // A game's own components, the plain structs they hold, its systems (GAME_COMPONENTS_SYSTEMS_DESIGN.md §5).
+            var gameComponents = new List<(string Type, string Key, string Label, List<(string Name, string Kind)> Fields)>();
+            var gameData = new Dictionary<string, List<(string Name, string Kind)>>();
+            var gameSystems = new List<(string Type, int Order)>();
             try
             {
                 using var fs = new FileStream(dllPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -1067,6 +1071,31 @@ namespace SokolApplicationBuilder
                     var typeDef = mr.GetTypeDefinition(typeDefHandle);
 
                     if ((typeDef.Attributes & System.Reflection.TypeAttributes.Abstract) != 0) continue;
+                    if (FindAttribute(mr, typeDef, "GameComponentAttribute") is { } gcAttr)
+                    {
+                        if (GetCSharpTypeName(mr, typeDef) is { } gcName)
+                        {
+                            string label = AttributeString(mr, gcAttr);
+                            gameComponents.Add((gcName, mr.GetString(typeDef.Name), label, GameFields(mr, typeDefHandle)));
+                            log.LogMessage(MessageImportance.Normal, $"  Found game component: {gcName}");
+                        }
+                        continue;
+                    }
+                    if (FindAttribute(mr, typeDef, "GameDataAttribute") != null)
+                    {
+                        if (GetCSharpTypeName(mr, typeDef) is { } gdName) gameData[gdName] = GameFields(mr, typeDefHandle);
+                        continue;
+                    }
+                    if (FindAttribute(mr, typeDef, "GameSystemAttribute") is { } gsAttr)
+                    {
+                        if (GetCSharpTypeName(mr, typeDef) is { } gsName && HasPublicParameterlessConstructor(mr, typeDef))
+                        {
+                            gameSystems.Add((gsName, AttributeNamedInt(mr, gsAttr, "Order")));
+                            log.LogMessage(MessageImportance.Normal, $"  Found game system: {gsName}");
+                        }
+                        else log.LogWarning($"Game system '{mr.GetString(typeDef.Name)}' is not registered: it must be a public class with a public constructor without parameters.");
+                        continue;
+                    }
                     if (HasDataAssetAttribute(mr, typeDef))
                     {
                         // §6: a data asset's class - made and set by generated code, as a script is.
@@ -1157,6 +1186,22 @@ namespace SokolApplicationBuilder
             sb.AppendLine("    }");
             sb.AppendLine("}");
             sb.AppendLine("#endif");
+            // A game's own components and systems: by generated code on the web too - its build is ahead of time, where
+            // reflection cannot make their generic code (GAME_COMPONENTS_SYSTEMS_DESIGN.md §5).
+            if (gameComponents.Count + gameSystems.Count > 0)
+            {
+                sb.AppendLine("#if __ANDROID__ || __IOS__ || _DESKTOP_PUBLISHED_BINARY_ || WEB");
+                sb.AppendLine("internal static class RegisteredGameTypes");
+                sb.AppendLine("{");
+                sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
+                sb.AppendLine("    public static void Register()");
+                sb.AppendLine("    {");
+                WriteGameTypes(sb, gameComponents, gameData, gameSystems);
+                sb.AppendLine("    }");
+                WriteGameDataMethods(sb, gameData);
+                sb.AppendLine("}");
+                sb.AppendLine("#endif");
+            }
 
             string newContent = sb.ToString();
             string? existing = File.Exists(outputPath) ? File.ReadAllText(outputPath) : null;
@@ -1169,6 +1214,254 @@ namespace SokolApplicationBuilder
             File.WriteAllText(outputPath, newContent);
             log.LogMessage(MessageImportance.High, $"✅ RegisteredScripts.g.cs updated ({scriptTypes.Count} type(s): {string.Join(", ", scriptTypes)}).");
             return true;
+        }
+
+        // ── a game's own components and systems (GAME_COMPONENTS_SYSTEMS_DESIGN.md §5) ─────────────────────────────
+
+        private const string GameScripting = "global::GameEditor.Framework.Scripting";
+
+        // The registration of each component (a writer and a reader naming every field), each system, and the mark that
+        // the game's types are registered by generated code (nothing is searched for by reflection then).
+        private static void WriteGameTypes(StringBuilder sb, List<(string Type, string Key, string Label, List<(string Name, string Kind)> Fields)> components,
+                                           Dictionary<string, List<(string Name, string Kind)>> data, List<(string Type, int Order)> systems)
+        {
+            sb.AppendLine($"        {GameScripting}.GameComponents.Generated = true;");
+            const string ecs = "global::GameEditor.Framework.ECS.ECSWorld.Instance";
+            foreach (var (t, key, label, fields) in components)
+            {
+                // Plain delegates in the game's own assembly: the ECS calls over its struct are ordinary code here (a web
+                // build, ahead of time, cannot call generic closures over it).
+                sb.AppendLine($"        {GameScripting}.GameComponents.Register(\"{key}\", \"{Escape(label)}\", typeof(global::{t}),");
+                sb.AppendLine($"            static e => {ecs}.HasComponent<global::{t}>(e),");
+                sb.AppendLine($"            static e => {ecs}.AddComponent(e, new global::{t}()),");
+                sb.AppendLine($"            static e => {ecs}.RemoveComponent<global::{t}>(e),");
+                sb.AppendLine($"            static e => {ecs}.TryGetComponent<global::{t}>(e, out var v) ? (object)v : null,");
+                sb.AppendLine("            static (w, e) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                if (!{ecs}.TryGetComponent<global::{t}>(e, out var c)) return false;");
+                foreach (var (name, kind) in fields) sb.AppendLine("                " + WriteField("w", "c", name, kind, data) + ";");
+                sb.AppendLine("                return true;");
+                sb.AppendLine("            },");
+                sb.AppendLine("            static (r, e) =>");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                var c = {ecs}.TryGetComponent<global::{t}>(e, out var had) ? had : new global::{t}();");
+                foreach (var (name, kind) in fields) sb.AppendLine("                " + ReadField("r", "c", name, kind, data));
+                sb.AppendLine($"                {ecs}.AddComponent(e, c);");
+                sb.AppendLine("            });");
+            }
+            foreach (var (t, order) in systems)
+                sb.AppendLine($"        {GameScripting}.GameSystems.Register(new global::{t}(), {order});");
+        }
+
+        // Per [GameData] struct: a method writing its fields into an element's writer and one reading them.
+        private static void WriteGameDataMethods(StringBuilder sb, Dictionary<string, List<(string Name, string Kind)>> data)
+        {
+            foreach (var (t, fields) in data)
+            {
+                string id = DataId(t);
+                sb.AppendLine($"    private static void Write_{id}({GameScripting}.GameDataWriter w, global::{t} c)");
+                sb.AppendLine("    {");
+                foreach (var (name, kind) in fields) sb.AppendLine("        " + WriteField("w", "c", name, kind, data) + ";");
+                sb.AppendLine("    }");
+                sb.AppendLine($"    private static global::{t} Read_{id}({GameScripting}.GameDataReader r)");
+                sb.AppendLine("    {");
+                sb.AppendLine($"        var c = new global::{t}();");
+                foreach (var (name, kind) in fields) sb.AppendLine("        " + ReadField("r", "c", name, kind, data));
+                sb.AppendLine("        return c;");
+                sb.AppendLine("    }");
+            }
+        }
+
+        private static string DataId(string type) => type.Replace('.', '_').Replace('+', '_');
+        private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        private static string WriteField(string w, string c, string name, string kind, Dictionary<string, List<(string Name, string Kind)>> data)
+        {
+            string v = $"{c}.@{name}";
+            if (kind.StartsWith("array:") || kind.StartsWith("list:"))
+            {
+                string e = kind.Substring(kind.IndexOf(':') + 1);
+                return $"{w}.List(\"{name}\", {v}, static (iw, x) => {WriteItem("iw", "x", e)})";
+            }
+            return kind switch
+            {
+                "int" => $"{w}.Int(\"{name}\", {v})",
+                "float" => $"{w}.Float(\"{name}\", {v})",
+                "double" => $"{w}.Double(\"{name}\", {v})",
+                "bool" => $"{w}.Bool(\"{name}\", {v})",
+                "string" => $"{w}.String(\"{name}\", {v})",
+                "Vector2" or "Vector3" or "Vector4" or "Quaternion" or "Entity" => $"{w}.{kind}(\"{name}\", {v})",
+                _ when kind.StartsWith("enum:") => $"{w}.String(\"{name}\", {v}.ToString())",
+                _ => $"/* {name}: not saved */ _ = 0",
+            };
+        }
+
+        private static string WriteItem(string w, string x, string kind) => kind switch
+        {
+            "int" or "float" or "bool" or "string" or "Vector2" or "Vector3" or "Vector4" => $"{w}.Item({x})",
+            _ when kind.StartsWith("enum:") => $"{w}.Item({x}.ToString())",
+            _ when kind.StartsWith("data:") => $"Write_{DataId(kind.Substring(5))}({w}, {x})",
+            _ => "{ }",
+        };
+
+        private static string ReadField(string r, string c, string name, string kind, Dictionary<string, List<(string Name, string Kind)>> data)
+        {
+            string v = $"{c}.@{name}";
+            if (kind.StartsWith("array:") || kind.StartsWith("list:"))
+            {
+                string e = kind.Substring(kind.IndexOf(':') + 1);
+                string list = $"{r}.List(\"{name}\", static ir => {ReadItem("ir", e)})";
+                return kind.StartsWith("array:")
+                    ? $"{{ var l = {list}; if (l != null) {v} = l.ToArray(); }}"
+                    : $"{{ var l = {list}; if (l != null) {v} = l; }}";
+            }
+            return kind switch
+            {
+                "int" => $"{v} = {r}.Int(\"{name}\", {v});",
+                "float" => $"{v} = {r}.Float(\"{name}\", {v});",
+                "double" => $"{v} = {r}.Double(\"{name}\", {v});",
+                "bool" => $"{v} = {r}.Bool(\"{name}\", {v});",
+                "string" => $"{v} = {r}.String(\"{name}\", {v} ?? \"\");",
+                "Vector2" or "Vector3" or "Vector4" or "Quaternion" or "Entity" => $"{v} = {r}.{kind}(\"{name}\", {v});",
+                _ when kind.StartsWith("enum:") => $"{v} = {r}.Enum(\"{name}\", {v});",
+                _ => $"/* {name}: not saved */",
+            };
+        }
+
+        private static string ReadItem(string r, string kind) => kind switch
+        {
+            "int" => $"{r}.ItemInt()",
+            "float" => $"{r}.ItemFloat()",
+            "bool" => $"{r}.ItemBool()",
+            "string" => $"{r}.ItemString()",
+            "Vector2" => $"{r}.ItemVector2()",
+            "Vector3" => $"{r}.ItemVector3()",
+            "Vector4" => $"{r}.ItemVector4()",
+            _ when kind.StartsWith("enum:") => $"(global::System.Enum.TryParse<global::{kind.Substring(5)}>({r}.ItemString(), true, out var e) ? e : default)",
+            _ when kind.StartsWith("data:") => $"Read_{DataId(kind.Substring(5))}({r})",
+            _ => "default",
+        };
+
+        // The saved fields of a game component or [GameData] struct: public, not static, not readonly, not [Runtime]; each
+        // with its kind ("float", "Vector3", "enum:Ns.Kind", "array:data:Ns.WayEdge" …).
+        private static List<(string Name, string Kind)> GameFields(MetadataReader mr, TypeDefinitionHandle handle)
+        {
+            var list = new List<(string Name, string Kind)>();
+            foreach (var fh in mr.GetTypeDefinition(handle).GetFields())
+            {
+                var field = mr.GetFieldDefinition(fh);
+                if ((field.Attributes & System.Reflection.FieldAttributes.FieldAccessMask) != System.Reflection.FieldAttributes.Public) continue;
+                if ((field.Attributes & (System.Reflection.FieldAttributes.Static | System.Reflection.FieldAttributes.InitOnly | System.Reflection.FieldAttributes.Literal)) != 0) continue;
+                bool runtime = false;
+                foreach (var ah in field.GetCustomAttributes()) runtime |= AttributeName(mr, mr.GetCustomAttribute(ah)) == "RuntimeAttribute";
+                if (runtime) continue;
+                string? kind = null;
+                try
+                {
+                    var sig = mr.GetBlobReader(field.Signature);
+                    if (sig.ReadSignatureHeader().Kind == SignatureKind.Field) kind = FieldKind(mr, ref sig, sig.ReadSignatureTypeCode(), true);
+                }
+                catch (BadImageFormatException) { }
+                if (kind != null) list.Add((mr.GetString(field.Name), kind));
+            }
+            return list;
+        }
+
+        private static string? FieldKind(MetadataReader mr, ref BlobReader sig, SignatureTypeCode code, bool allowList)
+        {
+            switch (code)
+            {
+                case SignatureTypeCode.Int32: return "int";
+                case SignatureTypeCode.Single: return "float";
+                case SignatureTypeCode.Double: return "double";
+                case SignatureTypeCode.Boolean: return "bool";
+                case SignatureTypeCode.String: return "string";
+                case SignatureTypeCode.SZArray:
+                    if (!allowList) return null;
+                    return FieldKind(mr, ref sig, sig.ReadSignatureTypeCode(), false) is { } a ? "array:" + a : null;
+                case SignatureTypeCode.GenericTypeInstance:
+                {
+                    if (!allowList) return null;
+                    sig.ReadSignatureTypeCode();
+                    var generic = sig.ReadTypeHandle();
+                    if (sig.ReadCompressedInteger() != 1 || generic.Kind != HandleKind.TypeReference) return null;
+                    var gr = mr.GetTypeReference((TypeReferenceHandle)generic);
+                    if (mr.GetString(gr.Namespace) != "System.Collections.Generic" || mr.GetString(gr.Name) != "List`1") return null;
+                    return FieldKind(mr, ref sig, sig.ReadSignatureTypeCode(), false) is { } l ? "list:" + l : null;
+                }
+                case SignatureTypeCode.TypeHandle:
+                {
+                    var type = sig.ReadTypeHandle();
+                    if (type.Kind == HandleKind.TypeDefinition)
+                    {
+                        var def = mr.GetTypeDefinition((TypeDefinitionHandle)type);
+                        if (GetCSharpTypeName(mr, def) is not { } name) return null;
+                        if (IsEnum(mr, def)) return "enum:" + name;
+                        if (FindAttribute(mr, def, "GameDataAttribute") != null) return "data:" + name;
+                        return null;
+                    }
+                    if (type.Kind != HandleKind.TypeReference) return null;
+                    var tr = mr.GetTypeReference((TypeReferenceHandle)type);
+                    return (mr.GetString(tr.Namespace) + "." + mr.GetString(tr.Name)) switch
+                    {
+                        "System.Numerics.Vector2" => "Vector2",
+                        "System.Numerics.Vector3" => "Vector3",
+                        "System.Numerics.Vector4" => "Vector4",
+                        "System.Numerics.Quaternion" => "Quaternion",
+                        "Frent.Entity" => "Entity",
+                        _ => null,
+                    };
+                }
+                default: return null;
+            }
+        }
+
+        private static string? AttributeName(MetadataReader mr, CustomAttribute a)
+        {
+            if (a.Constructor.Kind == HandleKind.MemberReference)
+            {
+                var parent = mr.GetMemberReference((MemberReferenceHandle)a.Constructor).Parent;
+                if (parent.Kind == HandleKind.TypeReference) return mr.GetString(mr.GetTypeReference((TypeReferenceHandle)parent).Name);
+            }
+            return null;
+        }
+
+        private static CustomAttribute? FindAttribute(MetadataReader mr, TypeDefinition typeDef, string name)
+        {
+            foreach (var h in typeDef.GetCustomAttributes())
+            {
+                var a = mr.GetCustomAttribute(h);
+                if (AttributeName(mr, a) == name) return a;
+            }
+            return null;
+        }
+
+        // An attribute's first fixed argument when it is a string ("" otherwise): [GameComponent("Traffic Car")].
+        private static string AttributeString(MetadataReader mr, CustomAttribute? a)
+        {
+            if (a is not { } at) return "";
+            var blob = mr.GetBlobReader(at.Value);
+            if (blob.Length < 3 || blob.ReadUInt16() != 1) return "";
+            return blob.ReadSerializedString() ?? "";
+        }
+
+        // An attribute's named int property ([GameSystem(Order = 100)]); 0 when not given.
+        private static int AttributeNamedInt(MetadataReader mr, CustomAttribute? a, string name)
+        {
+            if (a is not { } at) return 0;
+            var blob = mr.GetBlobReader(at.Value);
+            if (blob.ReadUInt16() != 1) return 0;
+            int named = blob.ReadUInt16();                       // GameSystemAttribute has no fixed arguments
+            for (int i = 0; i < named; i++)
+            {
+                blob.ReadByte();                                  // 0x53 field / 0x54 property
+                byte type = blob.ReadByte();
+                string? n = blob.ReadSerializedString();
+                if (type != 0x08) return 0;                       // only int32 named values are read
+                int value = blob.ReadInt32();
+                if (n == name) return value;
+            }
+            return 0;
         }
 
         /// <summary>True when the DLL references GameEditor.Framework, the assembly GameBehaviour is in.</summary>

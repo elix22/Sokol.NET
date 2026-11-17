@@ -160,6 +160,14 @@ namespace SokolApplicationBuilder
                         }
                         break;
 
+                    case "registry":
+                        {
+                            var task = new RegistryTask(opts);
+                            task.BuildEngine = buildEngine;
+                            taskSuccess = task.Execute();
+                        }
+                        break;
+
                     case "prepare":
                         {
                             var task = new PrepareTask(opts);
