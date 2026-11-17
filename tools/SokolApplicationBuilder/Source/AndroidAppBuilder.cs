@@ -3426,41 +3426,39 @@ KeyAlias={keystoreInfo.KeyAlias}
                     Log.LogMessage(MessageImportance.High, $"\n📱 Installing on device: {selectedDeviceId}");
                 }
                 
-                // Uninstall existing app to avoid signature mismatch errors
+                // Installed over the app already there (its saved data kept); only when the phone has it signed by another key
+                // (INSTALL_FAILED_UPDATE_INCOMPATIBLE) is it uninstalled and installed again. Uninstalling first every time
+                // left a phone without the app whenever the install was then refused.
                 string packageName = AndroidApplicationId(androidProperties, appName);
-                Log.LogMessage(MessageImportance.Normal, $"Uninstalling existing app (if any): {packageName}");
-                try
-                {
-                    var uninstallResult = Cli.Wrap("adb")
-                        .WithArguments($"-s {selectedDeviceId} uninstall {packageName}")
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                        .ExecuteAsync()
-                        .GetAwaiter()
-                        .GetResult();
-                    
-                    if (uninstallResult.ExitCode == 0)
-                    {
-                        Log.LogMessage(MessageImportance.Normal, "✅ Existing app uninstalled");
-                    }
-                }
-                catch
-                {
-                    // Ignore uninstall errors (app might not be installed)
-                    Log.LogMessage(MessageImportance.Normal, "ℹ️  No existing app to uninstall");
-                }
-                
-                var installResult = Cli.Wrap("adb")
-                    // -t when --device-archs was used: android.injected.build.abi makes the Android
-                    // Gradle Plugin emit its IDE-deploy APK, which carries android:testOnly="true"
-                    // (that is what stops a single-ABI build being distributed). Without -t adb
-                    // refuses it with INSTALL_FAILED_TEST_ONLY.
-                    .WithArguments($"-s {selectedDeviceId} install {(opts.DeviceArchs ? "-t " : "")}-r \"{apkPath}\"")  
-                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Log.LogError(s)))
+                // -t when --device-archs was used: android.injected.build.abi makes the Android Gradle Plugin emit its
+                // IDE-deploy APK, which carries android:testOnly="true" (that is what stops a single-ABI build being
+                // distributed). Without -t adb refuses it with INSTALL_FAILED_TEST_ONLY.
+                string installArgs = $"-s {selectedDeviceId} install {(opts.DeviceArchs ? "-t " : "")}-r \"{apkPath}\"";
+                var said = new System.Text.StringBuilder();
+                CommandResult Install() => Cli.Wrap("adb")
+                    .WithArguments(installArgs)
+                    .WithValidation(CommandResultValidation.None)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(s => { said.AppendLine(s); Log.LogMessage(MessageImportance.Normal, s); }))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(s => { said.AppendLine(s); Log.LogMessage(MessageImportance.Normal, s); }))
                     .ExecuteAsync()
                     .GetAwaiter()
                     .GetResult();
+                var installResult = Install();
+                if (installResult.ExitCode != 0 && said.ToString().Contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE"))
+                {
+                    Log.LogMessage(MessageImportance.High, $"The phone has {packageName} signed by another key: uninstalling it, installing again");
+                    Cli.Wrap("adb").WithArguments($"-s {selectedDeviceId} uninstall {packageName}")
+                        .WithValidation(CommandResultValidation.None)
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Log.LogMessage(MessageImportance.Normal, s)))
+                        .ExecuteAsync().GetAwaiter().GetResult();
+                    said.Clear();
+                    installResult = Install();
+                }
+                if (installResult.ExitCode != 0 && said.ToString().Contains("INSTALL_FAILED_USER_RESTRICTED"))
+                    Log.LogError($"❌ {selectedDeviceId} refused the install (INSTALL_FAILED_USER_RESTRICTED): the phone asks before an app is " +
+                                 "installed over USB. On a Xiaomi / Redmi / POCO: Settings > Additional settings > Developer options > turn on " +
+                                 "'Install via USB' and 'USB debugging (Security settings)' (a Mi account and a SIM may be needed); or watch the " +
+                                 "phone's screen while deploying and tap Allow. Then deploy again.");
 
                 if (installResult.ExitCode == 0)
                 {
