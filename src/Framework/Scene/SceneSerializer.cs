@@ -60,7 +60,22 @@ namespace GameEditor.Framework.Scene
 
         /// <summary>Takes a component extension away (a game's DLL loaded again by the editor): its blocks are kept as they
         /// are from then on (<see cref="PreservedComponents"/>), until it is registered again.</summary>
-        public static void UnregisterComponentExtension(string key) => _extensions.Remove(key);
+        public static void UnregisterComponentExtension(string key)
+        {
+            if (!_extensions.Remove(key, out var ext)) return;
+            // The components it has live now are kept as the blocks it writes (else nobody writes them: a scene saved after
+            // a game's DLL went and its next build failed lost all of that game's components).
+            var world = ECSWorld.Instance;
+            var blocks = new List<(Entity, string)>();
+            foreach (Entity e in world.Entities)
+                if (ext.Write(world, e) is { } b) blocks.Add((e, b));
+            foreach (var (e, block) in blocks)                 // components added and removed after the walk
+            {
+                if (world.TryGetComponent<PreservedComponents>(e, out var kept) && kept.Blocks != null) kept.Blocks[key] = block;
+                else world.AddComponent(e, new PreservedComponents { Blocks = new Dictionary<string, string> { [key] = block } });
+                ext.Remove?.Invoke(world, e);
+            }
+        }
 
         public static string Serialize(Scene scene)
         {
@@ -498,7 +513,9 @@ namespace GameEditor.Framework.Scene
                 {
                     foreach (var kvp in pres.Blocks)
                     {
-                        if (_extensions.ContainsKey(kvp.Key)) continue; // the extension owns this key now
+                        // the extension owns this key now - when it wrote the entity's component (a block kept while no
+                        // build knew the key, the key registered since without the scene read again: still the block)
+                        if (_extensions.TryGetValue(kvp.Key, out var owner) && owner.Write(world, id) != null) continue;
                         Comma(sb, ref fc);
                         sb.Append('"').Append(Esc(kvp.Key)).Append("\":").Append(kvp.Value);
                     }
