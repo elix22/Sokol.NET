@@ -1000,7 +1000,11 @@ namespace GameEditor.Framework.Physics
 
             // Lower centre-of-mass for stability
             using var comOff = new JPH.Vec3(0f, desc.COMOffsetY, 0f);
-            using var comSS  = new JPH.OffsetCenterOfMassShapeSettings(comOff, bodyBox);
+            // the box moved to ChassisCenter in the body's space (a model whose origin is on the ground)
+            using var boxAt  = new JPH.Vec3(desc.ChassisCenter.X, desc.ChassisCenter.Y, desc.ChassisCenter.Z);
+            using var noTurn = new JPH.Quat(0f, 0f, 0f, 1f);
+            using var placed = new JPH.RotatedTranslatedShapeSettings(boxAt, noTurn, bodyBox);
+            using var comSS  = new JPH.OffsetCenterOfMassShapeSettings(comOff, desc.ChassisCenter == Vector3.Zero ? bodyBox : placed);
 
             // ── Create chassis body ──────────────────────────────────────────
             using var carCS = new JPH.BodyCreationSettings();
@@ -1092,6 +1096,22 @@ namespace GameEditor.Framework.Physics
 
                 ctrlSettings.mEngine.mMaxTorque     = desc.MaxEngineTorque;
                 ctrlSettings.mTransmission.mClutchStrength = desc.ClutchStrength;
+                // The drivetrain beyond torque and clutch (each 0 / empty keeps Jolt's own default).
+                if (desc.MinRPM > 0f) ctrlSettings.mEngine.mMinRPM = desc.MinRPM;
+                if (desc.MaxRPM > 0f) ctrlSettings.mEngine.mMaxRPM = desc.MaxRPM;
+                ctrlSettings.mTransmission.mMode = desc.ManualGears ? JPH.ETransmissionMode.Manual : JPH.ETransmissionMode.Auto;
+                if (desc.GearRatios is { Length: > 0 } gears)
+                {
+                    ctrlSettings.mTransmission.mGearRatios.Clear();
+                    foreach (float g in gears) ctrlSettings.mTransmission.mGearRatios.PushBack(g);
+                }
+                if (desc.ReverseRatio < 0f)
+                {
+                    ctrlSettings.mTransmission.mReverseGearRatios.Clear();
+                    ctrlSettings.mTransmission.mReverseGearRatios.PushBack(desc.ReverseRatio);
+                }
+                if (desc.ShiftUpRPM > 0f) ctrlSettings.mTransmission.mShiftUpRPM = desc.ShiftUpRPM;
+                if (desc.ShiftDownRPM > 0f) ctrlSettings.mTransmission.mShiftDownRPM = desc.ShiftDownRPM;
 
                 // Add wheels
                 for (int i = 0; i < wheelCount; i++)
@@ -1107,6 +1127,7 @@ namespace GameEditor.Framework.Physics
                     ws.mSuspensionSpring.mDamping   = wd.SuspDamping;
                     ws.mMaxSteerAngle       = wd.MaxSteerAngle;
                     ws.mMaxHandBrakeTorque  = wd.MaxHandBrakeTorque;
+                    if (wd.MaxBrakeTorque > 0f) ws.mMaxBrakeTorque = wd.MaxBrakeTorque;
                     vehicleSettings.VehicleSettingsAddWheel(ws);
                 }
                 vehicleSettings.VehicleSettingsSetController(ctrlSettings);
@@ -1129,7 +1150,7 @@ namespace GameEditor.Framework.Physics
                         using var d = new JPH.VehicleDifferentialSettings();
                         d.mLeftWheel  = 0;
                         d.mRightWheel = 1;
-                        ctrlSettings.mDifferentials.PushBack(d);
+                        Diff(d, desc); ctrlSettings.mDifferentials.PushBack(d);
                     }
                 }
                 else if (wheelCount == 2)
@@ -1138,7 +1159,7 @@ namespace GameEditor.Framework.Physics
                     using var d = new JPH.VehicleDifferentialSettings();
                     d.mLeftWheel  = drivenLeft.Count > 0  ? drivenLeft[0]  : 1;
                     d.mRightWheel = drivenRight.Count > 0 ? drivenRight[0] : 1;
-                    ctrlSettings.mDifferentials.PushBack(d);
+                    Diff(d, desc); ctrlSettings.mDifferentials.PushBack(d);
                 }
                 else
                 {
@@ -1147,7 +1168,8 @@ namespace GameEditor.Framework.Physics
                         using var d = new JPH.VehicleDifferentialSettings();
                         d.mLeftWheel  = a < drivenLeft.Count  ? drivenLeft[a]  : -1;
                         d.mRightWheel = a < drivenRight.Count ? drivenRight[a] : -1;
-                        ctrlSettings.mDifferentials.PushBack(d);
+                        d.mEngineTorqueRatio = 1f / axleCount;     // the engine's torque shared between the driven axles (Jolt: they add up to 1)
+                        Diff(d, desc); ctrlSettings.mDifferentials.PushBack(d);
                     }
                 }
 
@@ -1157,10 +1179,12 @@ namespace GameEditor.Framework.Physics
                     using var arbFront = new JPH.VehicleAntiRollBar();
                     arbFront.mLeftWheel  = 0;
                     arbFront.mRightWheel = 1;
+                    if (desc.AntiRollStiffness > 0f) arbFront.mStiffness = desc.AntiRollStiffness;
                     vehicleSettings.mAntiRollBars.PushBack(arbFront);
                     using var arbRear = new JPH.VehicleAntiRollBar();
                     arbRear.mLeftWheel  = 2;
                     arbRear.mRightWheel = 3;
+                    if (desc.AntiRollStiffness > 0f) arbRear.mStiffness = desc.AntiRollStiffness;
                     vehicleSettings.mAntiRollBars.PushBack(arbRear);
                 }
 
@@ -1206,6 +1230,35 @@ namespace GameEditor.Framework.Physics
             _bodyInterface?.RemoveBody(state.CarBodyId);
             _bodyInterface?.DestroyBody(state.CarBodyId);
             state.Dispose();
+        }
+
+        // A differential's final drive and limited slip (0 keeps Jolt's own default).
+        private static void Diff(JPH.VehicleDifferentialSettings d, VehicleDesc desc)
+        {
+            if (desc.DifferentialRatio > 0f) d.mDifferentialRatio = desc.DifferentialRatio;
+            if (desc.LimitedSlipRatio > 0f) d.mLimitedSlipRatio = desc.LimitedSlipRatio;
+        }
+
+        public bool GetVehicleDrive(VehicleHandle handle, out float speed, out float rpm, out int gear)
+        {
+            speed = rpm = 0f; gear = 0;
+            if (!_vehicleStates.TryGetValue(handle.Value, out var state) || state.Type == ECS.Components.VehicleType.Tracked) return false;
+            var ctrl = state.Constraint.GetWheeledController();
+            if (ctrl == null || _bodyInterface == null) return false;
+            rpm = ctrl.GetEngine().GetCurrentRPM();
+            gear = ctrl.GetTransmission().GetCurrentGear();
+            using var v = _bodyInterface.GetLinearVelocity(state.CarBodyId);
+            using var r = _bodyInterface.GetRotation(state.CarBodyId);
+            var fwd = Vector3.Transform(Vector3.UnitZ, new Quaternion(r.GetX(), r.GetY(), r.GetZ(), r.GetW()));
+            speed = Vector3.Dot(new Vector3(v.GetX(), v.GetY(), v.GetZ()), fwd);
+            return true;
+        }
+
+        public void SetVehicleGear(VehicleHandle handle, int gear)
+        {
+            if (!_vehicleStates.TryGetValue(handle.Value, out var state) || state.Type == ECS.Components.VehicleType.Tracked) return;
+            var ctrl = state.Constraint.GetWheeledController();
+            ctrl?.GetTransmission().Set(gear, 1f);
         }
 
         public void SetVehicleInput(VehicleHandle handle, float steer, float throttle, float brake, float handBrake)

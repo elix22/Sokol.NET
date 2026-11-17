@@ -298,6 +298,11 @@ namespace GameEditor.Framework.Physics
         /// <paramref name="handBrake"/>: [0, 1]   — hand brake (rear wheels).
         /// </summary>
         void            SetVehicleInput(VehicleHandle handle, float steer, float throttle, float brake, float handBrake);
+        /// <summary>A wheeled vehicle's drive now: its speed along its forward (m/s, negative backward), its engine's
+        /// revolutions a minute, its gear (negative reverse, 0 neutral). False for a tracked vehicle or no such handle.</summary>
+        bool            GetVehicleDrive(VehicleHandle handle, out float speed, out float rpm, out int gear);
+        /// <summary>A manual gearbox's gear (ManualGears): -1 reverse, 0 neutral, 1 up; the clutch fully engaged.</summary>
+        void            SetVehicleGear(VehicleHandle handle, int gear);
         /// <summary>Returns true when the specified wheel is in contact with the ground.</summary>
         bool            IsWheelOnGround(VehicleHandle handle, int wheelIndex);
         /// <summary>Returns the spin speed of the specified wheel in rad/s.</summary>
@@ -335,6 +340,7 @@ namespace GameEditor.Framework.Physics
         public float   MaxSteerAngle;
         public float   MaxHandBrakeTorque;
         public bool    IsDriven;
+        public float   MaxBrakeTorque;
     }
 
     /// <summary>Vehicle creation parameters for <see cref="IPhysicsWorld.CreateVehicle"/>.</summary>
@@ -344,12 +350,16 @@ namespace GameEditor.Framework.Physics
         public Vector3    Position;
         public Quaternion Rotation;
         public Vector3    ChassisHalfExtent;
+        public Vector3    ChassisCenter;
         public float      Mass;
         public float      COMOffsetY;
         public float      MaxEngineTorque;
         public float      ClutchStrength;
         public float      MaxRollAngle;
         public float      Friction;
+        public float      MinRPM, MaxRPM, ReverseRatio, ShiftUpRPM, ShiftDownRPM, DifferentialRatio, LimitedSlipRatio, AntiRollStiffness;
+        public float[]?   GearRatios;
+        public bool       ManualGears;
         public VehicleWheelDesc[] Wheels;
         public ushort     Layer;
         public ushort     LayerMask;

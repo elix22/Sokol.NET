@@ -311,6 +311,8 @@ namespace GameEditor.Framework.ECS.Components
         public float MaxHandBrakeTorque;
         /// <summary>Whether this wheel is driven by the differential.</summary>
         public bool IsDriven;
+        /// <summary>Maximum brake torque in N·m (0 = Jolt's 1500).</summary>
+        public float MaxBrakeTorque;
     }
 
     /// <summary>
@@ -324,6 +326,9 @@ namespace GameEditor.Framework.ECS.Components
         public VehicleType Type;
         /// <summary>Half-extents of the chassis box shape (metres).</summary>
         public System.Numerics.Vector3 ChassisHalfExtent;
+        /// <summary>Where the chassis box's middle is in the body's space (metres; 0 = at the body's origin). A model whose
+        /// origin is on the ground has its box raised by this; the wheels' positions stay in the body's space.</summary>
+        public System.Numerics.Vector3 ChassisCenter;
         /// <summary>Chassis mass in kg.</summary>
         public float Mass;
         /// <summary>Y offset for the chassis centre-of-mass (negative lowers CoM for stability).</summary>
@@ -335,6 +340,24 @@ namespace GameEditor.Framework.ECS.Components
         /// <summary>Maximum allowed pitch/roll angle in radians (keeps vehicle from tipping too far).</summary>
         public float MaxRollAngle;
         public float Friction;
+        // ── The drivetrain (Jolt's WheeledVehicleController; every 0 / empty = Jolt's own default) ──
+        /// <summary>Engine speed range, revolutions a minute (0 = Jolt's 1000 / 6000).</summary>
+        public float MinRPM, MaxRPM;
+        /// <summary>Forward gear ratios, first gear first (empty = Jolt's 2.66, 1.78, 1.3, 1.0, 0.74).</summary>
+        public float[] GearRatios;
+        /// <summary>Reverse gear ratio, negative (0 = Jolt's -2.9).</summary>
+        public float ReverseRatio;
+        /// <summary>The automatic gearbox shifts up above / down below these engine speeds (0 = Jolt's 4000 / 2000).</summary>
+        public float ShiftUpRPM, ShiftDownRPM;
+        /// <summary>Gears changed by the game (SceneManager.SetVehicleGear) instead of the automatic gearbox.</summary>
+        public bool ManualGears;
+        /// <summary>Final drive ratio of each differential (0 = Jolt's 3.42).</summary>
+        public float DifferentialRatio;
+        /// <summary>Limited slip: the most the faster wheel of an axle may spin relative to the slower one (0 = Jolt's 1.4;
+        /// higher is more open, 1 is locked).</summary>
+        public float LimitedSlipRatio;
+        /// <summary>Anti-roll bar stiffness, N·m a radian of body roll (0 = Jolt's 1000).</summary>
+        public float AntiRollStiffness;
         public VehicleWheelSettings[] Wheels;
         public ushort Layer;
         public ushort LayerMask;
@@ -442,6 +465,8 @@ namespace GameEditor.Framework.ECS.Components
     {
         public Entity VehicleEntity;
         public int    WheelIndex;
+        /// <summary>The wheel model's axle is its X axis (most car models); off: its Y axis (a cylinder, as in Jolt's demos).</summary>
+        public bool   AxleX;
     }
 
     /// <summary>

@@ -771,6 +771,8 @@ namespace GameEditor.Framework.Scene
                 }
                 if (_entityToVehicleHandle.Remove(e, out var vehicle))
                 {
+                    var chassisBody = _physics!.GetVehicleBodyHandle(vehicle);
+                    if (chassisBody.IsValid) _handleToEntity.Remove(chassisBody.Value);
                     _physics!.DestroyVehicle(vehicle);
                     _vehicleHandleToEntity.Remove(vehicle.Value);
                 }
@@ -1234,8 +1236,12 @@ namespace GameEditor.Framework.Scene
                 if (wf.VehicleEntity.IsNull) continue;
                 var wm = GetWheelWorldTransform(wf.VehicleEntity, wf.WheelIndex);
                 ref var wfTr = ref row.Item2.Value;
-                wfTr.Position = new Vector3(wm.M41, wm.M42, wm.M43);
-                wfTr.Rotation = Quaternion.CreateFromRotationMatrix(wm);
+                // Jolt's wheel is world-space: a wheel model under its car (a child) gets it in its parent's space.
+                var wheelWorldRot = Quaternion.CreateFromRotationMatrix(wm);
+                if (wf.AxleX) wheelWorldRot *= AxleXTurn;            // the model's X axle onto Jolt's wheel axle
+                var (wheelPos, wheelRot) = WorldToLocalTransform(world, wfTr.Parent, new Vector3(wm.M41, wm.M42, wm.M43), wheelWorldRot);
+                wfTr.Position = wheelPos;
+                wfTr.Rotation = wheelRot;
             }
 
             // The race's HUD, if the scene has one (the race itself moves in the fixed steps, StepKarts).
@@ -1264,7 +1270,7 @@ namespace GameEditor.Framework.Scene
             velocity = Vector3.Zero;
             if (Physics2D.Physics2DWorld.TryGetLinearVelocity(entity, out Vector2 flat)) { velocity = new Vector3(flat, 0f); return true; }
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;
             velocity = _physics.GetLinearVelocity(handle);
             return true;
         }
@@ -1273,7 +1279,7 @@ namespace GameEditor.Framework.Scene
         {
             if (Physics2D.Physics2DWorld.SetLinearVelocity(entity, new Vector2(velocity.X, velocity.Y))) return true;
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;
             _physics.SetLinearVelocity(handle, velocity);
             return true;
         }
@@ -1283,7 +1289,7 @@ namespace GameEditor.Framework.Scene
             velocity = Vector3.Zero;
             if (Physics2D.Physics2DWorld.TryGetAngularVelocity(entity, out float turn)) { velocity = new Vector3(0f, 0f, turn); return true; }
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;
             velocity = _physics.GetAngularVelocity(handle);
             return true;
         }
@@ -1292,7 +1298,7 @@ namespace GameEditor.Framework.Scene
         {
             if (Physics2D.Physics2DWorld.SetAngularVelocity(entity, velocity.Z)) return true;
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;
             _physics.SetAngularVelocity(handle, velocity);
             return true;
         }
@@ -1358,6 +1364,21 @@ namespace GameEditor.Framework.Scene
         /// <summary>The 3D body an entity has in the world that plays.</summary>
         internal static bool TryGetBody(Entity entity, out PhysicsBodyHandle body) => _entityToHandle.TryGetValue(entity, out body);
 
+        // A wheel model whose axle is X: Jolt's wheel transform is given for a model whose axle is Y (GetWheelWorldTransform).
+        private static readonly Quaternion AxleXTurn = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2f);
+
+        // An entity's body: its rigidbody's, or its vehicle's chassis (a vehicle is teleported, pushed and read like a body).
+        private static bool BodyOf(Entity entity, out PhysicsBodyHandle body)
+        {
+            if (_entityToHandle.TryGetValue(entity, out body)) return true;
+            if (_physics != null && _entityToVehicleHandle.TryGetValue(entity, out var vehicle))
+            {
+                body = _physics.GetVehicleBodyHandle(vehicle);
+                return body.IsValid;
+            }
+            return false;
+        }
+
         // Before each fixed step of the 3D world: the computer's drivers choose their karts' inputs, then every kart drives,
         // then every aircraft flies.
         private static void StepKarts(float dt)
@@ -1384,7 +1405,7 @@ namespace GameEditor.Framework.Scene
                 return true;
             }
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;
 
             _physics.SetPosition(handle, position);
             _physics.SetRotation(handle, rotation);
@@ -1576,6 +1597,7 @@ namespace GameEditor.Framework.Scene
                     MaxSteerAngle     = w.MaxSteerAngle,
                     MaxHandBrakeTorque = w.MaxHandBrakeTorque,
                     IsDriven          = w.IsDriven,
+                    MaxBrakeTorque    = w.MaxBrakeTorque,
                 };
             }
             var vdesc = new VehicleDesc
@@ -1584,12 +1606,23 @@ namespace GameEditor.Framework.Scene
                 Position          = tr.Position,
                 Rotation          = tr.Rotation,
                 ChassisHalfExtent = vc.ChassisHalfExtent,
+                ChassisCenter     = vc.ChassisCenter,
                 Mass              = vc.Mass,
                 COMOffsetY        = vc.COMOffsetY,
                 MaxEngineTorque   = vc.MaxEngineTorque,
                 ClutchStrength    = vc.ClutchStrength,
                 MaxRollAngle      = vc.MaxRollAngle,
                 Friction          = vc.Friction,
+                MinRPM            = vc.MinRPM,
+                MaxRPM            = vc.MaxRPM,
+                GearRatios        = vc.GearRatios,
+                ReverseRatio      = vc.ReverseRatio,
+                ShiftUpRPM        = vc.ShiftUpRPM,
+                ShiftDownRPM      = vc.ShiftDownRPM,
+                ManualGears       = vc.ManualGears,
+                DifferentialRatio = vc.DifferentialRatio,
+                LimitedSlipRatio  = vc.LimitedSlipRatio,
+                AntiRollStiffness = vc.AntiRollStiffness,
                 Wheels            = wheels,
                 Layer             = vc.Layer,
                 LayerMask         = vc.LayerMask,
@@ -1599,6 +1632,8 @@ namespace GameEditor.Framework.Scene
             world.AddComponent(entity, vc);
             _entityToVehicleHandle[entity] = vHandle;
             _vehicleHandleToEntity[vHandle.Value] = entity;
+            var chassis = _physics.GetVehicleBodyHandle(vHandle);
+            if (chassis.IsValid) _handleToEntity[chassis.Value] = entity;      // a ray that hits the chassis names the car
         }
 
         /// <summary>
@@ -1828,6 +1863,23 @@ namespace GameEditor.Framework.Scene
             if (_setVehicleInputBridge != null) return _setVehicleInputBridge(entity, steer, throttle, brake, handBrake);
             if (_physics == null || !_entityToVehicleHandle.TryGetValue(entity, out var h)) return false;
             _physics.SetVehicleInput(h, steer, throttle, brake, handBrake);
+            return true;
+        }
+
+        /// <summary>A wheeled vehicle's drive now: its speed along its forward (m/s, negative backward), its engine's revolutions
+        /// a minute, its gear (negative reverse, 0 neutral) - a speedometer, a rev counter, an engine's sound.</summary>
+        public static bool TryGetVehicleDrive(Entity entity, out float speed, out float rpm, out int gear)
+        {
+            speed = rpm = 0f; gear = 0;
+            if (_physics == null || !_entityToVehicleHandle.TryGetValue(entity, out var h)) return false;
+            return _physics.GetVehicleDrive(h, out speed, out rpm, out gear);
+        }
+
+        /// <summary>A vehicle with ManualGears: its gear (-1 reverse, 0 neutral, 1 up).</summary>
+        public static bool SetVehicleGear(Entity entity, int gear)
+        {
+            if (_physics == null || !_entityToVehicleHandle.TryGetValue(entity, out var h)) return false;
+            _physics.SetVehicleGear(h, gear);
             return true;
         }
 

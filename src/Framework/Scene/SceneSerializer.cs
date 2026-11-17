@@ -438,8 +438,22 @@ namespace GameEditor.Framework.Scene
                       .Append(",\"Roll\":").Append(F(vehComp.MaxRollAngle))
                       .Append(",\"Friction\":").Append(F(vehComp.Friction))
                       .Append(",\"Layer\":").Append(vehComp.Layer)
-                      .Append(",\"Mask\":").Append(vehComp.LayerMask)
-                      .Append(",\"Wheels\":[");
+                      .Append(",\"Mask\":").Append(vehComp.LayerMask);
+                    // the drivetrain: only what is set (0 / empty = Jolt's own default)
+                    // the chassis box's place and the drivetrain (0 / empty = Jolt's own default) - always written, so a tool can set them
+                    sb.Append(",\"CX\":").Append(F(vehComp.ChassisCenter.X)).Append(",\"CY\":").Append(F(vehComp.ChassisCenter.Y))
+                      .Append(",\"CZ\":").Append(F(vehComp.ChassisCenter.Z))
+                      .Append(",\"MinRPM\":").Append(F(vehComp.MinRPM)).Append(",\"MaxRPM\":").Append(F(vehComp.MaxRPM))
+                      .Append(",\"Gears\":[");
+                    var gr = vehComp.GearRatios ?? System.Array.Empty<float>();
+                    for (int gi = 0; gi < gr.Length; gi++) { if (gi > 0) sb.Append(','); sb.Append(F(gr[gi])); }
+                    sb.Append(']')
+                      .Append(",\"Rev\":").Append(F(vehComp.ReverseRatio))
+                      .Append(",\"ShiftUp\":").Append(F(vehComp.ShiftUpRPM)).Append(",\"ShiftDown\":").Append(F(vehComp.ShiftDownRPM))
+                      .Append(",\"Manual\":").Append(vehComp.ManualGears ? "true" : "false")
+                      .Append(",\"Diff\":").Append(F(vehComp.DifferentialRatio)).Append(",\"LSD\":").Append(F(vehComp.LimitedSlipRatio))
+                      .Append(",\"ARB\":").Append(F(vehComp.AntiRollStiffness));
+                    sb.Append(",\"Wheels\":[");
                     for (int wi = 0; wi < vehComp.Wheels.Length; wi++)
                     {
                         if (wi > 0) sb.Append(',');
@@ -455,8 +469,9 @@ namespace GameEditor.Framework.Scene
                           .Append(",\"SDamp\":").Append(F(w.SuspDamping))
                           .Append(",\"Steer\":").Append(F(w.MaxSteerAngle))
                           .Append(",\"HBrake\":").Append(F(w.MaxHandBrakeTorque))
-                          .Append(",\"Driven\":").Append(w.IsDriven ? "true" : "false")
-                          .Append('}');
+                          .Append(",\"Driven\":").Append(w.IsDriven ? "true" : "false");
+                        sb.Append(",\"Brake\":").Append(F(w.MaxBrakeTorque));
+                        sb.Append('}');
                     }
                     sb.Append("]}");
                 }
@@ -467,6 +482,7 @@ namespace GameEditor.Framework.Scene
                     sb.Append("\"WheelFollow\":{\"V\":")
                       .Append(!wf.VehicleEntity.IsNull ? world.GetSceneId(wf.VehicleEntity) : -1)
                       .Append(",\"WI\":").Append(wf.WheelIndex)
+                      .Append(",\"AX\":").Append(wf.AxleX ? "true" : "false")
                       .Append('}');
                 }
 
@@ -751,6 +767,7 @@ namespace GameEditor.Framework.Scene
                             MaxSteerAngle     = we.TryGetProperty("Steer", out var st)   ? st.GetSingle()   : dw.MaxSteerAngle,
                             MaxHandBrakeTorque= we.TryGetProperty("HBrake",out var hb)   ? hb.GetSingle()   : dw.MaxHandBrakeTorque,
                             IsDriven          = we.TryGetProperty("Driven",out var dr) && dr.GetBoolean(),
+                            MaxBrakeTorque    = we.TryGetProperty("Brake", out var bt)   ? bt.GetSingle()   : 0f,
                         });
                     }
                     wheels = wList.ToArray();
@@ -776,6 +793,21 @@ namespace GameEditor.Framework.Scene
                     Friction          = vehEl.TryGetProperty("Friction", out var vfEl) ? vfEl.GetSingle()  : def.Friction,
                     Layer             = vehEl.TryGetProperty("Layer",   out var vlEl)  ? (ushort)vlEl.GetInt32() : def.Layer,
                     LayerMask         = vehEl.TryGetProperty("Mask",    out var vmkEl) ? (ushort)vmkEl.GetInt32(): def.LayerMask,
+                    ChassisCenter     = new System.Numerics.Vector3(
+                        vehEl.TryGetProperty("CX", out var cxEl) ? cxEl.GetSingle() : 0f,
+                        vehEl.TryGetProperty("CY", out var cyEl) ? cyEl.GetSingle() : 0f,
+                        vehEl.TryGetProperty("CZ", out var czEl) ? czEl.GetSingle() : 0f),
+                    MinRPM            = vehEl.TryGetProperty("MinRPM",   out var mnEl) ? mnEl.GetSingle()  : 0f,
+                    MaxRPM            = vehEl.TryGetProperty("MaxRPM",   out var mxEl) ? mxEl.GetSingle()  : 0f,
+                    GearRatios        = vehEl.TryGetProperty("Gears",    out var grEl) && grEl.ValueKind == JsonValueKind.Array
+                                        ? grEl.EnumerateArray().Select(g => g.GetSingle()).ToArray() : System.Array.Empty<float>(),
+                    ReverseRatio      = vehEl.TryGetProperty("Rev",      out var rvEl) ? rvEl.GetSingle()  : 0f,
+                    ShiftUpRPM        = vehEl.TryGetProperty("ShiftUp",  out var suEl) ? suEl.GetSingle()  : 0f,
+                    ShiftDownRPM      = vehEl.TryGetProperty("ShiftDown",out var sdEl) ? sdEl.GetSingle()  : 0f,
+                    ManualGears       = vehEl.TryGetProperty("Manual",   out var mgEl) && mgEl.GetBoolean(),
+                    DifferentialRatio = vehEl.TryGetProperty("Diff",     out var dfEl) ? dfEl.GetSingle()  : 0f,
+                    LimitedSlipRatio  = vehEl.TryGetProperty("LSD",      out var lsEl) ? lsEl.GetSingle()  : 0f,
+                    AntiRollStiffness = vehEl.TryGetProperty("ARB",      out var arEl) ? arEl.GetSingle()  : 0f,
                     Wheels            = wheels,
                 });
             }
@@ -784,7 +816,8 @@ namespace GameEditor.Framework.Scene
             {
                 int savedV = wfEl.TryGetProperty("V",  out var vEl)  ? vEl.GetInt32()  : -1;
                 int wi     = wfEl.TryGetProperty("WI", out var wiEl) ? wiEl.GetInt32() : 0;
-                world.AddComponent(newId, new WheelFollowerComponent { WheelIndex = wi });
+                world.AddComponent(newId, new WheelFollowerComponent { WheelIndex = wi,
+                                                                     AxleX = wfEl.TryGetProperty("AX", out var axEl) && axEl.GetBoolean() });
                 if (savedV >= 0) fx.WheelFollow[newId] = savedV;
             }
         }
