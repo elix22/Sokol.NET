@@ -253,11 +253,15 @@ namespace GameEditor.Framework.Physics
             foreach (var se in shapes)
                 if (se.Shape == ColliderShape.Mesh) { anyMesh = true; break; }
 
-            if (shapes.Count == 1)
+            // One shape at the body's middle: itself. One moved off it (its Offset), or more: a compound, each in its place
+            // (a single shape's offset was dropped: a building's box, lifted by half its height, sat half under the ground).
+            bool offMiddle = shapes.Count == 1 && (shapes[0].Offset != Vector3.Zero
+                             || (shapes[0].OffsetRotation != default && !shapes[0].OffsetRotation.IsIdentity));   // default: not set
+            if (shapes.Count == 1 && !offMiddle)
             {
                 BuildShapeAndCall(shapes[0], desc.Scale, shapeSS => cs.SetShapeSettings(shapeSS));
             }
-            else if (shapes.Count > 1)
+            else if (shapes.Count >= 1)
             {
                 using var scs = new JPH.StaticCompoundShapeSettings();
                 JPH.CompoundShapeSettings compound = scs;

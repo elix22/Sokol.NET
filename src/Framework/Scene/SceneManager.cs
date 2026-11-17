@@ -1147,6 +1147,7 @@ namespace GameEditor.Framework.Scene
             if (_physics == null || PlayMode != PlayModeState.Playing) return;
 
             var world = ECSWorld.Instance;
+            ApplyMotionChanges(world);
 
             // Pre-step: push Transform → Jolt for kinematic bodies so scripts can drive them.
             foreach (var (entity, handle) in _entityToHandle)
@@ -1346,6 +1347,40 @@ namespace GameEditor.Framework.Scene
             KartSystem.Step(dt);
             AircraftSystem.Step(dt);   // Phase H E17
             WaysSystem.Step(dt);       // Phase H E4: traffic and people on their graphs
+        }
+
+        private static readonly List<(Entity Entity, Vector3 Velocity)> _motionChanges = new();
+
+        /// <summary>
+        /// A body's motion changed while the game plays (Phase H E4: a car of the traffic the player hits becomes a dynamic
+        /// body, and is kinematic again when put back on its road). Its <see cref="RigidbodyComponent"/> changes now (so the
+        /// step that follows treats it so); its body is made again where its Transform is, before the next frame's step,
+        /// moving at <paramref name="velocity"/> when dynamic.
+        /// </summary>
+        public static void SetMotionType(Entity entity, RigidbodyMotionType type, Vector3 velocity = default)
+        {
+            var world = ECSWorld.Instance;
+            if (!world.TryGetComponentRef<RigidbodyComponent>(entity, out var rb) || rb.Value.MotionType == type) return;
+            rb.Value.MotionType = type;
+            _motionChanges.Add((entity, velocity));
+        }
+
+        private static void ApplyMotionChanges(ECSWorld world)
+        {
+            if (_motionChanges.Count == 0) return;
+            foreach (var (e, velocity) in _motionChanges)
+            {
+                if (!e.IsAlive || !world.TryGetComponent<RigidbodyComponent>(e, out var rb)) continue;
+                if (_entityToHandle.Remove(e, out var old))
+                {
+                    _physics!.DestroyBody(old);
+                    _handleToEntity.Remove(old.Value);
+                }
+                CreateBody(world, e);
+                if (rb.MotionType == RigidbodyMotionType.Dynamic && _entityToHandle.TryGetValue(e, out var made))
+                    _physics!.SetLinearVelocity(made, velocity);
+            }
+            _motionChanges.Clear();
         }
 
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
@@ -1700,6 +1735,7 @@ namespace GameEditor.Framework.Scene
             _entityToCharHandle.Clear();
             _charHandleToEntity.Clear();
             _vaults.Clear();
+            _motionChanges.Clear();
 
             // Destroy vehicle controllers.
             foreach (var (_, vHandle) in _entityToVehicleHandle)

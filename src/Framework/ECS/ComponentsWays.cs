@@ -34,7 +34,10 @@ namespace GameEditor.Framework.ECS.Components
     /// <summary>
     /// A car of the traffic (E4): it drives the road graph's edges at the edge's speed (never above its own
     /// <see cref="MaxSpeed"/>), keeps <see cref="Gap"/> metres to the car ahead, waits before a point while another car is in it,
-    /// and picks its next edge there at random (not the way back while there is another). It is moved, not a physics body.
+    /// and picks its next edge there at random (not the way back while there is another), and brakes for the player in its
+    /// lane. It is moved, not driven by physics: with a kinematic Rigidbody, nothing passes through it; when the player's kart
+    /// hits it, it becomes a dynamic body - pushed, it stops - and after a while, far from the player, it is put back on a
+    /// road and drives on.
     /// </summary>
     public struct TrafficCar
     {
@@ -50,10 +53,15 @@ namespace GameEditor.Framework.ECS.Components
         // ── now (not saved) ──
         public float Speed;
         public int Next;            // -1: not chosen yet
+        public int Prev;            // the edge it came from (-1: none): its curve through the point between them
         public bool Waiting;
         public uint Random;
+        /// <summary>Seconds since the player hit it (0: not hit).</summary>
+        public float Struck;
+        /// <summary>Kept away (more than the game keeps out): hidden, not moving.</summary>
+        public bool Away;
 
-        public static TrafficCar Default => new() { Edge = 0, Along = 0f, MaxSpeed = 10f, Gap = 6f, Acceleration = 4f, Seed = 1, Next = -1 };
+        public static TrafficCar Default => new() { Edge = 0, Along = 0f, MaxSpeed = 10f, Gap = 6f, Acceleration = 4f, Seed = 1, Next = -1, Prev = -1 };
     }
 
     /// <summary>
@@ -75,6 +83,12 @@ namespace GameEditor.Framework.ECS.Components
         public int Next;
         public bool Waiting;
         public uint Random;
+        /// <summary>Metres it has stepped aside from its line (+ to its right), out of the way of something fast.</summary>
+        public float Aside;
+        /// <summary>Seconds it has waited at this crossing.</summary>
+        public float Waited;
+        /// <summary>Kept away (more than the game keeps out): hidden, not moving.</summary>
+        public bool Away;
 
         public static Walker Default => new() { Edge = 0, Along = 0f, Speed = 1.4f, WaitRadius = 12f, WalkClip = "walk", IdleClip = "idle", Seed = 1, Next = -1 };
     }
