@@ -100,6 +100,12 @@ public class TextBox : Widget
     public event Action<string>? TextChanged;
     public event Action?         Submitted;
 
+    /// <summary>On desktop, Enter (after <see cref="Submitted"/>) moves the focus to the next field, as a form does - the
+    /// default. An app whose fields are not one form (an editor: a search box beside an Inspector, a Lighting panel)
+    /// turns it off: Enter then commits and the focus stays where it is (Tab still moves on). Without it, Enter in the
+    /// editor's Hierarchy search sent the focus to a field of the Lighting panel.</summary>
+    public static bool EnterMovesFocus = true;
+
     /// <summary>Raised when the box loses keyboard focus — the commit-on-blur partner to
     /// <see cref="Submitted"/> (Enter). A field that only commits on Enter silently drops an edit when
     /// the user taps elsewhere, which on a phone is the usual way to leave a field.
@@ -445,7 +451,7 @@ public class TextBox : Widget
             case KEY_KP_ENTER:
                 Submitted?.Invoke();
 #if !__ANDROID__ && !__IOS__
-                Screen.Instance?.Focus.MoveFocusNext();
+                if (EnterMovesFocus) Screen.Instance?.Focus.MoveFocusNext();
 #endif
                 return true;
         }
