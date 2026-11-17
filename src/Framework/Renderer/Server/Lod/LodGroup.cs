@@ -26,10 +26,18 @@ namespace GameEditor.Framework.Renderer.Server.Lod
         /// </summary>
         public float HysteresisMargin;
 
-        public LodLevel(float threshold, float hysteresis = 0.02f)
+        /// <summary>
+        /// The mesh drawn at this level (a mesh path as <see cref="GameEditor.Framework.ECS.Components.MeshRenderer.MeshPath"/>
+        /// has it: a primitive, or a mesh of a model); null or empty: the entity's own mesh (Phase H E6). The entity's material
+        /// is used; a model's mesh keeps its own sub-mesh materials as its MeshRenderer would.
+        /// </summary>
+        public string? Mesh;
+
+        public LodLevel(float threshold, float hysteresis = 0.02f, string? mesh = null)
         {
             ScreenCoverageThreshold = threshold;
             HysteresisMargin        = hysteresis;
+            Mesh                    = mesh;
         }
     }
 

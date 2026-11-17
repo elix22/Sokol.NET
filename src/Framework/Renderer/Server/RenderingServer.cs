@@ -1262,6 +1262,10 @@ namespace GameEditor.Framework.Renderer.Server
                     _stats.LodSwitches++;
                 }
 
+                // Phase H E6: the level's own mesh (a lightmapped entity keeps its own: only it has the lightmap's UV).
+                if (lodGroup is { } lg && !lightmapped && (uint)lodIndex < (uint)lg.Levels.Length
+                    && lg.Levels[lodIndex].Mesh is { Length: > 0 } levelMesh && _meshReg.GetByPath(levelMesh) is { } levelRes)
+                    meshRes = levelRes;
                 ushort lodMask = (ushort)(drawFlags | (ushort)(lodIndex & 0xF));
                 // M8b: not lightmapped, with probes baked: its light from the probes at its centre (drawn on its own)
                 ushort probe = !lightmapped && GI.Lightmaps.HasProbes ? ProbeSlot(worldAabb.Center) : (ushort)0;

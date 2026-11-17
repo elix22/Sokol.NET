@@ -34,6 +34,7 @@ namespace GameEditor.Framework.Scene
             RegisterFollowCamera();   // Phase H E3
             RegisterLightProbes();   // M8b
             RegisterReflectionProbe();   // M8c
+            RegisterLodGroup();   // Phase H E6
             RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
             RegisterComponentExtension("Text3D", WriteText3D, ReadText3D, static (w, e) => w.RemoveComponent<Text3D>(e));
             RegisterComponentExtension("Animator",

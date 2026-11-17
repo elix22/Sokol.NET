@@ -934,6 +934,12 @@ namespace GameEditor.Framework.Scene
         private static void PreloadMeshOf(ECSWorld world, Entity id)
         {
             if (!world.TryGetComponent<MeshRenderer>(id, out var mr)) return;
+            // Phase H E6: the meshes of its LOD levels too (another model's file is loaded as its own is).
+            if (world.TryGetComponent<GameEditor.Framework.Renderer.Server.Lod.LodGroup>(id, out var lods) && lods.Levels != null)
+                foreach (var level in lods.Levels)
+                    if (level.Mesh is { Length: > 0 } lm && !GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.IsMadeInCode(lm)
+                        && AssetLibrary.ToAssetsRelativePath(lm.Split('#')[0]) is { } lrel)
+                        AssetLibrary.Mesh(lrel);
             if (string.IsNullOrEmpty(mr.MeshPath)) return;
             if (GameEditor.Framework.Renderer.Server.Resources.MeshRegistry.IsMadeInCode(mr.MeshPath)) return;
 

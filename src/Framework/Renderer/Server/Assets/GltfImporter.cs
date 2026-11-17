@@ -30,6 +30,7 @@ using System.Runtime.InteropServices;
 using GameEditor.Framework.Core;
 using GameEditor.Framework.ECS;
 using GameEditor.Framework.ECS.Components;
+using GameEditor.Framework.Renderer.Server.Lod;
 using GameEditor.Framework.Renderer.Server.Materials;
 using GameEditor.Framework.Renderer.Server.Resources;
 using GameEditor.Framework.Renderer.Server.Animation;
@@ -487,21 +488,18 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             {
                 cgltf_data* data = _data;
 
+                var roots = new List<IntPtr>();
                 if (data->scene != null)
                 {
                     cgltf_scene* scene = data->scene;
-                    for (int i = 0; i < (int)scene->nodes_count; i++)
-                        ImportNode(scene->nodes[i], container, primKeysByMesh, primMatsByMesh);
+                    for (int i = 0; i < (int)scene->nodes_count; i++) roots.Add((IntPtr)scene->nodes[i]);
                 }
                 else
                 {
                     for (int i = 0; i < (int)data->nodes_count; i++)
-                    {
-                        cgltf_node* n = &data->nodes[i];
-                        if (n->parent == null)
-                            ImportNode(n, container, primKeysByMesh, primMatsByMesh);
-                    }
+                        if (data->nodes[i].parent == null) roots.Add((IntPtr)(&data->nodes[i]));
                 }
+                ImportNodes(roots, container, primKeysByMesh, primMatsByMesh, false);
 
                 return container;
             }
@@ -633,7 +631,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             }
 
             // ── Nodes ────────────────────────────────────────────────────────────────────────
-            private void ImportNode(
+            private Entity ImportNode(
                 cgltf_node* node, Entity parent,
                 Dictionary<IntPtr, string[]> primKeysByMesh, Dictionary<IntPtr, string[]> primMatsByMesh, bool underTurned = false)
             {
@@ -713,8 +711,51 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                             camera->data.perspective.has_zfar != 0 ? camera->data.perspective.zfar : 0f));
                 }
 
-                for (int c = 0; c < (int)node->children_count; c++)
-                    ImportNode(node->children[c], entity, primKeysByMesh, primMatsByMesh, turned);
+                var children = new List<IntPtr>((int)node->children_count);
+                for (int c = 0; c < (int)node->children_count; c++) children.Add((IntPtr)node->children[c]);
+                ImportNodes(children, entity, primKeysByMesh, primMatsByMesh, turned);
+                return entity;
+            }
+
+            // Phase H E6: sibling nodes named <Name>_LOD0, <Name>_LOD1, ... (one mesh each, as Blender exports them, at one
+            // place) become ONE entity, <Name>, made from _LOD0, with a LodGroup whose further levels draw the others' meshes
+            // (coverage 0.12, 0.04, 0.013, ... - a third each step; below the last it is not drawn). Other nodes as before.
+            private static readonly System.Text.RegularExpressions.Regex LodName = new(@"^(.*)_LOD(\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            private void ImportNodes(List<IntPtr> nodes, Entity parent, Dictionary<IntPtr, string[]> primKeysByMesh, Dictionary<IntPtr, string[]> primMatsByMesh, bool underTurned)
+            {
+                var groups = new Dictionary<string, SortedDictionary<int, IntPtr>>(StringComparer.Ordinal);
+                foreach (var p in nodes)
+                {
+                    cgltf_node* n = (cgltf_node*)p;
+                    var m = LodName.Match(PtrToStr(n->name) ?? "");
+                    if (!m.Success || n->mesh == null || !primKeysByMesh.TryGetValue((IntPtr)n->mesh, out var keys) || keys.Length != 1) continue;
+                    if (!groups.TryGetValue(m.Groups[1].Value, out var g)) groups[m.Groups[1].Value] = g = new SortedDictionary<int, IntPtr>();
+                    g[int.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)] = p;
+                }
+                var grouped = new HashSet<IntPtr>();
+                foreach (var (_, g) in groups)
+                    if (g.Count > 1 && g.ContainsKey(0)) foreach (var p in g.Values) grouped.Add(p);
+                foreach (var p in nodes)
+                {
+                    cgltf_node* n = (cgltf_node*)p;
+                    if (!grouped.Contains(p)) { ImportNode(n, parent, primKeysByMesh, primMatsByMesh, underTurned); continue; }
+                    var m = LodName.Match(PtrToStr(n->name) ?? "");
+                    var g = groups[m.Groups[1].Value];
+                    if (g[0] != p) continue;                               // made once, from _LOD0
+                    Entity e = ImportNode(n, parent, primKeysByMesh, primMatsByMesh, underTurned);
+                    if (_world.TryGetComponent<NameTag>(e, out var tag)) { tag.Name = m.Groups[1].Value; _world.AddComponent(e, tag); }
+                    var levels = new List<LodLevel>();
+                    float coverage = 0.12f;
+                    foreach (var (_, lp) in g)
+                    {
+                        cgltf_node* ln = (cgltf_node*)lp;
+                        string mesh = ln == n ? "" : primKeysByMesh[(IntPtr)ln->mesh][0];
+                        levels.Add(new LodLevel(coverage, coverage * 0.1f, mesh));
+                        coverage /= 3f;
+                    }
+                    _world.AddComponent(e, new LodGroup(levels.ToArray()));
+                }
             }
 
             private void AddMeshRenderer(Entity e, string meshKey, string matKey)
