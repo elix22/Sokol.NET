@@ -1345,6 +1345,7 @@ namespace GameEditor.Framework.Scene
             DriverSystem.Step(dt);
             KartSystem.Step(dt);
             AircraftSystem.Step(dt);   // Phase H E17
+            WaysSystem.Step(dt);       // Phase H E4: traffic and people on their graphs
         }
 
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
