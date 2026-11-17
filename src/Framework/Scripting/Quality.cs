@@ -97,6 +97,7 @@ namespace GameEditor.Framework.Scripting
             public float RenderScale;
             public int PerObjectLights;   // Forward: the most spot / point lights an object is lit by; 0 = all
             public bool Shadowmask;       // a baked Mixed sun's shadow on lightmapped objects from the bake's mask
+            public bool SimpleShading;    // a weak phone's shading: baked / diffuse light only (QualityLevel.SimpleShading)
         }
 
         /// <summary>The renderer's values of a level.</summary>
@@ -114,6 +115,7 @@ namespace GameEditor.Framework.Scripting
             RenderScale      = Math.Clamp(l.RenderScale, 0.5f, 1f),
             PerObjectLights  = Math.Clamp(l.PerObjectLights, 0, 8),
             Shadowmask       = l.Shadowmask,
+            SimpleShading    = l.SimpleShading,
         };
 
         /// <summary>The current level's values given to the renderer (again: after a value of it changed).</summary>
@@ -133,6 +135,7 @@ namespace GameEditor.Framework.Scripting
             RenderingServer.RenderScale      = v.RenderScale;
             RenderingServer.PerObjectLights  = v.PerObjectLights;
             RenderingServer.Shadowmask       = v.Shadowmask;
+            RenderingServer.SimpleShading    = v.SimpleShading;
         }
 
         private static int IndexOf(List<QualityLevel> levels, string? name)

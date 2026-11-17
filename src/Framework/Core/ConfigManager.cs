@@ -281,7 +281,7 @@ namespace GameEditor.Framework.Core
                 var l = c.QualityLevels[i];
                 sb.Append($"      {{ \"name\": \"{Esc(l.Name)}\", \"renderingPath\": \"{Esc(l.RenderingPath)}\", \"maxLights\": {l.MaxLights}, ");
                 sb.Append($"\"cascades\": {l.Cascades}, \"shadowDistance\": {l.ShadowDistance.ToString(System.Globalization.CultureInfo.InvariantCulture)}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
-                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)}, \"perObjectLights\": {l.PerObjectLights}, \"shadowmask\": {(l.Shadowmask ? "true" : "false")} }}");
+                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)}, \"perObjectLights\": {l.PerObjectLights}, \"shadowmask\": {(l.Shadowmask ? "true" : "false")}, \"simpleShading\": {(l.SimpleShading ? "true" : "false")} }}");
                 sb.Append(i + 1 < c.QualityLevels.Count ? ",\n" : "\n");
             }
             sb.Append("    ],\n    \"defaults\": { ");
@@ -324,6 +324,8 @@ namespace GameEditor.Framework.Core
                     else if (Defaults(l.Name) is { } known) l.PerObjectLights = known.PerObjectLights;   // a level of before the value
                     if (e.TryGetProperty("shadowmask", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.Shadowmask = v.ValueKind == JsonValueKind.True;
                     else if (Defaults(l.Name) is { } known2) l.Shadowmask = known2.Shadowmask;
+                    if (e.TryGetProperty("simpleShading", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.SimpleShading = v.ValueKind == JsonValueKind.True;
+                    else if (Defaults(l.Name) is { } known3) l.SimpleShading = known3.SimpleShading;
                     list.Add(l);
                 }
                 if (list.Count > 0) cfg.QualityLevels = list;

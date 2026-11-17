@@ -483,6 +483,72 @@ void main()
     vec3  v   = normalize(u_Camera - v_Position);
     float NdotV = clampedDot(n, v);
 
+    // ── A weak phone's shading (QualityLevel.SimpleShading: use_ibl 2 with the sky's diffuse light, 3 without) ──
+    // Only what the picture needs: the baked light (or the sky's diffuse), each light's diffuse with the sun's shadow, the
+    // occlusion, the glow, the haze. No GGX highlight, no reflection, no clearcoat, no spot / point shadow map - a Galaxy
+    // Tab A8 (Mali-G52) spent its frame on every surface's full PBR. (An unlit shader graph is lit here.) Not in Forward+:
+    // its lights are the cluster texture's (the renderer sends 2 / 3 only to forward views).
+#ifndef CLUSTERED
+    if (use_ibl >= 2) {
+        vec3 s_dc = baseColor.rgb * (1.0 - 0.5 * metallic);   // a metal keeps half its colour as diffuse (nothing reflects)
+        vec3 s_amb = use_ibl == 2 ? getDiffuseLight(n) : vec3(ambient_strength);
+#ifdef LIGHTMAPS
+        float s_lm = lightmap_mode > 3.5 ? lightmap_mode - 4.0 : lightmap_mode;
+        if (s_lm > 0.5) {
+            vec4 s_l = texture(sampler2D(u_LightmapTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
+            s_amb = s_l.rgb * (s_l.a * 8.0);
+            if (s_lm > 1.5) {
+                vec4 s_d = texture(sampler2D(u_LightmapDirTexture, u_GGXLUTSampler_Raw), v_TexCoord1);
+                s_amb *= (dot(n, s_d.xyz - 0.5) + 0.5) / max(1e-4, s_d.w);
+            }
+        }
+#endif
+        vec3 s_color = s_amb * s_dc;
+        if (use_punctual_lights > 0) {
+#if defined(LIGHTMAPS) && CSM_CASCADES == 0
+            float s_mask = lightmap_mode > 3.5 ? texture(sampler2D(u_ShadowmaskTexture, u_GGXLUTSampler_Raw), v_TexCoord1).r : 1.0;
+#endif
+            int s_n = num_lights;                               // the object's own lights (Per-object lights)
+            for (int i = 0; i < s_n; i++) {
+                vec4  s_li = getLightDirectionAndAttenuation(i, v_Position);
+                float s_nl = clampedDot(n, s_li.xyz);
+                if (s_nl <= 0.0 || s_li.w <= 0.0) continue;
+                float s_sh = 1.0;
+                if (int(LIGHT_DATA(i, 0).w + 0.5) == LIGHT_TYPE_DIRECTIONAL) {
+#if CSM_CASCADES > 0
+                    s_sh = sampleCsmShadow(v_Position, -(u_ViewMatrix * vec4(v_Position, 1.0)).z, s_nl);
+#endif
+#if defined(LIGHTMAPS) && CSM_CASCADES == 0
+                    if (LIGHT_DATA(i, 3).w > 0.5) s_sh = min(s_sh, s_mask);
+#endif
+                }
+                vec4 s_ci = LIGHT_DATA(i, 2);
+                s_color += s_nl * s_li.w * s_sh * s_ci.w * s_ci.xyz * s_dc;   // the diffuse BRDF's 1/pi and the light's pi cancel
+            }
+        }
+        s_color *= 1.0 + occlusion_strength * (surf.occlusion - 1.0);
+        s_color += surf.emissive;
+        if (u_FogDensity > 0.0) {                               // the haze, as below
+            float s_fd = length(v_Position - u_Camera) * u_FogDensity;
+            vec3 s_fc = vec3(float((u_FogColor >> 10) & 31), float((u_FogColor >> 5) & 31), float(u_FogColor & 31)) / 31.0;
+            s_color = mix(s_color, pow(s_fc, vec3(2.2)), 1.0 - exp(-s_fd * s_fd));
+        }
+        if (linear_output == 0) {                               // the output, as below
+            s_color *= tonemap_exposure;
+            int s_tm = int(tonemap_type + 0.5);
+            if (s_tm == 2)      s_color = toneMapACES_Hill(s_color);
+            else if (s_tm == 3) s_color = toneMapKhrPbrNeutral(s_color);
+            s_color = pow(clamp(s_color, 0.0, 1.0), vec3(1.0 / 2.2));
+        }
+#ifdef TRANSMISSION
+        frag_color = vec4(s_color, 1.0);
+#else
+        frag_color = vec4(s_color, baseColor.a);
+#endif
+        return;
+    }
+#endif
+
     float transmission = 0.0;
     vec3  f0 = vec3(0.04);
 #ifdef TRANSMISSION

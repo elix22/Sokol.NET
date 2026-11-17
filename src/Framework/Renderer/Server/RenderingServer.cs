@@ -387,6 +387,15 @@ namespace GameEditor.Framework.Renderer.Server
         /// a map left with none is not sampled. Off: every caster in real time.
         /// </summary>
         public static bool Shadowmask { get; set; }
+
+        /// <summary>A weak phone's shading (QualityLevel.SimpleShading): the PBR shader's short branch - baked or diffuse
+        /// light, each light's diffuse with the sun's shadow; no specular, no reflections. Sent as use_ibl 2 (with the sky's
+        /// diffuse light) or 3 (without).</summary>
+        public static bool SimpleShading { get; set; }
+
+        // Forward+ is not a weak phone's path (its shader takes its lights from the cluster texture, not the per-object block the
+        // simple branch reads - it is not compiled there): a clustered view keeps the full shading.
+        private static int UseIbl(bool iblActive) => SimpleShading && !ViewIsClustered ? (iblActive ? 2 : 3) : (iblActive ? 1 : 0);
         private static bool _shadowmaskView;   // this view's sun is the bake's shadowmask light (and the level uses it)
         private static bool _sunMapEmpty;      // ... and its maps have no caster: the shaders do not sample them
         private static int _sunShadowDraws;    // the draws into the sun's maps, the last view that drew them
@@ -2319,7 +2328,7 @@ namespace GameEditor.Framework.Renderer.Server
             sg_view lmMask  = lmPage >= 0 ? GI.Lightmaps.MaskView(lmPage) : _texCache.PlaceholderWhite;
             var flags = new pbr_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -2623,7 +2632,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrTx.pbr_transmission_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -3012,7 +3021,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkin.Shaders.pbr_skinning_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -3217,7 +3226,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -3427,7 +3436,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -3654,7 +3663,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -3852,7 +3861,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -4064,7 +4073,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -4278,7 +4287,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new Csm1.Shaders.pbr_csm1_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,
@@ -4555,7 +4564,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var flags = new Csm4.Shaders.pbr_csm4_pbr_rendering_flags_t
             {
-                use_ibl             = iblActive ? 1 : 0,
+                use_ibl             = UseIbl(iblActive),
                 use_punctual_lights = 1,
                 alphamode           = mat.AlphaMode,
                 linear_output       = _hdrPass ? 1 : 0,

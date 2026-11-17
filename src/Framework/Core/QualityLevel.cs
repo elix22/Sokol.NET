@@ -37,6 +37,11 @@ namespace GameEditor.Framework.Core
         /// map holds only the moving casters (an empty one is not sampled). Moving objects get no shadow of the static ones.
         /// Off: every caster in real time (a shadowmask is not used).</summary>
         public bool   Shadowmask       { get; set; }
+        /// <summary>A weak phone's shading: every surface lit by its baked light (or the sky's diffuse light), each light's
+        /// diffuse with the sun's shadow, its occlusion, glow and haze - no specular highlights, no reflections, no
+        /// clearcoat, no spot / point shadow maps. A Galaxy Tab A8 (Mali-G52) spent its frame on the full PBR of every
+        /// surface (2026-11-17: 16 fps whatever else was turned off).</summary>
+        public bool   SimpleShading    { get; set; }
 
         public QualityLevel Clone() => (QualityLevel)MemberwiseClone();
 
@@ -57,9 +62,9 @@ namespace GameEditor.Framework.Core
             new QualityLevel { Name = "Medium", MaxLights = 32, Cascades = 1, ShadowDistance = 100f },
             new QualityLevel { Name = "Mobile", RenderingPath = "forward", MaxLights = 32, Cascades = 1, ShadowDistance = 100f,
                                SoftShadows = 1, RenderScale = 0.5f, PerObjectLights = 4,
-                               Shadowmask = true },
+                               Shadowmask = true, SimpleShading = true },
             new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, Cascades = 1, ShadowDistance = 50f, ShadowResolution = 1024,
-                               PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f },
+                               PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f, SimpleShading = true },
         };
 
         /// <summary>A new project's default level per target: desktop High, Android Mobile, iOS and web Medium.</summary>
