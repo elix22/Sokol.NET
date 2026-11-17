@@ -25,7 +25,7 @@ namespace GameEditor.Framework.Scene
         }
 
         private static readonly Graph _roads = new(), _paves = new();
-        private static readonly List<(Entity E, Vector3 At)> _cars = new();
+        private static readonly List<(Entity E, Vector3 At, int Edge, float Along, float Speed)> _cars = new();
         private static readonly Dictionary<Entity, List<Entity>> _skinned = new();
 
         /// <summary>Forgets what it kept of the last scene (a game stopped or another scene).</summary>
@@ -39,7 +39,7 @@ namespace GameEditor.Framework.Scene
             _cars.Clear();
             if (world.HasAnyComponent<TrafficCar>())
                 foreach (var row in world.Query<TrafficCar, Transform>().EnumerateWithEntities<TrafficCar, Transform>())
-                    _cars.Add((row.Entity, row.Item2.Value.Position));
+                    _cars.Add((row.Entity, row.Item2.Value.Position, row.Item1.Value.Edge, row.Item1.Value.Along, row.Item1.Value.Speed));
             if (_roads.Data.Edges is { Length: > 0 } && world.HasAnyComponent<TrafficCar>())
                 foreach (var row in world.Query<TrafficCar, Transform>().EnumerateWithEntities<TrafficCar, Transform>())
                     Drive(row.Entity, ref row.Item1.Value, ref row.Item2.Value, dt);
@@ -108,20 +108,25 @@ namespace GameEditor.Framework.Scene
             if (c.Next < 0 || (uint)c.Next >= (uint)g.Length.Length) c.Next = Pick(g, c.Edge, ref c.Random, c.Seed);
             Vector3 end = g.Data.Points[g.Data.Edges[c.Edge].To];
 
-            // How far it may go: to the car ahead less the gap; to the point's edge while another car is in the point.
+            // How far it may go: to its leader less the gap - a car ahead on its own edge, or just onto the edge it takes next
+            // (never a car of another lane: two cars crossing a junction each saw the other "ahead" and waited for ever); and
+            // to the point's edge while another car is in the point, unless it is in it already.
             float free = float.MaxValue;
-            foreach (var (other, at) in _cars)
+            foreach (var (other, at, oEdge, oAlong, _) in _cars)
             {
                 if (other == me) continue;
-                Vector3 pos = At(g, c.Edge, c.Along);
-                Vector3 dir = g.Data.Points[g.Data.Edges[c.Edge].To] - g.Data.Points[g.Data.Edges[c.Edge].From];
-                if (dir.LengthSquared() < 1e-6f) continue;
-                dir = Vector3.Normalize(dir);
-                Vector3 to = at - pos;
-                float ahead = Vector3.Dot(to, dir), side = (to - dir * ahead).Length();
-                if (ahead > 0f && side < 2.2f) free = MathF.Min(free, ahead - c.Gap);       // in its lane, ahead
-                if (Vector3.Distance(at, end) < PointRadius && len - c.Along > PointRadius - 0.01f)
-                    free = MathF.Min(free, len - c.Along - PointRadius - 0.5f);            // the point is taken: stop before it
+                if (oEdge == c.Edge && oAlong > c.Along) free = MathF.Min(free, oAlong - c.Along - c.Gap);
+                else if (oEdge == c.Next && c.Next >= 0) free = MathF.Min(free, len - c.Along + oAlong - c.Gap);
+                if (len - c.Along > PointRadius - 0.01f)
+                {
+                    float otherToEnd = Vector3.Distance(at, end);
+                    bool inside = otherToEnd < PointRadius;
+                    // Another car coming to the same point, nearer to it: it goes first (two at once both went in).
+                    bool before = (uint)oEdge < (uint)g.Length.Length && g.Data.Edges[oEdge].To == g.Data.Edges[c.Edge].To
+                                  && g.Length[oEdge] - oAlong < len - c.Along;
+                    if (inside || before)
+                        free = MathF.Min(free, len - c.Along - PointRadius - 0.5f);        // the point is taken: stop before it
+                }
             }
             float want = MathF.Min(c.MaxSpeed, g.Data.Edges[c.Edge].Speed > 0f ? g.Data.Edges[c.Edge].Speed : c.MaxSpeed);
             if (free < 0.5f) want = 0f;
@@ -147,14 +152,15 @@ namespace GameEditor.Framework.Scene
             if ((uint)w.Edge >= (uint)g.Length.Length) return;
             float len = g.Length[w.Edge];
             if (w.Next < 0 || (uint)w.Next >= (uint)g.Length.Length) w.Next = Pick(g, w.Edge, ref w.Random, w.Seed);
-            // Before a crossing: waits while a car is near it.
+            // Before a crossing: waits while a MOVING car is near it (cars standing at the junction let people cross; with
+            // traffic always about, waiting for no car near at all kept a person there for minutes).
             bool wait = false;
             if (w.Next >= 0 && g.Data.Edges[w.Next].Crossing && len - w.Along < 0.6f)
             {
                 var ce = g.Data.Edges[w.Next];
                 Vector3 mid = (g.Data.Points[ce.From] + g.Data.Points[ce.To]) * 0.5f;
-                foreach (var (_, at) in _cars)
-                    if (Vector3.Distance(at, mid) < w.WaitRadius) { wait = true; break; }
+                foreach (var car in _cars)
+                    if (car.Speed > 0.5f && Vector3.Distance(car.At, mid) < w.WaitRadius) { wait = true; break; }
             }
             w.Waiting = wait;
             if (!wait)
