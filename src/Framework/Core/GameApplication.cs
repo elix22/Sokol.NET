@@ -71,6 +71,14 @@ namespace GameEditor.Framework.Core
         static void RegisterAvailableGameBehaviours()
         {
 #if !GAME_EDITOR && ! __ANDROID__ && !__IOS__
+            // The game's own components and systems ([GameComponent], [GameSystem]): by reflection only when no generated code
+            // registered them (GAME_COMPONENTS_SYSTEMS_DESIGN §5: a game compiled ahead of time - phones, the published desktop
+            // app, the web - has it).
+            if (!GameComponents.Generated)
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    if (!assembly.IsDynamic && assembly.GetName().Name is { } an && !an.StartsWith("System", StringComparison.Ordinal)
+                        && !an.StartsWith("Microsoft", StringComparison.Ordinal) && an != "GameEditor.Framework")
+                        GameTypesReflection.Register(assembly);
             // A game compiled ahead of time registers its scripts by generated code (RegisteredScripts.g.cs, a
             // module initializer that has run by now): nothing is searched for.
             if (ScriptSystem.HasGeneratedTypes) return;

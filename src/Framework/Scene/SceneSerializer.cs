@@ -58,6 +58,10 @@ namespace GameEditor.Framework.Scene
             _extensions[key] = (write, read, remove);
         }
 
+        /// <summary>Takes a component extension away (a game's DLL loaded again by the editor): its blocks are kept as they
+        /// are from then on (<see cref="PreservedComponents"/>), until it is registered again.</summary>
+        public static void UnregisterComponentExtension(string key) => _extensions.Remove(key);
+
         public static string Serialize(Scene scene)
         {
             var world = ECSWorld.Instance;

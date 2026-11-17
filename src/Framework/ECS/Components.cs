@@ -249,24 +249,6 @@ namespace GameEditor.Framework.ECS.Components
         };
     }
 
-    /// <summary>
-    /// A place a character may vault over something (Phase H E2; IP rule C12/C12a: the marker only ALLOWS the move). A box
-    /// of <see cref="Size"/> around the entity, turned with it; a character whose feet are inside it and who faces within
-    /// <see cref="MaxAngle"/> of the entity's forward (+Z) may vault: one fixed move of <see cref="Distance"/> along its own
-    /// facing, rising <see cref="Height"/> at the middle, taking <see cref="Seconds"/>. Nothing aims it.
-    /// </summary>
-    public struct VaultMarker
-    {
-        public Vector3 Size;
-        public float Distance;
-        public float Height;
-        public float Seconds;
-        /// <summary>Degrees either side of the marker's forward the character may face; 180 = any way.</summary>
-        public float MaxAngle;
-
-        public static VaultMarker Default => new VaultMarker { Size = new Vector3(2f, 2f, 1.5f), Distance = 2f, Height = 1f, Seconds = 0.5f, MaxAngle = 60f };
-    }
-
     public struct ScriptComponent
     {
         public string TypeName;

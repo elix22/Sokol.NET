@@ -474,14 +474,6 @@ namespace GameEditor.Framework.Scripting
         protected bool IsCrouched()
             => SceneManager.IsCharacterCrouched(EntityId);
 
-        /// <summary>Vaults when the character stands inside a Vault Marker facing its way: one fixed move along
-        /// <paramref name="facing"/> (Phase H E2). False when no marker allows it.</summary>
-        protected bool TryVault(Vector3 facing)
-            => SceneManager.TryVault(EntityId, facing);
-
-        protected bool IsVaulting()
-            => SceneManager.IsVaulting(EntityId);
-
         /// <summary>Places this character's feet at <paramref name="position"/> at once, at rest (out of a vehicle, a restart).</summary>
         protected bool SetCharacterPosition(Vector3 position)
             => SceneManager.TeleportCharacter(EntityId, position);

@@ -29,13 +29,10 @@ namespace GameEditor.Framework.Scene
             RegisterChaseCamera();
             RegisterParticles();
             RegisterWindZone();
-            RegisterVaultMarker();   // Phase H E2
-            RegisterAircraft();   // Phase H E17
             RegisterFollowCamera();   // Phase H E3
             RegisterLightProbes();   // M8b
             RegisterReflectionProbe();   // M8c
             RegisterLodGroup();   // Phase H E6
-            RegisterWays();   // Phase H E4
             RegisterComponentExtension("AnimationPlayer", WriteAnimationPlayer, ReadAnimationPlayer, static (w, e) => w.RemoveComponent<AnimationPlayer>(e));
             RegisterComponentExtension("Text3D", WriteText3D, ReadText3D, static (w, e) => w.RemoveComponent<Text3D>(e));
             RegisterComponentExtension("Animator",

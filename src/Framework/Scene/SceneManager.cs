@@ -167,6 +167,25 @@ namespace GameEditor.Framework.Scene
             Logger.Info($"Scene loaded from {path}");
         }
 
+        /// <summary>
+        /// The open scene made again from its text, keeping its file and whether it has changes (the editor: a game's DLL
+        /// loaded again - its own components read with the new types). The undo history is cleared, as when a scene is opened.
+        /// </summary>
+        public static void ReloadActiveScene(string json)
+        {
+            if (ActiveScene == null) return;
+            string? file = ActiveScene.FilePath;
+            bool dirty = ActiveScene.IsDirty;
+            EventBus.RaiseSceneUnloaded();
+            SceneSerializer.Deserialize(json, ActiveScene);
+            ActiveScene.FilePath = file;
+            ActiveScene.IsDirty = dirty;
+            PreloadSceneMeshes();
+            PreloadSceneMaterials();
+            EventBus.RaiseSceneLoaded();
+            UndoStack.Clear();
+        }
+
         public static void LoadSceneFromAssetsAsync(string assetPath)
             => ReadSceneFromAssets(assetPath, false, (json, loaded) => Loaded(json, loaded, assetPath), null);
 
@@ -457,6 +476,7 @@ namespace GameEditor.Framework.Scene
             ItemSystem.Reset();
             WorldParticles.Clear();
             ScriptSystem.StopAll();
+            GameSystems.StopAll();
             _destroyQueue.Clear();
             ShutdownPhysics();
         }
@@ -469,6 +489,7 @@ namespace GameEditor.Framework.Scene
             InitializePhysics();
             Sound.Audio.StartScene(ECS.ECSWorld.Instance);
             ScriptSystem.StartAll();
+            GameSystems.StartAll();
             Logger.Info($"[SceneManager] The game is in '{key}'. {ScriptSystem.Count} script(s) running.");
         }
 
@@ -577,6 +598,7 @@ namespace GameEditor.Framework.Scene
                 Diagnostics.Tests.Clear();
                 Determinism.GoldenTests.Clear();
                 ScriptSystem.StartAll();
+                GameSystems.StartAll();    // the game's own systems (GAME_COMPONENTS_SYSTEMS_DESIGN)
                 _fixedAccumulator = 0.0;   // the fixed tick from zero (G10)
                 Time.FixedTime = 0.0;
                 Logger.Info($"[SceneManager] Play started. {ScriptSystem.Count} script(s) running.");
@@ -605,6 +627,7 @@ namespace GameEditor.Framework.Scene
 
             // Destroy all running scripts
             ScriptSystem.StopAll();
+            GameSystems.StopAll();
             Race.Reset();
             DriverSystem.Reset();
             ItemSystem.Reset();
@@ -743,7 +766,6 @@ namespace GameEditor.Framework.Scene
             {
                 if (_entityToCharHandle.Remove(e, out var character))
                 {
-                    _vaults.Remove(e);
                     _physics!.DestroyCharacter(character);
                     _charHandleToEntity.Remove(character.Value);
                 }
@@ -1115,6 +1137,7 @@ namespace GameEditor.Framework.Scene
         public static void UpdateAfterScripts(float deltaTime)
         {
             if (PlayMode != PlayModeState.Playing) return;
+            GameSystems.UpdateAll(MathF.Max(0f, deltaTime * TimeScale));   // the game's own systems, after its scripts
             Profiler.Begin(_profParticles);
             WorldParticles.Step(ECSWorld.Instance, MathF.Max(0f, deltaTime * TimeScale));
             Profiler.End();
@@ -1147,7 +1170,6 @@ namespace GameEditor.Framework.Scene
             if (_physics == null || PlayMode != PlayModeState.Playing) return;
 
             var world = ECSWorld.Instance;
-            ApplyMotionChanges(world);
 
             // Pre-step: push Transform → Jolt for kinematic bodies so scripts can drive them.
             foreach (var (entity, handle) in _entityToHandle)
@@ -1163,7 +1185,6 @@ namespace GameEditor.Framework.Scene
                 _physics.MoveKinematic(handle, kmWorldPos, kmWorldRot, deltaTime);
             }
 
-            StepVaults(deltaTime);
             _physics.Step(deltaTime);
 
             // Post-step: sync physics positions/rotations back to Transform for dynamic bodies only.
@@ -1345,42 +1366,7 @@ namespace GameEditor.Framework.Scene
             ItemSystem.Step(dt);
             DriverSystem.Step(dt);
             KartSystem.Step(dt);
-            AircraftSystem.Step(dt);   // Phase H E17
-            WaysSystem.Step(dt);       // Phase H E4: traffic and people on their graphs
-        }
-
-        private static readonly List<(Entity Entity, Vector3 Velocity)> _motionChanges = new();
-
-        /// <summary>
-        /// A body's motion changed while the game plays (Phase H E4: a car of the traffic the player hits becomes a dynamic
-        /// body, and is kinematic again when put back on its road). Its <see cref="RigidbodyComponent"/> changes now (so the
-        /// step that follows treats it so); its body is made again where its Transform is, before the next frame's step,
-        /// moving at <paramref name="velocity"/> when dynamic.
-        /// </summary>
-        public static void SetMotionType(Entity entity, RigidbodyMotionType type, Vector3 velocity = default)
-        {
-            var world = ECSWorld.Instance;
-            if (!world.TryGetComponentRef<RigidbodyComponent>(entity, out var rb) || rb.Value.MotionType == type) return;
-            rb.Value.MotionType = type;
-            _motionChanges.Add((entity, velocity));
-        }
-
-        private static void ApplyMotionChanges(ECSWorld world)
-        {
-            if (_motionChanges.Count == 0) return;
-            foreach (var (e, velocity) in _motionChanges)
-            {
-                if (!e.IsAlive || !world.TryGetComponent<RigidbodyComponent>(e, out var rb)) continue;
-                if (_entityToHandle.Remove(e, out var old))
-                {
-                    _physics!.DestroyBody(old);
-                    _handleToEntity.Remove(old.Value);
-                }
-                CreateBody(world, e);
-                if (rb.MotionType == RigidbodyMotionType.Dynamic && _entityToHandle.TryGetValue(e, out var made))
-                    _physics!.SetLinearVelocity(made, velocity);
-            }
-            _motionChanges.Clear();
+            GameSystems.FixedStepAll(dt);   // the game's own systems (GAME_COMPONENTS_SYSTEMS_DESIGN)
         }
 
         public static bool TeleportBody(Entity entity, Vector3 position, Quaternion rotation)
@@ -1734,8 +1720,6 @@ namespace GameEditor.Framework.Scene
                 _physics?.DestroyCharacter(charHandle);
             _entityToCharHandle.Clear();
             _charHandleToEntity.Clear();
-            _vaults.Clear();
-            _motionChanges.Clear();
 
             // Destroy vehicle controllers.
             foreach (var (_, vHandle) in _entityToVehicleHandle)
@@ -1774,61 +1758,24 @@ namespace GameEditor.Framework.Scene
         public static bool IsCharacterCrouched(Entity entity)
             => _physics != null && _entityToCharHandle.TryGetValue(entity, out var h) && _physics.IsCharacterCrouched(h);
 
-        // ---- Vault (Phase H E2; IP rules C12 / C12a) --------------------------
-        // A vault is one fixed move: the marker the feet stand in only ALLOWS it; the move goes a fixed distance straight
-        // along the character's own facing, rising and falling once, the character held (no collision, no gravity) until it
-        // lands. Nothing aims it at the obstacle or corrects it.
-
-        private sealed class VaultRun
-        {
-            public Vector3 From, To;
-            public float Height, Seconds, Time;
-        }
-
-        private static readonly Dictionary<Entity, VaultRun> _vaults = new();
-
-        /// <summary>
-        /// Starts a vault when the character stands on the ground inside a <see cref="VaultMarker"/>'s box, facing within its
-        /// MaxAngle of the marker's forward. <paramref name="facing"/> is the character's facing (flattened); the vault goes
-        /// along it. False (nothing happens) otherwise.
-        /// </summary>
-        public static bool TryVault(Entity entity, Vector3 facing)
-        {
-            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h) || _vaults.ContainsKey(entity)) return false;
-            if (!_physics.IsCharacterGrounded(h)) return false;
-            facing.Y = 0f;
-            if (facing.LengthSquared() < 1e-8f) return false;
-            facing = Vector3.Normalize(facing);
-            Vector3 feet = _physics.GetCharacterPosition(h);
-            var world = ECSWorld.Instance;
-            if (!world.HasAnyComponent<VaultMarker>()) return false;
-            foreach (var row in world.Query<VaultMarker, Transform>().Enumerate<VaultMarker, Transform>())
-            {
-                var m = row.Item1.Value;
-                if (!Matrix4x4.Decompose(Transform.GetWorldMatrix(world, row.Item2.Value), out _, out var rot, out var pos)) continue;
-                var local = Vector3.Transform(feet - pos, Quaternion.Inverse(rot));
-                if (MathF.Abs(local.X) > m.Size.X * 0.5f || MathF.Abs(local.Y) > m.Size.Y * 0.5f || MathF.Abs(local.Z) > m.Size.Z * 0.5f) continue;
-                var fwd = Vector3.Transform(Vector3.UnitZ, rot);
-                fwd.Y = 0f;
-                if (fwd.LengthSquared() < 1e-8f) continue;
-                float cos = Vector3.Dot(Vector3.Normalize(fwd), facing);
-                if (cos < MathF.Cos(Math.Clamp(m.MaxAngle, 0f, 180f) * MathF.PI / 180f) - 1e-5f) continue;
-                _vaults[entity] = new VaultRun { From = feet, To = feet + facing * MathF.Max(0f, m.Distance), Height = MathF.Max(0f, m.Height), Seconds = MathF.Max(0.05f, m.Seconds) };
-                _physics.SetCharacterHeld(h, true);
-                return true;
-            }
-            return false;
-        }
-
         /// <summary>Places the character's feet at <paramref name="position"/> at once (no collision on the way), at rest: a
         /// trainee getting out of a vehicle, a restart.</summary>
         public static bool TeleportCharacter(Entity entity, Vector3 position)
         {
             if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
-            _vaults.Remove(entity);
             _physics.SetCharacterHeld(h, true);
             _physics.SetCharacterPosition(h, position);
             _physics.SetCharacterHeld(h, false);
+            if (ECSWorld.Instance.TryGetComponentRef<Transform>(entity, out var tr)) tr.Value.Position = position;
+            return true;
+        }
+
+        /// <summary>Places a character at once and leaves it held or free as it was (a scripted move steps a held character
+        /// along its way: TeleportCharacter would let it go).</summary>
+        public static bool PlaceCharacter(Entity entity, Vector3 position)
+        {
+            if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
+            _physics.SetCharacterPosition(h, position);
             if (ECSWorld.Instance.TryGetComponentRef<Transform>(entity, out var tr)) tr.Value.Position = position;
             return true;
         }
@@ -1839,27 +1786,6 @@ namespace GameEditor.Framework.Scene
             if (_physics == null || !_entityToCharHandle.TryGetValue(entity, out var h)) return false;
             _physics.SetCharacterHeld(h, held);
             return true;
-        }
-
-        /// <summary>True while the character is in a vault (its own moves wait).</summary>
-        public static bool IsVaulting(Entity entity) => _vaults.ContainsKey(entity);
-
-        private static readonly List<Entity> _vaultsDone = new();
-
-        // Before the physics step: each vault's place along its arc; the last step lets the character go, at rest.
-        private static void StepVaults(float dt)
-        {
-            if (_vaults.Count == 0 || _physics == null) return;
-            _vaultsDone.Clear();
-            foreach (var (e, run) in _vaults)
-            {
-                if (!_entityToCharHandle.TryGetValue(e, out var h)) { _vaultsDone.Add(e); continue; }
-                run.Time += dt;
-                float s = MathF.Min(1f, run.Time / run.Seconds);
-                _physics.SetCharacterPosition(h, Vector3.Lerp(run.From, run.To, s) + Vector3.UnitY * (run.Height * 4f * s * (1f - s)));
-                if (s >= 1f) { _physics.SetCharacterHeld(h, false); _vaultsDone.Add(e); }
-            }
-            foreach (var e in _vaultsDone) _vaults.Remove(e);
         }
 
         public static bool IsCharacterGrounded(Entity entity)

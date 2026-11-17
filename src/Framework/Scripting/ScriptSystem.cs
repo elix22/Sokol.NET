@@ -366,7 +366,6 @@ namespace GameEditor.Framework.Scripting
             Animation.AnimationSystem.Reset();      // its bindings name this game's entities
             Draw.Clear();
             Animation.AnimatorSystem.Reset();
-            Scene.WaysSystem.Reset();
             Logger.Info("[ScriptSystem] Stopped — all behaviours destroyed.");
         }
 
