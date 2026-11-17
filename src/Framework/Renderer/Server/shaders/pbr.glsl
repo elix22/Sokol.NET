@@ -749,6 +749,14 @@ void main()
 #endif
     }
 
+    // ── Haze (Phase H E7): far things fade into the sky's colour (exponential squared of the distance) ──
+    if (u_FogDensity > 0.0 && debug_view_enabled <= 0.5) {
+        float fogD = length(v_Position - u_Camera) * u_FogDensity;
+        float fogF = 1.0 - exp(-fogD * fogD);
+        vec3 fogC = vec3(float((u_FogColor >> 10) & 31), float((u_FogColor >> 5) & 31), float(u_FogColor & 31)) / 31.0;
+        color = mix(color, pow(fogC, vec3(2.2)), fogF);   // the colour is sRGB; the shading here is linear
+    }
+
     // ── In-shader tonemap + sRGB fallback ─────────────────────────────────────
     // When NOT writing to an HDR target (linear_output == 0), tonemap and sRGB-
     // encode here so the LDR (RGBA8) output displays correctly.  linear_output == 1

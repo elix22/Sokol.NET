@@ -2134,7 +2134,7 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            cam = new pbr_pbr_camera_params_t { u_Camera = cameraPos };
+            cam = new pbr_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             // IBL view-constants. When an environment is loaded these feed the GGX-mip
             // LOD math (u_MipCount) and irradiance/specular scaling (u_EnvIntensity);
@@ -2143,6 +2143,7 @@ namespace GameEditor.Framework.Renderer.Server
             bool iblActive = _environment is { IsLoaded: true };
             ibl = new pbr_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -2600,6 +2601,7 @@ namespace GameEditor.Framework.Renderer.Server
 
             var ibl = new PbrTx.pbr_transmission_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -2943,11 +2945,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkin.Shaders.pbr_skinning_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkin.Shaders.pbr_skinning_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkin.Shaders.pbr_skinning_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -3147,11 +3150,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkinCsm4.Shaders.pbr_skinning_csm4_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -3356,11 +3360,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkinCsm1.Shaders.pbr_skinning_csm1_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -3582,11 +3587,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkinMorph.Shaders.pbr_skinning_morphing_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -3779,11 +3785,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkinMorphCsm1.Shaders.pbr_skinning_morphing_csm1_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -3990,11 +3997,12 @@ namespace GameEditor.Framework.Renderer.Server
             }
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
 
-            var cam = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new PbrSkinMorphCsm4.Shaders.pbr_skinning_morphing_csm4_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -4193,11 +4201,12 @@ namespace GameEditor.Framework.Renderer.Server
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
             }
 
-            var cam = new Csm1.Shaders.pbr_csm1_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new Csm1.Shaders.pbr_csm1_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new Csm1.Shaders.pbr_csm1_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,
@@ -4469,11 +4478,12 @@ namespace GameEditor.Framework.Renderer.Server
             lights.ambient_num = new Vector4(0f, 0f, 0f, n);
             }
 
-            var cam = new Csm4.Shaders.pbr_csm4_pbr_camera_params_t { u_Camera = cameraPos };
+            var cam = new Csm4.Shaders.pbr_csm4_pbr_camera_params_t { u_Camera = cameraPos, u_FogDensity = PostEffects.FogDensity };
 
             bool iblActive = _environment is { IsLoaded: true };
             var ibl = new Csm4.Shaders.pbr_csm4_pbr_ibl_params_t
             {
+                u_FogColor          = PostEffects.FogColorPacked,   // Phase H E7: the haze
                 u_EnvIntensity      = iblActive ? _environment!.Intensity : 1f,
                 u_AmbientParams     = _pbrAmbientParams,
                 u_EnvBlurNormalized = 0f,

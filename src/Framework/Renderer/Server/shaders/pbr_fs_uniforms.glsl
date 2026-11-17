@@ -110,7 +110,8 @@ layout(binding=3) uniform pbr_ibl_params {
     float u_EnvIntensity;
     float u_EnvBlurNormalized;
     int   u_MipCount;
-    float _ibl_pad;
+    int   u_FogColor;      // Phase H E7: the haze's colour, sRGB 5 bits each, r<<10 | g<<5 | b (at most 32767: a GLES GPU
+                           // keeps only 16 bits of it - a Galaxy A71 did - and mediump floats hold no more) (the old pad: same size)
     mat4  u_EnvRotation;
     ivec2 u_TransmissionFramebufferSize;
     mat4  u_ViewMatrix;
@@ -126,7 +127,7 @@ layout(binding=3) uniform pbr_ibl_params {
 // ─── Camera (binding=4) ──────────────────────────────────────────────────────
 layout(binding=4) uniform pbr_camera_params {
     vec3  u_Camera;
-    float _cam_pad;
+    float u_FogDensity;    // Phase H E7: the haze, exp2 of distance x this; 0 = none (the block's old pad: same size)
 };
 
 // ─── Rendering flags (binding=5) ─────────────────────────────────────────────

@@ -50,6 +50,9 @@ namespace GameEditor.Framework.Core
         public float  EnvironmentVignetteSmoothness { get; set; } = 0.2f;
         public string EnvironmentVignetteCenter     { get; set; } = "0.5 0.5";   // "x y", 0..1, the top left 0 0
         public string EnvironmentVignetteColor      { get; set; } = "0 0 0";     // "r g b"
+        // Phase H E7: the haze - far things fade into a colour (exp2 of distance x density; 0 = none). Colour "" = the sky's horizon.
+        public float  EnvironmentFogDensity         { get; set; } = 0f;
+        public string EnvironmentFogColor           { get; set; } = "";          // "r g b" (sRGB 0..1) or "" for the sky's horizon
         public bool   EnvironmentVignetteRounded    { get; set; } = false;
         public float  EnvironmentContrast           { get; set; } = 0f;
         public string EnvironmentColorFilter        { get; set; } = "1 1 1";

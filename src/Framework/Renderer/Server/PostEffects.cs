@@ -80,6 +80,21 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>Any post effect is on: the scene is drawn through a target and the post pass.</summary>
         public static bool Any => Bloom.On || Vignette.On || ColorAdjustments.On;
 
+        /// <summary>Phase H E7, the haze: drawn in the lit shaders themselves (every tier, no extra pass): far things fade
+        /// into <see cref="FogColor"/> as 1 - exp(-(distance x density)^2). 0 = none.</summary>
+        public static float FogDensity;
+        /// <summary>The haze's colour, sRGB 0..1 (the sky's horizon unless the project names one).</summary>
+        public static Vector3 FogColor = Lighting.EnvironmentMap.Horizon;
+        /// <summary>The colour as the shaders take it: 5 bits each, r &lt;&lt; 10 | g &lt;&lt; 5 | b - at most 32767, which survives the
+        /// 16 bits a GLES GPU may keep of an int uniform (a Galaxy A71 kept only those).</summary>
+        public static int FogColorPacked = PackColor(Lighting.EnvironmentMap.Horizon);
+
+        public static int PackColor(Vector3 c)
+        {
+            static int B(float v) => (int)MathF.Round(Math.Clamp(v, 0f, 1f) * 31f);
+            return (B(c.X) << 10) | (B(c.Y) << 5) | B(c.Z);
+        }
+
         /// <summary>Every effect back to its default (off).</summary>
         public static void Reset()
         {
@@ -110,6 +125,9 @@ namespace GameEditor.Framework.Renderer.Server
                 Color = ParseVector(c.EnvironmentVignetteColor, Vector3.Zero),
                 Rounded = c.EnvironmentVignetteRounded,
             };
+            FogDensity = Math.Clamp(c.EnvironmentFogDensity, 0f, 1f);
+            FogColor = string.IsNullOrWhiteSpace(c.EnvironmentFogColor) ? Lighting.EnvironmentMap.Horizon : ParseVector(c.EnvironmentFogColor, Lighting.EnvironmentMap.Horizon);
+            FogColorPacked = PackColor(FogColor);
             ColorAdjustments = new ColorAdjustmentSettings
             {
                 Contrast = Math.Clamp(c.EnvironmentContrast, -100f, 100f),

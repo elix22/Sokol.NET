@@ -191,6 +191,8 @@ namespace GameEditor.Framework.Core
             sb.Append($"  \"environmentBloomClamp\": {config.EnvironmentBloomClamp.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"environmentBloomHq\": {(config.EnvironmentBloomHq ? "true" : "false")},\n");
             sb.Append($"  \"environmentVignetteIntensity\": {config.EnvironmentVignetteIntensity.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"environmentFogDensity\": {config.EnvironmentFogDensity.ToString(CultureInfo.InvariantCulture)},\n");
+            sb.Append($"  \"environmentFogColor\": \"{Esc(config.EnvironmentFogColor)}\",\n");
             sb.Append($"  \"environmentVignetteSmoothness\": {config.EnvironmentVignetteSmoothness.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"environmentContrast\": {config.EnvironmentContrast.ToString(CultureInfo.InvariantCulture)},\n");
             sb.Append($"  \"environmentHueShift\": {config.EnvironmentHueShift.ToString(CultureInfo.InvariantCulture)},\n");
@@ -234,6 +236,8 @@ namespace GameEditor.Framework.Core
             if (root.TryGetProperty("environmentBloomTint", out var bc)) cfg.EnvironmentBloomTint = bc.GetString() ?? cfg.EnvironmentBloomTint;
             if (root.TryGetProperty("environmentBloomClamp", out var bm) && bm.TryGetSingle(out var bmv)) cfg.EnvironmentBloomClamp = MathF.Max(0f, bmv);
             if (root.TryGetProperty("environmentVignetteIntensity", out var vi) && vi.TryGetSingle(out var viv)) cfg.EnvironmentVignetteIntensity = Math.Clamp(viv, 0f, 1f);
+            if (root.TryGetProperty("environmentFogDensity", out var fdn) && fdn.TryGetSingle(out var fdv)) cfg.EnvironmentFogDensity = Math.Clamp(fdv, 0f, 1f);
+            if (root.TryGetProperty("environmentFogColor", out var fcl)) cfg.EnvironmentFogColor = fcl.GetString() ?? cfg.EnvironmentFogColor;
             if (root.TryGetProperty("environmentVignetteSmoothness", out var vs) && vs.TryGetSingle(out var vsv)) cfg.EnvironmentVignetteSmoothness = Math.Clamp(vsv, 0.01f, 1f);
             if (root.TryGetProperty("environmentVignetteCenter", out var vce)) cfg.EnvironmentVignetteCenter = vce.GetString() ?? cfg.EnvironmentVignetteCenter;
             if (root.TryGetProperty("environmentVignetteColor", out var vco)) cfg.EnvironmentVignetteColor = vco.GetString() ?? cfg.EnvironmentVignetteColor;
