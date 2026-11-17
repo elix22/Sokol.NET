@@ -1307,7 +1307,7 @@ namespace GameEditor.Framework.Scene
         {
             if (Physics2D.Physics2DWorld.AddForce(entity, new Vector2(force.X, force.Y))) return true;
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;      // a vehicle: its chassis
             _physics.AddForce(handle, force);
             return true;
         }
@@ -1316,7 +1316,7 @@ namespace GameEditor.Framework.Scene
         {
             if (Physics2D.Physics2DWorld.AddImpulse(entity, new Vector2(impulse.X, impulse.Y))) return true;
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;      // a vehicle: its chassis
             _physics.AddImpulse(handle, impulse);
             return true;
         }
@@ -1325,7 +1325,7 @@ namespace GameEditor.Framework.Scene
         {
             if (Physics2D.Physics2DWorld.AddTorque(entity, torque.Z)) return true;
             if (_physics == null) return false;
-            if (!_entityToHandle.TryGetValue(entity, out var handle)) return false;
+            if (!BodyOf(entity, out var handle)) return false;      // a vehicle: its chassis
             _physics.AddTorque(handle, torque);
             return true;
         }
