@@ -374,6 +374,10 @@ SWIFT_EXTERN int32_t sokolreview_get_state(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSE
 
 SWIFT_EXTERN BOOL sokolreview_request(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
+/// How this copy was installed (testing only — see sokol_review.h): “development” when the embedded provisioning profile
+/// allows debugging (get-task-allow), “adhoc” for another embedded profile, else “testflight” (sandbox receipt) / “appstore”.
+SWIFT_EXTERN int32_t sokolreview_test_install_source(char * _Nullable buf, int32_t cap) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
+
 SWIFT_EXTERN void sokolreview_test_use_fake(BOOL on) SWIFT_NOEXCEPT;
 
 #endif // defined(__OBJC__)
