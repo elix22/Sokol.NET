@@ -1,8 +1,8 @@
-# sokol_ads — AdMob interstitials (Android + iOS)
+# sokol_ads — AdMob interstitials and rewarded ads (Android + iOS)
 
 Google Mobile Ads plugin for Sokol.NET apps: **Google Mobile Ads SDK 25 + UMP 4** on
 Android, **GoogleMobileAds 13 + UserMessagingPlatform 3** on iOS (the two are versioned
-independently — iOS has no UMP 4). Interstitials only; the max ad
+independently — iOS has no UMP 4). Interstitials and rewarded ads; the max ad
 content rating is pinned to **G** in both shims, and `npaOnly` requests carry the
 non-personalized-ads flag on every request. Desktop and web have no ad SDK — the
 managed layer stubs every call deterministically (`AdsPlugin.Available` is `false`).
@@ -27,6 +27,23 @@ AdsPlugin.Poll();
 show still emits `Dismissed` after `LoadFailed`, so the resume path runs exactly once
 either way.
 
+### Rewarded ads
+
+The player asks for one (a second chance, double coins…) and gets the reward only if they watched it:
+
+```csharp
+AdsPlugin.LoadRewarded(AdsPlugin.TestRewardedUnit);   // preload -> RewardedLoaded | RewardedLoadFailed
+if (AdsPlugin.RewardedReady) AdsPlugin.ShowRewarded();  // -> RewardedShown, RewardEarned (watched), RewardedDismissed
+```
+
+- **Grant on `RewardEarned`, never on `RewardedDismissed`.** A player who closes early gets only `RewardedDismissed`;
+  one who watched gets `RewardEarned` first. Resume music / navigation on `RewardedDismissed` (it always comes, a failed
+  show included).
+- `ShowRewarded` consumes the loaded ad — load the next one after `RewardedDismissed`.
+- Events 7–11 (`RewardedLoaded`, `RewardedLoadFailed`, `RewardedShown`, `RewardedDismissed`, `RewardEarned`) share the
+  interstitials' native queue; the interstitial API is unchanged.
+- Verified on a Galaxy Z Flip4 from Play internal testing with Google's test unit (2026-11-19).
+
 ## Ids: application id vs unit ids
 
 - **APPLICATION_ID is platform configuration, not an API input.**
@@ -37,9 +54,9 @@ either way.
     used and production inventory can never be served by accident.
   - iOS: `IOSInfoPlistKey_GADApplicationIdentifier` in `Directory.Build.props`
     (plus an `IOSInfoPlistRawFragment_SKAdNetworkItems` array).
-- **Ad unit ids are runtime parameters** of `LoadInterstitial`.
-  `AdsPlugin.TestInterstitialUnit` is Google's published test unit for the platform —
-  use it in every non-store build (clicking real ads in dev gets the account banned).
+- **Ad unit ids are runtime parameters** of `LoadInterstitial` / `LoadRewarded`.
+  `AdsPlugin.TestInterstitialUnit` / `AdsPlugin.TestRewardedUnit` are Google's published test units for the
+  platform — use them in every non-store build (clicking real ads in dev gets the account banned).
 
 ## Integration (consuming app)
 
@@ -98,3 +115,10 @@ libs/      prebuilt outputs (committed): android/<abi>/release/libsokol_ads.so,
            ios/arm64/{debug,release}/sokol_ads.framework
 vendor/    (gitignored) fetched Google SDK xcframeworks + device slices
 ```
+
+## Builds (CI)
+
+`.github/workflows/build-ads-plugin.yml` builds Android (armeabi-v7a, arm64-v8a, x86_64) and iOS on every change under
+`plugins/Ads/` (except `libs/`) and commits the libraries back to `libs/` — every shipped library is a CI build, never a
+local one. The 64-bit Android libraries are linked with 16 KB page alignment (`-Wl,-z,max-page-size=16384`, Google Play for
+Android 15+); the workflow fails if they are not.

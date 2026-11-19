@@ -7,9 +7,9 @@ Optional, self-contained add-ons that extend Sokol.NET applications.
 | Plugin | Platforms | Description |
 |--------|-----------|-------------|
 | [Share](Share/README.md) | Android, iOS, macOS, Windows, Linux | Share score + generated image via native share sheet |
-| [Ads](Ads/README.md) | Android, iOS | AdMob interstitials + UMP consent (Google Mobile Ads SDK 23 / xcframework 13) |
+| [Ads](Ads/README.md) | Android, iOS | AdMob interstitials + rewarded ads + UMP consent (Google Mobile Ads SDK 25 / xcframework 13) |
 | [Speech](Speech/README.md) | Android, iOS, macOS, Windows, Linux, Web | Platform text-to-speech (`Speech.Say(text, lang)`), offline-voice detection, runtime-only so no voice licence attaches |
-| [Billing](Billing/README.md) | Android, iOS | One-time in-app purchases (Play Billing 7 / StoreKit 2), with the store's signed proof handed to the app for its own verification |
+| [Billing](Billing/README.md) | Android, iOS | One-time and consumable in-app purchases (Play Billing 9 / StoreKit 2), with the store's signed proof handed to the app for its own verification |
 | [Links](Links/README.md) | Android, iOS, macOS, Windows, Linux, Web | Open a link with the system handler (`Links.Open(url)`): web URLs in the default browser, `mailto:` in the mail app |
 | [IncomingLinks](IncomingLinks/README.md) | Android | Receive the link that opened the app (`IncomingLinks.TakePending()`): Android App Links and custom URL schemes, cold start and while running |
 | [AppUpdate](AppUpdate/README.md) | Android | Google Play In-App Updates, FLEXIBLE flow (`AppUpdate.Check()` / `StartFlexible()` / `Complete()`), with Play's `FakeAppUpdateManager` for testing |

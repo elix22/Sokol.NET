@@ -3,7 +3,7 @@
    (sokol_billing_queue.c, linked into this framework) via sokolbilling__emit,
    so sokolbilling_poll_event works identically on both platforms.
 
-   One-time (non-consumable) products only. Requires iOS 15+ (StoreKit 2).
+   One-time and consumable products (a consumable is finished when reported). Requires iOS 15+ (StoreKit 2).
    PURCHASE_OK.proof carries the transaction's JWS representation — Apple-signed,
    verifiable offline by the app's entitlement layer. */
 
