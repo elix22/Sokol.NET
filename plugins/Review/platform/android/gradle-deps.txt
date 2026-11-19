@@ -1,0 +1,2 @@
+# Google Play In-App Review (Play Core review). FakeReviewManager (testing) ships in the same AAR.
+com.google.android.play:review:2.0.2
