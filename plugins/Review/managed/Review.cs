@@ -65,5 +65,22 @@ public static class Review
             SokolReview.TestUseFake(on);
 #endif
         }
+
+        /// <summary>How this copy was installed, so a test can refuse to ask the real store where a real review could be
+        /// posted. Android: the installer package ("com.android.vending" = Google Play; "" = sideloaded / adb). iOS:
+        /// "development" (development-signed: StoreKit submits nothing), "testflight", "appstore" or "adhoc". Elsewhere "".</summary>
+        public static string InstallSource
+        {
+            get
+            {
+#if __ANDROID__ || __IOS__
+                var buf = new byte[128];
+                int n = SokolReview.TestInstallSource(buf, buf.Length);
+                return n > 0 ? System.Text.Encoding.UTF8.GetString(buf, 0, n) : "";
+#else
+                return "";
+#endif
+            }
+        }
     }
 }

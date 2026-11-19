@@ -1,6 +1,9 @@
 package com.sokol.review;
 
 import android.app.Activity;
+import android.content.pm.InstallSourceInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
 
 import com.google.android.play.core.review.ReviewException;
 import com.google.android.play.core.review.ReviewInfo;
@@ -52,5 +55,25 @@ public final class SokolReview {
 
     public static void useFake(boolean on) {
         fake = on;
+    }
+
+    /** The package that installed this app ("" = sideloaded / adb) — testing only (see sokol_review.h). */
+    @SuppressWarnings("deprecation")
+    public static String installer(final Activity act) {
+        if (act == null) return "";
+        try {
+            PackageManager pm = act.getPackageManager();
+            String pkg = act.getPackageName();
+            String s;
+            if (Build.VERSION.SDK_INT >= 30) {
+                InstallSourceInfo info = pm.getInstallSourceInfo(pkg);
+                s = info.getInstallingPackageName();
+            } else {
+                s = pm.getInstallerPackageName(pkg);
+            }
+            return s == null ? "" : s;
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

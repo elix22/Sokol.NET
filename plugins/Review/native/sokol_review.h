@@ -42,6 +42,13 @@ int sokolreview_get_error(void);
    false = the real manager. iOS: no effect. */
 void sokolreview_test_use_fake(bool on);
 
+/* Testing: how this copy was installed, so a test can refuse to ask the real store where a real review could be posted.
+   Android: the installer package ("com.android.vending" = Google Play — for a debug/test build that can only be Play's
+   internal app sharing, where Google disables the submit button; "" = sideloaded / adb).
+   iOS: "development" (a development-signed build: StoreKit always shows the prompt and submits nothing), "testflight",
+   "appstore" or "adhoc". Copies a NUL-terminated string into buf (at most cap bytes) and returns its length. */
+int sokolreview_test_install_source(char* buf, int cap);
+
 #ifdef __cplusplus
 }
 #endif

@@ -18,6 +18,7 @@ extern const void* sapp_android_get_native_activity(void);
 static jclass    _rv_class;      /* global ref to com.sokol.review.SokolReview */
 static jmethodID _rv_request;
 static jmethodID _rv_use_fake;
+static jmethodID _rv_installer;
 
 static pthread_mutex_t _rv_lock = PTHREAD_MUTEX_INITIALIZER;
 static int _rv_state = SOKOLREVIEW_IDLE;
@@ -62,6 +63,7 @@ static bool _rv_resolve(JNIEnv* env, ANativeActivity* activity)
     _rv_class    = (jclass)(*env)->NewGlobalRef(env, cls);
     _rv_request  = (*env)->GetStaticMethodID(env, _rv_class, "request", "(Landroid/app/Activity;)Z");
     _rv_use_fake = (*env)->GetStaticMethodID(env, _rv_class, "useFake", "(Z)V");
+    _rv_installer = (*env)->GetStaticMethodID(env, _rv_class, "installer", "(Landroid/app/Activity;)Ljava/lang/String;");
     (*env)->DeleteLocalRef(env, cls);
     if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return false; }
     return true;
@@ -111,6 +113,27 @@ void sokolreview_test_use_fake(bool on)
     if (!activity || !env || !_rv_resolve(env, activity) || !_rv_use_fake) return;
     (*env)->CallStaticVoidMethod(env, _rv_class, _rv_use_fake, on ? JNI_TRUE : JNI_FALSE);
     if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+}
+
+int sokolreview_test_install_source(char* buf, int cap)
+{
+    if (!buf || cap <= 0) return 0;
+    buf[0] = 0;
+    ANativeActivity* activity = (ANativeActivity*)sapp_android_get_native_activity();
+    JNIEnv* env = _rv_env();
+    if (!activity || !env || !_rv_resolve(env, activity) || !_rv_installer) return 0;
+    jstring js = (jstring)(*env)->CallStaticObjectMethod(env, _rv_class, _rv_installer, activity->clazz);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return 0; }
+    if (!js) return 0;
+    const char* c = (*env)->GetStringUTFChars(env, js, NULL);
+    int n = 0;
+    if (c) {
+        while (c[n] && n < cap - 1) { buf[n] = c[n]; n++; }
+        buf[n] = 0;
+        (*env)->ReleaseStringUTFChars(env, js, c);
+    }
+    (*env)->DeleteLocalRef(env, js);
+    return n;
 }
 
 /* Upcall from com.sokol.review.SokolReview (Android UI thread). */

@@ -21,5 +21,8 @@ internal static class SokolReview
 
     [DllImport(Lib, EntryPoint = "sokolreview_test_use_fake", CallingConvention = CallingConvention.Cdecl)]
     internal static extern void TestUseFake([MarshalAs(UnmanagedType.I1)] bool on);
+
+    [DllImport(Lib, EntryPoint = "sokolreview_test_install_source", CallingConvention = CallingConvention.Cdecl)]
+    internal static extern int TestInstallSource([System.Runtime.InteropServices.Out] byte[] buf, int cap);
 }
 #endif

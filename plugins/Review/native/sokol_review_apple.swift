@@ -52,3 +52,27 @@ public func sokolreview_get_error() -> Int32 { 0 }
 
 @_cdecl("sokolreview_test_use_fake")
 public func sokolreview_test_use_fake(_ on: Bool) { }
+
+/// How this copy was installed (testing only — see sokol_review.h): "development" when the embedded provisioning profile
+/// allows debugging (get-task-allow), "adhoc" for another embedded profile, else "testflight" (sandbox receipt) / "appstore".
+@_cdecl("sokolreview_test_install_source")
+public func sokolreview_test_install_source(_ buf: UnsafeMutablePointer<CChar>?, _ cap: Int32) -> Int32 {
+    guard let buf = buf, cap > 0 else { return 0 }
+    var source = "appstore"
+    if let path = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision"),
+       let data = FileManager.default.contents(atPath: path) {
+        // the profile is a CMS envelope around a plain-text XML plist
+        let text = String(decoding: data, as: UTF8.self)
+        if let key = text.range(of: "<key>get-task-allow</key>") {
+            source = text[key.upperBound...].prefix(64).contains("<true/>") ? "development" : "adhoc"
+        } else {
+            source = "adhoc"
+        }
+    } else if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+        source = "testflight"
+    }
+    let bytes = Array(source.utf8.prefix(Int(cap) - 1))
+    for (i, b) in bytes.enumerated() { buf[i] = CChar(bitPattern: b) }
+    buf[bytes.count] = 0
+    return Int32(bytes.count)
+}
