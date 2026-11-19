@@ -6,7 +6,7 @@
 # Usage: ./plugins/Review/scripts/build-ios.sh [device|simulator-arm64|simulator-x64|all]
 # Default: all
 #
-# Objective-C over StoreKit (SKStoreReviewController); deployment target 15.0 to
+# Swift over StoreKit (AppStore.requestReview(in:); iOS 15: SKStoreReviewController); deployment target 15.0 to
 # match the app's floor. No link against the main sokol framework is required.
 
 set -e

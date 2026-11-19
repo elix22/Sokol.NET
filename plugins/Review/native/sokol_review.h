@@ -1,6 +1,7 @@
 /* sokol_review.h -- the platform's own in-app rating prompt, for Sokol.NET apps.
    Android: Google Play In-App Review (com.google.android.play:review) via a Java helper class.
-   iOS:     StoreKit SKStoreReviewController (requestReviewInScene: on iOS 14+, requestReview before).
+   iOS:     StoreKit AppStore.requestReview(in:) (iOS 16+; Swift, sokol_review_apple.swift), and on iOS 15 the only
+            API there, SKStoreReviewController.requestReview(in:) (deprecated from iOS 18).
    Other platforms have no native library; the managed layer reports "unsupported".
 
    Both stores decide by themselves whether the prompt really appears (quota: iOS at most 3 times in

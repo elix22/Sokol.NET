@@ -3,7 +3,7 @@ project(sokol_review C)
 
 # sokol_review — the platform's own in-app rating prompt.
 #   Android : sokol_review_android.c (JNI -> com.sokol.review.SokolReview, Play In-App Review) -> libs/android/<abi>/<config>/libsokol_review.so
-#   iOS     : sokol_review_apple.m   (StoreKit SKStoreReviewController)                       -> libs/ios/<target>/<config>/sokol_review.framework
+#   iOS     : sokol_review_apple.swift (StoreKit AppStore.requestReview(in:), iOS 15: SKStoreReviewController) -> libs/ios/<target>/<config>/sokol_review.framework
 #   Others  : no native library — no in-app rating API; the managed layer reports "unsupported".
 
 set(PLUGIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")   # plugins/Review/
@@ -43,12 +43,14 @@ if(ANDROID)
     )
 
 elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    add_library(${LIB_NAME} SHARED sokol_review_apple.m)
-    target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_source_files_properties(sokol_review_apple.m PROPERTIES COMPILE_OPTIONS "-x;objective-c;-fobjc-arc")
+    # Swift: AppStore.requestReview(in:) — the current StoreKit API (iOS 16+) — is Swift-only.
+    enable_language(Swift)
+    add_library(${LIB_NAME} SHARED sokol_review_apple.swift)
     target_link_libraries(${LIB_NAME} PRIVATE "-framework Foundation" "-framework UIKit" "-framework StoreKit")
 
     set_target_properties(${LIB_NAME} PROPERTIES
+        Swift_LANGUAGE_VERSION           5
+        XCODE_ATTRIBUTE_SWIFT_VERSION    5.0
         FRAMEWORK                        TRUE
         MACOSX_FRAMEWORK_IDENTIFIER      com.sokolnet.plugins.review
         FRAMEWORK_VERSION                A

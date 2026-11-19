@@ -2,14 +2,14 @@
 
 Asks the store to show **its own** rating prompt inside the app: Google Play
 [In-App Review](https://developer.android.com/guide/playcore/in-app-review) on Android
-(`com.google.android.play:review`) and StoreKit's
-[`SKStoreReviewController`](https://developer.apple.com/documentation/storekit/skstorereviewcontroller) on iOS. Every other
+(`com.google.android.play:review`) and StoreKit's `AppStore.requestReview(in:)` on iOS 16+ (Swift; on iOS 15 — the
+floor — the only API there, `SKStoreReviewController.requestReview(in:)`, deprecated from iOS 18). Every other
 platform gets a managed no-op stub (`Review.Supported == false`), so call sites need no `#if`.
 
 | Platform | API | Notes |
 |---|---|---|
 | Android | `ReviewManager.requestReviewFlow()` → `launchReviewFlow()` (Java helper `com.sokol.review.SokolReview`) | Play applies a time-bound quota; only a build installed from Google Play can show the card |
-| iOS | `SKStoreReviewController requestReviewInScene:` (iOS 14+, the foreground window scene), `requestReview` before | at most 3 times in 365 days per user; a development-signed build always shows it and submits nothing; TestFlight never shows it |
+| iOS | `AppStore.requestReview(in:)` on the foreground window scene (iOS 16+); `SKStoreReviewController.requestReview(in:)` on iOS 15 (`sokol_review_apple.swift`) | at most 3 times in 365 days per user; a development-signed build always shows it and submits nothing; TestFlight never shows it |
 
 ## Model
 

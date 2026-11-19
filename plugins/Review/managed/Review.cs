@@ -4,7 +4,7 @@ public enum ReviewState { Idle = 0, Requesting = 1, Done = 2, Failed = 3 }
 
 /// <summary>
 /// The platform's own in-app rating prompt: Google Play In-App Review on Android, StoreKit's
-/// <c>SKStoreReviewController</c> on iOS. The store decides by itself whether the prompt really appears (quota) and does
+/// <c>AppStore.requestReview(in:)</c> on iOS 16+ (<c>SKStoreReviewController</c> on iOS 15, the only API there). The store decides by itself whether the prompt really appears (quota) and does
 /// not say; elsewhere <see cref="Supported"/> is false and every call is a no-op, so call sites need no <c>#if</c>.
 /// <para>Store guidance is the app's job: ask after a positive moment at a natural pause, never mid-task, never at first
 /// launch, never from a button (a "Rate us" button opens the store page instead).</para>
