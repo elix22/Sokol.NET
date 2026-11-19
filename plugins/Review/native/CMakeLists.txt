@@ -3,7 +3,7 @@ project(sokol_review C)
 
 # sokol_review — the platform's own in-app rating prompt.
 #   Android : sokol_review_android.c (JNI -> com.sokol.review.SokolReview, Play In-App Review) -> libs/android/<abi>/<config>/libsokol_review.so
-#   iOS     : sokol_review_apple.swift (StoreKit AppStore.requestReview(in:), iOS 15: SKStoreReviewController) -> libs/ios/<target>/<config>/sokol_review.framework
+#   iOS     : sokol_review_apple.swift (StoreKit AppStore.requestReview(in:), iOS 16+; none on iOS 15) -> libs/ios/<target>/<config>/sokol_review.framework
 #   Others  : no native library — no in-app rating API; the managed layer reports "unsupported".
 
 set(PLUGIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")   # plugins/Review/

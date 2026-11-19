@@ -4,15 +4,18 @@ public enum ReviewState { Idle = 0, Requesting = 1, Done = 2, Failed = 3 }
 
 /// <summary>
 /// The platform's own in-app rating prompt: Google Play In-App Review on Android, StoreKit's
-/// <c>AppStore.requestReview(in:)</c> on iOS 16+ (<c>SKStoreReviewController</c> on iOS 15, the only API there). The store decides by itself whether the prompt really appears (quota) and does
+/// <c>AppStore.requestReview(in:)</c> on iOS 16+ (none on iOS 15: its only API, SKStoreReviewController, is deprecated). The store decides by itself whether the prompt really appears (quota) and does
 /// not say; elsewhere <see cref="Supported"/> is false and every call is a no-op, so call sites need no <c>#if</c>.
 /// <para>Store guidance is the app's job: ask after a positive moment at a natural pause, never mid-task, never at first
 /// launch, never from a button (a "Rate us" button opens the store page instead).</para>
 /// </summary>
 public static class Review
 {
-#if __ANDROID__ || __IOS__
+#if __ANDROID__
     public static bool Supported => true;
+#elif __IOS__
+    /// <summary>iOS 16+ only: AppStore.requestReview(in:) needs it, and the iOS 15 API is deprecated (no call is made there).</summary>
+    public static bool Supported => System.OperatingSystem.IsIOSVersionAtLeast(16);
 #else
     public static bool Supported => false;
 #endif
@@ -22,7 +25,7 @@ public static class Review
     public static bool Request()
     {
 #if __ANDROID__ || __IOS__
-        return SokolReview.Request();
+        return Supported && SokolReview.Request();
 #else
         return false;
 #endif

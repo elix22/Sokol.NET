@@ -1,7 +1,7 @@
-// sokol_review_apple.swift -- the App Store's rating prompt (iOS).
-//   iOS 16+ : StoreKit AppStore.requestReview(in:) — the current API (Swift-only, @MainActor).
-//   iOS 15  : SKStoreReviewController.requestReview(in:) — the only API there (deprecated from iOS 18, which never runs this
-//             branch). The app's floor is iOS 15.0.
+// sokol_review_apple.swift -- the App Store's rating prompt (iOS 16+).
+//   StoreKit AppStore.requestReview(in:) — the current API (Swift-only, @MainActor, iOS 16+).
+//   iOS 15: no prompt (owner decision 2026-11-19) — the only API there, SKStoreReviewController, is deprecated, so no
+//   deprecated call is made anywhere; sokolreview_request() returns false and the state stays IDLE.
 // StoreKit decides by itself whether the prompt appears (at most 3 times in 365 days per user; a development-signed build
 // always shows it and submits nothing; TestFlight never shows it) and does not report the outcome — so the state goes
 // REQUESTING -> DONE, or FAILED when the app has no window scene to show it in.
@@ -23,18 +23,16 @@ private func setState(_ s: Int32) { lock.lock(); state = s; lock.unlock() }
     return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
 }
 
+@available(iOS 16.0, *)
 @MainActor private func ask() {
     guard let scene = activeScene() else { setState(FAILED); return }
-    if #available(iOS 16.0, *) {
-        AppStore.requestReview(in: scene)
-    } else {
-        SKStoreReviewController.requestReview(in: scene)
-    }
+    AppStore.requestReview(in: scene)
     setState(DONE)
 }
 
 @_cdecl("sokolreview_request")
 public func sokolreview_request() -> Bool {
+    guard #available(iOS 16.0, *) else { return false }   // iOS 15: no current API → no prompt
     lock.lock()
     let busy = state == REQUESTING
     if !busy { state = REQUESTING }
