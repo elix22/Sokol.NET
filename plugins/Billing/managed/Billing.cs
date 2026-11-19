@@ -33,6 +33,10 @@ public enum BillingEventType
     /// means the query failed and its emptiness means nothing. Distinct from
     /// <see cref="RestoreDone"/> so a background sync never answers a "Restore purchases" tap.</summary>
     SyncDone          = 7,
+
+    /// <summary><see cref="Billing.FinishConsumable"/> answered: <c>Code == 0</c> = consumed, the SKU can be bought
+    /// again; otherwise it is still owned and replays as <see cref="PurchaseOk"/> on the next connect.</summary>
+    Consumed          = 8,
 }
 
 public readonly struct BillingEvent
@@ -131,6 +135,19 @@ public static class Billing
         SokolBilling.Consume(sku);
 #else
         _stubQueue.Enqueue(new BillingEvent { Type = BillingEventType.SyncDone, Code = CodeUnavailable });
+#endif
+    }
+
+    /// <summary>CONSUMABLE: after granting a consumable's <see cref="BillingEventType.PurchaseOk"/> (persisted, and
+    /// deduplicated by the order id in its proof — the same purchase replays until consumed), consume it so it can be
+    /// bought again → <see cref="BillingEventType.Consumed"/>. Never call it for a non-consumable (that would
+    /// revoke it).</summary>
+    public static void FinishConsumable(string sku)
+    {
+#if __ANDROID__ || __IOS__
+        SokolBilling.FinishConsumable(sku);
+#else
+        _stubQueue.Enqueue(new BillingEvent { Type = BillingEventType.Consumed, Code = CodeUnavailable, Sku = sku });
 #endif
     }
 

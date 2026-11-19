@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Google AdMob interstitials for Sokol.NET apps — Android + iOS. All calls are
+/// Google AdMob interstitials and rewarded ads for Sokol.NET apps — Android + iOS. All calls are
 /// non-blocking; results arrive as <see cref="AdsEvent"/>s raised by
 /// <see cref="AdsPlugin.Poll"/>, which the app calls once per frame from its
 /// game loop (the NearNet.Poll model).
@@ -25,6 +25,14 @@ public enum AdsEventType
     Dismissed     = 4,
     ConsentReady  = 5,
     ConsentFailed = 6,
+    /// <summary>The rewarded slot (independent of the interstitial one).</summary>
+    RewardedLoaded     = 7,
+    RewardedLoadFailed = 8,
+    RewardedShown      = 9,
+    /// <summary>Closed. Follows <see cref="RewardEarned"/> when the player watched it; alone on an early close.</summary>
+    RewardedDismissed  = 10,
+    /// <summary>Grant the reward now (<see cref="AdsEvent.Code"/> = the amount set on the ad unit).</summary>
+    RewardEarned       = 11,
 }
 
 public readonly struct AdsEvent
@@ -43,8 +51,10 @@ public static class AdsPlugin
     /// dev gets the AdMob account banned.</summary>
 #if __IOS__
     public const string TestInterstitialUnit = "ca-app-pub-3940256099942544/4411468910";
+    public const string TestRewardedUnit     = "ca-app-pub-3940256099942544/1712485313";
 #else
     public const string TestInterstitialUnit = "ca-app-pub-3940256099942544/1033173712";
+    public const string TestRewardedUnit     = "ca-app-pub-3940256099942544/5224354917";
 #endif
 
     /// <summary>True when a real ad SDK exists on this platform AND its native library
@@ -119,6 +129,37 @@ public static class AdsPlugin
     {
 #if __ANDROID__ || __IOS__
         Native(SokolAds.ShowInterstitial);
+#endif
+    }
+
+    public static void LoadRewarded(string adUnitId)
+    {
+#if __ANDROID__ || __IOS__
+        if (Native(() => SokolAds.LoadRewarded(adUnitId))) return;
+#endif
+        _stubQueue.Enqueue(new AdsEvent { Type = AdsEventType.RewardedLoadFailed, Code = CodeUnavailable });
+    }
+
+    public static bool RewardedReady
+    {
+        get
+        {
+#if __ANDROID__ || __IOS__
+            bool ready = false;
+            Native(() => ready = SokolAds.RewardedReady());
+            return ready;
+#else
+            return false;
+#endif
+        }
+    }
+
+    /// <summary>Show the preloaded rewarded ad (consumes it) — RewardedShown, RewardEarned (only if watched), then
+    /// RewardedDismissed follow. Grant on RewardEarned, never on the dismiss.</summary>
+    public static void ShowRewarded()
+    {
+#if __ANDROID__ || __IOS__
+        Native(SokolAds.ShowRewarded);
 #endif
     }
 

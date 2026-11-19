@@ -1,4 +1,5 @@
-/* sokol_billing.h -- one-time in-app purchases for Sokol.NET apps.
+/* sokol_billing.h -- one-time in-app purchases (non-consumable + consumable)
+   for Sokol.NET apps.
    Android: Google Play Billing Library (via a Java helper class).
    iOS:     StoreKit 2 (Swift shim with @_cdecl entry points).
 
@@ -47,6 +48,9 @@ typedef enum sokolbilling_event_type {
                                                   user's "Restore purchases" tap.
                                                   Android only today; iOS reads
                                                   Apple's own signed local cache.    */
+    SOKOLBILLING_EVENT_CONSUMED           = 8, /* sokolbilling_finish_consumable
+                                                  answered: sku + code (0 = consumed,
+                                                  the SKU can be bought again).      */
 } sokolbilling_event_type;
 
 typedef struct sokolbilling_event {
@@ -93,6 +97,16 @@ void sokolbilling_sync(void);
    the Console refund again. Completes like sokolbilling_sync() -> SYNC_DONE
    after a re-enumeration. No-op on iOS. */
 void sokolbilling_consume(const char* sku);
+
+/* CONSUMABLES: a consumable (e.g. a bundle of coins) arrives as PURCHASE_OK
+   like any other product. Grant it (persisted, deduplicated by the order id in
+   the proof), THEN call this to consume it -> CONSUMED (sku, code). Until it is
+   consumed the store keeps it owned: it replays as PURCHASE_OK on the next
+   connect (so a grant lost to a crash heals) and cannot be bought again.
+   Android: consumeAsync on the owned purchase of `sku` (Play holds at most one
+   unconsumed purchase per product). iOS: StoreKit 2 has already finished the
+   transaction when PURCHASE_OK was emitted, so this answers CONSUMED at once. */
+void sokolbilling_finish_consumable(const char* sku);
 
 /* Pop one queued event. Returns false when the queue is empty.
    Strings in *out stay valid until the next call. */

@@ -42,6 +42,20 @@ internal static class SokolAds
                CallingConvention = CallingConvention.Cdecl)]
     internal static extern void ShowInterstitial();
 
+    [DllImport(Lib, EntryPoint = "sokolads_load_rewarded",
+               CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void LoadRewarded(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string adUnitId);
+
+    [DllImport(Lib, EntryPoint = "sokolads_rewarded_ready",
+               CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool RewardedReady();
+
+    [DllImport(Lib, EntryPoint = "sokolads_show_rewarded",
+               CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void ShowRewarded();
+
     [DllImport(Lib, EntryPoint = "sokolads_poll_event",
                CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]

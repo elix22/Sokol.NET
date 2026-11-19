@@ -25,6 +25,7 @@
 /* sokol_ads_queue.c */
 extern void sokolads__emit(int type, int code);
 extern void sokolads__consume(void);
+extern void sokolads__consume_rewarded(void);
 
 /* Emitted as the code of *_FAILED when the app executable was built without
    the Google SDK — the managed layer then backs off exactly like a no-fill. */
@@ -33,6 +34,8 @@ extern void sokolads__consume(void);
 static bool _sa_npa_only;
 static GADInterstitialAd* _sa_loaded;
 static id<GADFullScreenContentDelegate> _sa_delegate;
+static GADRewardedAd* _sa_loaded_rw;
+static id<GADFullScreenContentDelegate> _sa_delegate_rw;
 
 @interface SokolAdsDelegate : NSObject <GADFullScreenContentDelegate>
 @end
@@ -50,6 +53,25 @@ static id<GADFullScreenContentDelegate> _sa_delegate;
        (music/navigation) runs exactly once either way. */
     sokolads__emit(SOKOLADS_EVENT_LOAD_FAILED, (int)error.code);
     sokolads__emit(SOKOLADS_EVENT_DISMISSED, 0);
+}
+@end
+
+/* The rewarded slot's own delegate, so its events never mix with the
+   interstitial's (both may be preloaded at once). */
+@interface SokolAdsRewardedDelegate : NSObject <GADFullScreenContentDelegate>
+@end
+
+@implementation SokolAdsRewardedDelegate
+- (void)adWillPresentFullScreenContent:(id<GADFullScreenPresentingAd>)ad {
+    sokolads__emit(SOKOLADS_EVENT_REWARDED_SHOWN, 0);
+}
+- (void)adDidDismissFullScreenContent:(id<GADFullScreenPresentingAd>)ad {
+    sokolads__emit(SOKOLADS_EVENT_REWARDED_DISMISSED, 0);
+}
+- (void)ad:(id<GADFullScreenPresentingAd>)ad
+    didFailToPresentFullScreenContentWithError:(NSError*)error {
+    sokolads__emit(SOKOLADS_EVENT_REWARDED_LOAD_FAILED, (int)error.code);
+    sokolads__emit(SOKOLADS_EVENT_REWARDED_DISMISSED, 0);
 }
 @end
 
@@ -131,6 +153,19 @@ void sokolads_consent_gather(void) {
     });
 }
 
+static GADRequest* _sa_request(Class reqCls) {
+    GADRequest* request = ((GADRequest* (*)(Class, SEL))objc_msgSend)(reqCls, @selector(request));
+    if (_sa_npa_only) {
+        Class extrasCls = NSClassFromString(@"GADExtras");
+        if (extrasCls) {
+            GADExtras* extras = [[extrasCls alloc] init];
+            extras.additionalParameters = @{ @"npa" : @"1" };
+            [request registerAdNetworkExtras:extras];
+        }
+    }
+    return request;
+}
+
 void sokolads_load_interstitial(const char* ad_unit_id) {
     if (!ad_unit_id) return;
     NSString* unit = [NSString stringWithUTF8String:ad_unit_id];
@@ -142,15 +177,7 @@ void sokolads_load_interstitial(const char* ad_unit_id) {
             sokolads__emit(SOKOLADS_EVENT_LOAD_FAILED, SOKOLADS_ERR_NO_SDK);
             return;
         }
-        GADRequest* request = ((GADRequest* (*)(Class, SEL))objc_msgSend)(reqCls, @selector(request));
-        if (_sa_npa_only) {
-            Class extrasCls = NSClassFromString(@"GADExtras");
-            if (extrasCls) {
-                GADExtras* extras = [[extrasCls alloc] init];
-                extras.additionalParameters = @{ @"npa" : @"1" };
-                [request registerAdNetworkExtras:extras];
-            }
-        }
+        GADRequest* request = _sa_request(reqCls);
         [interCls loadWithAdUnitID:unit
                            request:request
                  completionHandler:^(GADInterstitialAd* ad, NSError* error) {
@@ -175,5 +202,46 @@ void sokolads_show_interstitial(void) {
         _sa_loaded = nil;
         if (!ad) return;
         [ad presentFromRootViewController:_sa_root_vc()];
+    });
+}
+
+void sokolads_load_rewarded(const char* ad_unit_id) {
+    if (!ad_unit_id) return;
+    NSString* unit = [NSString stringWithUTF8String:ad_unit_id];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        Class rwCls  = NSClassFromString(@"GADRewardedAd");
+        Class reqCls = NSClassFromString(@"GADRequest");
+        if (!rwCls || !reqCls) {
+            _sa_loaded_rw = nil;
+            sokolads__emit(SOKOLADS_EVENT_REWARDED_LOAD_FAILED, SOKOLADS_ERR_NO_SDK);
+            return;
+        }
+        [rwCls loadWithAdUnitID:unit
+                        request:_sa_request(reqCls)
+              completionHandler:^(GADRewardedAd* ad, NSError* error) {
+            if (error) {
+                _sa_loaded_rw = nil;
+                sokolads__emit(SOKOLADS_EVENT_REWARDED_LOAD_FAILED, (int)error.code);
+                return;
+            }
+            if (!_sa_delegate_rw) _sa_delegate_rw = [[SokolAdsRewardedDelegate alloc] init];
+            ad.fullScreenContentDelegate = _sa_delegate_rw;
+            _sa_loaded_rw = ad;
+            sokolads__emit(SOKOLADS_EVENT_REWARDED_LOADED, 0);
+        }];
+    });
+}
+
+void sokolads_show_rewarded(void) {
+    if (!sokolads_rewarded_ready()) return;
+    sokolads__consume_rewarded();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        GADRewardedAd* ad = _sa_loaded_rw;
+        _sa_loaded_rw = nil;
+        if (!ad) return;
+        [ad presentFromRootViewController:_sa_root_vc()
+                 userDidEarnRewardHandler:^{
+            sokolads__emit(SOKOLADS_EVENT_REWARD_EARNED, ad.adReward.amount.intValue);
+        }];
     });
 }

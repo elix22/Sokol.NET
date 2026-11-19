@@ -24,7 +24,7 @@ import java.util.Map;
  * (sokol_billing_android.c); results flow back through nativeOnEvent into the
  * plugin's C event queue, drained by the app's game thread.
  *
- * One-time (INAPP) products only. Purchases are acknowledged here as soon as
+ * One-time (INAPP) products, non-consumable and consumable. Purchases are acknowledged here as soon as
  * they are reported PURCHASED (Play refunds unacknowledged purchases after
  * three days); the app persists the proof from the same event.
  */
@@ -42,6 +42,7 @@ public final class SokolBilling {
     static final int EV_PURCHASE_FAILED    = 5;
     static final int EV_RESTORE_DONE       = 6;
     static final int EV_SYNC_DONE          = 7;
+    static final int EV_CONSUMED           = 8;
 
     static Activity activity;
     /** Created on the UI thread by init(), read from the game thread. */
@@ -177,6 +178,37 @@ public final class SokolBilling {
                     .setPurchaseToken(target.getPurchaseToken())
                     .build(),
                 (cr, token) -> queryOwned(false));
+        });
+    }
+
+    /** CONSUMABLE: the app has granted the purchase of `sku` (from its PURCHASE_OK) — consume it
+        so the SKU can be bought again. Play holds at most one unconsumed purchase per product, so
+        the SKU names it. Answers CONSUMED with Play's response code (ITEM_NOT_OWNED when there is
+        nothing to consume — e.g. it was consumed already). */
+    public static void finishConsumable(final String sku) {
+        if (notInitialised(EV_CONSUMED, sku)) return;
+        QueryPurchasesParams params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.INAPP)
+            .build();
+        client.queryPurchasesAsync(params, (r, purchases) -> {
+            if (r.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+                nativeOnEvent(EV_CONSUMED, r.getResponseCode(), sku, null, null, null);
+                return;
+            }
+            Purchase target = null;
+            for (Purchase p : purchases)
+                if (p.getPurchaseState() == Purchase.PurchaseState.PURCHASED
+                    && p.getProducts().contains(sku)) { target = p; break; }
+            if (target == null) {
+                nativeOnEvent(EV_CONSUMED, BillingClient.BillingResponseCode.ITEM_NOT_OWNED,
+                              sku, null, null, null);
+                return;
+            }
+            client.consumeAsync(
+                ConsumeParams.newBuilder()
+                    .setPurchaseToken(target.getPurchaseToken())
+                    .build(),
+                (cr, token) -> nativeOnEvent(EV_CONSUMED, cr.getResponseCode(), sku, null, null, null));
         });
     }
 

@@ -37,6 +37,9 @@ if(ANDROID)
     target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_options(${LIB_NAME} PRIVATE -x c)
     target_link_libraries(${LIB_NAME} PRIVATE android log)
+    if(ANDROID_ABI STREQUAL "arm64-v8a" OR ANDROID_ABI STREQUAL "x86_64")
+        target_link_options(${LIB_NAME} PRIVATE "-Wl,-z,max-page-size=16384")   # Google Play: 16 KB pages (whatever the NDK's default)
+    endif()
 
     # Link against the pre-built libsokol.so (for sapp_android_get_native_activity).
     if(NOT DEFINED SOKOL_LIB_DIR)

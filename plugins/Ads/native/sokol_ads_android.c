@@ -19,12 +19,15 @@ extern const void* sapp_android_get_native_activity(void);
 /* sokol_ads_queue.c */
 extern void sokolads__emit(int type, int code);
 extern void sokolads__consume(void);
+extern void sokolads__consume_rewarded(void);
 
 static jclass    _sa_class;      /* global ref to com.sokol.ads.SokolAds */
 static jmethodID _sa_init;
 static jmethodID _sa_consent;
 static jmethodID _sa_load;
 static jmethodID _sa_show;
+static jmethodID _sa_load_rw;
+static jmethodID _sa_show_rw;
 
 static JNIEnv* _sa_env(void)
 {
@@ -69,6 +72,14 @@ static bool _sa_resolve(JNIEnv* env, ANativeActivity* activity)
     _sa_load    = (*env)->GetStaticMethodID(env, _sa_class, "loadInterstitial",
                       "(Ljava/lang/String;)V");
     _sa_show    = (*env)->GetStaticMethodID(env, _sa_class, "showInterstitial", "()V");
+    _sa_load_rw = (*env)->GetStaticMethodID(env, _sa_class, "loadRewarded",
+                      "(Ljava/lang/String;)V");
+    _sa_show_rw = (*env)->GetStaticMethodID(env, _sa_class, "showRewarded", "()V");
+    if ((*env)->ExceptionCheck(env)) {   /* an older helper without rewarded */
+        (*env)->ExceptionClear(env);
+        _sa_load_rw = NULL;
+        _sa_show_rw = NULL;
+    }
     (*env)->DeleteLocalRef(env, cls);
     return true;
 }
@@ -111,6 +122,31 @@ void sokolads_show_interstitial(void)
     JNIEnv* env = _sa_env();
     if (!env) return;
     (*env)->CallStaticVoidMethod(env, _sa_class, _sa_show);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+}
+
+void sokolads_load_rewarded(const char* ad_unit_id)
+{
+    if (!ad_unit_id) return;
+    if (!_sa_class || !_sa_load_rw) {
+        sokolads__emit(SOKOLADS_EVENT_REWARDED_LOAD_FAILED, -1);
+        return;
+    }
+    JNIEnv* env = _sa_env();
+    if (!env) return;
+    jstring junit = (*env)->NewStringUTF(env, ad_unit_id);
+    (*env)->CallStaticVoidMethod(env, _sa_class, _sa_load_rw, junit);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    (*env)->DeleteLocalRef(env, junit);
+}
+
+void sokolads_show_rewarded(void)
+{
+    if (!_sa_class || !_sa_show_rw || !sokolads_rewarded_ready()) return;
+    sokolads__consume_rewarded();
+    JNIEnv* env = _sa_env();
+    if (!env) return;
+    (*env)->CallStaticVoidMethod(env, _sa_class, _sa_show_rw);
     if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
 }
 

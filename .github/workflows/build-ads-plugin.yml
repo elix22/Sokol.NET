@@ -1,0 +1,120 @@
+name: Build Ads Plugin
+
+# Builds plugins/Ads (sokol_ads: AdMob interstitials + rewarded ads) for Android and iOS on every change to the plugin, and commits the prebuilt outputs
+# back to plugins/Ads/libs/ on main — every shipped library is a CI build, never a local one. A change is not done until
+# every job is green.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/Ads/**'
+      - '!plugins/Ads/libs/**'
+      - '.github/workflows/build-ads-plugin.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'plugins/Ads/**'
+      - '!plugins/Ads/libs/**'
+      - '.github/workflows/build-ads-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: Build iOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [device, simulator-arm64, simulator-x64]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    - name: Build
+      run: ./plugins/Ads/scripts/build-ios.sh ${{ matrix.target }}
+    - name: Determine upload path
+      id: upload_path
+      run: |
+        case "${{ matrix.target }}" in
+          device)          echo "path=plugins/Ads/libs/ios/arm64" >> $GITHUB_OUTPUT ;;
+          simulator-arm64) echo "path=plugins/Ads/libs/ios/simulator-arm64" >> $GITHUB_OUTPUT ;;
+          simulator-x64)   echo "path=plugins/Ads/libs/ios/simulator-x64" >> $GITHUB_OUTPUT ;;
+        esac
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ads-ios-${{ matrix.target }}
+        path: ${{ steps.upload_path.outputs.path }}/**/*
+        retention-days: 30
+
+  build-android:
+    name: Build Android (armeabi-v7a, arm64-v8a, x86_64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: ''
+    - name: Install Android NDK
+      run: |
+        sdkmanager --install "ndk;27.2.12479018"
+        echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+    - name: Build (links the repo's CI-built libsokol.so)
+      run: ./plugins/Ads/scripts/build-android.sh
+    - name: 64-bit libraries are 16 KB aligned (Google Play, Android 15+)
+      run: |
+        READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        for abi in arm64-v8a x86_64; do
+          so=plugins/Ads/libs/android/$abi/release/libsokol_ads.so
+          align=$("$READELF" -l "$so" | awk '/LOAD/ {print $NF; exit}')
+          [ "$align" = "0x4000" ] || { echo "::error::$so is not 16 KB aligned ($align)"; exit 1; }
+          echo "$so: 16 KB aligned"
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ads-android
+        path: plugins/Ads/libs/android/**/*
+        retention-days: 30
+
+  commit-libs:
+    name: Commit the Android and iOS libraries
+    needs: [build-ios, build-android]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Download the artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Commit the libraries
+      run: |
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p plugins/Ads/libs/android \
+                 plugins/Ads/libs/ios/arm64 plugins/Ads/libs/ios/simulator-arm64 plugins/Ads/libs/ios/simulator-x64
+        cp -r ../artifacts/ads-android/*              plugins/Ads/libs/android/
+        cp -r ../artifacts/ads-ios-device/*           plugins/Ads/libs/ios/arm64/
+        cp -r ../artifacts/ads-ios-simulator-arm64/*  plugins/Ads/libs/ios/simulator-arm64/
+        cp -r ../artifacts/ads-ios-simulator-x64/*    plugins/Ads/libs/ios/simulator-x64/
+        LIBS="plugins/Ads/libs"
+        if [ -z "$(git status --porcelain $LIBS)" ]; then
+          echo "No sokol_ads library change to commit"
+          exit 0
+        fi
+        git add $LIBS
+        git commit -m "Auto-update built sokol_ads libraries (Android, iOS) [skip ci]" \
+                   -m "Generated from commit: ${{ github.sha }}" \
+                   -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        git pull --rebase origin main
+        git push origin main
+        echo "✓ Committed sokol_ads libraries"

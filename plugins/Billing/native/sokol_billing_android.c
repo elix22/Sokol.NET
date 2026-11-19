@@ -25,6 +25,7 @@ static jmethodID _sb_purchase;
 static jmethodID _sb_restore;
 static jmethodID _sb_sync;
 static jmethodID _sb_consume;
+static jmethodID _sb_finish;
 
 static JNIEnv* _sb_env(void)
 {
@@ -73,6 +74,12 @@ static bool _sb_resolve(JNIEnv* env, ANativeActivity* activity)
     _sb_sync     = (*env)->GetStaticMethodID(env, _sb_class, "sync", "()V");
     _sb_consume  = (*env)->GetStaticMethodID(env, _sb_class, "consume",
                        "(Ljava/lang/String;)V");
+    _sb_finish   = (*env)->GetStaticMethodID(env, _sb_class, "finishConsumable",
+                       "(Ljava/lang/String;)V");
+    if ((*env)->ExceptionCheck(env)) {   /* an older helper without consumables */
+        (*env)->ExceptionClear(env);
+        _sb_finish = NULL;
+    }
     (*env)->DeleteLocalRef(env, cls);
     return true;
 }
@@ -112,6 +119,7 @@ static void _sb_call_void(jmethodID method)
 void sokolbilling_restore(void) { _sb_call_void(_sb_restore); }
 void sokolbilling_sync(void)    { _sb_call_void(_sb_sync); }
 void sokolbilling_consume(const char* sku) { _sb_call_str(_sb_consume, sku); }
+void sokolbilling_finish_consumable(const char* sku) { _sb_call_str(_sb_finish, sku); }
 
 /* Upcall from com.sokol.billing.SokolBilling (any Java thread). */
 JNIEXPORT void JNICALL

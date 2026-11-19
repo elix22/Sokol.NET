@@ -23,6 +23,7 @@ private let EV_PURCHASE_OK: Int32        = 3
 private let EV_PURCHASE_CANCELLED: Int32 = 4
 private let EV_PURCHASE_FAILED: Int32    = 5
 private let EV_RESTORE_DONE: Int32       = 6
+private let EV_CONSUMED: Int32           = 8
 
 private func emit(_ type: Int32, code: Int32 = 0, sku: String? = nil,
                   price: String? = nil, proof: String? = nil) {
@@ -157,3 +158,13 @@ public func sokolbilling_sync() { }
    app's static link; StoreKit has no consume for non-consumables. */
 @_cdecl("sokolbilling_consume")
 public func sokolbilling_consume(_ sku: UnsafePointer<CChar>?) { }
+
+/* Consumables: StoreKit 2 already finished the transaction when PURCHASE_OK was
+   emitted (and a finished consumable never appears in currentEntitlements), so
+   there is nothing left to consume — answer at once so the managed flow is the
+   same on both platforms. */
+@_cdecl("sokolbilling_finish_consumable")
+public func sokolbilling_finish_consumable(_ cSku: UnsafePointer<CChar>?) {
+    guard let cSku = cSku else { return }
+    emit(EV_CONSUMED, sku: String(cString: cSku))
+}
