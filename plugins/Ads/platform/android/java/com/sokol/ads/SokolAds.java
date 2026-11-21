@@ -44,6 +44,7 @@ public final class SokolAds {
     static final int EV_RW_SHOWN       = 9;
     static final int EV_RW_DISMISSED   = 10;
     static final int EV_RW_EARNED      = 11;
+    static final int EV_PRIVACY_DONE   = 12;
 
     static Activity activity;
     static boolean npaOnly;
@@ -79,6 +80,21 @@ public final class SokolAds {
                 }),
                 requestError -> nativeOnEvent(EV_CONSENT_FAILED, requestError.getErrorCode()));
         });
+    }
+
+    /** UMP's privacy options requirement (EEA / UK with a published GDPR message): the app shows a
+     *  "Privacy options" entry while true. Read from any thread (a stored value). */
+    public static boolean privacyOptionsRequired() {
+        if (activity == null) return false;
+        return UserMessagingPlatform.getConsentInformation(activity).getPrivacyOptionsRequirementStatus()
+            == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED;
+    }
+
+    /** UMP's privacy options form: the player changes or withdraws consent -> EV_PRIVACY_DONE. */
+    public static void showPrivacyOptions() {
+        if (activity == null) { nativeOnEvent(EV_PRIVACY_DONE, -1); return; }
+        activity.runOnUiThread(() -> UserMessagingPlatform.showPrivacyOptionsForm(activity, formError ->
+            nativeOnEvent(EV_PRIVACY_DONE, formError != null ? formError.getErrorCode() : 0)));
     }
 
     static AdRequest request() {

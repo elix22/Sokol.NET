@@ -33,6 +33,8 @@ public enum AdsEventType
     RewardedDismissed  = 10,
     /// <summary>Grant the reward now (<see cref="AdsEvent.Code"/> = the amount set on the ad unit).</summary>
     RewardEarned       = 11,
+    /// <summary>The privacy options form closed (<see cref="AdsEvent.Code"/> = UMP error, 0 = closed normally).</summary>
+    PrivacyOptionsDone = 12,
 }
 
 public readonly struct AdsEvent
@@ -82,6 +84,18 @@ public static class AdsPlugin
         try { call(); return true; }
         catch (DllNotFoundException)        { _nativeOk = false; }
         catch (EntryPointNotFoundException) { _nativeOk = false; }
+        return false;
+    }
+
+    // the privacy options calls (added 2026-11-21) on their own guard: a native library built before them lacks the two
+    // entry points — that must hide the "Privacy options" entry, never switch off the ads (Native() would)
+    static bool _privacyOk = true;
+    static bool Privacy(Action call)
+    {
+        if (!_nativeOk || !_privacyOk) return false;
+        try { call(); return true; }
+        catch (EntryPointNotFoundException) { _privacyOk = false; }
+        catch (DllNotFoundException)        { _nativeOk = false; }
         return false;
     }
 #endif
@@ -161,6 +175,32 @@ public static class AdsPlugin
 #if __ANDROID__ || __IOS__
         Native(SokolAds.ShowRewarded);
 #endif
+    }
+
+    /// <summary>True when the player must be able to change their consent choice (UMP: EEA / UK users once a GDPR message is
+    /// published in AdMob) — known after <see cref="GatherConsent"/> answers; show a "Privacy options" entry while true.
+    /// Always false on desktop / web.</summary>
+    public static bool PrivacyOptionsRequired
+    {
+        get
+        {
+#if __ANDROID__ || __IOS__
+            bool required = false;
+            Privacy(() => required = SokolAds.PrivacyOptionsRequired());
+            return required;
+#else
+            return false;
+#endif
+        }
+    }
+
+    /// <summary>Open UMP's privacy options form (change or withdraw consent) → <see cref="AdsEventType.PrivacyOptionsDone"/>.</summary>
+    public static void ShowPrivacyOptions()
+    {
+#if __ANDROID__ || __IOS__
+        if (Privacy(SokolAds.ShowPrivacyOptions)) return;
+#endif
+        _stubQueue.Enqueue(new AdsEvent { Type = AdsEventType.PrivacyOptionsDone, Code = CodeUnavailable });
     }
 
     /// <summary>Drain pending ad events; call once per frame from the game loop.</summary>

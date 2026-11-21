@@ -47,6 +47,7 @@ typedef enum sokolads_event_type {
     SOKOLADS_EVENT_REWARDED_SHOWN       = 9,  /* rewarded ad on screen              */
     SOKOLADS_EVENT_REWARDED_DISMISSED   = 10, /* closed — after REWARD_EARNED if the player watched it */
     SOKOLADS_EVENT_REWARD_EARNED        = 11, /* code = reward amount; grant it now */
+    SOKOLADS_EVENT_PRIVACY_DONE         = 12, /* privacy options form closed; code = UMP error or 0 */
 } sokolads_event_type;
 
 typedef struct sokolads_event {
@@ -85,6 +86,15 @@ bool sokolads_rewarded_ready(void);
    emits REWARDED_LOAD_FAILED then REWARDED_DISMISSED. No-op when none ready. */
 void sokolads_show_rewarded(void);
 
+/* True when the player must be able to change their consent choice (UMP's
+   privacy options requirement: EEA / UK users once a GDPR message is published
+   in AdMob). Known after the consent flow (CONSENT_READY / CONSENT_FAILED);
+   false before it and where not required. Show a "Privacy options" entry in
+   the app's settings while it is true. */
+bool sokolads_privacy_options_required(void);
+/* Open UMP's privacy options form (the player changes or withdraws consent)
+   -> PRIVACY_DONE (code = UMP error, 0 when the form closed normally). */
+void sokolads_show_privacy_options(void);
 /* Pop one queued event. Returns false when the queue is empty. */
 bool sokolads_poll_event(sokolads_event* out);
 

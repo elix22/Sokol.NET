@@ -56,6 +56,15 @@ internal static class SokolAds
                CallingConvention = CallingConvention.Cdecl)]
     internal static extern void ShowRewarded();
 
+    [DllImport(Lib, EntryPoint = "sokolads_privacy_options_required",
+               CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool PrivacyOptionsRequired();
+
+    [DllImport(Lib, EntryPoint = "sokolads_show_privacy_options",
+               CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void ShowPrivacyOptions();
+
     [DllImport(Lib, EntryPoint = "sokolads_poll_event",
                CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]

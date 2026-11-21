@@ -153,6 +153,26 @@ void sokolads_consent_gather(void) {
     });
 }
 
+bool sokolads_privacy_options_required(void) {
+    /* sokol_app's frame runs on the main thread on iOS, where UMP's state lives */
+    Class infoCls = NSClassFromString(@"UMPConsentInformation");
+    if (!infoCls) return false;
+    UMPConsentInformation* info =
+        ((UMPConsentInformation* (*)(Class, SEL))objc_msgSend)(infoCls, @selector(sharedInstance));
+    return info.privacyOptionsRequirementStatus == UMPPrivacyOptionsRequirementStatusRequired;
+}
+
+void sokolads_show_privacy_options(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        Class formCls = NSClassFromString(@"UMPConsentForm");
+        if (!formCls) { sokolads__emit(SOKOLADS_EVENT_PRIVACY_DONE, SOKOLADS_ERR_NO_SDK); return; }
+        [formCls presentPrivacyOptionsFormFromViewController:_sa_root_vc()
+            completionHandler:^(NSError* _Nullable formError) {
+                sokolads__emit(SOKOLADS_EVENT_PRIVACY_DONE, formError ? (int)formError.code : 0);
+            }];
+    });
+}
+
 static GADRequest* _sa_request(Class reqCls) {
     GADRequest* request = ((GADRequest* (*)(Class, SEL))objc_msgSend)(reqCls, @selector(request));
     if (_sa_npa_only) {

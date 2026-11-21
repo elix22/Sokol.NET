@@ -28,6 +28,8 @@ static jmethodID _sa_load;
 static jmethodID _sa_show;
 static jmethodID _sa_load_rw;
 static jmethodID _sa_show_rw;
+static jmethodID _sa_priv_req;
+static jmethodID _sa_priv_show;
 
 static JNIEnv* _sa_env(void)
 {
@@ -79,6 +81,13 @@ static bool _sa_resolve(JNIEnv* env, ANativeActivity* activity)
         (*env)->ExceptionClear(env);
         _sa_load_rw = NULL;
         _sa_show_rw = NULL;
+    }
+    _sa_priv_req  = (*env)->GetStaticMethodID(env, _sa_class, "privacyOptionsRequired", "()Z");
+    _sa_priv_show = (*env)->GetStaticMethodID(env, _sa_class, "showPrivacyOptions", "()V");
+    if ((*env)->ExceptionCheck(env)) {   /* an older helper without the privacy options */
+        (*env)->ExceptionClear(env);
+        _sa_priv_req = NULL;
+        _sa_priv_show = NULL;
     }
     (*env)->DeleteLocalRef(env, cls);
     return true;
@@ -147,6 +156,25 @@ void sokolads_show_rewarded(void)
     JNIEnv* env = _sa_env();
     if (!env) return;
     (*env)->CallStaticVoidMethod(env, _sa_class, _sa_show_rw);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+}
+
+bool sokolads_privacy_options_required(void)
+{
+    if (!_sa_class || !_sa_priv_req) return false;
+    JNIEnv* env = _sa_env();
+    if (!env) return false;
+    jboolean r = (*env)->CallStaticBooleanMethod(env, _sa_class, _sa_priv_req);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return false; }
+    return r == JNI_TRUE;
+}
+
+void sokolads_show_privacy_options(void)
+{
+    if (!_sa_class || !_sa_priv_show) { sokolads__emit(SOKOLADS_EVENT_PRIVACY_DONE, -1); return; }
+    JNIEnv* env = _sa_env();
+    if (!env) return;
+    (*env)->CallStaticVoidMethod(env, _sa_class, _sa_priv_show);
     if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
 }
 

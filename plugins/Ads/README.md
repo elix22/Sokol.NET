@@ -44,6 +44,22 @@ if (AdsPlugin.RewardedReady) AdsPlugin.ShowRewarded();  // -> RewardedShown, Rew
   interstitials' native queue; the interstitial API is unchanged.
 - Verified on a Galaxy Z Flip4 from Play internal testing with Google's test unit (2026-11-19).
 
+### Privacy options (GDPR)
+
+Where UMP requires it (EEA / UK users, once a GDPR message is published in AdMob), a player must be able to change or
+withdraw their consent later. After the consent flow has answered (`ConsentReady` / `ConsentFailed`):
+
+```csharp
+if (AdsPlugin.PrivacyOptionsRequired)           // UMP's privacy options requirement — false elsewhere and on desktop / web
+    AdsPlugin.ShowPrivacyOptions();             // UMP's privacy options form -> PrivacyOptionsDone (Code = UMP error, 0 = closed)
+```
+
+- Show a "Privacy options" entry in the app's settings only while `PrivacyOptionsRequired` is true (Google's guidance).
+- Event 12 `PrivacyOptionsDone`; C: `sokolads_privacy_options_required()` / `sokolads_show_privacy_options()`.
+- The two calls have their own guard: a native library built before them hides the entry, it never switches off the ads.
+- Added 2026-11-21. Built for Android + iOS; the form itself needs an EEA / UK user and a
+  published GDPR message (without one UMP answers "no form configured").
+
 ## Ids: application id vs unit ids
 
 - **APPLICATION_ID is platform configuration, not an API input.**
