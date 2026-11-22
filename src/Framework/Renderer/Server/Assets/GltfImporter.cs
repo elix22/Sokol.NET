@@ -556,6 +556,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     var ex = CGltfSkinExtractor.Extract(data, si);   // si < 0 → no-skin (morph/node) clips
                     var ent = SkinnedCharacterRegistry.GetOrCreateFresh(KeyFor(si));
                     ent.BoneCount = ex.BoneCount;
+                    ent.RestBones = ex.HasSkin ? ex.RestBoneMatrices : null;   // drawn when no clip moves it (quantized skins)
                     ent.Nodes = ex.Nodes; ent.BoneInfoMap = ex.BoneInfoMap;   // each copy's own animator is made from these (E1)
                     ent.Animator  = ex.HasAnimations
                         ? new CGltfAnimator(ex.Animations[0], ex.Nodes, ex.BoneCount, ex.BoneInfoMap)
@@ -605,11 +606,14 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                     {
                         cgltf_primitive* prim = &node->mesh->primitives[pi];
                         if (prim->type != cgltf_primitive_type.cgltf_primitive_type_triangles) continue;
-                        if (!BuildSkinnedPrimitive(prim, out SkinnedVertex[] sverts, out uint[] sidx, out Aabb sbounds)) continue;
+                        if (!BuildSkinnedPrimitive(prim, entry.RestBones, out SkinnedVertex[] sverts, out uint[] sidx, out Aabb sbounds, out float lodScale)) continue;
 
                         int primIndex = runningPrims[skinIdx]++;
                         totalPrims++;
-                        var skinnedMesh = SkinnedMesh.Create(sverts, sidx, in sbounds, $"{nodeName}_p{pi}", ReadLods(prim, sverts.Length));
+                        var lods = ReadLods(prim, sverts.Length);
+                        if (lods != null && lodScale != 1f)
+                            for (int k = 0; k < lods.Errors.Length; k++) lods.Errors[k] *= lodScale;   // file units -> the bounds' (rest pose)
+                        var skinnedMesh = SkinnedMesh.Create(sverts, sidx, in sbounds, $"{nodeName}_p{pi}", lods);
 
                         // Morph targets: build the immutable displacement texture once; record the node
                         // index + static weights for per-frame weight resolution at draw time.
@@ -1149,11 +1153,15 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
             // Skinned variant of BuildPrimitive: also reads JOINTS_0 + WEIGHTS_0 into an 80 B
             // SkinnedVertex (joint indices are unpacked as floats — the shader casts them back).
-            private bool BuildSkinnedPrimitive(cgltf_primitive* prim, out SkinnedVertex[] vertices, out uint[] indices, out Aabb bounds)
+            // The bounds are where the vertices are drawn in the rest pose (restBones, when skinned), not the file's raw positions:
+            // a KHR_mesh_quantization file's are in quantized units, which only its skin turns into the model's space.
+            // lodScale: the rest pose's size over the file's (its LOD errors are in the file's units).
+            private bool BuildSkinnedPrimitive(cgltf_primitive* prim, Matrix4x4[]? restBones, out SkinnedVertex[] vertices, out uint[] indices, out Aabb bounds, out float lodScale)
             {
                 vertices = Array.Empty<SkinnedVertex>();
                 indices  = Array.Empty<uint>();
                 bounds   = default;
+                lodScale = 1f;
 
                 cgltf_accessor* posAcc = null, normAcc = null, tanAcc = null, tc0Acc = null, tc1Acc = null, jntAcc = null, wgtAcc = null;
                 for (int ai = 0; ai < (int)prim->attributes_count; ai++)
@@ -1224,6 +1232,30 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
                 indices = idx;
                 bounds  = new Aabb(bmin, bmax);
+                if (restBones != null && restBones.Length > 0 && jntData.Length > 0 && wgtData.Length > 0)
+                {
+                    // As the shader skins: the weighted bone matrices (a vertex with no weight is drawn where it is).
+                    var rmin = new Vector3(float.MaxValue);
+                    var rmax = new Vector3(float.MinValue);
+                    for (int i = 0; i < vc; i++)
+                    {
+                        var p = vertices[i].Position;
+                        Vector3 q = Vector3.Zero; float wsum = 0f;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            float w = wgtData[i * 4 + k];
+                            int j = (int)jntData[i * 4 + k];
+                            if (w == 0f || j < 0 || j >= restBones.Length) continue;
+                            q += Vector3.Transform(p, restBones[j]) * w; wsum += w;
+                        }
+                        if (wsum == 0f) q = p;
+                        rmin = Vector3.Min(rmin, q);
+                        rmax = Vector3.Max(rmax, q);
+                    }
+                    float fileSize = (bmax - bmin).Length(), restSize = (rmax - rmin).Length();
+                    if (fileSize > 0f && restSize > 0f) lodScale = restSize / fileSize;
+                    bounds = new Aabb(rmin, rmax);
+                }
                 return true;
             }
 

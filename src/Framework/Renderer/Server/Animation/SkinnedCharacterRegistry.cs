@@ -27,6 +27,14 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             public CGltfAnimator? Animator;
             public int BoneCount;
 
+            /// <summary>The skeleton's rest pose (the file's, by bone id): drawn when there is no animator. Zero matrices would
+            /// leave the shader's skinning off - right for a file whose positions are already in model space, but a quantized
+            /// one (KHR_mesh_quantization) is only placed by its skin.</summary>
+            public Matrix4x4[]? RestBones;
+
+            /// <summary>The bone matrices to draw with: the animator's pose, else the rest pose.</summary>
+            public Matrix4x4[]? Bones => Animator?.GetFinalBoneMatrices() ?? RestBones;
+
             /// <summary>The model file's entry this copy belongs to; null on the file's entry itself.</summary>
             public Entry? File { get; private set; }
 
@@ -45,6 +53,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                 Clips = file.Clips;
                 Meshes = file.Meshes;
                 BoneCount = file.BoneCount;
+                RestBones = file.RestBones;
                 if (file.Animator != null && !file.AnimatorTaken) { Animator = file.Animator; file.AnimatorTaken = true; }
                 else if (file.Animator != null && file.Nodes != null && file.Clips.Count > 0)
                     Animator = new CGltfAnimator(file.Clips[0].Clip, file.Nodes, file.BoneCount, file.BoneInfoMap);
@@ -178,7 +187,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
 
             /// <summary>Packs the current bone matrices into the joint texture and uploads it. Frame-
             /// guarded so a character shared across primitives + views uploads at most once per frame.
-            /// A null animator leaves the texture cleared → zero matrices → shader bind-pose fallback.
+            /// A null animator uploads the rest pose (none: cleared → zero matrices → the shader's no-skin fallback).
             /// Render-thread only.</summary>
             public unsafe void UploadJointMatrices(int frame)
             {
@@ -190,7 +199,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                     _jointScratch = new float[texelCount * 4];
                 Array.Clear(_jointScratch, 0, _jointScratch.Length);
 
-                var bones = Animator?.GetFinalBoneMatrices();
+                var bones = Bones;
                 if (bones != null)
                 {
                     int maxJoints = Math.Min(Math.Min(BoneCount, bones.Length), texelCount / 8);

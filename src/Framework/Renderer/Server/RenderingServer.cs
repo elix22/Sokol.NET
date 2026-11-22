@@ -2951,7 +2951,7 @@ namespace GameEditor.Framework.Renderer.Server
             };
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);
@@ -3157,7 +3157,7 @@ namespace GameEditor.Framework.Renderer.Server
             vs.csm_vp[3] = _csmCascadeVP[3];
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);
@@ -3367,7 +3367,7 @@ namespace GameEditor.Framework.Renderer.Server
             vs.csm_normal_offsets = CsmNormalOffsets();
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);
@@ -3595,7 +3595,7 @@ namespace GameEditor.Framework.Renderer.Server
             vs.u_morphWeights[1] = mw1;
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);
@@ -3793,7 +3793,7 @@ namespace GameEditor.Framework.Renderer.Server
             vs.u_morphWeights[1] = mw1;
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);
@@ -4005,7 +4005,7 @@ namespace GameEditor.Framework.Renderer.Server
             vs.u_morphWeights[1] = mw1;
             if (!useTex)
             {
-                var bones = entry.Animator?.GetFinalBoneMatrices();
+                var bones = entry.Bones;
                 if (bones != null)
                 {
                     int bc = Math.Min(Math.Min(entry.BoneCount, bones.Length), Animation.AnimationConstants.MAX_BONES);

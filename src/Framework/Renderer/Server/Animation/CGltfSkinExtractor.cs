@@ -29,6 +29,11 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         public Dictionary<string, BoneInfo> BoneInfoMap { get; private set; } = new();
         public int BoneCount { get; private set; }
 
+        /// <summary>Each bone's matrix in the file's rest pose (inverse bind × the joint's world matrix), by bone id: what a
+        /// character with no clip is drawn with. A KHR_mesh_quantization file's skinned positions are in quantized units and
+        /// only these matrices (gltfpack folds the dequantization into the inverse binds) bring them to the model's space.</summary>
+        public Matrix4x4[] RestBoneMatrices { get; private set; } = Array.Empty<Matrix4x4>();
+
         /// <summary>Animation clips (skin-filtered when a skin exists, else node animations).</summary>
         public List<CGltfAnimation> Animations { get; } = new();
 
@@ -69,8 +74,8 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             // Step 1b — the requested skin → bone-info map (only that skin's bones).
             if (skinIndex >= 0 && skinIndex < (int)data->skins_count)
             {
-                var (bim, bc) = ProcessSkin(&data->skins[skinIndex], skinIndex);
-                BoneInfoMap = bim; BoneCount = bc;
+                var (bim, bc, rest) = ProcessSkin(&data->skins[skinIndex], skinIndex);
+                BoneInfoMap = bim; BoneCount = bc; RestBoneMatrices = rest;
             }
 
             // Step 2 — scene node tree → CGltfNode hierarchy (one node per glTF node).
@@ -92,10 +97,12 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         }
 
         // ── ProcessSkin (CGltfModel.cs:361) ───────────────────────────────────────
-        private (Dictionary<string, BoneInfo> bim, int count) ProcessSkin(cgltf_skin* skin, int skinIndex)
+        private (Dictionary<string, BoneInfo> bim, int count, Matrix4x4[] rest) ProcessSkin(cgltf_skin* skin, int skinIndex)
         {
             var boneInfoMap = new Dictionary<string, BoneInfo>();
+            var rest = new List<Matrix4x4>();
             int counter = 0;
+            float* wm = stackalloc float[16];
 
             for (int ji = 0; ji < (int)skin->joints_count; ji++)
             {
@@ -115,8 +122,14 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                         m[12], m[13], m[14], m[15]);
                 }
                 boneInfoMap[name] = new BoneInfo { Id = counter++, Offset = ibm };
+                cgltf_node_transform_world(in *joint, wm);
+                rest.Add(ibm * new Matrix4x4(
+                    wm[0],  wm[1],  wm[2],  wm[3],
+                    wm[4],  wm[5],  wm[6],  wm[7],
+                    wm[8],  wm[9],  wm[10], wm[11],
+                    wm[12], wm[13], wm[14], wm[15]));
             }
-            return (boneInfoMap, counter);
+            return (boneInfoMap, counter, rest.ToArray());
         }
 
         // ── Node hierarchy (simplified from ProcessNodeWithParent, CGltfModel.cs:732) ──
@@ -201,6 +214,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                     if (bone == null)
                     {
                         bone = new CGltfBone(targetName, boneId);
+                        SetRest(bone, ch->target_node);
                         animation.AddBone(bone);
                     }
 
@@ -246,6 +260,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                     if (bone == null)
                     {
                         bone = new CGltfBone(targetName, -1);
+                        SetRest(bone, ch->target_node);
                         animation.AddBone(bone);
                     }
                     ParseBoneChannel(ch, bone, ConvertInterpolation(ch->sampler->interpolation));
@@ -255,6 +270,29 @@ namespace GameEditor.Framework.Renderer.Server.Animation
                     result.Add(animation);
             }
             return result;
+        }
+
+        // A bone starts at its node's own transform: the channels the clip lacks keep it.
+        private static void SetRest(CGltfBone bone, cgltf_node* n)
+        {
+            Vector3 t = Vector3.Zero, s = Vector3.One;
+            Quaternion r = Quaternion.Identity;
+            if (n->has_matrix != 0)
+            {
+                var m = new Matrix4x4(
+                    n->matrix[0],  n->matrix[1],  n->matrix[2],  n->matrix[3],
+                    n->matrix[4],  n->matrix[5],  n->matrix[6],  n->matrix[7],
+                    n->matrix[8],  n->matrix[9],  n->matrix[10], n->matrix[11],
+                    n->matrix[12], n->matrix[13], n->matrix[14], n->matrix[15]);
+                Matrix4x4.Decompose(m, out s, out r, out t);
+            }
+            else
+            {
+                if (n->has_translation != 0) t = new Vector3(n->translation[0], n->translation[1], n->translation[2]);
+                if (n->has_rotation    != 0) r = new Quaternion(n->rotation[0], n->rotation[1], n->rotation[2], n->rotation[3]);
+                if (n->has_scale       != 0) s = new Vector3(n->scale[0], n->scale[1], n->scale[2]);
+            }
+            bone.SetRest(t, r, s);
         }
 
         // ── ParseBoneChannel (CGltfModel.cs:973) ──────────────────────────────────

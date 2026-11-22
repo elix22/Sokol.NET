@@ -46,6 +46,19 @@ namespace GameEditor.Framework.Renderer.Server.Animation
             ID = id;
         }
 
+        /// <summary>The node's own (rest) transform: a channel the clip does not have keeps it (glTF: an unanimated property
+        /// stays the node's). gltfpack drops every track equal to the rest pose; without this such a bone sat at zero.</summary>
+        public void SetRest(Vector3 translation, Quaternion rotation, Vector3 scale)
+        {
+            _translation = _restTranslation = translation;
+            _rotation    = _restRotation    = rotation;
+            _scale       = _restScale       = scale;
+        }
+
+        private Vector3 _restTranslation;
+        private Quaternion _restRotation = Quaternion.Identity;
+        private Vector3 _restScale = Vector3.One;
+
         public void SetTranslationKeys(float[] times, Vector3[] values, CGltfInterpolation interp)
         {
             _transKeys = times;
@@ -94,6 +107,7 @@ namespace GameEditor.Framework.Renderer.Server.Animation
         public CGltfBone Clone(int newId)
         {
             var clone = new CGltfBone(Name, newId);
+            clone.SetRest(_restTranslation, _restRotation, _restScale);
             if (_hasTranslation) clone.SetTranslationKeys(_transKeys!, _transValues!, _transInterp);
             if (_hasRotation)    clone.SetRotationKeys(_rotKeys!, _rotValues!, _rotInterp);
             if (_hasScale)       clone.SetScaleKeys(_scaleKeys!, _scaleValues!, _scaleInterp);

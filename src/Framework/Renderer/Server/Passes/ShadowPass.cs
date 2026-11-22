@@ -697,7 +697,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     };
                     if (!useTex)
                     {
-                        var bones = entry.Animator?.GetFinalBoneMatrices();
+                        var bones = entry.Bones;
                         if (bones != null)
                         {
                             int bc = Math.Min(entry.BoneCount, Math.Min(bones.Length, AnimationConstants.MAX_BONES));
