@@ -67,6 +67,7 @@ namespace GameEditor.Framework.Renderer.Server
         DoubleSided  = 1 << 1,
         OffscreenRt  = 1 << 2,   // rendering to an offscreen RenderView
         Hdr          = 1 << 3,   // ... a float one (G8.3: the scene before its tone curve); with OffscreenRt
+        CompactVertices = 1 << 4,   // the static mesh's vertices are CompactVertex (28 B)
     }
 
     public sealed class ShaderVariantCache : IDisposable
@@ -89,7 +90,7 @@ namespace GameEditor.Framework.Renderer.Server
             public readonly Func<sg_shader, PipelineFlags, sg_pipeline> Build;
             public readonly int LowLightBytes;   // the LOW_TIER shader's light block, as sokol-shdc sized it (0 = not checked)
             public readonly int ExpectedLowBytes;
-            public readonly sg_pipeline[] Pipelines = new sg_pipeline[16];   // the flags' 4 bits (Hdr: made when the GPU has an HDR format)
+            public readonly sg_pipeline[] Pipelines = new sg_pipeline[32];   // the flags' 5 bits (Hdr: made when the GPU has an HDR format; CompactVertices: static families only)
             public sg_shader Shader;
             public bool Made;
             public bool Low;
@@ -287,6 +288,33 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>As on a GPU without float render targets (a check sees the in-shader fallback anywhere).</summary>
         public static bool ForceNoHdr { get; set; }
         private static bool _buildHdr;   // while a family's HDR pipelines are made
+        private static bool _buildCompact;   // while a family's compact-vertex pipelines are made (the static families read it)
+
+        /// <summary>
+        /// A static mesh's pipeline made for <see cref="Resources.CompactVertex"/>: the ObjVertex
+        /// layout's attributes of buffer 0 found by their place and given the compact one's - position 3 floats, normal and
+        /// tangent 4 signed normalised bytes, each UV 2 unsigned normalised shorts - in 28 bytes. The shaders are the same.
+        /// </summary>
+        internal static void MakeCompact(ref sg_pipeline_desc d)
+        {
+            if (d.layout.buffers[0].stride != 56) return;
+            d.layout.buffers[0].stride = Resources.CompactVertex.SizeBytes;
+            for (int i = 0; i < 16; i++)
+            {
+                var a = d.layout.attrs[i];
+                if (a.format == sg_vertex_format.SG_VERTEXFORMAT_INVALID || a.buffer_index != 0) continue;
+                (a.offset, a.format) = a.offset switch
+                {
+                    0  => (0,  sg_vertex_format.SG_VERTEXFORMAT_FLOAT3),
+                    12 => (12, sg_vertex_format.SG_VERTEXFORMAT_BYTE4N),
+                    24 => (16, sg_vertex_format.SG_VERTEXFORMAT_USHORT2N),
+                    32 => (20, sg_vertex_format.SG_VERTEXFORMAT_BYTE4N),
+                    48 => (24, sg_vertex_format.SG_VERTEXFORMAT_USHORT2N),
+                    _  => (a.offset, a.format),
+                };
+                d.layout.attrs[i] = a;
+            }
+        }
         private static sg_pixel_format OffscreenColor => _buildHdr ? HdrFormat : SG_PIXELFORMAT_RGBA8;
 
         private static sg_pixel_format FindHdrFormat()
@@ -303,12 +331,14 @@ namespace GameEditor.Framework.Renderer.Server
         // project draws with (21 families × 16 kinds made at once overran the pipeline pool — G8.3's regression).
         private static sg_pipeline Pipeline(Family f, PipelineFlags flags)
         {
-            int i = (int)flags & 0x0F;
+            int i = (int)flags & 0x1F;
             if (f.Pipelines[i].id == 0 && f.Shader.id != 0)
             {
                 _buildHdr = (i & (int)PipelineFlags.Hdr) != 0;
+                _buildCompact = (i & (int)PipelineFlags.CompactVertices) != 0;
                 f.Pipelines[i] = f.Build(f.Shader, (PipelineFlags)i);
                 _buildHdr = false;
+                _buildCompact = false;
             }
             return f.Pipelines[i];
         }
@@ -549,6 +579,7 @@ namespace GameEditor.Framework.Renderer.Server
                 desc.sample_count           = sc.sample_count;
             }
 
+            if (_buildCompact) MakeCompact(ref desc);
             return sg_make_pipeline(desc);
         }
 
@@ -628,6 +659,7 @@ namespace GameEditor.Framework.Renderer.Server
                 desc.sample_count           = sc.sample_count;
             }
 
+            if (_buildCompact) MakeCompact(ref desc);
             return sg_make_pipeline(desc);
         }
 
@@ -783,6 +815,7 @@ namespace GameEditor.Framework.Renderer.Server
                 desc.sample_count           = sc.sample_count;
             }
 
+            if (_buildCompact) MakeCompact(ref desc);
             return sg_make_pipeline(desc);
         }
 
@@ -856,6 +889,7 @@ namespace GameEditor.Framework.Renderer.Server
                 desc.sample_count           = sc.sample_count;
             }
 
+            if (_buildCompact) MakeCompact(ref desc);
             return sg_make_pipeline(desc);
         }
 
@@ -920,6 +954,7 @@ namespace GameEditor.Framework.Renderer.Server
                 desc.sample_count           = sc.sample_count;
             }
 
+            if (_buildCompact) MakeCompact(ref desc);
             return sg_make_pipeline(desc);
         }
 

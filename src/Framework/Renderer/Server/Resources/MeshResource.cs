@@ -18,6 +18,14 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         public int       IndexStart;
         /// <summary>The buffers are shared (their owner frees them, not this sub-mesh).</summary>
         public bool      SharedBuffers;
+        /// <summary>
+        /// The index buffer the shadow passes draw with: each vertex replaced by the first
+        /// vertex at its position, so a seam's copies are one vertex to a shadow and the GPU's vertex cache reuses them.
+        /// Same length and ranges as <see cref="IndexBuffer"/>; 0: the shadows draw with <see cref="IndexBuffer"/>.
+        /// </summary>
+        public sg_buffer ShadowIndexBuffer;
+        /// <summary>The vertex buffer holds <see cref="CompactVertex"/> (28 B), not <see cref="ObjVertex"/> (56 B) .</summary>
+        public bool      Compact;
         public string    MaterialName = "";
         /// <summary>Pre-computed registry key ("mtllib#materialName"). Empty when either part is absent.
         /// Read by RenderingServer.ResolveSubMeshMaterial — avoids per-frame string allocation.</summary>
@@ -25,9 +33,10 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
         public void Destroy()
         {
-            if (SharedBuffers) { VertexBuffer = default; IndexBuffer = default; return; }
+            if (SharedBuffers) { VertexBuffer = default; IndexBuffer = default; ShadowIndexBuffer = default; return; }
             if (VertexBuffer.id != 0) { sg_destroy_buffer(VertexBuffer); VertexBuffer = default; }
             if (IndexBuffer.id  != 0) { sg_destroy_buffer(IndexBuffer);  IndexBuffer  = default; }
+            if (ShadowIndexBuffer.id != 0) { sg_destroy_buffer(ShadowIndexBuffer); ShadowIndexBuffer = default; }
         }
     }
 
@@ -60,6 +69,20 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// Populated by the glTF importer (M4).  The OBJ loader leaves this empty.
         /// </summary>
         public MeshResource?[] LodSlots = Array.Empty<MeshResource?>();
+
+        /// <summary>
+        /// A level of an index LOD: how far its surface is from the full mesh's, in the
+        /// mesh's own units (0 for the full mesh). A <see cref="LodSlots"/> entry made from the file's levels shares the full
+        /// mesh's buffers (its sub-meshes' <see cref="MeshSubResource.SharedBuffers"/>, a range of the index buffer).
+        /// </summary>
+        public float LodError;
+
+        /// <summary>The mesh's levels came from its file (index LODs): the renderer chooses among them by their error when the
+        /// entity has no LOD Group.</summary>
+        public bool HasIndexLods;
+
+        /// <summary>Its vertex buffers hold <see cref="CompactVertex"/>: its pipelines are the compact ones.</summary>
+        public bool Compact => SubMeshes.Length > 0 && SubMeshes[0].Compact;
 
         /// <summary>The sub-meshes' vertices and indices as uploaded, kept only while <see cref="MeshRegistry.KeepCpuCopies"/>
         /// is on (the editor: the lightmap baker reads them, M8a); null in a game.</summary>

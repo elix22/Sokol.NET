@@ -49,9 +49,46 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// <summary>True when this primitive carries morph-target displacement data.</summary>
         public bool HasMorph => MorphView.id != 0 && MorphTargetCount > 0;
 
-        public static unsafe SkinnedMesh Create(SkinnedVertex[] vertices, uint[] indices, in Aabb bounds, string label)
+        // ── Index LODs: each level a range of the index buffer, over the same vertices ──────────
+        /// <summary>Level k+1's first index and count in <see cref="IndexBuffer"/>, and its error in the mesh's units.</summary>
+        public int[] LodStarts = Array.Empty<int>();
+        public int[] LodCounts = Array.Empty<int>();
+        public float[] LodErrors = Array.Empty<float>();
+        /// <summary>The range the next draw takes (the renderer chooses the level just before it draws).</summary>
+        public int DrawStart;
+        public int DrawCount => _drawCount > 0 ? _drawCount : IndexCount;
+        private int _drawCount;
+
+        /// <summary>Draws level <paramref name="level"/> from now on (0: the full mesh).</summary>
+        public void UseLevel(int level)
+        {
+            if (level <= 0 || level > LodStarts.Length) { DrawStart = 0; _drawCount = 0; return; }
+            DrawStart = LodStarts[level - 1];
+            _drawCount = LodCounts[level - 1];
+        }
+
+        public static unsafe SkinnedMesh Create(SkinnedVertex[] vertices, uint[] indices, in Aabb bounds, string label, MeshLods? lods = null)
         {
             var m = new SkinnedMesh { IndexCount = indices.Length, LocalBounds = bounds };
+            if (lods is { Indices.Length: > 0 })
+            {
+                int total = indices.Length;
+                foreach (var l in lods.Indices) total += l.Length;
+                var all = new uint[total];
+                indices.CopyTo(all, 0);
+                int at = indices.Length;
+                m.LodStarts = new int[lods.Indices.Length];
+                m.LodCounts = new int[lods.Indices.Length];
+                m.LodErrors = new float[lods.Indices.Length];
+                for (int k = 0; k < lods.Indices.Length; k++)
+                {
+                    lods.Indices[k].CopyTo(all, at);
+                    m.LodStarts[k] = at; m.LodCounts[k] = lods.Indices[k].Length;
+                    m.LodErrors[k] = k < lods.Errors.Length ? lods.Errors[k] : 0f;
+                    at += lods.Indices[k].Length;
+                }
+                indices = all;
+            }
             m.VertexBuffer = sg_make_buffer(new sg_buffer_desc
             {
                 data  = SG_RANGE(vertices),

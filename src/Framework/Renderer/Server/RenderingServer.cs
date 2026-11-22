@@ -598,6 +598,9 @@ namespace GameEditor.Framework.Renderer.Server
         /// </summary>
         public static int PbrDebugViewMode { get; set; } = 0;
 
+        /// <summary>The index LOD level a preview draws (SubmitPreview): 0 the full mesh.</summary>
+        public static int PreviewLod { get; set; }
+
         /// <summary>
         /// Game-style "shadows darken ambient" weight (pbr.glsl shadow_ambient_weight), 0..1.
         /// 0 (default) = physically correct: punctual shadows only occlude their own
@@ -1155,6 +1158,9 @@ namespace GameEditor.Framework.Renderer.Server
             bool allowShadowPassRendering,
             CsmCamera? csm)
         {
+            // The projection's vertical scale (1 / tan(fov/2)): the length of the view-projection's Y column (the view is a
+            // rotation) - the index LODs' errors are measured on the screen with it .
+            float cotHalfFov = MathF.Sqrt(viewProj.M12 * viewProj.M12 + viewProj.M22 * viewProj.M22 + viewProj.M32 * viewProj.M32);
             var world = ECSWorld.Instance;
 
             // Per-view: deferred transmission (refractive) draws are collected during extraction
@@ -1263,6 +1269,15 @@ namespace GameEditor.Framework.Renderer.Server
                 int lodIndex = LodSelector.Pick(worldRadius, dist, prevLod, lodGroup);
                 if (lodIndex == LodSelector.Skip) { _stats.Culled++; continue; }
 
+                // a mesh with index LODs and no LOD Group - the coarsest level whose error, as
+                // the camera sees it, is under the quality level's pixels. A lightmapped entity keeps its full mesh.
+                if (!lodGroup.HasValue && !lightmapped && meshRes.HasIndexLods)
+                {
+                    float localRadius = meshRes.LocalBounds.Extents.Length();
+                    lodIndex = MeshLodPicker.Pick(meshRes, localRadius > 0f ? worldRadius / localRadius : 1f, dist, cotHalfFov);
+                    if (lodIndex > 0) { _stats.IndexLodDraws++; _stats.IndexLodMax = Math.Max(_stats.IndexLodMax, lodIndex); }
+                }
+
                 // Update per-view, per-entity hysteresis state (only when entity has a LodGroup;
                 // lodGroup.HasValue implies lodHistory != null — it was only set inside the guard).
                 if (lodHistory != null && lodGroup.HasValue && prevLod != lodIndex)
@@ -1272,10 +1287,15 @@ namespace GameEditor.Framework.Renderer.Server
                 }
 
                 // Phase H E6: the level's own mesh (a lightmapped entity keeps its own: only it has the lightmap's UV).
+                int lodBits = lodIndex;
                 if (lodGroup is { } lg && !lightmapped && (uint)lodIndex < (uint)lg.Levels.Length
                     && lg.Levels[lodIndex].Mesh is { Length: > 0 } levelMesh && _meshReg.GetByPath(levelMesh) is { } levelRes)
+                {
                     meshRes = levelRes;
-                ushort lodMask = (ushort)(drawFlags | (ushort)(lodIndex & 0xF));
+                    // The level is its own mesh: the draw walk must not also take one of that mesh's index LODs by this number.
+                    if (levelRes.HasIndexLods) lodBits = 0;
+                }
+                ushort lodMask = (ushort)(drawFlags | (ushort)(lodBits & 0xF));
                 // M8b: not lightmapped, with probes baked: its light from the probes at its centre (drawn on its own)
                 ushort probe = !lightmapped && GI.Lightmaps.HasProbes ? ProbeSlot(worldAabb.Center) : (ushort)0;
                 // M8c: without a probe slot, the reflection probe it reflects keeps its group apart (0x8000 + probe)
@@ -1308,7 +1328,8 @@ namespace GameEditor.Framework.Renderer.Server
                 }
                 Matrix4x4 pm = pd.Model;
                 Aabb box = meshRes.LocalBounds.Transform(pm);
-                _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, 0, 0, 0x40000000u | (uint)d, box.Center, box.Extents.Length());
+                ushort previewLod = meshRes.HasIndexLods ? (ushort)(Math.Clamp(PreviewLod, 0, Math.Min(15, meshRes.LodSlots.Length))) : (ushort)0;
+                _cmds[_drawCount]    = new DrawCommand(meshRes.Id, matId, previewLod, 0, 0x40000000u | (uint)d, box.Center, box.Extents.Length());
                 _cmdLmPage[_drawCount] = 0;
                 _cpuInst[_drawCount] = new InstanceData(in pm, new Vector4(1f, 1f, 1f, 0f));
                 _drawCount++;
@@ -1502,6 +1523,8 @@ namespace GameEditor.Framework.Renderer.Server
                 }
 
                 if (mat == null && !HasSubMeshMaterial(mesh, disableSubMeshMaterial)) mat = _defaultMat;
+                // a mesh of compact vertices is drawn by the compact pipelines (its layout).
+                PipelineFlags meshFlags = mesh.Compact ? basePipelineFlags | PipelineFlags.CompactVertices : basePipelineFlags;
 
                 // ── PBR path ──────────────────────────────────────────────────────────────
                 // PBR materials are applied whole-group (no per-sub-mesh .mtl override).
@@ -1520,12 +1543,12 @@ namespace GameEditor.Framework.Renderer.Server
                     if (_csmCascadeCount == 4)
                     {
                         DrawPbrCsm4Group(pbrMat, mesh, groupSize, pbrInstByteOffset,
-                            basePipelineFlags, in viewProj, cameraPos);
+                            meshFlags, in viewProj, cameraPos);
                     }
                     else if (_hasDirectionalShadow)
                     {
                         DrawPbrCsm1Group(pbrMat, mesh, groupSize, pbrInstByteOffset,
-                            basePipelineFlags, in viewProj, cameraPos);
+                            meshFlags, in viewProj, cameraPos);
                     }
                     else
                     {
@@ -1535,7 +1558,7 @@ namespace GameEditor.Framework.Renderer.Server
                                 out pbrVs, out pbrLights, out pbrCam, out pbrIbl);
                             pbrSharedBuilt = true;
                         }
-                        DrawPbrGroup(pbrMat, mesh, groupSize, pbrInstByteOffset, basePipelineFlags,
+                        DrawPbrGroup(pbrMat, mesh, groupSize, pbrInstByteOffset, meshFlags,
                             in pbrVs, in pbrLights, in pbrCam, in pbrIbl);
                     }
                     _probeOn = false;
@@ -1549,8 +1572,8 @@ namespace GameEditor.Framework.Renderer.Server
                 bool groupAlpha = mat is BlinnPhongMaterial bpmG && bpmG.HasAlpha;
                 sg_apply_pipeline(_shaderCache.GetPipeline(
                     groupAlpha
-                        ? basePipelineFlags | PipelineFlags.AlphaBlend
-                        : basePipelineFlags));
+                        ? meshFlags | PipelineFlags.AlphaBlend
+                        : meshFlags));
 
                 // Apply VS uniforms after pipeline (required by sokol validation).
                 sg_apply_uniforms(UB_blinn_phong_vs_params, SG_RANGE(ref vsParams));
@@ -1571,8 +1594,8 @@ namespace GameEditor.Framework.Renderer.Server
                     {
                         sg_apply_pipeline(_shaderCache.GetPipeline(
                             subAlpha
-                                ? basePipelineFlags | PipelineFlags.AlphaBlend
-                                : basePipelineFlags));
+                                ? meshFlags | PipelineFlags.AlphaBlend
+                                : meshFlags));
                         sg_apply_uniforms(UB_blinn_phong_vs_params, SG_RANGE(ref vsParams));
                     }
 
@@ -2553,6 +2576,7 @@ namespace GameEditor.Framework.Renderer.Server
             // Editor renders to an offscreen RT; standalone (swapchain) transmission is deferred.
             PipelineFlags pf = PipelineFlags.OffscreenRt | (_hdrPass ? PipelineFlags.Hdr : 0);
             if (mat.DoubleSided) pf |= PipelineFlags.DoubleSided;
+            if (mesh.Compact) pf |= PipelineFlags.CompactVertices;   //
             sg_apply_pipeline(_shaderCache.GetPbrTransmissionPipeline(pf));
 
             bool iblActive = _environment is { IsLoaded: true };
@@ -2854,6 +2878,7 @@ namespace GameEditor.Framework.Renderer.Server
             // else a single-fit directional map → skinning_csm1, else the base skinning variant.
             bool csm4 = _csmCascadeCount == 4;
             bool csm1 = !csm4 && _hasDirectionalShadow;
+            float skinCot = MathF.Sqrt(viewProj.M12 * viewProj.M12 + viewProj.M22 * viewProj.M22 + viewProj.M32 * viewProj.M32);
             for (int k = 0; k < staged; k++)
             {
                 int instByteOffset = baseOff + k * Unsafe.SizeOf<InstanceData>();
@@ -2862,6 +2887,15 @@ namespace GameEditor.Framework.Renderer.Server
                 _probeOn = GI.Lightmaps.HasProbes && GI.Lightmaps.SampleProbes(d.mesh.LocalBounds.Transform(d.model).Center, _probeSH);
                 if (_probeOn) ProbeCharacterDraws++;
                 _reflIndex = GI.ReflectionProbes.Count > 0 ? GI.ReflectionProbes.Choose(d.mesh.LocalBounds.Transform(d.model).Center) : -1;   // M8c
+                // a skinned mesh with index LODs draws the coarsest level whose error, on the screen, is under the pixels.
+                if (d.mesh.LodErrors.Length > 0)
+                {
+                    var wb = d.mesh.LocalBounds.Transform(d.model);
+                    float lr = d.mesh.LocalBounds.Extents.Length();
+                    int level = MeshLodPicker.Pick(d.mesh.LodErrors, lr > 0f ? wb.Extents.Length() / lr : 1f, Vector3.Distance(cameraPos, wb.Center), skinCot);
+                    d.mesh.UseLevel(level);
+                    if (level > 0) { _stats.IndexLodDraws++; _stats.IndexLodMax = Math.Max(_stats.IndexLodMax, level); }
+                }
                 // Morphed primitives route to the skinning+morphing variants (extra morph-texture bind +
                 // weights uniform); non-morphed skinned chars keep the cheaper non-morph pipeline.
                 bool morph = d.mesh.HasMorph;
@@ -3085,7 +3119,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3299,7 +3333,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3509,7 +3543,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3727,7 +3761,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -3936,7 +3970,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 
@@ -4148,7 +4182,7 @@ namespace GameEditor.Framework.Renderer.Server
             }));
 
             if (!Diagnostics.FrameDebugger.Enabled || Diagnostics.FrameDebugger.Draw("skinned / " + mat.Name, mesh.IndexCount, 1, "PBR, skinned"))
-                sg_draw(0u, (uint)mesh.IndexCount, 1u);
+                sg_draw((uint)mesh.DrawStart, (uint)mesh.DrawCount, 1u);
             _stats.DrawCalls++;
         }
 

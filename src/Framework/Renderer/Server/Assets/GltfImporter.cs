@@ -448,8 +448,9 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
                         string key = $"{_path}#m{mi}p{pi}";
                         var sub = new ObjSubMesh { MaterialName = "", Vertices = verts, Indices = indices };
-                        if ((Replace ? _meshReg.RegisterOrReplaceMesh(key, new[] { sub }, in bounds)
-                                     : _meshReg.RegisterMesh(key, new[] { sub }, in bounds)) == 0) continue;
+                        var lods = ReadLods(prim, verts.Length);
+                        if ((Replace ? _meshReg.RegisterOrReplaceMesh(key, new[] { sub }, in bounds, lods)
+                                     : _meshReg.RegisterMesh(key, new[] { sub }, in bounds, lods)) == 0) continue;
                         meshKeys?.Add(key);
 
                         keys.Add(key);
@@ -587,7 +588,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
 
                         int primIndex = runningPrims[skinIdx]++;
                         totalPrims++;
-                        var skinnedMesh = SkinnedMesh.Create(sverts, sidx, in sbounds, $"{nodeName}_p{pi}");
+                        var skinnedMesh = SkinnedMesh.Create(sverts, sidx, in sbounds, $"{nodeName}_p{pi}", ReadLods(prim, sverts.Length));
 
                         // Morph targets: build the immutable displacement texture once; record the node
                         // index + static weights for per-frame weight resolution at draw time.
@@ -1013,6 +1014,45 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             }
 
             // ── Primitives ─────────────────────────────────────────────────────────────────
+            /// <summary>
+            /// A primitive's index LODs, from its extras:
+            /// <c>"lods": [{"indices": accessor, "error": model units}, …]</c> - each level an index list over the primitive's own
+            /// vertices. Null when it has none, or when one is not as it should be (a level is then never drawn wrongly).
+            /// </summary>
+            private MeshLods? ReadLods(cgltf_primitive* prim, int vertexCount)
+            {
+                nuint size = 0;
+                if (cgltf_copy_extras_json(*_data, prim->extras, IntPtr.Zero, ref size) != cgltf_result.cgltf_result_success || size <= 2) return null;
+                var buf = new byte[(int)size];
+                fixed (byte* b = buf)
+                    if (cgltf_copy_extras_json(*_data, prim->extras, (IntPtr)b, ref size) != cgltf_result.cgltf_result_success) return null;
+                int len = Array.IndexOf(buf, (byte)0); if (len < 0) len = buf.Length;
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(buf.AsMemory(0, len));
+                    if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object
+                        || !doc.RootElement.TryGetProperty("lods", out var lods) || lods.ValueKind != System.Text.Json.JsonValueKind.Array) return null;
+                    var levels = new List<uint[]>(); var errors = new List<float>();
+                    foreach (var l in lods.EnumerateArray())
+                    {
+                        if (!l.TryGetProperty("indices", out var ai) || !ai.TryGetInt32(out int acc) || acc < 0 || acc >= (int)_data->accessors_count) return null;
+                        cgltf_accessor* a = &_data->accessors[acc];
+                        int n = (int)a->count;
+                        if (n == 0 || n % 3 != 0) return null;
+                        var idx = new uint[n];
+                        for (int i = 0; i < n; i++)
+                        {
+                            idx[i] = (uint)cgltf_accessor_read_index(*a, (nuint)i);
+                            if (idx[i] >= (uint)vertexCount) return null;
+                        }
+                        levels.Add(idx);
+                        errors.Add(l.TryGetProperty("error", out var e) && e.TryGetSingle(out float ev) ? ev : 0f);
+                    }
+                    return levels.Count == 0 ? null : new MeshLods { Indices = levels.ToArray(), Errors = errors.ToArray() };
+                }
+                catch (System.Text.Json.JsonException) { return null; }
+            }
+
             private bool BuildPrimitive(cgltf_primitive* prim, out ObjVertex[] vertices, out uint[] indices, out Aabb bounds)
             {
                 vertices = Array.Empty<ObjVertex>();

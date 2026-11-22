@@ -42,6 +42,15 @@ namespace GameEditor.Framework.Core
         /// clearcoat, no spot / point shadow maps. A Galaxy Tab A8 (Mali-G52) spent its frame on the full PBR of every
         /// surface (2026-11-17: 16 fps whatever else was turned off).</summary>
         public bool   SimpleShading    { get; set; }
+        /// <summary>A static mesh's triangles and vertices put in the GPU's best order when it loads (vertex cache, overdraw,
+        /// vertex fetch). The picture is the same.</summary>
+        public bool   OptimizeMeshes   { get; set; } = true;
+        /// <summary>A mesh with index LODs draws the coarsest level whose error on the screen is under this many pixels (of a
+        /// 1080-pixel-high picture;). 0: always the full mesh.</summary>
+        public float  LodPixels        { get; set; } = 1f;
+        /// <summary>Static meshes loaded from now on keep their vertices in 28 bytes instead of 56  when their UVs
+        /// allow it: half the memory and bandwidth, normals at 8 bits.</summary>
+        public bool   CompactVertices  { get; set; }
 
         public QualityLevel Clone() => (QualityLevel)MemberwiseClone();
 
@@ -62,9 +71,10 @@ namespace GameEditor.Framework.Core
             new QualityLevel { Name = "Medium", MaxLights = 32, Cascades = 1, ShadowDistance = 100f },
             new QualityLevel { Name = "Mobile", RenderingPath = "forward", MaxLights = 32, Cascades = 1, ShadowDistance = 100f,
                                SoftShadows = 1, RenderScale = 0.5f, PerObjectLights = 4,
-                               Shadowmask = true, SimpleShading = true },
+                               Shadowmask = true, SimpleShading = true, LodPixels = 2f, CompactVertices = true },
             new QualityLevel { Name = "Low", RenderingPath = "forward", MaxLights = 8, Cascades = 1, ShadowDistance = 50f, ShadowResolution = 1024,
-                               PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f, SimpleShading = true },
+                               PunctualShadows = false, SoftShadows = 1, Hdr = false, RenderScale = 0.75f, SimpleShading = true,
+                               LodPixels = 3f, CompactVertices = true },
         };
 
         /// <summary>A new project's default level per target: desktop High, Android Mobile, iOS and web Medium.</summary>

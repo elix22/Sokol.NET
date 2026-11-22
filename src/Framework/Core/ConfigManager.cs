@@ -281,7 +281,8 @@ namespace GameEditor.Framework.Core
                 var l = c.QualityLevels[i];
                 sb.Append($"      {{ \"name\": \"{Esc(l.Name)}\", \"renderingPath\": \"{Esc(l.RenderingPath)}\", \"maxLights\": {l.MaxLights}, ");
                 sb.Append($"\"cascades\": {l.Cascades}, \"shadowDistance\": {l.ShadowDistance.ToString(System.Globalization.CultureInfo.InvariantCulture)}, \"shadowResolution\": {l.ShadowResolution}, \"punctualShadows\": {(l.PunctualShadows ? "true" : "false")}, ");
-                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)}, \"perObjectLights\": {l.PerObjectLights}, \"shadowmask\": {(l.Shadowmask ? "true" : "false")}, \"simpleShading\": {(l.SimpleShading ? "true" : "false")} }}");
+                sb.Append($"\"softShadows\": {l.SoftShadows}, \"hdr\": {(l.Hdr ? "true" : "false")}, \"renderScale\": {l.RenderScale.ToString(inv)}, \"perObjectLights\": {l.PerObjectLights}, \"shadowmask\": {(l.Shadowmask ? "true" : "false")}, \"simpleShading\": {(l.SimpleShading ? "true" : "false")}, ");
+                sb.Append($"\"optimizeMeshes\": {(l.OptimizeMeshes ? "true" : "false")}, \"lodPixels\": {l.LodPixels.ToString(inv)}, \"compactVertices\": {(l.CompactVertices ? "true" : "false")} }}");
                 sb.Append(i + 1 < c.QualityLevels.Count ? ",\n" : "\n");
             }
             sb.Append("    ],\n    \"defaults\": { ");
@@ -326,6 +327,11 @@ namespace GameEditor.Framework.Core
                     else if (Defaults(l.Name) is { } known2) l.Shadowmask = known2.Shadowmask;
                     if (e.TryGetProperty("simpleShading", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.SimpleShading = v.ValueKind == JsonValueKind.True;
                     else if (Defaults(l.Name) is { } known3) l.SimpleShading = known3.SimpleShading;
+                    // A level of before them keeps the safe values (optimized, 1 pixel, full vertices) -
+                    // compact vertices only where a level was given them.
+                    if (e.TryGetProperty("optimizeMeshes", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.OptimizeMeshes = v.ValueKind == JsonValueKind.True;
+                    if (e.TryGetProperty("lodPixels", out v) && v.TryGetSingle(out float lp)) l.LodPixels = Math.Clamp(lp, 0f, 64f);
+                    if (e.TryGetProperty("compactVertices", out v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)) l.CompactVertices = v.ValueKind == JsonValueKind.True;
                     list.Add(l);
                 }
                 if (list.Count > 0) cfg.QualityLevels = list;

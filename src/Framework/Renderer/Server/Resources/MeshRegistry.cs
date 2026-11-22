@@ -35,6 +35,15 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// <summary>Each mesh keeps its vertices and indices on the CPU (<see cref="MeshResource.Cpu"/>): the editor turns it on
         /// before loading (the lightmap baker reads them, M8a); games leave it off.</summary>
         public static bool KeepCpuCopies;
+        /// <summary>A static mesh registered from now on gets <see cref="CompactVertex"/> buffers (28 B) when its UVs allow it
+        ///: the quality level's Compact vertices (Quality.Apply sets it).</summary>
+        public static bool CompactVertices;
+        /// <summary>A static mesh registered from now on gets a shadow index buffer (a seam's copies are one vertex to a shadow).</summary>
+        public static bool ShadowIndexBuffers = true;
+        /// <summary>A static mesh registered from now on is put in the GPU's best order : the quality level's Optimize meshes.</summary>
+        public static bool OptimizeMeshes = true;
+        /// <summary>The largest mesh (in indices) that is optimized when it loads: a larger one is left as it is (its load time).</summary>
+        public const int OptimizeLimit = 1_000_000;
 
         private readonly Dictionary<string, MeshResource> _byPath = new(StringComparer.Ordinal);
         private readonly MeshResource?[] _byId;    // sparse id → resource
@@ -69,23 +78,13 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
             if (_nextId >= _byId.Length) return 0; // registry full
 
-            var subResources = new MeshSubResource[obj.SubMeshes.Length];
+            var subResources = BuildSubs(obj.SubMeshes, path, null, out _);
             for (int i = 0; i < obj.SubMeshes.Length; i++)
             {
-                var sm    = obj.SubMeshes[i];
-                var vbRes = UploadVertexBuffer(sm, path, i);
-                var ibRes = UploadIndexBuffer(sm, path, i);
-
-                subResources[i] = new MeshSubResource
-                {
-                    VertexBuffer = vbRes,
-                    IndexBuffer  = ibRes,
-                    IndexCount   = sm.Indices.Length,
-                    MaterialName = sm.MaterialName,
-                    MaterialKey  = (!string.IsNullOrEmpty(obj.MtlLib) && !string.IsNullOrEmpty(sm.MaterialName))
-                                       ? string.Concat(MtlKey(path, obj.MtlLib), "#", sm.MaterialName)
-                                       : ""
-                };
+                var sm = obj.SubMeshes[i];
+                subResources[i].MaterialKey = (!string.IsNullOrEmpty(obj.MtlLib) && !string.IsNullOrEmpty(sm.MaterialName))
+                                                  ? string.Concat(MtlKey(path, obj.MtlLib), "#", sm.MaterialName)
+                                                  : "";
             }
 
             System.Console.WriteLine($"[MeshRegistry] Loaded '{path}': {obj.SubMeshes.Length} sub-mesh(es), bounds={obj.Bounds}");
@@ -123,7 +122,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// instead of parsing OBJ text. Ref-counted like <see cref="Load"/>; returns the 16-bit id
         /// (0 on failure or when the registry is full).
         /// </summary>
-        public ushort RegisterMesh(string key, ObjSubMesh[] subMeshes, in Aabb bounds)
+        public ushort RegisterMesh(string key, ObjSubMesh[] subMeshes, in Aabb bounds, MeshLods? lods = null)
         {
             if (_byPath.TryGetValue(key, out var existing))
             {
@@ -132,18 +131,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
             }
             if (subMeshes.Length == 0 || _nextId >= _byId.Length) return 0;
 
-            var subResources = new MeshSubResource[subMeshes.Length];
-            for (int i = 0; i < subMeshes.Length; i++)
-            {
-                subResources[i] = new MeshSubResource
-                {
-                    VertexBuffer = UploadVertexBuffer(subMeshes[i], key, i),
-                    IndexBuffer  = UploadIndexBuffer(subMeshes[i], key, i),
-                    IndexCount   = subMeshes[i].Indices.Length,
-                    MaterialName = subMeshes[i].MaterialName,
-                    MaterialKey  = ""
-                };
-            }
+            var subResources = BuildSubs(subMeshes, key, lods, out var ranges);
 
             ushort id = _nextId++;
             var res = new MeshResource
@@ -157,6 +145,7 @@ namespace GameEditor.Framework.Renderer.Server.Resources
                 Cpu         = KeepCpuCopies ? subMeshes : null
             };
             _byPath[key] = res;
+            SetLods(res, ranges, lods);
             _byId[id]    = res;
             return id;
         }
@@ -166,27 +155,17 @@ namespace GameEditor.Framework.Renderer.Server.Resources
         /// its buffers are made anew and it keeps its id, so what draws it by key or by id draws the new mesh.
         /// For a model file that changed and is read again.
         /// </summary>
-        public ushort RegisterOrReplaceMesh(string key, ObjSubMesh[] subMeshes, in Aabb bounds)
+        public ushort RegisterOrReplaceMesh(string key, ObjSubMesh[] subMeshes, in Aabb bounds, MeshLods? lods = null)
         {
-            if (!_byPath.TryGetValue(key, out var existing)) return RegisterMesh(key, subMeshes, in bounds);
+            if (!_byPath.TryGetValue(key, out var existing)) return RegisterMesh(key, subMeshes, in bounds, lods);
             if (subMeshes.Length == 0) return 0;
 
             foreach (var old in existing.SubMeshes) old.Destroy();
-            var subResources = new MeshSubResource[subMeshes.Length];
-            for (int i = 0; i < subMeshes.Length; i++)
-            {
-                subResources[i] = new MeshSubResource
-                {
-                    VertexBuffer = UploadVertexBuffer(subMeshes[i], key, i),
-                    IndexBuffer  = UploadIndexBuffer(subMeshes[i], key, i),
-                    IndexCount   = subMeshes[i].Indices.Length,
-                    MaterialName = subMeshes[i].MaterialName,
-                    MaterialKey  = ""
-                };
-            }
+            var subResources = BuildSubs(subMeshes, key, lods, out var ranges);
             existing.SubMeshes   = subResources;
             existing.LocalBounds = bounds;
             existing.Cpu         = KeepCpuCopies ? subMeshes : null;
+            SetLods(existing, ranges, lods);
             return existing.Id;
         }
 
@@ -778,6 +757,157 @@ namespace GameEditor.Framework.Renderer.Server.Resources
 
         // Without sokol_gfx (a tool that runs with no window, e.g. the editor's headless command line) a mesh
         // is registered with its bounds and sub-meshes but no GPU buffers: nothing draws there.
+        // ── index LODs, shadow index buffers, compact vertices ──────────────────────────────
+
+        /// <summary>The sub-meshes' buffers: compact vertices when on and the UVs allow; one index buffer holding the full
+        /// index list then each level's (a single sub-mesh's levels: <paramref name="lods"/>); a shadow index buffer.</summary>
+        private static MeshSubResource[] BuildSubs(ObjSubMesh[] subMeshes, string key, MeshLods? lods, out (int Start, int Count)[]? ranges)
+        {
+            ranges = null;
+            var subs = new MeshSubResource[subMeshes.Length];
+            for (int i = 0; i < subMeshes.Length; i++)
+            {
+                var sm = subMeshes[i];
+                MeshLods? subLods = i == 0 && subMeshes.Length == 1 ? lods : null;
+                if (OptimizeMeshes) Optimize(sm, subLods);
+                uint[] indices = sm.Indices;
+                if (i == 0 && subMeshes.Length == 1 && lods is { Indices.Length: > 0 })
+                {
+                    int total = sm.Indices.Length;
+                    foreach (var l in lods.Indices) total += l.Length;
+                    indices = new uint[total];
+                    sm.Indices.CopyTo(indices, 0);
+                    ranges = new (int, int)[lods.Indices.Length];
+                    int at = sm.Indices.Length;
+                    for (int k = 0; k < lods.Indices.Length; k++)
+                    {
+                        lods.Indices[k].CopyTo(indices, at);
+                        ranges[k] = (at, lods.Indices[k].Length);
+                        at += lods.Indices[k].Length;
+                    }
+                }
+                bool compact = CompactVertices && sm.Vertices.Length > 0 && CompactVertex.Fits(sm.Vertices);
+                subs[i] = new MeshSubResource
+                {
+                    VertexBuffer = compact ? UploadCompact(sm, key, i) : UploadVertexBuffer(sm, key, i),
+                    IndexBuffer  = UploadIndices(indices, $"{key}:ib[{i}]"),
+                    ShadowIndexBuffer = ShadowIndexBuffers ? UploadIndices(ShadowIndices(sm.Vertices, indices), $"{key}:shadow-ib[{i}]") : default,
+                    IndexCount   = sm.Indices.Length,
+                    Compact      = compact,
+                    MaterialName = sm.MaterialName,
+                    MaterialKey  = ""
+                };
+            }
+            return subs;
+        }
+
+        /// <summary>
+        /// the mesh in the GPU's best order - each index list (the full mesh and every level)
+        /// in vertex-cache order, the full one also against overdraw, then the vertices in the order the indices first use
+        /// them (every list renumbered). meshoptimizer's own optimizers (ported, MeshOpt/). The arrays of
+        /// <paramref name="sm"/> and <paramref name="lods"/> are replaced, so a CPU copy is what the GPU draws.
+        /// </summary>
+        public static void Optimize(ObjSubMesh sm, MeshLods? lods)
+        {
+            int vc = sm.Vertices.Length;
+            if (vc == 0 || sm.Indices.Length < 3 || sm.Indices.Length > OptimizeLimit || sm.Indices.Length % 3 != 0) return;
+            foreach (uint ix in sm.Indices) if (ix >= (uint)vc) return;
+            var indices = new uint[sm.Indices.Length];
+            MeshOpt.VertexCache.OptimizeVertexCache(indices, sm.Indices, vc);
+            var positions = MemoryMarshal.Cast<ObjVertex, float>(sm.Vertices.AsSpan());
+            int stride = Marshal.SizeOf<ObjVertex>() / sizeof(float);
+            var ordered = new uint[indices.Length];
+            MeshOpt.Overdraw.OptimizeOverdraw(ordered, indices, positions, vc, stride, 1.05f);
+            if (lods != null)
+                for (int k = 0; k < lods.Indices.Length; k++)
+                {
+                    var l = lods.Indices[k];
+                    if (l.Length % 3 != 0) continue;
+                    var lo = new uint[l.Length];
+                    MeshOpt.VertexCache.OptimizeVertexCache(lo, l, vc);
+                    lods.Indices[k] = lo;
+                }
+            // The vertices in first-use order: the full mesh's indices first, then the levels' (a vertex only a level uses
+            // keeps a place after them).
+            var remap = new uint[vc];
+            Array.Fill(remap, uint.MaxValue);
+            uint next = 0;
+            void Visit(uint[] list) { foreach (uint v in list) if (remap[v] == uint.MaxValue) remap[v] = next++; }
+            Visit(ordered);
+            if (lods != null) foreach (var l in lods.Indices) Visit(l);
+            for (int v = 0; v < vc; v++) if (remap[v] == uint.MaxValue) remap[v] = next++;
+            var verts = new ObjVertex[vc];
+            for (int v = 0; v < vc; v++) verts[remap[v]] = sm.Vertices[v];
+            for (int i = 0; i < ordered.Length; i++) ordered[i] = remap[ordered[i]];
+            if (lods != null) foreach (var l in lods.Indices) for (int i = 0; i < l.Length; i++) l[i] = remap[l[i]];
+            sm.Vertices = verts;
+            sm.Indices = ordered;
+        }
+
+        /// <summary>The levels as meshes sharing the full mesh's buffers, each a range of its index buffer, with its error.</summary>
+        private static void SetLods(MeshResource res, (int Start, int Count)[]? ranges, MeshLods? lods)
+        {
+            if (ranges == null || lods == null)
+            {
+                if (res.HasIndexLods) { res.LodSlots = Array.Empty<MeshResource?>(); res.HasIndexLods = false; }
+                return;
+            }
+            var full = res.SubMeshes[0];
+            var slots = new MeshResource?[ranges.Length];
+            for (int k = 0; k < ranges.Length; k++)
+                slots[k] = new MeshResource
+                {
+                    Id = res.Id, SourcePath = res.SourcePath, LocalBounds = res.LocalBounds, RefCount = 1,
+                    LodError = k < lods.Errors.Length ? lods.Errors[k] : 0f,
+                    SubMeshes = [new MeshSubResource
+                    {
+                        VertexBuffer = full.VertexBuffer, IndexBuffer = full.IndexBuffer, ShadowIndexBuffer = full.ShadowIndexBuffer,
+                        IndexStart = ranges[k].Start, IndexCount = ranges[k].Count, SharedBuffers = true, Compact = full.Compact,
+                        MaterialName = full.MaterialName, MaterialKey = full.MaterialKey,
+                    }],
+                };
+            res.LodSlots = slots;
+            res.HasIndexLods = true;
+        }
+
+        /// <summary>Each index replaced by the first vertex at the same position (generateShadowIndexBuffer's idea).</summary>
+        public static uint[] ShadowIndices(ReadOnlySpan<ObjVertex> vertices, uint[] indices)
+        {
+            var first = new Dictionary<Vector3, uint>(vertices.Length);
+            var remap = new uint[vertices.Length];
+            for (int v = 0; v < vertices.Length; v++)
+            {
+                if (!first.TryGetValue(vertices[v].Position, out uint f)) first[vertices[v].Position] = f = (uint)v;
+                remap[v] = f;
+            }
+            var shadow = new uint[indices.Length];
+            for (int i = 0; i < indices.Length; i++) shadow[i] = indices[i] < (uint)remap.Length ? remap[indices[i]] : indices[i];
+            return shadow;
+        }
+
+        private static sg_buffer UploadCompact(ObjSubMesh sm, string path, int subIdx)
+        {
+            if (!sg_isvalid()) return default;
+            var packed = CompactVertex.From(sm.Vertices);
+            return sg_make_buffer(new sg_buffer_desc
+            {
+                data  = SG_RANGE(packed.AsSpan()),
+                usage = new sg_buffer_usage { vertex_buffer = true, immutable = true },
+                label = $"{path}:compact-vb[{subIdx}]"
+            });
+        }
+
+        private static sg_buffer UploadIndices(uint[] indices, string label)
+        {
+            if (!sg_isvalid() || indices.Length == 0) return default;
+            return sg_make_buffer(new sg_buffer_desc
+            {
+                usage = new sg_buffer_usage { index_buffer = true, immutable = true },
+                data  = SG_RANGE(indices.AsSpan()),
+                label = label
+            });
+        }
+
         private static sg_buffer UploadVertexBuffer(ObjSubMesh sm, string path, int subIdx)
         {
             if (!sg_isvalid()) return default;

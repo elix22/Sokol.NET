@@ -34,6 +34,24 @@ namespace GameEditor.Framework.Renderer.Server.Passes
         // pixel: the picture is the same), and the rest are drawn one instanced draw per sub-mesh.
         private sg_shader _instShader;
         private sg_pipeline _instPipeline, _instPointPipeline;
+        private sg_pipeline _pipelineCompact, _pointPipelineCompact, _instPipelineCompact, _instPointPipelineCompact;   // compact vertices
+        private sg_pipeline_desc _compactDesc, _compactInstDesc;   // their descriptions, the pipelines made when first needed
+
+        /// <summary>The caster pipeline for compact vertices (made the first time it is asked for).</summary>
+        private sg_pipeline CompactPipeline(bool point, bool instanced)
+        {
+            ref sg_pipeline pip = ref instanced ? ref (point ? ref _instPointPipelineCompact : ref _instPipelineCompact)
+                                                : ref (point ? ref _pointPipelineCompact : ref _pipelineCompact);
+            if (pip.id == 0)
+            {
+                var d = instanced ? _compactInstDesc : _compactDesc;
+                d.cull_mode = point ? sg_cull_mode.SG_CULLMODE_FRONT : sg_cull_mode.SG_CULLMODE_BACK;
+                d.label = instanced ? (point ? "shadow-caster-instanced-point-faces-compact" : "shadow-caster-instanced-compact")
+                                    : (point ? "shadow-caster-point-faces-compact" : "shadow-caster-compact");
+                pip = sg_make_pipeline(d);
+            }
+            return pip;
+        }
         private InstanceBuffer? _instances;
         private int _instancesThisFrame;
         private const int InstanceCapacity = RenderingConstants.MAX_VIEWS * RenderingConstants.MAX_DRAWS;   // the buffer's, per frame
@@ -44,6 +62,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             public int IndexCount;
             public Matrix4x4 Model;
             public ulong Key;   // the sub-mesh: its vertex and index buffers
+                    public bool Compact;
         }
         private CasterDraw[] _draws = new CasterDraw[1024];
         private ulong[] _keys = new ulong[1024];
@@ -126,7 +145,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             _castersWorld = world;
         }
 
-        private void AddDraw(sg_buffer vb, sg_buffer ib, int indexCount, in Matrix4x4 model)
+        private void AddDraw(sg_buffer vb, sg_buffer ib, int indexCount, in Matrix4x4 model, bool compact = false)
         {
             if (_drawCount == _draws.Length)
             {
@@ -134,7 +153,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 Array.Resize(ref _keys, _draws.Length);
                 Array.Resize(ref _order, _draws.Length);
             }
-            _draws[_drawCount] = new CasterDraw { Vb = vb, Ib = ib, IndexCount = indexCount, Model = model,
+            _draws[_drawCount] = new CasterDraw { Vb = vb, Ib = ib, IndexCount = indexCount, Model = model, Compact = compact,
                                                   Key = ((ulong)vb.id << 32) | ib.id };
             _drawCount++;
         }
@@ -275,6 +294,10 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             desc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
             desc.label = "shadow-caster-point-faces";
             _pointPipeline = sg_make_pipeline(desc);
+            // The same for meshes of compact vertices (28 B; the position is still 3 floats at 0): made the first time a
+            // compact caster is drawn, never in a game that has none.
+            _compactDesc = desc;
+            ShaderVariantCache.MakeCompact(ref _compactDesc);
 
             // The instanced casters: the vertices' positions (buffer 0, as above) and InstanceData per instance (buffer 1).
             _instShader = sg_make_shader(shadow_caster_instanced_shader_desc(sg_query_backend()));
@@ -300,6 +323,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             idesc.cull_mode = sg_cull_mode.SG_CULLMODE_FRONT;
             idesc.label = "shadow-caster-instanced-point-faces";
             _instPointPipeline = sg_make_pipeline(idesc);
+            _compactInstDesc = idesc;
+            ShaderVariantCache.MakeCompact(ref _compactInstDesc);
             _instances = new InstanceBuffer(RenderingConstants.MAX_DRAWS);
 
 
@@ -457,6 +482,10 @@ namespace GameEditor.Framework.Renderer.Server.Passes
             }
             if (_instPipeline.id != 0) { sg_destroy_pipeline(_instPipeline); _instPipeline = default; }
             if (_instPointPipeline.id != 0) { sg_destroy_pipeline(_instPointPipeline); _instPointPipeline = default; }
+            if (_pipelineCompact.id != 0) { sg_destroy_pipeline(_pipelineCompact); _pipelineCompact = default; }
+            if (_pointPipelineCompact.id != 0) { sg_destroy_pipeline(_pointPipelineCompact); _pointPipelineCompact = default; }
+            if (_instPipelineCompact.id != 0) { sg_destroy_pipeline(_instPipelineCompact); _instPipelineCompact = default; }
+            if (_instPointPipelineCompact.id != 0) { sg_destroy_pipeline(_instPointPipelineCompact); _instPointPipelineCompact = default; }
             if (_instShader.id != 0) { sg_destroy_shader(_instShader); _instShader = default; }
             _instances?.Dispose();
             _instances = null;
@@ -791,7 +820,8 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     foreach (MeshSubResource sub in c.Mesh!.SubMeshes)
                     {
                         if (sub.IndexCount == 0 || sub.VertexBuffer.id == 0 || sub.IndexBuffer.id == 0) continue;
-                        AddDraw(sub.VertexBuffer, sub.IndexBuffer, sub.IndexCount, in c.Model);
+                        // The shadow index buffer (a seam's copies one vertex) when the mesh has one, and the mesh's vertex layout.
+                        AddDraw(sub.VertexBuffer, sub.ShadowIndexBuffer.id != 0 ? sub.ShadowIndexBuffer : sub.IndexBuffer, sub.IndexCount, in c.Model, sub.Compact);
                     }
                 }
                 drawCallCount += DrawGathered(in lightViewProj, point);
@@ -807,6 +837,7 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     if (!batch.CastShadows) continue;
                     sg_buffer vb = default, ib = default;
                     int indexCount = 0;
+                    bool compactBatch = false;
                     if (PrimitiveMeshSpec.TryParse(batch.Mesh, out var pspec))
                     {
                         PrimitiveShadowMesh prim = GetOrCreatePrimitiveShadowMesh(PrimitiveMeshSpec.ToMeshPath(pspec));
@@ -815,8 +846,10 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     else if (meshRegistry.GetByPath(batch.Mesh) is { SubMeshes: { Length: > 0 } subs } && subs[0].IndexCount > 0)
                     {
                         vb = subs[0].VertexBuffer; ib = subs[0].IndexBuffer; indexCount = subs[0].IndexCount;
+                        compactBatch = subs[0].Compact;
                     }
                     if (indexCount == 0 || vb.id == 0 || ib.id == 0) continue;
+                    sg_apply_pipeline(compactBatch ? CompactPipeline(point, instanced: false) : (point ? _pointPipeline : _pipeline));
                     sg_apply_bindings(new sg_bindings { vertex_buffers = { [0] = vb }, index_buffer = ib });
                     for (int k = batch.Start; k < batch.Start + batch.Count; k++)
                     {
@@ -848,15 +881,21 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                     _instances.TryAppend(new InstanceData(in _draws[_order[i]].Model, Vector4.Zero));
                 int baseOffset = _instances.Flush();
                 _instancesThisFrame += _drawCount;
-                sg_apply_pipeline(point ? _instPointPipeline : _instPipeline);
                 var p = new shadow_caster_instanced_vs_params_t { light_view_proj = lightViewProj };
-                sg_apply_uniforms(UB_shadow_caster_instanced_vs_params, SG_RANGE(ref p));
                 const int InstanceBytes = 80;
+                int applied = -1;                                   // the layout applied: -1 none, 0 full, 1 compact
                 for (int i = 0; i < _drawCount;)
                 {
                     int j = i + 1;
                     while (j < _drawCount && _keys[j] == _keys[i]) j++;
                     ref readonly var d = ref _draws[_order[i]];
+                    int layout = d.Compact ? 1 : 0;
+                    if (layout != applied)
+                    {
+                        sg_apply_pipeline(d.Compact ? CompactPipeline(point, instanced: true) : (point ? _instPointPipeline : _instPipeline));
+                        sg_apply_uniforms(UB_shadow_caster_instanced_vs_params, SG_RANGE(ref p));
+                        applied = layout;
+                    }
                     sg_apply_bindings(new sg_bindings
                     {
                         vertex_buffers = { [0] = d.Vb, [1] = _instances.Buffer },
@@ -869,10 +908,15 @@ namespace GameEditor.Framework.Renderer.Server.Passes
                 }
                 return draws;
             }
-            sg_apply_pipeline(point ? _pointPipeline : _pipeline);
+            int appliedLayout = -1;
             for (int i = 0; i < _drawCount; i++)
             {
                 ref readonly var d = ref _draws[_order[i]];
+                if ((d.Compact ? 1 : 0) != appliedLayout)
+                {
+                    sg_apply_pipeline(d.Compact ? CompactPipeline(point, instanced: false) : (point ? _pointPipeline : _pipeline));
+                    appliedLayout = d.Compact ? 1 : 0;
+                }
                 var vsParams = new shadow_caster_vs_params_t { mvp = d.Model * lightViewProj };
                 sg_apply_uniforms(UB_shadow_caster_vs_params, SG_RANGE(ref vsParams));
                 sg_apply_bindings(new sg_bindings { vertex_buffers = { [0] = d.Vb }, index_buffer = d.Ib });

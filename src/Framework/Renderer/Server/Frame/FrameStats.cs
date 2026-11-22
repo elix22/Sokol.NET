@@ -21,6 +21,10 @@ namespace GameEditor.Framework.Renderer.Server
         /// <summary>Number of LOD level switches that occurred this frame.</summary>
         public int LodSwitches;
 
+        /// <summary>Draws of a coarser index LOD level , and the coarsest level drawn.</summary>
+        public int IndexLodDraws;
+        public int IndexLodMax;
+
         /// <summary>Number of shadow-pass draw calls issued this frame.</summary>
         public int ShadowDrawCalls;
 
@@ -34,6 +38,8 @@ namespace GameEditor.Framework.Renderer.Server
             TotalRenderable    = 0;
             Culled             = 0;
             LodSwitches        = 0;
+            IndexLodDraws      = 0;
+            IndexLodMax        = 0;
             ShadowDrawCalls    = 0;
             InstancesDropped   = 0;
         }
