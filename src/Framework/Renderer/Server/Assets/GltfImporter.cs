@@ -279,6 +279,7 @@ namespace GameEditor.Framework.Renderer.Server.Assets
             // ── Stage 3: all bytes present → build the scene ─────────────────────────────────
             private void Finish()
             {
+                if (!DecodeMeshopt()) return;
                 bool ok = false;
                 Entity? result = null;
                 try { result = BuildScene(); ok = true; Succeeded = true; }
@@ -286,6 +287,26 @@ namespace GameEditor.Framework.Renderer.Server.Assets
                 Cleanup();
                 if (ok) Logger.Info($"[glTF] {(_buildEntities ? "imported" : "preloaded resources for")} '{_path}'");
                 if (!_done) { _done = true; _onComplete?.Invoke(result); }
+            }
+
+            // EXT_meshopt_compression / KHR_meshopt_compression: every compressed buffer view decoded (meshoptimizer, native:
+            // ext/sokol_meshopt.h) into buffer_view->data, which every cgltf accessor read below uses; cgltf_free frees it.
+            // A file without the extension does not call into it.
+            private bool DecodeMeshopt()
+            {
+                bool any = false;
+                for (int i = 0; i < (int)_data->buffer_views_count && !any; i++) any = _data->buffer_views[i].has_meshopt_compression != 0;
+                if (!any) return true;
+                int decoded = SMeshopt.smeshopt_decode_gltf(_data);
+                if (decoded >= 0) return true;
+                Fail(decoded switch
+                {
+                    -1 => "a compressed buffer (EXT_meshopt_compression) has no bytes",
+                    -2 => "out of memory decoding its compressed geometry",
+                    -4 => "its compressed geometry uses an unknown meshopt mode or filter",
+                    _ => "its compressed geometry (EXT_meshopt_compression) is malformed",
+                });
+                return false;
             }
 
             private void Fail(string why)

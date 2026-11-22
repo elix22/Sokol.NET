@@ -39,6 +39,7 @@ module_names = {
     'manifold_': 'Manifoldc',
     'sfs_':      'SFilesystem',
     'scap_':     'SCapture',
+    'smeshopt_': 'SMeshopt',
     'ssafe_':    'SSafeArea',
     'ssens_':    'SSens',
     'nvg':       'NanoVG',
@@ -73,6 +74,7 @@ default_output_dir = '../src/sokol/generated'
 # Extra include directories for clang, per prefix (relative to bindgen/)
 extra_include_dirs = {
     'manifold_': ['../ext/manifold/bindings/c/include'],
+    'smeshopt_': ['../ext/cgltf'],   # sokol_meshopt.h includes "cgltf.h" (on the native build's include path)
 }
 
 # Extra hand-written declarations to emit at the top of a generated class, per prefix.
@@ -118,6 +120,7 @@ library_names = {
     'manifold_': 'manifoldc',  # manifoldc uses separate library
     'sfs_':      'sokol',
     'scap_':     'sokol',
+    'smeshopt_': 'sokol',
     'ssafe_':    'sokol',
     'ssens_':    'sokol',
     'nvg':       'sokol',
@@ -157,6 +160,7 @@ c_source_paths = {
     'manifold_': 'c/manifoldc.c',  # manifoldc has its own CMake build — no single .c source
     'sfs_':      'c/sokol_filesystem.c',
     'scap_':     'c/sokol_capture.c',
+    'smeshopt_': 'c/sokol_meshopt.c',
     'ssafe_':    'c/sokol_safearea.c',
     'ssens_':    'c/sokol_sensors.c',
     'nvg':       'c/nanovg.c',

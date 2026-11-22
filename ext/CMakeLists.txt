@@ -50,6 +50,14 @@ set(NANOVG_SOURCE_FILES
         nanovg/src/nanovg_impl.c
 )
 
+# EXT_meshopt_compression for cgltf (sokol_meshopt.h): meshoptimizer's codecs, the C API beside them
+set(MESHOPT_SOURCE_FILES
+        sokol_meshopt.cpp
+        meshoptimizer/src/vertexcodec.cpp
+        meshoptimizer/src/indexcodec.cpp
+        meshoptimizer/src/vertexfilter.cpp
+)
+
 # Avoid pulling tinyexr/nanozlib (which embeds wuffs) into the Emscripten build
 # We check both CMAKE_SYSTEM_NAME (toolchain file) and the EMSCRIPTEN cache var
 # to be resilient across emcmake/toolchain invocations.
@@ -61,6 +69,7 @@ if (NOT MSVC)
     set_source_files_properties(basisu/sokol_basisu.cpp PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
     set_source_files_properties(${IMGUI_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
     set_source_files_properties(${TINYEXR_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
+    set_source_files_properties(${MESHOPT_SOURCE_FILES} PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x c++")
 endif()
 if (APPLE)
     # Use macOS/iOS specific file utility for both iOS and macOS (supports app bundles)
@@ -91,6 +100,7 @@ ${IMGUIZMO_SOURCE_FILES}
 ${TINYEXR_SOURCE_FILES}
 ${FILEUTIL_SRCS}
 ${NANOVG_SOURCE_FILES}
+${MESHOPT_SOURCE_FILES}
 "basisu/sokol_basisu.cpp")
 
 

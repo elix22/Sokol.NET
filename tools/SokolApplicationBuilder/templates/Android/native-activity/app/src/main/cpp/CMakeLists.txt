@@ -49,6 +49,14 @@ set(NANOVG_SOURCE_FILES
         ${EXT_ROOT_DIR}/nanovg/src/nanovg_impl.c
 )
 
+# EXT_meshopt_compression for cgltf (sokol_meshopt.h): meshoptimizer's codecs, the C API beside them
+set(MESHOPT_SOURCE_FILES
+        ${EXT_ROOT_DIR}/sokol_meshopt.cpp
+        ${EXT_ROOT_DIR}/meshoptimizer/src/vertexcodec.cpp
+        ${EXT_ROOT_DIR}/meshoptimizer/src/indexcodec.cpp
+        ${EXT_ROOT_DIR}/meshoptimizer/src/vertexfilter.cpp
+)
+
  set(FILEUTIL_SRCS ${EXT_ROOT_DIR}/util/fileutil.c ${EXT_ROOT_DIR}/util/fileutil.h)
 
 set_source_files_properties(${IMGUI_SOURCE_FILES}
@@ -74,7 +82,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-add_library(sokol SHARED  ${EXT_ROOT_DIR}/sokol.c ${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp ${IMGUI_SOURCE_FILES} ${FILEUTIL_SRCS} ${TINYEXR_SOURCE_FILES} ${NANOVG_SOURCE_FILES})
+add_library(sokol SHARED  ${EXT_ROOT_DIR}/sokol.c ${EXT_ROOT_DIR}/basisu/sokol_basisu.cpp ${IMGUI_SOURCE_FILES} ${FILEUTIL_SRCS} ${TINYEXR_SOURCE_FILES} ${NANOVG_SOURCE_FILES} ${MESHOPT_SOURCE_FILES})
 
 target_include_directories(sokol PRIVATE
     ${ANDROID_NDK}/sources/android/native_app_glue ${EXT_ROOT_DIR} ${EXT_ROOT_DIR}/cimgui ${EXT_ROOT_DIR}/sokol ${EXT_ROOT_DIR}/sokol/util ${EXT_ROOT_DIR}/pl_mpeg ${EXT_ROOT_DIR}/cgltf ${EXT_ROOT_DIR}/tinyexr ${EXT_ROOT_DIR}/tinyexr/deps/nanozlib .)
