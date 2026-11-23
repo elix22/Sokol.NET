@@ -31,9 +31,12 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public float IndirectIntensity = 1f;
         public float AlbedoBoost = 1f;
         public bool Filtering = true;
-        /// <summary>The Lighting window's Lightmapper: false Progressive CPU (the default, the reference), true Progressive GPU
-        /// (compute, where the editor has it: BAKED_GI_DESIGN.md §3.7).</summary>
-        public bool Gpu;
+        /// <summary>The Lightmapper of a scene whose file names none: the editor sets it once its GPU is up - Progressive GPU
+        /// where that path is proven (BAKED_GI_DESIGN.md §3.7), Progressive CPU elsewhere.</summary>
+        public static bool DefaultGpu;
+        /// <summary>The Lighting window's Lightmapper: false Progressive CPU (the reference), true Progressive GPU (compute,
+        /// where the editor has it: BAKED_GI_DESIGN.md §3.7); <see cref="DefaultGpu"/> when the scene names none.</summary>
+        public bool Gpu = DefaultGpu;
         /// <summary>The shadowmask's texels per light texel along a side (1, 2, 4): the sun's baked shadow edges that much
         /// sharper; one channel a texel, so 2 costs what the light page does in memory (<see cref="LightBaker.MaxMaskSize"/>
         /// caps a page).</summary>
@@ -100,7 +103,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 if (IndirectIntensity != Defaults.IndirectIntensity) w.WriteNumber("indirectIntensity", IndirectIntensity);
                 if (AlbedoBoost != Defaults.AlbedoBoost) w.WriteNumber("albedoBoost", AlbedoBoost);
                 if (Filtering != Defaults.Filtering) w.WriteBoolean("filtering", Filtering);
-                if (Gpu != Defaults.Gpu) w.WriteString("lightmapper", Gpu ? "GPU" : "CPU");
+                if (Gpu != DefaultGpu) w.WriteString("lightmapper", Gpu ? "GPU" : "CPU");
                 if (ShadowmaskScale != Defaults.ShadowmaskScale) w.WriteNumber("shadowmaskScale", ShadowmaskScale);
                 w.WriteEndObject();
             }

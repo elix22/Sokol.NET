@@ -24,7 +24,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
         {
             var world = ECSWorld.Instance;
             var input = new BakeInput { Settings = settings, Sky = Sky(RenderingServer.CurrentEnvironmentSettings) };
-            var textureAverage = new Dictionary<string, Vector3>(StringComparer.Ordinal);
+            var maps = new Dictionary<string, BakeTexture?>(StringComparer.Ordinal);
 
             foreach (var row in world.Query<ActiveFlag, MeshRenderer, Transform>().EnumerateWithEntities<ActiveFlag, MeshRenderer, Transform>())
             {
@@ -42,7 +42,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 {
                     string key = !string.IsNullOrEmpty(mr.MaterialPath) && mr.MaterialPath != MeshRenderer.NoMaterialSentinel ? mr.MaterialPath
                                : s < mesh.SubMeshes.Length ? mesh.SubMeshes[s].MaterialKey : "";
-                    mats[s] = Material(key, textureAverage);
+                    mats[s] = Material(key, maps);
                 }
                 input.Meshes.Add(new BakeMesh
                 {
@@ -93,50 +93,88 @@ namespace GameEditor.Framework.Renderer.Server.GI
             return input;
         }
 
-        // A material's albedo (base colour × its texture's average, linear; at most 0.9 so bounces converge) and emission.
-        private static BakeMaterial Material(string key, Dictionary<string, Vector3> textureAverage)
+        // A material's albedo (base colour × (1 - metallic), linear) and emission, each with its texture as a map the bake samples
+        // per point (BAKED_GI_DESIGN.md §3.8); LightBaker keeps a point's albedo at most 0.9 a channel.
+        private static BakeMaterial Material(string key, Dictionary<string, BakeTexture?> maps)
         {
             if (string.IsNullOrEmpty(key) || RenderingServer.Materials.GetByKey(key) is not PbrMaterial pm)
                 return new BakeMaterial { Albedo = new Vector3(0.9f) };   // the engine's default white surface
             var c = new Vector3(pm.BaseColorFactor.X, pm.BaseColorFactor.Y, pm.BaseColorFactor.Z) * (1f - Math.Clamp(pm.MetallicFactor, 0f, 1f));
-            if (!string.IsNullOrEmpty(pm.BaseColorMapPath)) c *= Average(pm.BaseColorMapPath, textureAverage);
-            float max = MathF.Max(c.X, MathF.Max(c.Y, c.Z));
-            if (max > 0.9f) c *= 0.9f / max;
-            var emission = pm.EmissiveFactor * pm.EmissiveStrength;
-            if (!string.IsNullOrEmpty(pm.EmissiveMapPath)) emission *= Average(pm.EmissiveMapPath, textureAverage);
-            return new BakeMaterial { Albedo = c, Emission = emission };
+            return new BakeMaterial
+            {
+                Albedo = c, AlbedoMap = Map(pm.BaseColorMapPath, maps),
+                Emission = pm.EmissiveFactor * pm.EmissiveStrength, EmissionMap = Map(pm.EmissiveMapPath, maps),
+            };
         }
 
-        // A texture's average colour, linear (its file decoded once; white when it cannot be read).
-        private static unsafe Vector3 Average(string key, Dictionary<string, Vector3> cache)
+        // A colour texture (sRGB) as the bake's map, decoded once a bake; null when there is none or it cannot be read (the
+        // material's colour alone then).
+        private static unsafe BakeTexture? Map(string key, Dictionary<string, BakeTexture?> cache)
         {
+            if (string.IsNullOrEmpty(key)) return null;
             if (cache.TryGetValue(key, out var hit)) return hit;
-            var avg = Vector3.One;
+            BakeTexture? map = null;
             try
             {
-                string path = ConfigManager.HasProject ? Path.Combine(ConfigManager.ProjectFolder!, "Assets", key) : key;
-                if (File.Exists(path))
+                if (ImageBytes(key) is { Length: > 0 } bytes)
                 {
-                    byte[] bytes = File.ReadAllBytes(path);
                     int w = 0, h = 0, ch = 0;
                     byte* px = Sokol.StbImage.stbi_load_csharp(in bytes[0], bytes.Length, ref w, ref h, ref ch, 4);
                     if (px != null)
                     {
-                        double r = 0, g = 0, b = 0; long n = (long)w * h;
-                        int step = Math.Max(1, (int)(n / 65536));
-                        long count = 0;
-                        for (long i = 0; i < n; i += step, count++)
-                        {
-                            r += AmbientSH.SrgbToLinear(px[i * 4] / 255f); g += AmbientSH.SrgbToLinear(px[i * 4 + 1] / 255f); b += AmbientSH.SrgbToLinear(px[i * 4 + 2] / 255f);
-                        }
+                        map = BakeTexture.FromRgba8(px, w, h, srgb: true);
                         Sokol.StbImage.stbi_image_free_csharp(px);
-                        if (count > 0) avg = new Vector3((float)(r / count), (float)(g / count), (float)(b / count));
                     }
                 }
+                if (map == null) Logger.Warning($"[LightBake] texture '{key}' could not be read: its material's colour alone");
             }
             catch (Exception e) { Logger.Warning($"[LightBake] texture '{key}': {e.Message}"); }
-            cache[key] = avg;
-            return avg;
+            cache[key] = map;
+            return map;
+        }
+
+        // A texture's file bytes: an image file in Assets, or "<model>.glb#img<i>" / "<model>.gltf#img<i>" (the glTF
+        // importer's key): that model's image i - in its binary chunk, a buffer, a file beside it or a data URI.
+        private static byte[]? ImageBytes(string key)
+        {
+            static string Full(string k) => ConfigManager.HasProject ? Path.Combine(ConfigManager.ProjectFolder!, "Assets", k) : k;
+            int at = key.LastIndexOf("#img", StringComparison.Ordinal);
+            if (at < 0) { string p = Full(key); return File.Exists(p) ? File.ReadAllBytes(p) : null; }
+            string file = Full(key[..at]);
+            if (!int.TryParse(key.AsSpan(at + 4), out int index) || !File.Exists(file)) return null;
+            byte[] data = File.ReadAllBytes(file);
+            ReadOnlyMemory<byte> json, bin = default;
+            if (data.Length >= 20 && BitConverter.ToUInt32(data, 0) == 0x46546C67)          // "glTF": a .glb
+            {
+                int jl = BitConverter.ToInt32(data, 12);
+                json = new ReadOnlyMemory<byte>(data, 20, jl);
+                int b = 20 + jl;
+                if (b + 8 <= data.Length && BitConverter.ToUInt32(data, b + 4) == 0x004E4942) // "BIN\0"
+                    bin = new ReadOnlyMemory<byte>(data, b + 8, Math.Min(BitConverter.ToInt32(data, b), data.Length - b - 8));
+            }
+            else json = data;
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("images", out var images) || index >= images.GetArrayLength()) return null;
+            var img = images[index];
+            string dir = Path.GetDirectoryName(file) ?? "";
+            byte[]? Uri(string uri)
+            {
+                if (uri.StartsWith("data:", StringComparison.Ordinal)) return Convert.FromBase64String(uri[(uri.IndexOf(',') + 1)..]);
+                string p = Path.Combine(dir, System.Uri.UnescapeDataString(uri));
+                return File.Exists(p) ? File.ReadAllBytes(p) : null;
+            }
+            if (img.TryGetProperty("uri", out var u)) return Uri(u.GetString() ?? "");
+            if (!img.TryGetProperty("bufferView", out var bvi)) return null;
+            var bv = root.GetProperty("bufferViews")[bvi.GetInt32()];
+            int buffer = bv.TryGetProperty("buffer", out var bi) ? bi.GetInt32() : 0;
+            int offset = bv.TryGetProperty("byteOffset", out var bo) ? bo.GetInt32() : 0;
+            int length = bv.GetProperty("byteLength").GetInt32();
+            ReadOnlyMemory<byte> src;
+            var buf = root.GetProperty("buffers")[buffer];
+            if (buf.TryGetProperty("uri", out var bu)) src = Uri(bu.GetString() ?? "") ?? Array.Empty<byte>();
+            else src = buffer == 0 ? bin : default;
+            return offset + length <= src.Length ? src.Slice(offset, length).ToArray() : null;
         }
 
         /// <summary>The sky's linear radiance by world direction, as the environment lights the scene: the procedural sky

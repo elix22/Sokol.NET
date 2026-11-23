@@ -8,13 +8,14 @@ using GameEditor.Framework.Renderer.Server.Resources;
 
 namespace GameEditor.Framework.Renderer.Server.GI
 {
-    /// <summary>A surface's look to the baker: linear albedo and emission; <see cref="Texture"/> (optional) multiplies the albedo
-    /// at a TEXCOORD_0.</summary>
+    /// <summary>A surface's look to the baker: linear albedo and emission, each multiplied at a point by its map (optional) at
+    /// the point's TEXCOORD_0 (BAKED_GI_DESIGN.md §3.8). The albedo is then scaled so no channel passes 0.9 (bounces converge).</summary>
     public struct BakeMaterial
     {
         public Vector3 Albedo;
         public Vector3 Emission;
-        public Func<Vector2, Vector3>? Texture;
+        public BakeTexture? AlbedoMap;
+        public BakeTexture? EmissionMap;
     }
 
     /// <summary>A contributing renderer: its mesh (as the registry holds it), where it is, its sub-meshes' materials.</summary>
@@ -54,20 +55,23 @@ namespace GameEditor.Framework.Renderer.Server.GI
                        float[] visibility, long[] rays, CancellationToken cancel);
     }
 
-    /// <summary>The scene as a tracer gets it: the ray BVH flattened (<see cref="Bvh.Flatten"/>), each triangle's albedo and
-    /// emission (by its own index), the lights (4 vec4 each: (position, type), (direction, mode), (colour, range), (inner
+    /// <summary>The scene as a tracer gets it: the ray BVH flattened (<see cref="Bvh.Flatten"/>), each triangle's surface (by its
+    /// own index, 4 vec4: (albedo, its map + 1 or 0), (emission, its map + 1 or 0), (TEXCOORD_0 of corner a, of b), (of c, 0, 0) -
+    /// a point's colour as <see cref="LightBaker"/>'s: the albedo × its map, at most 0.9 a channel, × <see cref="AlbedoBoost"/>,
+    /// at most 1), the maps (map k's header at Maps[k]: (first texel, width, height, 0); its texels linear RGB, rows from the
+    /// top: <see cref="BakeTexture"/>), the lights (4 vec4 each: (position, type), (direction, mode), (colour, range), (inner
     /// cos, outer cos, indirect multiplier, shadows 0/1)), the sky as a lat-long table (u: atan2(z, x) / 2π + ½, v: acos(y) /
     /// π, texel centres), the settings.</summary>
     public sealed class BakeTraceScene
     {
         public Vector4[] Nodes = Array.Empty<Vector4>(), Tris = Array.Empty<Vector4>();
-        public Vector4[] Albedo = Array.Empty<Vector4>(), Emission = Array.Empty<Vector4>();
+        public Vector4[] Surfaces = Array.Empty<Vector4>(), Maps = Array.Empty<Vector4>();
         public Vector4[] Lights = Array.Empty<Vector4>();
         public int LightCount;
         public Vector4[] Sky = Array.Empty<Vector4>();
         public int SkyWidth, SkyHeight;
         public int MaxBounces, Samples, DirectSamples;
-        public float IndirectIntensity;
+        public float IndirectIntensity, AlbedoBoost;
         /// <summary>The tracer's own (its GPU buffers), made on its first use, freed by it.</summary>
         public object? State;
     }
@@ -216,9 +220,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
             }
             var bvh = new Bvh(corners.ToArray());
             var ctx = new Context(input, bvh, triMaterial.ToArray(), triUv0.ToArray());
-            // The tracer (the GPU) takes the pages when every surface is a flat colour (a material's texture function is the
-            // CPU's alone).
-            var traceScene = input.Tracer != null && Array.TrueForAll(ctx.Material, m => m.Texture == null) ? TraceScene(ctx) : null;
+            var traceScene = input.Tracer != null ? TraceScene(ctx) : null;
             result.Traced = traceScene != null;
 
             // ── light probes (M8b): the light arriving at each, over the whole sphere ──
@@ -353,7 +355,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
         /// <summary>The sky table's size (lat-long): 0.35° a texel - the procedural sky's sun (~2°) and horizon kept.</summary>
         public const int SkyWidth = 1024, SkyHeight = 512;
 
-        private static BakeTraceScene TraceScene(Context ctx)
+        private static BakeTraceScene? TraceScene(Context ctx)
         {
             var sc = new BakeTraceScene
             {
@@ -361,12 +363,35 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 DirectSamples = Math.Clamp(ctx.Input.Settings.DirectSamples, 1, 64), SkyWidth = SkyWidth, SkyHeight = SkyHeight,
             };
             ctx.Bvh.Flatten(out sc.Nodes, out sc.Tris);
+            sc.AlbedoBoost = ctx.AlbedoBoost;
+            // The maps, each once (headers first, then their texels: indices as floats, exact below 2^24).
+            var maps = new List<BakeTexture>();
+            var mapIndex = new Dictionary<BakeTexture, int>(ReferenceEqualityComparer.Instance);
+            float Map(BakeTexture? m)
+            {
+                if (m == null) return 0f;
+                if (!mapIndex.TryGetValue(m, out int k)) { k = maps.Count; maps.Add(m); mapIndex[m] = k; }
+                return k + 1;
+            }
             int n = ctx.Material.Length;
-            sc.Albedo = new Vector4[n]; sc.Emission = new Vector4[n];
+            sc.Surfaces = new Vector4[n * 4];
             for (int t = 0; t < n; t++)
             {
-                sc.Albedo[t] = new Vector4(ctx.Albedo(t, 0f, 0f), 0f);       // a flat colour: the same at every point
-                sc.Emission[t] = new Vector4(ctx.Material[t].Emission, 0f);
+                var m = ctx.Material[t];
+                var (a, b, c) = ctx.Uv0[t];
+                sc.Surfaces[t * 4] = new Vector4(m.Albedo, Map(m.AlbedoMap));
+                sc.Surfaces[t * 4 + 1] = new Vector4(m.Emission, Map(m.EmissionMap));
+                sc.Surfaces[t * 4 + 2] = new Vector4(a.X, a.Y, b.X, b.Y);
+                sc.Surfaces[t * 4 + 3] = new Vector4(c.X, c.Y, 0f, 0f);
+            }
+            long texels = maps.Count;
+            foreach (var m in maps) texels += m.Linear.Length;
+            if (texels >= 1 << 24) return null;              // past a float's exact integers: the CPU bakes it
+            sc.Maps = new Vector4[Math.Max(1, texels)];
+            for (int k = 0, first = maps.Count; k < maps.Count; first += maps[k].Linear.Length, k++)
+            {
+                sc.Maps[k] = new Vector4(first, maps[k].Width, maps[k].Height, 0f);
+                for (int i = 0; i < maps[k].Linear.Length; i++) sc.Maps[first + i] = new Vector4(maps[k].Linear[i], 0f);
             }
             var lights = ctx.Input.Lights;
             sc.LightCount = lights.Count;
@@ -472,16 +497,29 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 AlbedoBoost = input.Settings.AlbedoBoost;
             }
 
+            /// <summary>The albedo at a point of a triangle (u, v: its barycentrics toward corners b and c): the material's × its
+            /// map, scaled so no channel passes 0.9, × Albedo Boost (at most 1).</summary>
             public Vector3 Albedo(int tri, float u, float v)
             {
                 var m = Material[tri];
                 var a = m.Albedo;
-                if (m.Texture != null)
-                {
-                    var (ua, ub, uc) = Uv0[tri];
-                    a *= m.Texture(ua * (1f - u - v) + ub * u + uc * v);
-                }
+                if (m.AlbedoMap != null) a *= m.AlbedoMap.Sample(Uv(tri, u, v));
+                float max = MathF.Max(a.X, MathF.Max(a.Y, a.Z));
+                if (max > 0.9f) a *= 0.9f / max;
                 return Vector3.Min(a * AlbedoBoost, new Vector3(1f));
+            }
+
+            /// <summary>The emission at a point of a triangle: the material's × its map.</summary>
+            public Vector3 Emission(int tri, float u, float v)
+            {
+                var m = Material[tri];
+                return m.EmissionMap != null ? m.Emission * m.EmissionMap.Sample(Uv(tri, u, v)) : m.Emission;
+            }
+
+            private Vector2 Uv(int tri, float u, float v)
+            {
+                var (ua, ub, uc) = Uv0[tri];
+                return ua * (1f - u - v) + ub * u + uc * v;
             }
         }
 
@@ -562,7 +600,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 int tri = hit.Triangle;
                 var n = ctx.Bvh.Normal(tri);
                 if (Vector3.Dot(n, w) > 0f) n = -n;
-                sum += throughput * ctx.Material[tri].Emission;
+                sum += throughput * ctx.Emission(tri, hit.U, hit.V);
                 if (bounce > ctx.MaxBounces) return sum;
                 var albedo = ctx.Albedo(tri, hit.U, hit.V);
                 var p = o + w * hit.T + n * Eps;
