@@ -52,7 +52,7 @@
     ========
         SOKOL_GLCORE / SOKOL_GLES3 (incl. WebGL2)  supported
         SOKOL_METAL (macOS + iOS)                  supported
-        SOKOL_D3D11                                not implemented (scap_supported() == false)
+        SOKOL_D3D11                                supported (a staging copy, mapped; 8-bit RGBA/BGRA, not multisampled)
         SOKOL_WGPU                                 not implemented (scap_supported() == false)
 
     zlib/libpng license -- same terms as the sokol headers.
@@ -236,6 +236,82 @@ static bool _scap_read_image(sg_image img, int width, int height, uint8_t* out_r
             _SCAP_RELEASE(staging);
         }
     }
+    return ok;
+}
+
+#define _SCAP_SUPPORTED (1)
+
+/*--- D3D11 -------------------------------------------------------------------*/
+#elif defined(SOKOL_D3D11)
+
+/* COM calls from C or C++ (as sokol_gfx.h's own D3D11 backend makes them) */
+#if defined(__cplusplus)
+#define _SCAP_D3D11_CALL0(obj, fn) (obj)->fn()
+#define _SCAP_D3D11_CALL(obj, fn, ...) (obj)->fn(__VA_ARGS__)
+#else
+#define _SCAP_D3D11_CALL0(obj, fn) (obj)->lpVtbl->fn(obj)
+#define _SCAP_D3D11_CALL(obj, fn, ...) (obj)->lpVtbl->fn(obj, __VA_ARGS__)
+#endif
+
+static bool _scap_read_image(sg_image img, int width, int height, uint8_t* out_rgba) {
+    const sg_d3d11_image_info info = sg_d3d11_query_image_info(img);
+    ID3D11Texture2D* tex = (ID3D11Texture2D*) info.tex2d;
+    ID3D11Device* dev = (ID3D11Device*) sg_d3d11_device();
+    ID3D11DeviceContext* ctx = (ID3D11DeviceContext*) sg_d3d11_device_context();
+    if (0 == tex) {
+        return _scap_fail("sg_d3d11_query_image_info: no 2D texture (invalid image?)");
+    }
+    if ((0 == dev) || (0 == ctx)) {
+        return _scap_fail("no D3D11 device/context (sg_setup() not called?)");
+    }
+    D3D11_TEXTURE2D_DESC desc;
+    _SCAP_D3D11_CALL(tex, GetDesc, &desc);
+    const bool is_bgra = (DXGI_FORMAT_B8G8R8A8_UNORM == desc.Format) || (DXGI_FORMAT_B8G8R8A8_UNORM_SRGB == desc.Format);
+    const bool is_rgba = (DXGI_FORMAT_R8G8B8A8_UNORM == desc.Format) || (DXGI_FORMAT_R8G8B8A8_UNORM_SRGB == desc.Format);
+    if (!is_bgra && !is_rgba) {
+        return _scap_fail("image is not an 8-bit RGBA/BGRA format");
+    }
+    if (desc.SampleDesc.Count > 1) {
+        return _scap_fail("multisampled image (resolve it first)");
+    }
+    if (((UINT)width > desc.Width) || ((UINT)height > desc.Height)) {
+        return _scap_fail("width/height larger than the image");
+    }
+    /* a CPU-readable copy of mip 0, slice 0 */
+    D3D11_TEXTURE2D_DESC sdesc;
+    memset(&sdesc, 0, sizeof(sdesc));
+    sdesc.Width = (UINT)width;
+    sdesc.Height = (UINT)height;
+    sdesc.MipLevels = 1;
+    sdesc.ArraySize = 1;
+    sdesc.Format = desc.Format;
+    sdesc.SampleDesc.Count = 1;
+    sdesc.Usage = D3D11_USAGE_STAGING;
+    sdesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    ID3D11Texture2D* staging = 0;
+    if (FAILED(_SCAP_D3D11_CALL(dev, CreateTexture2D, &sdesc, NULL, &staging)) || (0 == staging)) {
+        return _scap_fail("CreateTexture2D (staging) failed");
+    }
+    D3D11_BOX box;
+    box.left = 0; box.top = 0; box.front = 0;
+    box.right = (UINT)width; box.bottom = (UINT)height; box.back = 1;
+    _SCAP_D3D11_CALL(ctx, CopySubresourceRegion, (ID3D11Resource*)staging, 0, 0, 0, 0, (ID3D11Resource*)tex, 0, &box);
+    bool ok = true;
+    D3D11_MAPPED_SUBRESOURCE mapped;
+    if (FAILED(_SCAP_D3D11_CALL(ctx, Map, (ID3D11Resource*)staging, 0, D3D11_MAP_READ, 0, &mapped))) {
+        ok = _scap_fail("Map (staging) failed");
+    } else {
+        /* D3D11 rows are top-down, as the result's: copied row by row (the pitch may be wider) */
+        const size_t row = (size_t)width * 4;
+        for (int y = 0; y < height; y++) {
+            memcpy(out_rgba + (size_t)y * row, (const uint8_t*)mapped.pData + (size_t)y * mapped.RowPitch, row);
+        }
+        _SCAP_D3D11_CALL(ctx, Unmap, (ID3D11Resource*)staging, 0);
+        if (is_bgra) {
+            _scap_bgra_to_rgba(out_rgba, width, height);
+        }
+    }
+    _SCAP_D3D11_CALL0(staging, Release);
     return ok;
 }
 
