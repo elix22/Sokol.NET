@@ -38,8 +38,44 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public bool Shadows;
     }
 
+    /// <summary>
+    /// The light bake's ray work done elsewhere - the editor's GPU path (BAKED_GI_DESIGN.md §3.7): each texel as
+    /// <see cref="LightBaker"/>'s CPU does it (the same random numbers, lights, bounces), given the scene flattened. Returns
+    /// false when it cannot (the CPU then does that page).
+    /// </summary>
+    public interface IBakeTracer
+    {
+        /// <summary>Per texel (index = its place on page <paramref name="page"/>): direct light, bounced light (sky +
+        /// bounces × Indirect Intensity), the dominant direction, the rays traced.</summary>
+        bool TraceTexels(BakeTraceScene scene, int page, int[] index, Vector3[] pos, Vector3[] nrm,
+                         Vector3[] direct, Vector3[] bounce, Vector3[] dir, long[] rays, CancellationToken cancel);
+        /// <summary>Per texel of a shadowmask page: the share of the sun it sees (as <c>SunVisibility</c>).</summary>
+        bool TraceMask(BakeTraceScene scene, int page, int[] index, Vector3[] pos, Vector3[] nrm, Vector3 sunDirection,
+                       float[] visibility, long[] rays, CancellationToken cancel);
+    }
+
+    /// <summary>The scene as a tracer gets it: the ray BVH flattened (<see cref="Bvh.Flatten"/>), each triangle's albedo and
+    /// emission (by its own index), the lights (4 vec4 each: (position, type), (direction, mode), (colour, range), (inner
+    /// cos, outer cos, indirect multiplier, shadows 0/1)), the sky as a lat-long table (u: atan2(z, x) / 2π + ½, v: acos(y) /
+    /// π, texel centres), the settings.</summary>
+    public sealed class BakeTraceScene
+    {
+        public Vector4[] Nodes = Array.Empty<Vector4>(), Tris = Array.Empty<Vector4>();
+        public Vector4[] Albedo = Array.Empty<Vector4>(), Emission = Array.Empty<Vector4>();
+        public Vector4[] Lights = Array.Empty<Vector4>();
+        public int LightCount;
+        public Vector4[] Sky = Array.Empty<Vector4>();
+        public int SkyWidth, SkyHeight;
+        public int MaxBounces, Samples, DirectSamples;
+        public float IndirectIntensity;
+        /// <summary>The tracer's own (its GPU buffers), made on its first use, freed by it.</summary>
+        public object? State;
+    }
+
     public sealed class BakeInput
     {
+        /// <summary>The ray work's other path (the editor's GPU); null: the CPU's threads.</summary>
+        public IBakeTracer? Tracer;
         public List<BakeMesh> Meshes = new();
         public List<BakeLight> Lights = new();
         /// <summary>The sky's linear radiance toward a world direction (the environment the scene is lit by).</summary>
@@ -87,6 +123,8 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public List<(Vector3 Position, Vector3[] Radiance)> Probes = new();
         public long Rays;
         public double Seconds;
+        /// <summary>The pages traced by <see cref="BakeInput.Tracer"/> (the GPU).</summary>
+        public bool Traced;
         /// <summary>The light whose shadow is in the pages' <see cref="LightmapPage.Mask"/> (scene id); -1: no shadowmask.</summary>
         public int ShadowmaskLight = -1;
         /// <summary>The lightmap layouts: a source mesh's sub-meshes with their lightmap UV in texels (<c>Uv1</c>), one a mesh
@@ -178,6 +216,10 @@ namespace GameEditor.Framework.Renderer.Server.GI
             }
             var bvh = new Bvh(corners.ToArray());
             var ctx = new Context(input, bvh, triMaterial.ToArray(), triUv0.ToArray());
+            // The tracer (the GPU) takes the pages when every surface is a flat colour (a material's texture function is the
+            // CPU's alone).
+            var traceScene = input.Tracer != null && Array.TrueForAll(ctx.Material, m => m.Texture == null) ? TraceScene(ctx) : null;
+            result.Traced = traceScene != null;
 
             // ── light probes (M8b): the light arriving at each, over the whole sphere ──
             if (input.Probes.Count > 0)
@@ -221,6 +263,12 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 var direct = new Vector3[tx.Pos.Length];
                 var bounce = new Vector3[tx.Pos.Length];
                 int pageIndex = p;
+                if (traceScene != null && TracePage(input.Tracer!, traceScene, tx, pageIndex, page, direct, bounce, directional, ref rays, cancel))
+                {
+                    long d = Interlocked.Add(ref doneRows, 4L * tx.Size);
+                    progress?.Invoke((float)d / Math.Max(1, totalRows));
+                }
+                else
                 Parallel.For(0, tx.Size, new ParallelOptions { CancellationToken = cancel }, y =>
                 {
                     long localRays = 0;
@@ -270,6 +318,12 @@ namespace GameEditor.Framework.Renderer.Server.GI
                                 Raster(mt, i, sm.Vertices[sm.Indices[t]], sm.Vertices[sm.Indices[t + 1]], sm.Vertices[sm.Indices[t + 2]], m.World, nm);
                     }
                     int pageIndex = p;
+                    if (traceScene != null && TraceMaskPage(input.Tracer!, traceScene, mt, pageIndex, page, sunDir, ref rays, cancel))
+                    {
+                        long d = Interlocked.Add(ref doneRows, mt.Size);
+                        progress?.Invoke((float)d / Math.Max(1, totalRows));
+                    }
+                    else
                     Parallel.For(0, mt.Size, new ParallelOptions { CancellationToken = cancel }, y =>
                     {
                         long localRays = 0;
@@ -292,6 +346,89 @@ namespace GameEditor.Framework.Renderer.Server.GI
             result.Rays = rays;
             result.Seconds = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds;
             return result;
+        }
+
+        // ── the tracer's side (BAKED_GI_DESIGN.md §3.7) ──────────────────────────────────
+
+        /// <summary>The sky table's size (lat-long): 0.35° a texel - the procedural sky's sun (~2°) and horizon kept.</summary>
+        public const int SkyWidth = 1024, SkyHeight = 512;
+
+        private static BakeTraceScene TraceScene(Context ctx)
+        {
+            var sc = new BakeTraceScene
+            {
+                MaxBounces = ctx.MaxBounces, Samples = ctx.Samples, IndirectIntensity = ctx.IndirectIntensity,
+                DirectSamples = Math.Clamp(ctx.Input.Settings.DirectSamples, 1, 64), SkyWidth = SkyWidth, SkyHeight = SkyHeight,
+            };
+            ctx.Bvh.Flatten(out sc.Nodes, out sc.Tris);
+            int n = ctx.Material.Length;
+            sc.Albedo = new Vector4[n]; sc.Emission = new Vector4[n];
+            for (int t = 0; t < n; t++)
+            {
+                sc.Albedo[t] = new Vector4(ctx.Albedo(t, 0f, 0f), 0f);       // a flat colour: the same at every point
+                sc.Emission[t] = new Vector4(ctx.Material[t].Emission, 0f);
+            }
+            var lights = ctx.Input.Lights;
+            sc.LightCount = lights.Count;
+            sc.Lights = new Vector4[Math.Max(1, lights.Count) * 4];
+            for (int i = 0; i < lights.Count; i++)
+            {
+                var l = lights[i];
+                sc.Lights[i * 4] = new Vector4(l.Position, (float)(int)l.Type);
+                sc.Lights[i * 4 + 1] = new Vector4(l.Direction, (float)(int)l.Mode);
+                sc.Lights[i * 4 + 2] = new Vector4(l.Color, l.Range);
+                sc.Lights[i * 4 + 3] = new Vector4(l.InnerCos, l.OuterCos, l.IndirectMultiplier, l.Shadows ? 1f : 0f);
+            }
+            sc.Sky = new Vector4[SkyWidth * SkyHeight];
+            var sky = ctx.Input.Sky;
+            Parallel.For(0, SkyHeight, y =>
+            {
+                float theta = MathF.PI * (y + 0.5f) / SkyHeight;
+                for (int x = 0; x < SkyWidth; x++)
+                {
+                    float phi = 2f * MathF.PI * ((x + 0.5f) / SkyWidth - 0.5f);
+                    var d = new Vector3(MathF.Sin(theta) * MathF.Cos(phi), MathF.Cos(theta), MathF.Sin(theta) * MathF.Sin(phi));
+                    sc.Sky[y * SkyWidth + x] = new Vector4(sky(d), 0f);
+                }
+            });
+            return sc;
+        }
+
+        private static bool TracePage(IBakeTracer tracer, BakeTraceScene sc, Texels tx, int pageIndex, LightmapPage page,
+                                      Vector3[] direct, Vector3[] bounce, bool directional, ref long rays, CancellationToken cancel)
+        {
+            int count = 0;
+            foreach (int o in tx.Owner) if (o >= 0) count++;
+            var index = new int[count]; var pos = new Vector3[count]; var nrm = new Vector3[count];
+            for (int i = 0, k = 0; i < tx.Owner.Length; i++)
+                if (tx.Owner[i] >= 0) { index[k] = i; pos[k] = tx.Pos[i]; nrm[k] = tx.Nrm[i]; k++; }
+            var d = new Vector3[count]; var b = new Vector3[count]; var dir = new Vector3[count]; var r = new long[count];
+            if (!tracer.TraceTexels(sc, pageIndex, index, pos, nrm, d, b, dir, r, cancel)) return false;
+            for (int k = 0; k < count; k++)
+            {
+                int i = index[k];
+                direct[i] = d[k]; bounce[i] = b[k]; rays += r[k];
+                if (directional)
+                {
+                    float w = 0.5f * Vector3.Dot(tx.Nrm[i], dir[k]) + 0.5f;
+                    page.Direction[i] = new Vector4(dir[k] * 0.5f + new Vector3(0.5f), MathF.Max(1e-4f, w));
+                }
+            }
+            return true;
+        }
+
+        private static bool TraceMaskPage(IBakeTracer tracer, BakeTraceScene sc, Texels mt, int pageIndex, LightmapPage page,
+                                          Vector3 sunDir, ref long rays, CancellationToken cancel)
+        {
+            int count = 0;
+            foreach (int o in mt.Owner) if (o >= 0) count++;
+            var index = new int[count]; var pos = new Vector3[count]; var nrm = new Vector3[count];
+            for (int i = 0, k = 0; i < mt.Owner.Length; i++)
+                if (mt.Owner[i] >= 0) { index[k] = i; pos[k] = mt.Pos[i]; nrm[k] = mt.Nrm[i]; k++; }
+            var vis = new float[count]; var r = new long[count];
+            if (!tracer.TraceMask(sc, pageIndex, index, pos, nrm, sunDir, vis, r, cancel)) return false;
+            for (int k = 0; k < count; k++) { page.Mask[index[k]] = vis[k]; rays += r[k]; }
+            return true;
         }
 
         // A mesh's layout group: its source (the registry's copy, one a mesh), its world scale in 10 % steps, its Scale In

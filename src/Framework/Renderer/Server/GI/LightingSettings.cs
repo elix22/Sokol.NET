@@ -31,6 +31,9 @@ namespace GameEditor.Framework.Renderer.Server.GI
         public float IndirectIntensity = 1f;
         public float AlbedoBoost = 1f;
         public bool Filtering = true;
+        /// <summary>The Lighting window's Lightmapper: false Progressive CPU (the default, the reference), true Progressive GPU
+        /// (compute, where the editor has it: BAKED_GI_DESIGN.md §3.7).</summary>
+        public bool Gpu;
         /// <summary>The shadowmask's texels per light texel along a side (1, 2, 4): the sun's baked shadow edges that much
         /// sharper; one channel a texel, so 2 costs what the light page does in memory (<see cref="LightBaker.MaxMaskSize"/>
         /// caps a page).</summary>
@@ -71,6 +74,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 s.IndirectIntensity = Float(r, "indirectIntensity", s.IndirectIntensity, 0f, 100f);
                 s.AlbedoBoost = Float(r, "albedoBoost", s.AlbedoBoost, 1f, 10f);
                 if (r.TryGetProperty("filtering", out e) && (e.ValueKind == JsonValueKind.True || e.ValueKind == JsonValueKind.False)) s.Filtering = e.GetBoolean();
+                if (r.TryGetProperty("lightmapper", out e) && e.ValueKind == JsonValueKind.String) s.Gpu = string.Equals(e.GetString(), "GPU", StringComparison.OrdinalIgnoreCase);
                 int scale = Int(r, "shadowmaskScale", s.ShadowmaskScale, 1, 4);
                 s.ShadowmaskScale = scale >= 4 ? 4 : scale >= 2 ? 2 : 1;
             }
@@ -96,6 +100,7 @@ namespace GameEditor.Framework.Renderer.Server.GI
                 if (IndirectIntensity != Defaults.IndirectIntensity) w.WriteNumber("indirectIntensity", IndirectIntensity);
                 if (AlbedoBoost != Defaults.AlbedoBoost) w.WriteNumber("albedoBoost", AlbedoBoost);
                 if (Filtering != Defaults.Filtering) w.WriteBoolean("filtering", Filtering);
+                if (Gpu != Defaults.Gpu) w.WriteString("lightmapper", Gpu ? "GPU" : "CPU");
                 if (ShadowmaskScale != Defaults.ShadowmaskScale) w.WriteNumber("shadowmaskScale", ShadowmaskScale);
                 w.WriteEndObject();
             }
