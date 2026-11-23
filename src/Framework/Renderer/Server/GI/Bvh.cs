@@ -131,6 +131,30 @@ namespace GameEditor.Framework.Renderer.Server.GI
         private static float Get(Vector3 v, int axis) => axis == 0 ? v.X : axis == 1 ? v.Y : v.Z;
         private static float Area(Vector3 mn, Vector3 mx) { var d = mx - mn; return d.X * d.Y + d.Y * d.Z + d.Z * d.X; }
 
+        /// <summary>
+        /// The tree as flat arrays for a GPU (Retopology's texture bake): two vec4 a node - (min, first child or first leaf
+        /// slot), (max, triangle count: 0 an inner node), the integers' bits in w; three a leaf slot - (corner, the
+        /// triangle's own index), (edge 1, 0), (edge 2, 0). A hit's barycentrics: u for the second corner, v the third.
+        /// </summary>
+        public void Flatten(out Vector4[] nodes, out Vector4[] triangles)
+        {
+            nodes = new Vector4[_nodeCount * 2];
+            for (int i = 0; i < _nodeCount; i++)
+            {
+                ref Node n = ref _nodes[i];
+                nodes[i * 2] = new Vector4(n.Min, BitConverter.Int32BitsToSingle(n.Left));
+                nodes[i * 2 + 1] = new Vector4(n.Max, BitConverter.Int32BitsToSingle(n.Count));
+            }
+            triangles = new Vector4[_tris.Length * 3];
+            for (int i = 0; i < _tris.Length; i++)
+            {
+                ref Tri t = ref _tris[i];
+                triangles[i * 3] = new Vector4(t.A, BitConverter.Int32BitsToSingle(_order[i]));
+                triangles[i * 3 + 1] = new Vector4(t.E1, 0f);
+                triangles[i * 3 + 2] = new Vector4(t.E2, 0f);
+            }
+        }
+
         /// <summary>The nearest triangle the ray meets before <paramref name="tMax"/> (both faces), or false.</summary>
         public bool Intersect(Vector3 origin, Vector3 dir, float tMax, out Hit hit) => Trace(origin, dir, tMax, false, out hit);
 
