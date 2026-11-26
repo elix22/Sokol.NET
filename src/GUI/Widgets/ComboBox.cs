@@ -4,7 +4,9 @@ using System.Collections.Generic;
 namespace Sokol.GUI;
 
 /// <summary>
-/// Drop-down combo box.
+/// Drop-down combo box. A press on the closed box only arms it; the list opens on release over the box. So a drag that
+/// starts on the box (a finger scrolling the page it sits in) goes to the enclosing ScrollView instead of opening the list:
+/// the input router un-presses the box (OnMouseLeave) once the drag passes the scroll slop.
 /// </summary>
 public class ComboBox : Widget
 {
@@ -26,6 +28,7 @@ public class ComboBox : Widget
     // once it moves past the slop, so a finger-flick scrolls the list instead of picking
     // a row. Selection is therefore deferred to mouse-up (and skipped if we panned).
     private bool  _pressInList;
+    private bool  _armed;          // pressed on the closed box: opens on release
     private bool  _dragScrolling;
     private float _pressStartY, _pressLastY;
     private const float DragSlop      = 8f;   // px before a press becomes a pan
@@ -304,20 +307,35 @@ public class ComboBox : Widget
 
         if (e.Button == MouseButton.Left && Enabled)
         {
-            _popupAnchorScreenPos = new Vector2(e.Position.X - e.LocalPosition.X, e.Position.Y - e.LocalPosition.Y);
-            _hasPopupAnchor = true;
-            _open         = true;
-            _hoveredIndex = -1;
-            _scrollOffset = 0f;     // reset scroll each time we open
-            Screen.SetActivePopup(this);
-            Sokol.SLog.Info($"ComboBox: opened, registered as popup", "Sokol.GUI");
+            _armed = true;   // the list opens on release (OnMouseUp); a drag from here scrolls the page instead
             return true;
         }
         return false;
     }
 
+    /// <summary>Opens the list under the box (a tap on the closed box, on release).</summary>
+    private void OpenFrom(MouseEvent e)
+    {
+        _popupAnchorScreenPos = new Vector2(e.Position.X - e.LocalPosition.X, e.Position.Y - e.LocalPosition.Y);
+        _hasPopupAnchor = true;
+        _open         = true;
+        _hoveredIndex = -1;
+        _scrollOffset = 0f;     // reset scroll each time we open
+        Screen.SetActivePopup(this);
+        Sokol.SLog.Info($"ComboBox: opened, registered as popup", "Sokol.GUI");
+    }
+
     public override bool OnMouseUp(MouseEvent e)
     {
+        // A press on the closed box released over it: open. (Released elsewhere, or un-pressed by a scroll: nothing.)
+        if (!_open && _armed)
+        {
+            _armed = false;
+            var p = e.LocalPosition;
+            if (Enabled && p.X >= 0 && p.Y >= 0 && p.X <= Bounds.Width && p.Y <= Bounds.Height) OpenFrom(e);
+            return true;
+        }
+
         bool panned = _dragScrolling;
 
         // A tap (press that didn't become a pan) selects the row under the release point.
@@ -346,7 +364,7 @@ public class ComboBox : Widget
         return panned;   // if we panned, swallow the up so it isn't treated as a click
     }
 
-    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _hoveredIndex = -1; _sbHovered = false; return false; }
+    public override bool OnMouseLeave(MouseEvent e) { IsHovered = false; _hoveredIndex = -1; _sbHovered = false; _armed = false; return false; }
 
     public override bool OnMouseMove(MouseEvent e)
     {
