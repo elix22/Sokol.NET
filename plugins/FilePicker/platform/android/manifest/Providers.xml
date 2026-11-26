@@ -1,0 +1,8 @@
+<!-- FilePicker plugin: the see-through activity that shows the system document picker and receives its answer
+     (injected into the <application> block by SokolApplicationBuilder). "behind" keeps the app's orientation. -->
+<activity
+    android:name="com.sokol.filepicker.FilePickerActivity"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar"
+    android:exported="false"
+    android:screenOrientation="behind"
+    android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />

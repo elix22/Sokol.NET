@@ -14,6 +14,7 @@ Optional, self-contained add-ons that extend Sokol.NET applications.
 | [IncomingLinks](IncomingLinks/README.md) | Android | Receive the link that opened the app (`IncomingLinks.TakePending()`): Android App Links and custom URL schemes, cold start and while running |
 | [AppUpdate](AppUpdate/README.md) | Android | Google Play In-App Updates, FLEXIBLE flow (`AppUpdate.Check()` / `StartFlexible()` / `Complete()`), with Play's `FakeAppUpdateManager` for testing |
 | [Notifications](Notifications/README.md) | Android, iOS | Local scheduled notifications (`Notifications.Schedule(id, at, …)`): WorkManager / `UNUserNotificationCenter`, no push or server; permission asked when the app chooses |
+| [FilePicker](FilePicker/README.md) | Android, iOS, macOS, Windows, Linux | The system's file pickers (`FilePicker.Open` / `Save`): open or save anywhere the picker reaches (device, iCloud Drive, Google Drive, Dropbox, ...), read and write by handle, bookmarks for recent files |
 
 `Ads` and `Billing` have no desktop or web backend. Rather than requiring `#if` at every call site,
 their managed layer stubs each call and completes it through the normal event path (queries fail,
