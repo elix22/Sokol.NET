@@ -1012,6 +1012,20 @@ public static extern void sapp_cancel_quit();
 #endif
 public static extern void sapp_quit();
 
+#if WEB
+[DllImport("sokol", EntryPoint = "sapp_skip_present", CallingConvention = CallingConvention.Cdecl)]
+private static extern int sapp_skip_present_native();
+public static bool sapp_skip_present() => sapp_skip_present_native() != 0;
+#else
+#if __IOS__
+[DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_skip_present", CallingConvention = CallingConvention.Cdecl)]
+#else
+[DllImport("sokol", EntryPoint = "sapp_skip_present", CallingConvention = CallingConvention.Cdecl)]
+#endif
+[return: M(U.I1)]
+public static extern bool sapp_skip_present();
+#endif
+
 #if __IOS__
 [DllImport("@rpath/sokol.framework/sokol", EntryPoint = "sapp_consume_event", CallingConvention = CallingConvention.Cdecl)]
 #else
