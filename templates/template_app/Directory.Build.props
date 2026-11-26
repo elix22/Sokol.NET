@@ -19,6 +19,8 @@
       <HostOS Condition="'$(IsWindowsHost)'=='true'">windows</HostOS>
       <HostOS Condition="'$(IsLinuxHost)'=='true'">linux</HostOS>
       <HostOS Condition="'$(IsOSXHost)'=='true'">osx</HostOS>
+      <!-- Windows has no HOME: the user's folder is USERPROFILE (unset elsewhere, so HOME is used there as before). -->
+      <HomeDir Condition="'$(HomeDir)' == ''">$(UserProfile)</HomeDir>
       <HomeDir Condition="'$(HomeDir)' == ''">$(Home)</HomeDir>
       <SokolNetHome Condition="Exists('$(HomeDir)/.sokolnet_config/sokolnet_home')">$([System.IO.File]::ReadAllText('$(HomeDir)/.sokolnet_config/sokolnet_home').Trim())</SokolNetHome>
       <!-- Sokol Shader Compiler Path -->

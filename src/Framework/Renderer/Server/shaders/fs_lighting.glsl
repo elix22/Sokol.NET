@@ -8,6 +8,17 @@
 //   [i*4+2] ColorIntensity : xyz=color     w=intensity
 //   [i*4+3] SpotShadow     : x=innerCos  y=outerCos  z=shadowIdx  w=pad
 
+// A shadow map's depth compare. D3D11: at level 0 (SampleCmpLevelZero, no gradients). The default compare is SampleCmp,
+// which needs gradients, so fxc (d3dcompiler_47) must unroll every loop around it - the PCF loops and the light loop,
+// whose sizes are uniforms - and it failed ("unable to unroll loop") or crashed (access violation in D3DCompile, the
+// cascade shadow). The shadow maps have one mip, so both read the same; the other backends keep texture().
+#if SOKOL_HLSL
+#extension GL_EXT_texture_shadow_lod : require
+#define SHADOW_CMP(tex, smp, c) textureLod(sampler2DArrayShadow(tex, smp), (c), 0.0)
+#else
+#define SHADOW_CMP(tex, smp, c) texture(sampler2DArrayShadow(tex, smp), (c))
+#endif
+
 float get_range_attenuation(float range, float distance)
 {
     if (range < 0.0) return 1.0;
@@ -112,7 +123,7 @@ float sampleCsmShadow(vec3 worldPos, float view_depth, float ndotl)
     // shadowed surface's every pixel was slower for them, a full-screen one 23 ms a frame.
     float vis;
     if (csm_pcf_taps < 9) {
-        vis = texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp), vec4(uv, slice, receiver - bias));
+        vis = SHADOW_CMP(shadow_atlas, shadow_atlas_smp, vec4(uv, slice, receiver - bias));
     } else {
         int   pcfR    = csm_pcf_taps >= 25 ? 2 : 1;
         float pcfStep = csm_pcf_taps >= 25 ? 1.5 : 1.0;
@@ -120,8 +131,7 @@ float sampleCsmShadow(vec3 worldPos, float view_depth, float ndotl)
         for (int y = -pcfR; y <= pcfR; y++)
         for (int x = -pcfR; x <= pcfR; x++) {
             vec2 s = uv + vec2(float(x), float(y)) * texel * pcfStep;
-            vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
-                           vec4(s, slice, receiver - bias));
+            vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp, vec4(s, slice, receiver - bias));
         }
         vis /= float((2 * pcfR + 1) * (2 * pcfR + 1));
     }
@@ -171,8 +181,7 @@ float sample_spot_shadow(float atlas_slice, vec3 worldPos, vec3 nrm)
     for (int y = -1; y <= 1; y++)
     for (int x = -1; x <= 1; x++) {
         vec2 suv = uv + vec2(float(x), float(y)) * texel * 2.5;
-        vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
-                       vec4(suv, atlas_slice, receiver - bias));
+        vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp, vec4(suv, atlas_slice, receiver - bias));
     }
     return vis / 9.0;
 }
@@ -224,8 +233,7 @@ float sample_point_shadow(int point_slot, vec3 light_pos, vec3 worldPos, vec3 nr
     for (int y = -1; y <= 1; y++)
     for (int x = -1; x <= 1; x++) {
         vec2 suv = uv + vec2(float(x), float(y)) * texel;
-        vis2 += texture(sampler2DArrayShadow(cube_shadow_array, cube_shadow_array_smp),
-                        vec4(suv, slice, receiver - bias));
+        vis2 += SHADOW_CMP(cube_shadow_array, cube_shadow_array_smp, vec4(suv, slice, receiver - bias));
     }
     return vis2 / 9.0;
 }

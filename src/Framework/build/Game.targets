@@ -24,6 +24,9 @@
     </Compile>
   </ItemGroup>
 
+  <!-- Windows: the managed bindings (sokol.dll) and the native library of the same name side by side. -->
+  <Import Project="$(MSBuildThisFileDirectory)WindowsNativeSokol.targets" />
+
   <!-- Box2D, the 2D physics library. Its binding is inside the engine; the library is a file of its own.
        Desktop: copied beside the app. Web: linked into the page. (Android and iOS: the project's
        Directory.Build.props names the folders, where the app builder reads them.) -->

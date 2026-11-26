@@ -96,10 +96,14 @@ namespace SokolApplicationBuilder
                 // platform-gated P/Invoke — which is not a build error, just a method that compiles to
                 // nothing. It cost us the whole macOS share sheet: the app ran, captured its screenshot
                 // and called into a SharePlugin whose macOS branch had been compiled away.
+                // The ';' between symbols is MSBuild's %3B. On a Windows host the command runs from a .cmd file
+                // (Utils.RunShellCommand), where "%3" is the batch file's third argument: "%3B__WINDOWS__" came out
+                // as "B__WINDOWS__" and the symbol was lost. "%%3B" is the batch file's way to write "%3B".
+                string sep = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "%%3B" : "%3B";
                 string desktopConstants = "_DESKTOP_PUBLISHED_BINARY_";
                 string platformDefine = DesktopPlatformDefine(opts.RID);
-                if (platformDefine.Length > 0) desktopConstants += "%3B" + platformDefine;   // never an empty entry
-                if (opts.Type == "release-harness") desktopConstants += "%3BHARNESS";
+                if (platformDefine.Length > 0) desktopConstants += sep + platformDefine;   // never an empty entry
+                if (opts.Type == "release-harness") desktopConstants += sep + "HARNESS";
 
                 // Build project with dotnet publish
                 string dotnetCommand = $"dotnet publish -f {targetFramework} \"{absoluteProjectFile}\" -r {opts.RID} -c {buildType} " +
@@ -877,6 +881,16 @@ namespace SokolApplicationBuilder
                         {
                             string outputAssetsPath = Path.Combine(outputDir, "Assets");
                             CopyDirectory(assetsPath, outputAssetsPath);
+                        }
+
+                        // Windows: the published app has the project's assets beside the executable (copied in by Build,
+                        // not into an Assets folder), so the output folder gets them the same way - without them the app
+                        // started with no config.json and no scenes (a development build could not be attached either).
+                        string projectAssets = Path.Combine(opts.ProjectPath, "Assets");
+                        if (opts.RID.Contains("win") && Directory.Exists(projectAssets))
+                        {
+                            projectAssets.CopyDirectoryIfDifferent(outputDir, true);
+                            Utils.RemoveSourceOnlyAssets(outputDir);
                         }
 
                         Log.LogMessage(MessageImportance.High, $"✅ Desktop executable copied to: {outputExecutable}");

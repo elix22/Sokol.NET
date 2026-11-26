@@ -87,6 +87,9 @@ elseif(WIN32)
     set_source_files_properties(sokol_speech_winrt.cpp
         PROPERTIES COMPILE_FLAGS "/std:c++20 /EHsc /bigobj")
     target_link_libraries(${LIB_NAME} PRIVATE windowsapp shell32)
+    # MSVC exports nothing from a DLL unless told to (clang/gcc export by default): the DLL had no sokolspeech_*
+    # entry point, and every call from C# failed with EntryPointNotFoundException.
+    set_target_properties(${LIB_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
     if(CMAKE_GENERATOR_PLATFORM MATCHES "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
         set(WIN_ARCH_DIR "arm64")

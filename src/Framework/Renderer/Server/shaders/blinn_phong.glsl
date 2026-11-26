@@ -123,6 +123,16 @@ layout(binding=3) uniform sampler opacity_smp;
 layout(binding=4) uniform samplerShadow shadow_atlas_smp;
 layout(binding=5) uniform samplerShadow cube_shadow_array_smp;
 
+// A shadow map's depth compare. D3D11: at level 0 (SampleCmpLevelZero, no gradients). The default compare is SampleCmp,
+// which needs gradients, so fxc (d3dcompiler_47) must unroll the light loop around it, whose size is a uniform - it
+// failed ("unable to unroll loop"). The shadow maps have one mip, so both read the same; the other backends keep texture().
+#if SOKOL_HLSL
+#extension GL_EXT_texture_shadow_lod : require
+#define SHADOW_CMP(tex, smp, c) textureLod(sampler2DArrayShadow(tex, smp), (c), 0.0)
+#else
+#define SHADOW_CMP(tex, smp, c) texture(sampler2DArrayShadow(tex, smp), (c))
+#endif
+
 in vec3 fs_world_pos;
 in vec3 fs_world_normal;
 in vec3 fs_world_tangent;
@@ -167,7 +177,7 @@ float sample_dir_shadow(float atlas_slice, float bias)
         for (int y = -2; y <= 2; y++)
             for (int x = -2; x <= 2; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel * 1.5;
-                vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+                vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                                vec4(suv, atlas_slice, receiver_depth - bias));
             }
         return vis / 25.0;
@@ -176,12 +186,12 @@ float sample_dir_shadow(float atlas_slice, float bias)
         for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel;
-                vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+                vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                                vec4(suv, atlas_slice, receiver_depth - bias));
             }
         return vis / 9.0;
     } else {
-        return texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+        return SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                        vec4(uv, atlas_slice, receiver_depth - bias));
     }
 }
@@ -227,7 +237,7 @@ float sample_spot_shadow(float atlas_slice, float bias)
         for (int y = -2; y <= 2; y++)
             for (int x = -2; x <= 2; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel * 4.0;
-                vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+                vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                                vec4(suv, atlas_slice, receiver_depth - bias));
             }
         return vis / 25.0;
@@ -236,12 +246,12 @@ float sample_spot_shadow(float atlas_slice, float bias)
         for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel * 2.5;
-                vis += texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+                vis += SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                                vec4(suv, atlas_slice, receiver_depth - bias));
             }
         return vis / 9.0;
     } else {
-        return texture(sampler2DArrayShadow(shadow_atlas, shadow_atlas_smp),
+        return SHADOW_CMP(shadow_atlas, shadow_atlas_smp,
                        vec4(uv, atlas_slice, receiver_depth - bias));
     }
 }
@@ -295,7 +305,7 @@ float sample_point_shadow(int point_slot, vec3 light_pos, float bias, vec3 recei
         for (int y = -2; y <= 2; y++)
             for (int x = -2; x <= 2; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel * 1.5;
-                vis += texture(sampler2DArrayShadow(cube_shadow_array, cube_shadow_array_smp),
+                vis += SHADOW_CMP(cube_shadow_array, cube_shadow_array_smp,
                                vec4(suv, slice, receiver_depth - bias));
             }
         return vis / 25.0;
@@ -304,12 +314,12 @@ float sample_point_shadow(int point_slot, vec3 light_pos, float bias, vec3 recei
         for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++) {
                 vec2 suv = uv + vec2(float(x), float(y)) * texel;
-                vis += texture(sampler2DArrayShadow(cube_shadow_array, cube_shadow_array_smp),
+                vis += SHADOW_CMP(cube_shadow_array, cube_shadow_array_smp,
                                vec4(suv, slice, receiver_depth - bias));
             }
         return vis / 9.0;
     } else {
-        return texture(sampler2DArrayShadow(cube_shadow_array, cube_shadow_array_smp),
+        return SHADOW_CMP(cube_shadow_array, cube_shadow_array_smp,
                        vec4(uv, slice, receiver_depth - bias));
     }
 }

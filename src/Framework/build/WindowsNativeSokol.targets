@@ -1,0 +1,23 @@
+<Project>
+  <!--
+    Windows, a project that references the managed bindings as an assembly (src/sokol, through the Framework): that
+    assembly is sokol.dll, the native library's own name, and the project's CopyCustomContentWindows copied the native
+    one over it (the app then failed to start: "Could not load file or assembly 'sokol'"). The native library goes into
+    native\ instead, where Sokol.SokolNativeLibrary points DllImport("sokol"), and the managed one is put back.
+    Nothing changes elsewhere: other hosts, projects that compile the bindings in (no managed sokol.dll), and the
+    NativeAOT publish (the bindings are inside the executable; its own copy step puts the native library beside it).
+  -->
+  <Target Name="SokolNativeIntoSubfolderWindows" AfterTargets="CopyCustomContentWindows"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(TargetOS)' != 'browser'">
+    <ItemGroup>
+      <_SokolManagedAssembly Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)%(Extension)' == 'sokol.dll'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_SokolNativeLib>$(SokolLibsPath)windows/$(OSArch)/$(Configuration.ToLower())/sokol.dll</_SokolNativeLib>
+    </PropertyGroup>
+    <Copy Condition="'@(_SokolManagedAssembly)' != '' and Exists('$(_SokolNativeLib)')"
+          SourceFiles="$(_SokolNativeLib)" DestinationFolder="$(OutDir)native" SkipUnchangedFiles="true" />
+    <Copy Condition="'@(_SokolManagedAssembly)' != ''"
+          SourceFiles="@(_SokolManagedAssembly)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
