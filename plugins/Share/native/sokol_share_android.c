@@ -11,6 +11,7 @@
 #include <jni.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 /* Already declared in sokol_app.h; returns ANativeActivity* as const void*. */
 extern const void* sapp_android_get_native_activity(void);
@@ -209,4 +210,103 @@ void sokolshare_set_clipboard(const char* text)
     (*env)->DeleteLocalRef(env, svcName);
     (*env)->DeleteLocalRef(env, ctxClass);
     /* Do NOT DetachCurrentThread -- Sokol reuses this thread across frames. */
+}
+
+/* ── Any file ─────────────────────────────────────────────────────────────────
+   ACTION_SEND with the file's content:// URI (FileProvider, as the image share above) and the caller's MIME type.
+   The URI also goes in the intent's ClipData: from Android 10 the chooser reads the grant and its preview from there.
+   Every Java exception is cleared and reported as 0 (a path outside file_provider_paths.xml throws
+   IllegalArgumentException), so a refused share can never take the app down. A local frame frees every reference. */
+
+static int sokolshare_failed(JNIEnv* env)
+{
+    if (!(*env)->ExceptionCheck(env)) return 0;
+    (*env)->ExceptionClear(env);
+    return 1;
+}
+
+int sokolshare_file(const char* path, const char* mime, const char* title)
+{
+    if (!path || !path[0] || access(path, R_OK) != 0) return 0;
+    ANativeActivity* activity = (ANativeActivity*)sapp_android_get_native_activity();
+    if (!activity) return 0;
+
+    JavaVM* vm  = activity->vm;
+    JNIEnv* env = NULL;
+    (*vm)->AttachCurrentThread(vm, &env, NULL);
+    if (!env) return 0;
+    if ((*env)->PushLocalFrame(env, 48) != 0) { sokolshare_failed(env); return 0; }
+
+    int ok = 0;
+    jobject ctx = activity->clazz;
+    do {
+        /* authority = <package>.fileprovider (Providers.xml) */
+        jclass    ctxClass = (*env)->FindClass(env, "android/content/Context");
+        jmethodID getPkg   = (*env)->GetMethodID(env, ctxClass, "getPackageName", "()Ljava/lang/String;");
+        jstring   jpkg     = (jstring)(*env)->CallObjectMethod(env, ctx, getPkg);
+        if (sokolshare_failed(env) || !jpkg) break;
+        const char* pkgStr = (*env)->GetStringUTFChars(env, jpkg, NULL);
+        char authority[256];
+        snprintf(authority, sizeof(authority), "%s.fileprovider", pkgStr);
+        (*env)->ReleaseStringUTFChars(env, jpkg, pkgStr);
+
+        /* FileProvider through the app's ClassLoader (a native thread's FindClass cannot see androidx). */
+        jclass    actCls    = (*env)->GetObjectClass(env, ctx);
+        jmethodID getClsLdr = (*env)->GetMethodID(env, actCls, "getClassLoader", "()Ljava/lang/ClassLoader;");
+        jobject   loader    = (*env)->CallObjectMethod(env, ctx, getClsLdr);
+        jclass    clsLdrCls = (*env)->FindClass(env, "java/lang/ClassLoader");
+        jmethodID loadClass = (*env)->GetMethodID(env, clsLdrCls, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+        jclass    fpClass   = (jclass)(*env)->CallObjectMethod(env, loader, loadClass,
+                                  (*env)->NewStringUTF(env, "androidx.core.content.FileProvider"));
+        if (sokolshare_failed(env) || !fpClass) break;
+
+        jclass    fileClass = (*env)->FindClass(env, "java/io/File");
+        jmethodID fileInit  = (*env)->GetMethodID(env, fileClass, "<init>", "(Ljava/lang/String;)V");
+        jobject   fileObj   = (*env)->NewObject(env, fileClass, fileInit, (*env)->NewStringUTF(env, path));
+        jmethodID getUri    = (*env)->GetStaticMethodID(env, fpClass, "getUriForFile",
+            "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;");
+        jobject uri = (*env)->CallStaticObjectMethod(env, fpClass, getUri, ctx,
+                          (*env)->NewStringUTF(env, authority), fileObj);
+        if (sokolshare_failed(env) || !uri) break;
+
+        jclass    intentClass = (*env)->FindClass(env, "android/content/Intent");
+        jmethodID intentInit  = (*env)->GetMethodID(env, intentClass, "<init>", "(Ljava/lang/String;)V");
+        jobject   intent      = (*env)->NewObject(env, intentClass, intentInit,
+                                    (*env)->NewStringUTF(env, "android.intent.action.SEND"));
+        jmethodID setType     = (*env)->GetMethodID(env, intentClass, "setType",
+                                    "(Ljava/lang/String;)Landroid/content/Intent;");
+        jmethodID putExtra    = (*env)->GetMethodID(env, intentClass, "putExtra",
+                                    "(Ljava/lang/String;Landroid/os/Parcelable;)Landroid/content/Intent;");
+        jmethodID addFlags    = (*env)->GetMethodID(env, intentClass, "addFlags", "(I)Landroid/content/Intent;");
+        jmethodID setClip     = (*env)->GetMethodID(env, intentClass, "setClipData", "(Landroid/content/ClipData;)V");
+        (*env)->CallObjectMethod(env, intent, setType,
+            (*env)->NewStringUTF(env, mime && mime[0] ? mime : "application/octet-stream"));
+        (*env)->CallObjectMethod(env, intent, putExtra,
+            (*env)->NewStringUTF(env, "android.intent.extra.STREAM"), uri);
+        (*env)->CallObjectMethod(env, intent, addFlags, (jint)1 /* FLAG_GRANT_READ_URI_PERMISSION */);
+
+        jclass    clipCls = (*env)->FindClass(env, "android/content/ClipData");
+        jmethodID newRaw  = (*env)->GetStaticMethodID(env, clipCls, "newRawUri",
+                                "(Ljava/lang/CharSequence;Landroid/net/Uri;)Landroid/content/ClipData;");
+        jobject   clip    = (*env)->CallStaticObjectMethod(env, clipCls, newRaw, (*env)->NewStringUTF(env, ""), uri);
+        if (sokolshare_failed(env)) break;
+        if (clip) (*env)->CallVoidMethod(env, intent, setClip, clip);
+        if (sokolshare_failed(env)) break;
+
+        jmethodID chooser = (*env)->GetStaticMethodID(env, intentClass, "createChooser",
+            "(Landroid/content/Intent;Ljava/lang/CharSequence;)Landroid/content/Intent;");
+        jobject chooserIntent = (*env)->CallStaticObjectMethod(env, intentClass, chooser, intent,
+                                    title && title[0] ? (*env)->NewStringUTF(env, title) : NULL);
+        if (sokolshare_failed(env) || !chooserIntent) break;
+
+        jmethodID startAct = (*env)->GetMethodID(env, actCls, "startActivity", "(Landroid/content/Intent;)V");
+        (*env)->CallVoidMethod(env, ctx, startAct, chooserIntent);
+        if (sokolshare_failed(env)) break;
+        ok = 1;
+    } while (0);
+
+    sokolshare_failed(env);
+    (*env)->PopLocalFrame(env, NULL);
+    /* Do NOT DetachCurrentThread -- Sokol reuses this thread across frames. */
+    return ok;
 }

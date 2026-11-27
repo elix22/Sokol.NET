@@ -99,6 +99,32 @@ public static unsafe class SharePlugin
 #endif
     }
 
+    // Share one file the app has already written (an export, a document: PNG, JPEG, ZIP, JSON, ...) through the
+    // system share sheet, keeping its name. Android and iOS ONLY (false elsewhere): show a Share button only
+    // where CanShareFile is true.
+    // mime:  e.g. "image/png", "application/zip" - Android offers the apps that take that type; iOS reads the type
+    //        from the file's extension. null = "application/octet-stream".
+    // title: the Android chooser's title (null = the system's; Android 10+ does not show it for a send).
+    // Android: the file must be under the app's files folder (sfs_get_pref_path), which the plugin's FileProvider
+    // exposes. Returns false when the file is missing or cannot be shared.
+    public static bool ShareFile(string path, string? mime = null, string? title = null)
+    {
+#if __ANDROID__ || __IOS__
+        return SokolShare.ShareFile(path, mime, title) != 0;
+#else
+        _ = path; _ = mime; _ = title;
+        return false;
+#endif
+    }
+
+    /// <summary>True on the platforms ShareFile works on (Android, iOS).</summary>
+    public static bool CanShareFile =>
+#if __ANDROID__ || __IOS__
+        true;
+#else
+        false;
+#endif
+
     // ── Platform dispatch ─────────────────────────────────────────────────────
 
     static void ShareImageAndText(string imagePath, string text)

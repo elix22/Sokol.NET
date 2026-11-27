@@ -28,6 +28,18 @@ void sokolshare_image_text(const char* image_path, const char* text);
    callers should keep using sokol's own clipboard rather than this. */
 void sokolshare_set_clipboard(const char* text);
 
+/* Share one existing file of any type (PNG, JPEG, ZIP, JSON, ...) via the platform share sheet,
+   keeping its name. Android and iOS ONLY.
+   path:  absolute path of a readable file. Android: it must be under the app's files folder
+          (sfs_get_pref_path), the root file_provider_paths.xml exposes.
+   mime:  MIME type, e.g. "image/png", "application/zip"; NULL or "" = "application/octet-stream".
+          Android picks the target apps by it; iOS reads the type from the file's extension.
+   title: Android chooser title (NULL = the system's; Android 10+ does not show it for a send).
+          Ignored on iOS.
+   Returns 1 when the share sheet was asked to open, 0 when the file cannot be shared
+   (missing, outside the shared folder, no FileProvider in the app). */
+int sokolshare_file(const char* path, const char* mime, const char* title);
+
 #ifdef __cplusplus
 }
 #endif

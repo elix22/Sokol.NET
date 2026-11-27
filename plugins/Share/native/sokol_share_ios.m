@@ -52,3 +52,49 @@ void sokolshare_set_clipboard(const char* text)
         [UIPasteboard generalPasteboard].string = nsText;
     });
 }
+
+/* Any file: the file's URL as the one item, so receivers get the file itself with its name and type (Save to Files,
+   AirDrop, Mail, Messages, ...). Presented from the top-most controller: the app may still be presenting something
+   (a document picker that just closed). iPad needs a popover anchor, as above. */
+static UIViewController* sokolshare_top_controller(void)
+{
+    UIWindow* win = nil;
+    UIWindow* first = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        for (UIWindow* w in ((UIWindowScene*)scene).windows) {
+            if (!first) first = w;
+            if (w.isKeyWindow) { win = w; break; }
+        }
+        if (win) break;
+    }
+    if (!win) win = first;
+    UIViewController* vc = win.rootViewController;
+    while (vc.presentedViewController) vc = vc.presentedViewController;
+    return vc;
+}
+
+int sokolshare_file(const char* path, const char* mime, const char* title)
+{
+    (void)mime; (void)title;
+    if (!path || !path[0]) return 0;
+    NSString* nsPath = [NSString stringWithUTF8String:path];
+    if (!nsPath || ![[NSFileManager defaultManager] isReadableFileAtPath:nsPath]) return 0;
+    NSURL* url = [NSURL fileURLWithPath:nsPath];
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController* top = sokolshare_top_controller();
+        if (!top) return;
+        UIActivityViewController* vc =
+            [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad)
+        {
+            vc.popoverPresentationController.sourceView = top.view;
+            vc.popoverPresentationController.sourceRect =
+                CGRectMake(top.view.bounds.size.width / 2.0, top.view.bounds.size.height / 2.0, 1.0, 1.0);
+            vc.popoverPresentationController.permittedArrowDirections = 0;
+        }
+        [top presentViewController:vc animated:YES completion:nil];
+    });
+    return 1;
+}

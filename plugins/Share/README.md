@@ -2,6 +2,8 @@
 
 Cross-platform share feature: lets players share their score along with a generated PNG
 score card via the platform's native share sheet (WhatsApp, Telegram, Mail, etc.).
+On Android and iOS it also shares any file the app has written (`SharePlugin.ShareFile`), and
+puts text on the clipboard (`SharePlugin.SetClipboard`).
 
 ## Platforms
 
@@ -115,6 +117,28 @@ SOKOL_APP_API_IMPL ANativeActivity* sapp_android_get_native_activity(void) {
 // Call when the player taps the Share button at game over:
 SharePlugin.ShareScore(score, "My Game");
 ```
+
+### Share a file (Android and iOS only)
+
+```csharp
+// Any file the app has written: an exported image, a ZIP, a JSON document ... The share sheet gets the
+// file itself, with its name (Mail, chat apps, Drive, AirDrop, Save to Files, Print, ...).
+if (SharePlugin.CanShareFile)                       // true on Android and iOS only
+    SharePlugin.ShareFile(path, "image/png");       // false: missing file / cannot be shared
+```
+
+- `mime`: Android offers the apps that accept that type (`null` = `application/octet-stream`); iOS reads
+  the type from the file's extension.
+- Android: the file must be under the app's files folder (`sfs_get_pref_path`), which
+  `platform/android/res/xml/file_provider_paths.xml` exposes through the plugin's FileProvider.
+- Never throws: a Java exception (for example a path outside the shared folder) is cleared and reported
+  as `false`.
+
+## Android: 16 KB page alignment (mandatory)
+
+`scripts/build-android.sh` passes `-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON` and the CI workflow
+(`.github/workflows/build-share-plugin.yml`) fails unless the 64-bit libraries are 16 KB aligned
+(Google Play, Android 15+ devices). The libraries in `libs/` are built by that workflow, never locally.
 
 ## File I/O
 

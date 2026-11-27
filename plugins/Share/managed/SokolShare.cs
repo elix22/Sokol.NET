@@ -29,6 +29,15 @@ internal static class SokolShare
                CallingConvention = CallingConvention.Cdecl)]
     internal static extern void SetClipboard(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string text);
+
+    // Share one existing file of any type, keeping its name. Android/iOS ONLY (the macOS dylib has no such
+    // symbol). Returns 1 when the share sheet was asked to open, 0 when the file cannot be shared.
+    [DllImport(Lib, EntryPoint = "sokolshare_file",
+               CallingConvention = CallingConvention.Cdecl)]
+    internal static extern int ShareFile(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string  path,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? mime,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? title);
 #endif
 }
 #endif

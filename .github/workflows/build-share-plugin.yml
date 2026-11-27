@@ -1,0 +1,173 @@
+name: Build Share Plugin
+
+# Builds plugins/Share (sokol_share) for every native backend on every change to the plugin, and commits
+# the prebuilt outputs back to plugins/Share/libs/ on main — every shipped library is a CI build, never a
+# local one. Windows and Linux have no native library (managed MAPI / xdg-email); the managed layer is compiled for
+# every platform symbol set instead. Android libraries MUST be 16 KB page aligned (checked below). A change is not done
+# until every job is green.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/Share/**'
+      - '!plugins/Share/libs/**'
+      - '.github/workflows/build-share-plugin.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'plugins/Share/**'
+      - '!plugins/Share/libs/**'
+      - '.github/workflows/build-share-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS (arm64 + X64)
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    - name: Build
+      run: ./plugins/Share/scripts/build-macos.sh
+    - uses: actions/upload-artifact@v4
+      with:
+        name: share-macos
+        path: plugins/Share/libs/macos/**/*
+        retention-days: 30
+
+  build-ios:
+    name: Build iOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [device, simulator-arm64, simulator-x64]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup CMake
+      uses: lukka/get-cmake@latest
+    - name: Build
+      run: ./plugins/Share/scripts/build-ios.sh ${{ matrix.target }}
+    - name: Determine upload path
+      id: upload_path
+      run: |
+        case "${{ matrix.target }}" in
+          device)          echo "path=plugins/Share/libs/ios/arm64" >> $GITHUB_OUTPUT ;;
+          simulator-arm64) echo "path=plugins/Share/libs/ios/simulator-arm64" >> $GITHUB_OUTPUT ;;
+          simulator-x64)   echo "path=plugins/Share/libs/ios/simulator-x64" >> $GITHUB_OUTPUT ;;
+        esac
+    - uses: actions/upload-artifact@v4
+      with:
+        name: share-ios-${{ matrix.target }}
+        path: ${{ steps.upload_path.outputs.path }}/**/*
+        retention-days: 30
+
+  build-android:
+    name: Build Android (arm64-v8a, armeabi-v7a, x86_64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: ''
+    - name: Install Android NDK
+      run: |
+        sdkmanager --install "ndk;27.2.12479018"
+        echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
+    - name: Build
+      run: ./plugins/Share/scripts/build-android.sh
+    - name: Check 16 KB page alignment (Google Play, Android 15+ — 64-bit ABIs only, as the NDK flag)
+      run: |
+        READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        for so in plugins/Share/libs/android/{arm64-v8a,x86_64}/release/libsokol_share.so; do
+          align=$("$READELF" -l "$so" | awk '/LOAD/ {print $NF; exit}')
+          echo "$so: LOAD align $align"
+          [ "$align" = "0x4000" ] || { echo "::error::$so is not 16 KB aligned ($align)"; exit 1; }
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: share-android
+        path: plugins/Share/libs/android/**/*
+        retention-days: 30
+
+  build-managed:
+    name: Managed layer (Windows + Linux backends, every platform symbol set)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Compile the managed layer for every platform symbol set
+      run: |
+        set -e
+        mkdir -p /tmp/share-managed && cd /tmp/share-managed
+        cat > share.csproj <<'PROJ'
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net10.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <ImplicitUsings>enable</ImplicitUsings>
+            <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+            <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+            <DefineConstants>$(DefineConstants);$(ShSymbols)</DefineConstants>
+          </PropertyGroup>
+          <ItemGroup>
+            <Compile Include="$(GITHUB_WORKSPACE)/plugins/Share/managed/*.cs" />
+            <!-- the plugin's file I/O goes through the Sokol filesystem binding, as in every consuming app -->
+            <Compile Include="$(GITHUB_WORKSPACE)/src/sokol/generated/SFilesystem.cs" />
+          </ItemGroup>
+        </Project>
+        PROJ
+        for SYMS in "" "__LINUX__" "__WINDOWS__" "__MACOS__" "__ANDROID__" "__IOS__" "WEB"; do
+          echo "=== DefineConstants: '${SYMS:-<none>}'"
+          dotnet build -c Release -p:ShSymbols="$SYMS" --nologo -v q
+        done
+
+  commit-libs:
+    name: Commit the Android, iOS and macOS libraries
+    needs: [build-macos, build-ios, build-android, build-managed]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Download the artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Commit the libraries
+      run: |
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git repo
+        cd repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p plugins/Share/libs/android plugins/Share/libs/macos \
+                 plugins/Share/libs/ios/arm64 plugins/Share/libs/ios/simulator-arm64 plugins/Share/libs/ios/simulator-x64
+        cp -r ../artifacts/share-android/*              plugins/Share/libs/android/
+        cp -r ../artifacts/share-macos/*                plugins/Share/libs/macos/
+        cp -r ../artifacts/share-ios-device/*           plugins/Share/libs/ios/arm64/
+        cp -r ../artifacts/share-ios-simulator-arm64/*  plugins/Share/libs/ios/simulator-arm64/
+        cp -r ../artifacts/share-ios-simulator-x64/*    plugins/Share/libs/ios/simulator-x64/
+        LIBS="plugins/Share/libs"
+        if [ -z "$(git status --porcelain $LIBS)" ]; then
+          echo "No sokol_share library change to commit"
+          exit 0
+        fi
+        git add $LIBS
+        git commit -m "Auto-update built sokol_share libraries (Android, iOS, macOS) [skip ci]" \
+                   -m "Generated from commit: ${{ github.sha }}" \
+                   -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        git pull --rebase origin main
+        git push origin main
+        echo "✓ Committed sokol_share libraries"
